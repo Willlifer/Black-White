@@ -57,7 +57,7 @@ front,Front,front attack|facing the blow|head-on,facing,Striking straight into t
 backstab,Backstab,backstabs|backstabbing,rule,Daggerleap landing behind a foe (its back three sides) deals +50% to it; Assassinate backstabs too.,rear
 affinity_rank,Affinity Rank,affinity|affinities|affinity ranks,progression,Every 10 affinity points is a rank: +5% damage and +5% resistance in that element. Rank 1 in an element lets you use it.,perk
 expertise,Expertise,expertise rank|weapon expertise,progression,"Weapon skill, ranked E, D, C, B, A every 10 points. Each letter adds +5 hit with that weapon and owes one skill pick.",improve
-xp,XP,experience,progression,"Each attack earns 10 XP, +1 affinity and +1 expertise; a knockout earns 30 XP and +3 of each. 100 XP is a level.",affinity_rank
+xp,Level up,experience|XP,progression,"Every unit in the squad, benched too, gains a level after every fight, won or lost. There is no XP. Attacks still give +1 affinity and +1 expertise, a knockout +3 of each.",affinity_rank
 attuned_element,Attuned Element,attuned|attunement,progression,"The element a unit last used this battle, its own element at the start. Basic attacks carry it for damage, resist and growth.",affinity_rank
 perk,Perk,perks,progression,A passive element bonus. Affinity ranks 1 and 2 each give one pick of the element's five perks; rank 3 grants all five.,affinity_rank
 improve,Improve,improved|improve rider,progression,An expertise pick that gives a known skill its upgrade rider. Only skills with a listed rider can be improved.,expertise
@@ -75,3 +75,16 @@ follow_up,Follow-Up,follow-ups|follow up,rule,"A second action some skills grant
 riposte,Riposte,ripostes|riposted,rule,"Sword skill, free to set. The first blow to land on you is halved and answered at 10 power on your ring; a landed answer refunds 1 cooldown.",counter
 counter,Counter,counters|countered|counterattack|counter attack,rule,"A basic strike back at an attacker, from an enchantment like Riposting (50%, once per enemy turn) or overwatch. Counters are never countered.",riposte
 seeded_tile,Seeded Tile,seeded|seeded tiles,tile,"A map tile that starts charged and holds without decay until play changes it; after any change it is ordinary charge and never returns.",static_tile
+cursed,Cursed,curse|curses|cursed row,rule,"An enchantment with a cost, marked † on its tile, name and card. The card spells out the cost (an HP price per action, no healing, -2 move ...). Cursed rows drop as often as any other.",
+advantage,Advantage,,roll,"Roll the resist twice and keep the better (Second Opinion for the attacker, Stubborn for the defender). Then 3 of the holder's turns to recharge.",resist
+imbuement_scroll,Imbuement Scroll,scroll|scrolls|imbuement scrolls,rule,"Featured in the shop, one per element, new after every battle. Costs 2 loose items. On armour it replaces the enchantment; on a weapon it sets the imbue to its element and enchantment.",imbue
+imbue,Imbue,imbues,rule,"A weapon's elemental part: an element plus one enchantment of that element, active while the weapon is drawn. C weapons and up roll one; a scroll sets one. Basic attacks carry the element and paint it on the target's hex, hit or miss.",imbuement_scroll
+on_kill,On-Kill,on kill|on-kill effects,rule,"An enchantment that fires when you score a KO (Relentless, Death Knell, Feast ...). A KO caused by an on-kill effect never sets off another.",
+sheltered,Sheltered,shelter|parry,status,"The next hit on this unit deals less (Sheltering, Parry Shield), then it's gone.",guard
+waterwalking,Waterwalking,,progression,Water perk: the first water hex you cross each turn costs no move.,water
+physical,Physical damage,physical,rule,"Weapon basic attacks (even with an imbued weapon), weapon skills cast without an element, and slams. Elemental Beings are immune to it.",elemental
+elemental,Elemental damage,elemental,rule,"Any skill cast with an element, staff spells, tile damage, detonations and chain arcs. Blanks are immune to it.",physical
+horde,Horde,grunt|grunts,rule,"A special encounter (a Hard room): ten elementless melee grunts, each with a fraction of a normal enemy's HP.",colossus
+colossus,Colossus,the colossus,rule,"A special encounter (a Hard room): one elementless spear fighter on 7 hexes with a huge HP pool. It can't be displaced; its thrust runs 3 hexes in a line.",horde
+blank,Blank,blanks,rule,"A special encounter (a Hard room) of three: immune to elemental damage and every element effect, and takes double damage from melee strikes.",physical
+elemental_being,Elemental Being,elemental beings|being|beings,rule,"A special encounter (a Hard room) of three, each glowing in its own element: immune to physical damage. Use element skills and the ground.",elemental

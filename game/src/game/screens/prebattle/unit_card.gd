@@ -58,7 +58,7 @@ func show_unit(u: BWUnit) -> void:
 	lines.append("[font_size=%d][color=#%s]%s (%s)   [/color][color=#%s]◆[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SMALL, lab, wname, u.expertise_letter(u.weapon_class), BWGearText.hex(BWLook.element_color(u.element)), el,
 		u.element.capitalize()])
-	lines.append_array(BWCombatUI.badge_lines(u, BWStyle.F_SMALL))      # D129/D130: Disobedient, immunity, next battle
+	lines.append_array(BWCombatUI.badge_lines(u, BWStyle.F_SMALL))      # D130: immunity, next battle
 	lines.append("[font_size=%d]HP %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.max_hp(), u.move_range(), u.speed()])
 	var st: PackedStringArray = []
 	for s in BWUnit.STATS:
@@ -74,9 +74,11 @@ func show_unit(u: BWUnit) -> void:
 	if not aff.is_empty():
 		lines.append("[font_size=%d][color=#%s]Affinity[/color]  %s[/font_size]" % [BWStyle.F_SMALL, faint, "  ".join(aff)])
 	lines.append("[font_size=%d][color=#%s]GEAR[/color][/font_size]" % [BWStyle.F_MENU_TITLE - 2, faint])
-	for slot in BWRun.SLOTS:
+	for slot in BWRun.GEAR_SLOTS:
 		var it: Dictionary = u.equipment.get(slot, {})
 		var sl := str(BWGearText.SLOT_NAMES[slot])
+		if it.is_empty() and slot == BWUnit.SECOND:
+			continue                                     # D180: only a carried weapon is listed
 		if it.is_empty():
 			lines.append("[font_size=%d][color=#%s]%s   —[/color][/font_size]" % [BWStyle.F_SMALL, faint, sl])
 			continue

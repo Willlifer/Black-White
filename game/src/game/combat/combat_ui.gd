@@ -258,14 +258,11 @@ DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 	_set_rich(c.text, "\n".join(lines))          # D153: no personality line          # D102: glyph slots become images
 
 
-## D129/D130: what Wander left on a unit, for every card that shows one:
-## the Disobedient badge (a rogue), immunities, the next battle's buff.
+## D130: what Wander left on a unit, for every card that shows one:
+## immunities, the next battle's buff (D177 removed the Disobedient badge).
 static func badge_lines(u: BWUnit, fs: int) -> PackedStringArray:
 	var out: PackedStringArray = []
 	var dim := BWStyle.TEXT_DIM.to_html(false)
-	if u.rogue:
-		out.append("[font_size=%d][bgcolor=#ffffff][color=#000000][b] %s [/b][/color][/bgcolor]  [color=#%s]plays itself (AI)[/color][/font_size]" % [
-			fs, BWUnit.ROGUE_BADGE.to_upper(), dim])
 	var imm: PackedStringArray = []
 	for st in u.immune_statuses:
 		imm.append(str(BWSkills.STATUS.get(st, [st])[0]))
@@ -346,6 +343,18 @@ func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
 				continue
 			shown += 1
 			_order.add_child(_order_icon(u, false, true))
+	# D211: a crowd (the Horde's ten) doesn't fit; say how many more act this round
+	var left := queue.filter(func(u): return u.alive()).size() - mini(queue.filter(func(u): return u.alive()).size(), 8)
+	if left > 0:
+		var more := Label.new()
+		more.text = "+%d" % left
+		more.tooltip_text = "%d more act this round" % left
+		more.mouse_filter = Control.MOUSE_FILTER_PASS
+		more.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		more.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_order.add_child(more)
+		_order.move_child(more, mini(8, _order.get_child_count() - 1))
 
 
 func _order_icon(u: BWUnit, current: bool, next_round: bool) -> Control:
@@ -395,8 +404,10 @@ func _place_menu() -> void:
 ## V8's action menu: ATTACK — weapon, then the basic attack, then each skill;
 ## a skill that needs an element is an accordion group whose rows are the
 ## elements; then Wait. During a follow-up only what's allowed is listed.
-func set_skills(u: BWUnit, rows: Array, mode_key: String) -> void:
-	_last_menu = { "u": u, "rows": rows, "mode": mode_key }
+func set_skills(u: BWUnit, rows: Array, mode_key: String, can_swap: Variant = null) -> void:
+	if can_swap == null:
+		can_swap = _last_menu.get("swap", false) if _last_menu.get("u") == u else false
+	_last_menu = { "u": u, "rows": rows, "mode": mode_key, "swap": can_swap }
 	for c in _menu_list.get_children():
 		_menu_list.remove_child(c)      # out of the layout now, not at frame end
 		c.queue_free()
@@ -404,6 +415,12 @@ func set_skills(u: BWUnit, rows: Array, mode_key: String) -> void:
 	_menu_list.add_child(BWStyle.section_label("Follow-up" if not fu.is_empty() else "Attack — " + BWText.weapon(u.weapon_class)))
 	if not u.acted or "basic" in fu:
 		_menu_item("Attack", "Basic %s strike" % u.weapon_class, mode_key == "", func(): action_pressed.emit("attack"))
+	if can_swap:                                     # D181/D195: free, any number of times, right under Attack
+		var other: Dictionary = u.second_weapon()
+		var b := _menu_item("Swap weapon  ·  %s" % BWText.weapon(str(other.get("weight", ""))),
+			"Swap weapon (free)\nDraw %s and sheathe the one in hand: the attack, range and skills change with it. Doesn't use the action or the move." % BWRun.item_name(other),
+			false, func(): action_pressed.emit("swap"))
+		b.name = "swap_weapon"
 	for row in rows:
 		var els: Array = row.elements
 		if row.get("upgraded", false):

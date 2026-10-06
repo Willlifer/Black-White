@@ -94,12 +94,17 @@ func test_parse_collect_and_conversions(t) -> void:
 	var pct := func(id): return BWEffects.make(BWData.row("enchantments", id), "enchant").params
 	t.eq(pct.call("explosive").dmg_pct_per_point, 4, "Explosive 3 flat -> 4% per point")
 	t.eq(pct.call("collapsing").dmg_pct_per_point, 3, "Collapsing 2 flat -> 3% per point")
-	t.eq(pct.call("geyser").dmg_pct_per_point, 1, "Geyser 1 flat -> 1% per point")
+	t.eq(pct.call("geyser").dmg_pct_per_point, 2, "D196: Geyser sets 2% per point directly")
 	t.eq(pct.call("flaring").heal_pct_per_point, 3, "Flaring heal 2 flat -> 3% per point")
 	var keys := {}
 	for r in BWData.table("enchantments") + BWData.table("abilities"):
 		keys[str(r.effect_key)] = true
-	t.eq(keys.size(), 25, "the data uses exactly the 25 keys")
+	for k in BWEffects.GEAR_KEYS:
+		t.ok(keys.has(k), "the 25 gear keys are all used (%s)" % k)
+	for k in keys:
+		t.ok(k in BWEffects.KEYS, "every key in the data is known (%s)" % k)
+	for k in ["on_event", "pity", "swap"]:
+		t.ok(keys.has(k), "D196: v2 key %s is data" % k)
 
 
 func test_rank_scaling(t) -> void:
@@ -174,7 +179,7 @@ func test_tile_erupt_geyser_and_flaring(t) -> void:
 	b.paint([E], "water", me)
 	var h := foe.hp
 	b.end_turn()
-	t.eq(h - foe.hp, BWTiles.tile_damage(foe, 1.0, "water"), "Geyser: 1% × water 1")
+	t.eq(h - foe.hp, BWTiles.tile_damage(foe, 2.0, "water"), "Geyser (D196): 2% × water 1")
 	t.eq(foe.pos, _nb(E, 0), "the occupant is pushed 1 hex away from the owner")
 	t.ok(b.tiles.intensity(E, "water") >= 1, "consume=0: the water stays")
 	# Flaring: heals the owner's side 3% per light point, then the tile goes neutral.
@@ -279,7 +284,7 @@ func test_stand_on_bonus(t) -> void:
 	var b := _fight([me], [_far()], [C], [FAR])
 	t.eq(me.stat("str"), 4, "off the fire")
 	b.tiles.apply([C], "fire", "anyone", 2)
-	t.eq(me.stat("str"), 6, "Blazing: +1 str per fire point under you (anyone's)")
+	t.eq(me.stat("str"), 6, "Blazing: +1 str per fire point under you (anyone's; the D196 floor at STR 4)")
 	var rimed := _ench(_u("r", "sword", "ice"), "rimed")
 	var b2 := _fight([rimed], [_far()], [C], [FAR])
 	b2.tiles.apply([C], "fire", "x")
@@ -345,7 +350,7 @@ func test_damage_taken_mod(t) -> void:
 	var bare := _u("q", "axe", "water")
 	var b := _fight([att], [proof, bare], [C], [_nb(C, 0), _nb(C, 3)])
 	var fc := b.forecast_basic(att, proof)
-	t.eq(fc.damage.value, maxf(1.0, roundf(b.forecast_basic(att, bare).damage.value * 0.85)), "Fireproof: fire −15%")
+	t.eq(fc.damage.value, maxf(1.0, roundf(b.forecast_basic(att, bare).damage.value * 0.80)), "Fireproof (D196): fire −20%")
 	t.ok(fc.damage.formula.contains("Fireproof"), "in the breakdown")
 	t.eq(b._tile_dmg(proof, 8.0, "fire"), BWTiles.tile_damage(proof, 8.0, "fire", 0.5), "Fireproof: burning tiles at half")
 	var visor := _ab(_u("v", "axe", "water"), "visor")
@@ -645,10 +650,10 @@ func test_trigger_stat(t) -> void:
 	# low_hp, once: Second Wind.
 	var sw := _ab(_u("sw", "sword", "fire"), "second_wind")
 	var b2 := _fight([sw], [_far()], [C], [FAR])
-	b2._tile_hurt(sw, 60, "test", "")
+	b2._tile_hurt(sw, 70, "test", "")                # D178: 123 HP, so 70 takes it below half
 	t.eq(int(sw.battle_mods.get("spd", 0)), 2, "Second Wind: below half, +2 spd")
 	sw.hp = sw.max_hp()
-	b2._tile_hurt(sw, 60, "test", "")
+	b2._tile_hurt(sw, 70, "test", "")
 	t.eq(int(sw.battle_mods.get("spd", 0)), 2, "only the first time")
 	# knockout: Encore. ally_ko: Heavy Is the Head. avoided: Poise.
 	var enc := _ab(_u("en", "sword", "fire"), "encore")

@@ -256,9 +256,14 @@ func author(hex: Vector2i, h: int, v: int, marker: String = "") -> void:
 func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: Dictionary = {}) -> Dictionary:
 	var out := { "detonations": [], "changed": [], "marker_fired": [], "gales": [] }
 	var plans := {}
+	# D199: `propagated` = the charge arrives as spread (on-kill paint, ENCHANTMENTS
+	# §5.3): it never fires a marker and skips glazed hexes.
+	var fresh: bool = not opts.get("propagated", false)
 	for hex in hexes:
 		if can_hold(hex) and not plans.has(hex):
-			plans[hex] = _route(at(hex), element, true, steps, caster, opts)
+			if not fresh and is_glazed(hex):
+				continue
+			plans[hex] = _route(at(hex), element, fresh, steps, caster, opts)
 	var ring: Dictionary = opts.get("ring", {})
 	for hex in ring:
 		if can_hold(hex) and not plans.has(hex):
@@ -277,7 +282,8 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 		if p.has("detonate"):
 			if statics.has(hex):
 				scars[hex] = STATIC_SCAR_TICKS          # D115: a blown static stays spent a cycle
-			out.detonations.append({ "hex": hex, "pct": p.detonate, "source": p.get("det_source", caster) })
+			out.detonations.append({ "hex": hex, "pct": p.detonate, "source": p.get("det_source", caster),
+				"points": int(p.get("det_points", 0)) })   # v2 Overload reads the points blown
 		if p.has("gale"):
 			gales.append([hex, p.gale, int(p.get("gale_level", 1))])
 		if p.get("fired", false):
@@ -523,7 +529,7 @@ func _operate(e: Dictionary, mk: String, src: String, glaze_plus: int = 0) -> Di
 			var pct := float(DETONATE_BASE_PCT + DETONATE_PER_POINT_PCT * (absi(e.h) + absi(e.v))) + wet
 			if int(e.get("glaze", 0)) > 0:
 				pct *= SHATTER_MULT * pot(Vector2i.ZERO, "ice", str(e.get("glaze_source", "")))
-			return { "op": "erase", "detonate": pct, "det_source": src }
+			return { "op": "erase", "detonate": pct, "det_source": src, "det_points": absi(e.h) + absi(e.v) }
 		"stasis":
 			e.glaze = GLAZE_CYCLES + glaze_plus
 			e["glaze_source"] = src

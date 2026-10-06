@@ -42,7 +42,7 @@ func test_roster_builds_units(t) -> void:
 		return
 	for row in BWData.table("roster"):
 		var u := BWUnit.from_roster(row)
-		t.ok(u.max_hp() >= 112 and u.max_hp() <= 122, "%s hp %d" % [u.id, u.max_hp()])
+		t.ok(u.max_hp() >= 117 and u.max_hp() <= 127, "%s hp %d" % [u.id, u.max_hp()])
 		t.ok(u.move_range() >= 4, "%s can move" % u.id)
 
 
@@ -133,7 +133,7 @@ func test_fists_rows(t) -> void:
 		for e in BWData.table("enchantments"):
 			if str(it.id) in BWData.list(e.applies_to):
 				n += 1
-				t.ok(str(e.effect_key) in keys, "%s: %s reuses the effect_key vocabulary (%s)" % [it.id, e.id, e.effect_key])
+				t.ok(str(e.effect_key) in keys or str(e.effect_key) in BWEffects.KEYS, "%s: %s reuses the effect_key vocabulary (%s)" % [it.id, e.id, e.effect_key])
 				t.eq(str(e.element), "", "%s: %s is a weapon row (no element)" % [it.id, e.id])
 		t.ok(n >= 3, "%s rolls %d enchantments (3+)" % [it.id, n])
 	# the skill riders name a real fists skill and stay off the basic attack

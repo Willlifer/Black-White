@@ -174,7 +174,8 @@ func test_run_keeps_the_roll(t) -> void:
 func test_old_save_refused(t) -> void:
 	var run := BWRun.start(["aureli", "della", "jericho"], 5)
 	var d := run.to_dict()
-	t.eq(int(d.version), 5, "save version 5 (D150)")
+	t.eq(int(d.version), BWRun.SAVE_VERSION, "saves the current version (5+ since D150; 7 since D189)")
+	t.ok(int(d.version) >= 5, "save version 5 or later (D150)")
 	var old: Dictionary = d.duplicate(true)
 	old.version = 4
 	old.erase("roster")

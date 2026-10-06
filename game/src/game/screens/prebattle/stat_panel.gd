@@ -1,7 +1,7 @@
 class_name BWStatPanel
 extends VBoxContainer
 ## The unit sheet, top right of the pre-battle screen:
-##   header       head icon, name, level, element, weapon, XP to next level
+##   header       head icon, name, level, element, weapon (D179: no XP bar)
 ##   attributes   one row per stat: glyph, full name, a bar on a shared scale
 ##                (base in white, equipment as a hatched extension), the BASE
 ##                value large and the equipment modifier as "(+x)"
@@ -58,12 +58,7 @@ func refresh() -> void:
 	sub.add_child(_label(u.element.capitalize(), BWStyle.F_SMALL, BWGearText.readable(BWLook.element_color(u.element))))
 	sub.add_child(_label("·", BWStyle.F_SMALL, BWStyle.FAINT))
 	sub.add_child(_label(str(BWData.row("weapons", u.weapon_class).get("name", u.weapon_class)), BWStyle.F_SMALL, BWStyle.LABEL))
-	var xp := _Meter.new(float(u.xp) / float(BWProgression.XP_PER_LEVEL), Color(1, 1, 1, 0.85))
-	xp.custom_minimum_size = Vector2(0, 6)
-	xp.tooltip_text = "%d / %d XP to level %d" % [u.xp, BWProgression.XP_PER_LEVEL, u.level + 1]
-	xp.mouse_filter = Control.MOUSE_FILTER_PASS
-	hv.add_child(xp)
-	hv.add_child(_label("%d / %d XP" % [u.xp, BWProgression.XP_PER_LEVEL], BWStyle.F_SMALL - 3, BWStyle.FAINT))
+	hv.add_child(_label("+1 level for every fight", BWStyle.F_SMALL - 3, BWStyle.FAINT))   # D179: no XP
 	# ---- attributes
 	add_child(_section("Attributes", "base  (+equipment)"))
 	for s in BWUnit.STATS:
@@ -315,8 +310,8 @@ class _ExTile:
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		var pts := int(u.expertise.get(wc, 0))
-		tooltip_text = "%s expertise %s  (%d points)\nEquips %s-tier weapons and better below it" % [
-			BWText.weapon(wc), u.expertise_letter(wc), pts, u.expertise_letter(wc)]
+		tooltip_text = "%s expertise %s  (%d points)\n+5 hit and a skill pick per letter. Anyone can wield any weapon." % [
+			BWText.weapon(wc), u.expertise_letter(wc), pts]
 	func _ready() -> void:
 		_font = get_theme_default_font()
 	func _draw() -> void:

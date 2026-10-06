@@ -1,14 +1,22 @@
 class_name BWProgression
-## XP, levels, affinity and expertise growth (brief + D14, D15, D27).
+## Levels, affinity and expertise growth (brief + D14, D15, D27; D179).
+##
+## D179 (author: "standardize levels. All units gain a level upon clearing a
+## map. Exp no longer matters."): there is no XP. Every squad unit, deployed
+## or benched, gains one level after every fight, won or lost (BWRun.after_fight;
+## D194 LEVEL_ON_LOSS; false would level on wins only). Attacks and knockouts still grow
+## affinity and expertise.
 
-const XP_PER_LEVEL := 100
-const ATTACK := { "xp": 10, "affinity": 1, "expertise": 1 }
-const KNOCKOUT := { "xp": 30, "affinity": 3, "expertise": 3 }
+const ATTACK := { "affinity": 1, "expertise": 1 }
+const KNOCKOUT := { "affinity": 3, "expertise": 3 }
 const ARMOR_BIAS := { "heavy": "def", "ranger": "spd", "wizard": "res" }
+## D179: false = only a won fight levels the squad; true = every fight does.
+## D194 (author): true, a lost fight levels the squad too.
+const LEVEL_ON_LOSS := true
 
 
-## Award one attack or knockout. Returns a list of event dicts for the UI
-## ({type: "xp"|"level"|"affinity_rank"|"expertise_rank", ...}).
+## Award one attack or knockout: affinity and expertise. Returns a list of
+## event dicts for the UI ({type: "affinity_rank"|"expertise_rank", ...}).
 static func award(u: BWUnit, ko: bool, element: String) -> Array:
 	var g: Dictionary = KNOCKOUT if ko else ATTACK
 	var events: Array = []
@@ -22,15 +30,14 @@ static func award(u: BWUnit, ko: bool, element: String) -> Array:
 	u.expertise[wc] = int(u.expertise.get(wc, 0)) + g.expertise
 	if u.expertise_rank(wc) > before_e:
 		events.append({ "type": "expertise_rank", "weapon": wc, "rank": u.expertise_letter(wc) })
-	events.append_array(add_xp(u, g.xp))
 	return events
 
 
-static func add_xp(u: BWUnit, amount: int) -> Array:
-	var events: Array = [{ "type": "xp", "amount": amount }]
-	u.xp += amount
-	while u.xp >= XP_PER_LEVEL:
-		u.xp -= XP_PER_LEVEL
+## D179: `n` levels, each with its stat gains (level_gains). Returns one
+## { type: "level", level, gains } event per level.
+static func level_up(u: BWUnit, n: int = 1) -> Array:
+	var events: Array = []
+	for i in maxi(n, 0):
 		u.level += 1
 		var gains := level_gains(u)
 		for s in gains:

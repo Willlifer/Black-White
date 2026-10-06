@@ -782,7 +782,7 @@ func _numbers(results: Array, targets: Array, only: int) -> void:
 		var r: Dictionary = results[k]
 		var res: Dictionary = r.result
 		var t: BWUnitView = targets[k]
-		var label := "MISS" if not res.hit else str(res.damage)
+		var label := ("IMMUNE" if res.get("immune", false) else "MISS") if not res.hit else str(res.damage)   # D209
 		if res.get("crit", false) and res.hit:
 			label += "  CRIT"
 		if res.get("glance", false):

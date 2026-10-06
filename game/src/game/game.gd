@@ -78,6 +78,27 @@ func go_prep() -> void:
 	BWMusic.play("rest")
 	await s.done
 	_save()
+	go_rooms(true)
+
+
+## D186/D190: the room choice before the pre-battle (not at the Obelisks or
+## the Giant, and not again once made: a load mid-choice shows the same two).
+## Esc goes back to the hall before fight 1 (`from_hall`); after a day it can't.
+func go_rooms(from_hall: bool = false) -> void:
+	if not BWRooms.has_choice(run.fight) or BWRooms.chosen_index(run) >= 0:
+		go_prebattle()
+		return
+	var s := BWRoomScreen.new()
+	s.run = run
+	s.can_back = from_hall
+	await _swap(s)
+	_save()                                        # the offer is stored: a reload shows the same two
+	var i: int = await s.done
+	if i < 0:
+		go_prep()
+		return
+	BWRooms.choose(run, i)
+	_save()
 	go_prebattle()
 
 
@@ -132,7 +153,7 @@ func go_downtime() -> void:
 	BWMusic.play("rest")
 	await s.done
 	_save()
-	go_prebattle()
+	go_rooms()
 
 
 func go_end(won: bool, boss: bool, report: Dictionary = {}) -> void:
@@ -150,7 +171,7 @@ func go_end(won: bool, boss: bool, report: Dictionary = {}) -> void:
 
 func _next_after_load() -> void:
 	await go_picks("Picks owed")
-	go_prebattle()
+	go_rooms()                                     # D190: mid-choice, the same two rooms
 
 
 # ---------------------------------------------------------------- plumbing

@@ -474,11 +474,16 @@ func _squad_cell(u: BWUnit) -> Control:
 	n.clip_text = true
 	top.add_child(n)
 	top.add_child(_label("Lv %d  %s" % [u.level, u.expertise_letter(u.weapon_class)], BWStyle.F_SMALL - 2, BWStyle.TEXT_DIM))
-	var bar := BWWidgets.HPBar.new(Vector2(200, 6))
-	bar.set_hp(u.xp, BWProgression.XP_PER_LEVEL)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.tooltip_text = "%d / %d XP" % [u.xp, BWProgression.XP_PER_LEVEL]
-	v.add_child(bar)
+	# D179/D194: no XP bar; every fight levels everyone, so say so per unit
+	var gains: Dictionary = report.get("levels", {}).get(u.id, {})
+	if not gains.is_empty():
+		var up := _label("Level up!  →  Lv %d" % u.level, BWStyle.F_SMALL - 1, Color.WHITE)
+		var parts: PackedStringArray = []
+		for k in gains:
+			parts.append("+%d %s" % [int(gains[k]), str(k).to_upper()])
+		up.tooltip_text = "  ".join(parts)
+		up.mouse_filter = Control.MOUSE_FILTER_PASS
+		v.add_child(up)
 	return hb
 
 

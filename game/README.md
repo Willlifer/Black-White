@@ -9,7 +9,7 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Play | `run.bat`, or open this folder in Godot and press F5 |
 | Self-test | `test.bat`, or `godot --headless --path . -- --self-test` |
 | Balance sheet | `godot --headless --path . -- --forecast` |
-| One fight, AI vs AI | `godot --path . -- --combat arena --autoplay` |
+| One fight, AI vs AI | `godot --path . -- --combat arena --autoplay [--carry]` (exits 2 s after the battle; `--carry`: everyone carries a second weapon, D195) |
 | One screen | `godot --path . -- --screen roster` (title, roster, prep, prebattle, downtime, results) |
 | Fixed roster roll (D154) | add `--seed N` to any run: the roster screen opens on that roll (R re-rolls reproducibly), a new run uses it; probes, shots and the self-test default to seed 1 |
 | Hall / title review frames | `SHOTS=<dir> MODE=hall\|prep\|progress\|title [GIF=<dir>] godot --path . --script res://tools/phase5_shots.gd` (→ `phase5_*.png`; GIF frames for `phase5_progress_day.gif`) |
@@ -18,8 +18,10 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Battle / run summary frames (D119–D121) | `[SHOTS=<dir>] godot --path . --script res://tools/summary_shots.gd` (a real AI-played run → `design/art/summary_win\|loss\|run.png`) |
 | UI review frames | `godot --path . -- --ui-shots` (roster 0/3/6 picks, codex tabs, loading, results → `design/art/ui_*.png`) |
 | Flow probe | `godot --path . -- --flow-probe` (every screen transition, the hall prep's equip and give, the downtime choices, the day, the per-unit result cards and their pickers; exit 0 = ok) |
-| Downtime review (D127–D132) | `[SHOTS=<dir>] [MODE=hall\|cards\|rogue] godot --path . --script res://tools/downtime2_shots.gd` (→ `design/art/downtime2_*.png`) |
-| Campaign sim | `RUNS=n godot --headless --path . --script res://tools/campaign_sim.gd` (policies specialize / branch / wander / mixed) |
+| Downtime review (D127–D132) | `[SHOTS=<dir>] [MODE=hall\|cards] godot --path . --script res://tools/downtime2_shots.gd` (→ `design/art/downtime2_*.png`) |
+| Two-choice review (D174–D176) | `[SHOTS=<dir>] godot --path . --script res://tools/choice2_shots.gd` (→ `design/art/choice2_*.png`: the hall's 2 tiles with the Branch out cards, a 2-card perk and skill pick) |
+| Campaign sim | `RUNS=n [POLICY=mixed] [ROOMS=standard\|hard\|mixed\|all] godot --headless --path . --script res://tools/campaign_sim.gd` (downtime policies specialize / branch / wander / mixed; room policy D188, win rate per room kind per fight) |
+| Room select (D186–D190) | `godot --path . --resolution 1600x900 --script res://tools/room_shots.gd` (→ `design/art/rooms_select.png`, `rooms_hover.png`; env FIGHT (default 3: fights 1–2 have no choice, D208), SEED, ENC) · `-- --screen rooms` |
 | Presentation review (D100–D102) | `RES=1920x1080 SHOTS=<dir> MODE=callout\|crit\|status\|clip [SLOW=6] [CLIP=spin UNIT=pip] godot --path . --script res://tools/present_shots.gd`; `python tools/present_strip.py <dir>/crit_frames <dir>` (crit strip + GIF) |
 | Readability review (D160–D163) | `RES=1920x1080 [SHOTS=<dir>] godot --path . --script res://tools/readability_shots.gd` (blast preview, confirm box, slow beat, recap, tile cards → `design/art/read_*.png`) |
 | UX pass review (D122–D126) | `RES=1920x1080 [SHOTS=<dir>] [MODE=all\|settings\|pause\|gloss\|codex\|tiers] godot --path . --script res://tools/ux_shots.gd` (→ `design/art/ux_*.png`) |
@@ -27,7 +29,10 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Fight pace | `godot --headless --path . -- --pace [--support]` (`--support`: every kit carries its class's support skills, D112) |
 | UI pass review (D109–D113) | `RES=1920x1080 SHOTS=<dir> [MODE=all\|callout\|odds] godot --path . --script res://tools/uipass_shots.gd` (→ `uipass_*.png`) |
 | Cast / spectacle VFX review (D167–D170) | `RES=1600x900 SHOTS=<dir> [MODE=all\|surge\|ley\|tempest\|dive\|elements\|fists\|chamber\|spin\|warcry\|siphon\|saturate\|bolt\|truth\|triumph] godot --path . --script res://tools/vfx_shots.gd` (prints a Tempest frame-time readout), then `python tools/vfx_strip.py <dir>` → `design/art/casts_*.png` (design/art/VFX.md) |
+| Weapons pass review (D180–D182) | `[SHOTS=<dir>] [MODE=gear\|carry] [VIEWS=back,front,side] godot --path . --resolution 1920x1080 --script res://tools/weapons2_shots.gd` (gear panel with two weapon slots, the imbued card, carried weapons → `design/art/weapons2_*.png`; the combat menu before / after a swap: `SWAP_SHOTS=<dir> godot --path . -- --ui-probe`) |
+| Enchantments v2 + shop review (D196–D205) | `[SHOTS=<dir>] [MODE=shop\|knell] godot --path . --resolution 1920x1080 --script res://tools/ench2_shots.gd` (the shop with its featured scrolls, a scroll card, the scroll flow, a cursed card, a Death Knell KO → `design/art/ench2_*.png`) |
 | Boss fight | `godot --path . -- --combat arena --boss` |
+| Special encounters (D208–D213) | `godot --path . -- --combat <map> --encounter horde\|colossus\|blank\|being [--fight n] --autoplay` (a squad levelled to fight n, default 5) · review frames: `[SHOTS=<dir>] [FIGHT=n] godot --path . --resolution 1920x1080 --script res://tools/encounter_shots.gd` (→ `design/art/encounters_*.png`: horde, colossus, blank, being, immune, blank_x2) · room cards: `ENC=<kind> FIGHT=5 godot --path . --resolution 1600x900 --script res://tools/room_shots.gd` (→ `encounters_room_<kind>.png`) · balance: `RUNS=n POLICY=mixed SHADOW=1 ENC=1 [ENC_TUNE=...] campaign_sim` |
 | Audio capture | `godot --path . -- --audio-capture` (61 s scripted run → `design/audio/capture.wav`; analyse with `python tools/audio/analyse_capture.py`) |
 | Rebuild SFX / music layers | `python tools/audio/make_sfx.py` · `python tools/audio/make_music.py`, then `--import` (see design/audio/AUDIO.md) |
 | Hair rank review (D146–D148) | `godot --path . --resolution 1800x1250 -s res://tools/hair_ranks_preview.gd` (→ `design/art/hair_ranks_*.png`) |
@@ -44,7 +49,7 @@ Left click: move to a grey hex, attack a pulsing enemy, or aim a skill from
 the menu beside the unit (forecast opens; hover a number for its formula).
 Enter confirms · Esc first closes the newest open window (a tooltip, card, codex, panel, menu, D171), then backs out one step: forecast → second pick (Transfer,
 Grapple Throw, D109) → aiming → **undo the move** (D48) → with nothing left to back out of, the
-**pause menu** (D124: resume, settings, codex & glossary, quit) · T ends the turn · F11 / Alt+Enter toggles fullscreen.
+**pause menu** (D124: resume, settings, codex & glossary, quit) · T ends the turn · **Swap weapon** (menu, under Attack) draws the carried weapon: free, as often as you like (D181, D195) · F11 / Alt+Enter toggles fullscreen.
 
 Cutscenes (D122/D123): basic attacks, counters and setup skills play in place; quick skills zoom
 briefly; long-cooldown and once-per-battle skills, crits and KOs get the full cutscene. **Hold Space
@@ -75,17 +80,21 @@ src/core/      The framework: pure rules, no nodes. Usable in another game.
   tiles.gd       BWTiles — elements on the ground (design/ELEMENTS.md)
   formulas.gd    BWFormulas — every combat number, each with its explanation
   unit.gd        BWUnit — a character sheet plus battle state
-  progression.gd BWProgression — XP, levels, affinity, expertise
+  progression.gd BWProgression — levels (one per fight, won or lost, D179/D194), affinity, expertise
   turn_queue.gd  BWTurnQueue — speed order
   battle.gd      BWBattle — one fight as rules; emits events for the view
   skills.gd      BWSkills — the skills' tuning numbers, statuses, reactions (lookups are facades)
   skill_def.gd / skill_registry.gd / skill_defs/   BWSkillDef, BWSkillRegistry: one file per skill (D89)
   picks.gd       BWPicks — element perks (data/perks.csv) and weapon-skill picks (D90, D91)
   effects.gd     BWEffects — enchantments + abilities → battle hooks
+  enchant_v2.gd  BWEnchant — the v2 keys (on_event, pity, drawback, swap), the loop caps (design/ENCHANTMENTS-v2.md)
   ai.gd          BWAI — enemy turns (and the obelisks' pulses, D145)
   obelisk.gd     BWObelisk — the neutral objective stones of the Obelisks map (D140–D145)
   battle_stats.gd BWBattleStats — the end-of-battle summary, tallied from battle.history (D119–D121)
-  run.gd         BWRun — one run: squad, items, loot, downtime, shop, saves (v5: the run's roster roll)
+  run.gd         BWRun — one run: squad, items, loot, downtime, shop + imbuement scrolls (D203), saves (v8)
+  rooms.gd       BWRooms — the room choice before each fight from fight 3 (D186–D189, D208): two rooms, the map queue, Hard tuning and pay
+  encounters.gd  BWEncounters — special encounters in the Hard room's place (D208–D212): Horde, Colossus, Blanks, Elemental Beings;
+                 the damage classes are BWFormulas.damage_class (D209)
   roster_gen.gd  BWRosterGen — the roster roll: weapon, element, stats (class profiles), clothes from a seed (D150–D152)
   barks.gd       BWBarks — picks bark lines (design/BARKS.md)
   forecast_sheet.gd  the Gate 0 balance printout
@@ -93,7 +102,7 @@ src/core/      The framework: pure rules, no nodes. Usable in another game.
 src/game/      Presentation. Reads core, never the reverse.
   game.gd        BWGame — the run's screen flow and autosave
   combat/        board view, unit views (BWCharacter; use_rig=false = primitives), HUD, combat screen + cutscene
-  screens/       title, roster, prep (the hall before fight 1, D84), pre-battle, results,
+  screens/       title, roster, prep (the hall before fight 1, D84), room select (D190; rooms/map_thumbs.gd = BWMapThumbs), pre-battle, results,
                  downtime, end card; loading (the old map-orbit intro, unused since D84);
     downtime/    BWHall (the marble hall: floor + reflection, columns, windows, spotlights,
                  time of day) and the downtime widgets (the three choice tiles, chips, the arrow), D83/D127;

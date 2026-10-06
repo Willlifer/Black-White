@@ -95,6 +95,10 @@ var _loosed_all: Array = []      # D164: every loosed arrow's last world transfo
 ## D164: the fletching's element for the arrows nocked now (null = attuned).
 var nock_element: Variant = null
 const FAN_SPREAD := 0.13         # radians between fanned arrows on the string
+## D180: the carried (second) weapon, sheathed or slung on the back or hip.
+var stowed: BWWeaponView
+var _stowed_key := ""
+var _hip: BoneAttachment3D
 var _sparkle := -1.0             # staves: the aura strength a handling sparkle set (< 0: none)
 var _sparkle_prev := ["", 0.0]   # the aura before the sparkle
 
@@ -121,6 +125,7 @@ static func look_for(u: BWUnit) -> Dictionary:
 		"bottom": str(cos.get("bottom", DEFAULT_BOTTOMS[(h / 7) % DEFAULT_BOTTOMS.size()])),
 		"clothing_shade": str(cos.get("clothing_shade", SHADES[(h / 3) % 3])),
 		"element": u.element, "armour": {}, "armour_element": "",
+		"encounter": u.encounter,
 	}
 	if u.id == "boss" or (u.size > 1 and not cos.has("hair_style")):
 		out.merge(BOSS_LOOK, true)
@@ -160,8 +165,8 @@ func build(u: BWUnit) -> bool:
 	poser.socket_r = rig.socket("weapon_r").transform
 	poser.socket_l = rig.socket("offhand_l").transform
 	_phase = float(absi(hash(u.id)) % 628) / 100.0
-	hair = BWHair.create(str(look.hair_style), str(look.element), int(look.get("hair_variant", 0)))
-	if hair == null:
+	hair = BWHair.create(str(look.hair_style), str(look.element), int(look.get("hair_variant", 0))) if look.hair_style != "none" else null
+	if hair == null and look.hair_style != "none":           # D213: "none" = bald (the Blanks)
 		hair = BWHair.create("buzzed", str(look.element), int(look.get("hair_variant", 0)))
 	if hair:
 		hair.attach_to(rig)
@@ -200,12 +205,18 @@ func refresh_equipment() -> void:
 		if weapon:
 			weapon.detach()
 			weapon.free()
+		_nocks.clear()                           # D195: the nocked arrows rode on the old bow (freed with it)
+		_nocked = null
 		weapon = BWWeaponView.create(wid)
 		_weapon_id = wid
 		if weapon:
 			weapon.attach_to(rig)
 			if aura != "":
 				weapon.set_aura(aura, strength)
+	if weapon:
+		weapon.set_imbue(str(unit.equipment.get("main_hand", {}).get("imbue", "")))   # D182: the accent
+	_refresh_stowed()                                # D180: the carried weapon, slung
+	_encounter_look()                                # D213
 	# 7. poses
 	poser.set_weapon(weapon.meta if weapon else {})
 	if poser.current == "":
@@ -221,6 +232,36 @@ func refresh_equipment() -> void:
 		animator.set_showcase(showcase)
 		animator.play(poser.current if poser.current != "" else "idle", 0.0)
 		animator.update(0.0)
+
+
+## D213: the special encounters' looks, laid over the dressed figure.
+##   blank  all white: no hair, the clothes and the weapon washed to white
+##   being  the whole figure glows in its element (the ink contours stay
+##          black), its weapon in the element's aura
+## Everything else is as dressed (the Horde's grunts are grey-haired and
+## plain by their cosmetics; the Colossus is a size-2 figure, BWUnitView).
+const BLANK_TINT := Color(1.6, 1.6, 1.6)
+
+
+func _encounter_look() -> void:
+	var kind := str(look.get("encounter", ""))
+	if kind != "blank" and kind != "being":
+		return
+	var tint := BLANK_TINT
+	if kind == "being":
+		var c := BWLook.element_color(unit.element)
+		tint = c.lerp(Color.WHITE, 0.25) * 1.25
+		tint.a = 1.0
+	_tint_all(self, tint)
+	if kind == "being" and weapon:
+		weapon.set_aura(unit.element, 1.0)
+
+
+static func _tint_all(n: Node, tint: Color) -> void:
+	if n is GeometryInstance3D and not n is Label3D:
+		(n as GeometryInstance3D).set_instance_shader_parameter("tint", tint)
+	for c in n.get_children():
+		_tint_all(c, tint)
 
 
 func _wear(slot: String, id: String) -> void:
@@ -485,6 +526,131 @@ func set_aura(element: String, strength: float = 1.0) -> void:
 		weapon.set_aura(element, strength)
 
 
+## D182: what a basic shot's fletching shows: the weapon's imbue, else the attunement.
+func _basic_element() -> String:
+	if unit == null:
+		return ""
+	return unit.imbue() if unit.imbue() != "" else unit.attuned
+
+
+## D180: where a carried weapon rides, per class, in its holder's axes
+## (+Y up, +Z forward, +X the character's left): [holder, position, euler
+## degrees, scale]. "back" = socket_back (the chest): swords and axes hilt-up
+## over a shoulder, blade down across the back; lances and staves diagonal,
+## the tip over the shoulder; the bow the other way, flat to the body. "hip" = the hips bone: pistols holstered muzzle-down on the
+## right, daggers sheathed point-down on the left, fists clipped at the left hip.
+const STOW := {
+	"sword": ["back", Vector3(-0.19, 0.26, -0.22), Vector3(0, 90, 216), 0.85],
+	"axe": ["back", Vector3(-0.19, 0.26, -0.22), Vector3(0, 90, 216), 0.85],
+	"lance": ["back", Vector3(0.30, -0.55, -0.22), Vector3(0, 90, 36), 0.72],
+	"staff": ["back", Vector3(0.28, -0.45, -0.22), Vector3(0, 90, 36), 0.72],
+	"bow": ["back", Vector3(0.0, 0.02, -0.23), Vector3(0, 90, -36), 0.9],
+	"pistols": ["hip", Vector3(-0.21, -0.02, 0.02), Vector3(90, 0, 0), 0.9],
+	"daggers": ["hip", Vector3(0.21, -0.02, 0.03), Vector3(180, 0, -12), 0.95],
+	"fists": ["hip", Vector3(0.22, -0.06, 0.0), Vector3(0, 0, 0), 0.9],
+}
+
+
+## D180: build, move or clear the slung second weapon from unit.equipment.second.
+func _refresh_stowed() -> void:
+	var it: Dictionary = unit.equipment.get("second", {}) if unit else {}
+	var id := str(it.get("base", ""))
+	if id != "" and BWWeaponView.meta_for(id).is_empty():
+		id = ""
+	var key := "%s|%s" % [id, str(it.get("imbue", ""))]
+	if key == _stowed_key and (id == "") == (stowed == null):
+		return
+	_stowed_key = key
+	if stowed:
+		stowed.detach()
+		stowed.free()
+		stowed = null
+	if id == "":
+		return
+	stowed = BWWeaponView.create(id)
+	if stowed == null:
+		return
+	stowed.name = "stowed_" + id
+	var spec: Array = STOW.get(str(BWWeaponView.meta_for(id).get("class", "")), STOW.sword)
+	stowed.transform = _stow_local(spec)
+	_stow_holder(spec).add_child(stowed)
+	stowed.set_imbue(str(it.get("imbue", "")))
+
+
+## D180: the node a STOW row rides on (the back socket, or the hips bone).
+func _stow_holder(spec: Array) -> Node3D:
+	if spec[0] == "hip":
+		if _hip == null or not is_instance_valid(_hip):
+			_hip = BoneAttachment3D.new()
+			_hip.name = "stow_hip"
+			_hip.bone_name = "hips"
+			rig.skeleton.add_child(_hip)
+		return _hip
+	return rig.socket("back")
+
+
+## D180: a STOW row's transform in its holder.
+static func _stow_local(spec: Array) -> Transform3D:
+	var deg: Vector3 = spec[2]
+	var bs := Basis(Vector3.BACK, deg_to_rad(deg.z)) * Basis(Vector3.UP, deg_to_rad(deg.y)) * Basis(Vector3.RIGHT, deg_to_rad(deg.x))
+	return Transform3D(bs.scaled(Vector3.ONE * float(spec[3])), spec[1])
+
+
+## Where weapon view `w` would ride slung, in world space (its class's STOW row).
+func stow_global(w: BWWeaponView) -> Transform3D:
+	var spec: Array = STOW.get(str(w.meta.get("class", "")), STOW.sword)
+	return _stow_holder(spec).global_transform * _stow_local(spec)
+
+
+## D195: the swap as a small animation, ~0.5 s. The unit's equipment has
+## already been swapped (the rules ran first); the model still shows the
+## old weapon in hand. Holster: the arm reaches back (the windup's coil) and
+## the weapon in hand travels to its carry spot (STOW, D180); re-dress (it is
+## now the slung one); draw: the other weapon travels from its carry spot
+## into the hand as the arm comes forward to the guard. `on_holster` runs at
+## the hand-off (a sound). Each leg follows the moving body every frame.
+const SWAP_LEG := 0.22
+
+func animate_swap(on_holster: Callable = Callable()) -> void:
+	if weapon == null or rig == null:
+		refresh_equipment()
+		return
+	pose("windup", 0.16)
+	await _fly(weapon, true)
+	refresh_equipment()
+	if on_holster.is_valid():
+		on_holster.call()
+	pose("idle", 0.2)
+	if weapon:
+		await _fly(weapon, false)
+
+
+## One leg of the swap: `w` (in its hand socket) to its carry spot
+## (`to_stow`), or from it into the hand. The off-hand copy (daggers, fists)
+## shrinks away or grows in.
+func _fly(w: BWWeaponView, to_stow: bool) -> void:
+	var local := w.transform
+	var off: BWWeaponView = w.offhand_view if is_instance_valid(w.offhand_view) else null
+	var off_s := off.scale if off else Vector3.ONE
+	var step := func(k: float) -> void:
+		if not is_instance_valid(w) or w.get_parent() == null:
+			return
+		var hand: Transform3D = (w.get_parent() as Node3D).global_transform * local
+		var slung := stow_global(w)
+		var e := k * k * (3.0 - 2.0 * k)          # smoothstep
+		w.global_transform = hand.interpolate_with(slung, e) if to_stow else slung.interpolate_with(hand, e)
+		if off and is_instance_valid(off):
+			off.scale = off_s * maxf(0.01, (1.0 - e) if to_stow else e)
+	step.call(0.0)
+	var tw := create_tween()
+	tw.tween_method(step, 0.0, 1.0, SWAP_LEG)
+	await tw.finished
+	if is_instance_valid(w):
+		w.transform = local
+	if off and is_instance_valid(off):
+		off.scale = off_s
+
+
 func _process(delta: float) -> void:
 	if poser == null:
 		return
@@ -559,7 +725,7 @@ func _update_bow(delta: float) -> void:
 			weapon.add_child(pv)
 			_nocks.append(pv)
 		_nocked = _nocks[0]
-		var el: String = str(nock_element) if nock_element != null else (unit.attuned if unit else "")
+		var el: String = str(nock_element) if nock_element != null else _basic_element()
 		var rest := BWWeaponView.v3(weapon.meta.get("tip", [0, 0, 0.05]))
 		var dir := (rest - nock).normalized()
 		if dir.length() < 0.5:

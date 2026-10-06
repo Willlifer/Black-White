@@ -414,7 +414,7 @@ func _mod(m: int) -> String:
 # ---------------------------------------------------------------- stats
 
 func _stats() -> void:
-	_intro("Seven stats. Starting values are 1–6; they grow by 1–2 a level (biased by weapon and armour) toward ~100 late in a run. "
+	_intro("Seven stats. Starting values are 1–6; they grow by 1–2 a level (biased by weapon and armour), and every unit in the squad gains a level after every fight, won or lost. "
 		+ "Every number below is the game's own formula, the same one the attack forecast shows when you hover a number.")
 	var sword := _sample("sword")
 	var bow := _sample("bow")

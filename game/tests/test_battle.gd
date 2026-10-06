@@ -79,17 +79,10 @@ func test_ko_and_growth(t) -> void:
 	_autoplay(b)
 	var kos := b.history.filter(func(e): return e.type == "ko")
 	t.ok(kos.size() >= 3, "a finished 3v3 has at least 3 KOs")
-	# One award per action (attack or skill): 30 if it knocked anyone out, else 10
-	# (ELEMENTS §8.4); tile knockouts credit their hostile source 30.
-	var actions := b.history.filter(func(e): return e.type == "attack" or e.type == "skill")
-	var xp_total := 0
-	for u in b.units:
-		xp_total += u.xp + (u.level - 1) * BWProgression.XP_PER_LEVEL
-	var action_xp := 0
-	for e in actions:
-		action_xp += 30 if e.ko else 10
-	var tile_kos := kos.filter(func(e): return e.has("cause") and e.cause != "riposte" and e.by != "").size()
-	t.eq(xp_total, action_xp + tile_kos * 30, "xp = 10 per action, 30 per knockout action")
+	# D179: no XP; growth is affinity / expertise only, so nobody levels mid-fight.
+	t.ok(b.units.all(func(u): return u.level == 1), "no levels from fighting")
+	t.ok(not b.history.any(func(e): return e.type == "growth" and e.events.any(func(g): return g.type in ["xp", "level"])),
+		"growth events carry no XP or level")
 	for e in b.history:
 		if e.type == "attack":
 			t.ok(e.result.damage >= 0 and (e.result.damage > 0) == e.result.hit, "damage iff hit")

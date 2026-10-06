@@ -79,7 +79,7 @@ Ugly on purpose — this is where we find out whether it's fun.
 | b | Combat screen: speed turns, move-then-act / act-then-move, arrow + area highlight, forecast window with formula hover, simple enemy AI, win/lose | Serial |
 | c | Combat cutscene v1: dim all but attacker, target and their tiles; FOV tighten; placeholder strike/react | After b |
 | d | Pre-battle: review units, equip, pick 3, place in rows, Begin Battle | After b |
-| e | Roster select (20 → 6), downtime (2 actions each, progress day, 5-second results scroll), shop trades, re-imbue, loot table | After d |
+| e | Roster select (20 → 6), downtime (2 actions each, progress day, 5-second results scroll), shop trades, re-imbue (removed later, D202), loot table | After d |
 | f | Run structure: title → roster → (pre-battle → combat → downtime) × 10 → boss | After e |
 
 **Gate 2 — the important one:** you play a full run start to boss on placeholders.

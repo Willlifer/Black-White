@@ -42,7 +42,7 @@ one `PIECE` line per piece (attach type, slot, tris, accent %, bones).
 var eq := BWEquipmentView.for_rig(rig)     # a child Node of the rig
 eq.equip(item)                             # BWRun.make_item(): base, slot, enchant
 eq.equip_model("crown", "ice")             # tools: by id + element ("" = plain)
-eq.set_element("chest", "fire")            # recolour in place after a re-imbue
+eq.set_element("chest", "fire")            # recolour in place after a scroll (D203)
 eq.unequip("head"); eq.clear()
 eq.refresh_hair()                          # after attaching new hair
 ```

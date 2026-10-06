@@ -18,8 +18,7 @@ var element := ""                    # starting affinity, also hair colour
 var weapon_class := ""
 var weapon_model := ""
 var stats := {}                      # base stats, before equipment
-var level := 1
-var xp := 0
+var level := 1                       # D179/D194: +1 per fight, won or lost (BWRun.after_fight); there is no XP
 var affinity := {}                   # element -> points (rank = points / 10)
 var expertise := {}                  # weapon class -> points (rank index = points / 10)
 var equipment := {}                  # slot -> item Dictionary (later phases)
@@ -35,12 +34,14 @@ var skill_picks := {}                # weapon class -> expertise picks already m
 ## itself doesn't move): element -> extra perk picks, class -> extra skill picks.
 var bonus_perks := {}
 var bonus_skills := {}
+## D174: salts which two options a pick offers (BWPicks.offer). BWRun sets it
+## from the run seed and the unit id (BWRun.seed_unit), so it is never saved:
+## a load derives the same value and the same two cards.
+var pick_seed := 0
 
 # --- downtime outcomes that last (D129, D130; save v4) ---
-## Wander's jackpot: +5000 XP and the unit plays itself (BWAI) from then on.
-var rogue := false
-const ROGUE_LINE := "You do not have enough badges to control me!"
-const ROGUE_BADGE := "Disobedient"
+## (D177 removed the rogue: Wander's jackpot no longer takes control away; a
+## save's old "rogue" flag is ignored on load.)
 ## D130 Wander: statuses it shrugs off in its NEXT battle; begin_battle()
 ## moves them into `immune_statuses` (that battle only) and clears it.
 var next_immune: Array = []
@@ -68,6 +69,10 @@ var battle_mods := {}                # stat -> bonus for this battle (reactive a
 var size := 1                        # hex radius + 1; the boss is 2 (7 hexes)
 ## D138: > 0 = max HP is this, not the D137 formula (the Giant's 500).
 var fixed_hp := 0
+## D208: a special-encounter unit (BWEncounters): "grunt" (the Horde),
+## "colossus", "blank" (immune to elements, x2 from melee), "being" (immune
+## to physical damage); "" = an ordinary unit. Never saved (enemies only).
+var encounter := ""
 var attuned := ""                    # last element used this battle (ELEMENTS §7.1)
 var follow_up: Array = []            # while non-empty: the only actions allowed ("basic" or skill keys)
 var follow_up_element := ""          # element of the skill that granted the follow-up
@@ -127,8 +132,9 @@ static func from_roster(row: Dictionary) -> BWUnit:
 
 func stat(key: String) -> int:
 	var v: int = stats.get(key, 0) + battle_mods.get(key, 0)
-	for item in equipment.values():
-		v += int(item.get("stats", {}).get(key, 0))
+	for slot in equipment:
+		if slot != SECOND:                         # D180: the carried weapon adds nothing until drawn
+			v += int(equipment[slot].get("stats", {}).get(key, 0))
 	v += BWEffects.share(self, key)                # FX hook: stat_share
 	if fx_hook.is_valid():
 		v += int(fx_hook.call(self, key))          # FX hook: stand_on_bonus, aura_mod
@@ -354,18 +360,54 @@ func sync_weapon() -> void:
 		weapon_model = str(mh.get("base", weapon_model))
 
 
+# ---------------------------------------------------------------- D180-D182: two weapons
+
+## D180: the equipment key of the carried (sheathed) weapon. Its item keeps
+## slot "main_hand" (what kind of item it is); only the active weapon in
+## "main_hand" counts for stats, enchantments, range, skills.
+const SECOND := "second"
+
+
+## The carried weapon ({} = none).
+func second_weapon() -> Dictionary:
+	return equipment.get(SECOND, {})
+
+
+## D181: draw the carried weapon and sheathe the active one (the two items
+## trade places). The class, model, effects and skills follow the main hand;
+## cooldowns are per skill key, so they carry over. False with nothing carried.
+func swap_weapons() -> bool:
+	var other: Dictionary = equipment.get(SECOND, {})
+	if other.is_empty():
+		return false
+	var cur: Dictionary = equipment.get("main_hand", {})
+	equipment["main_hand"] = other
+	if cur.is_empty():
+		equipment.erase(SECOND)
+	else:
+		equipment[SECOND] = cur
+	sync_weapon()
+	refresh_effects()
+	return true
+
+
+## D182: the element the active weapon is imbued with ("" = none).
+func imbue() -> String:
+	return str(equipment.get("main_hand", {}).get("imbue", ""))
+
+
 func to_dict() -> Dictionary:
 	return {
 		"id": id, "name": name, "team": team, "friendliness": friendliness,
 		"element": element, "weapon_class": weapon_class, "weapon_model": weapon_model,
-		"stats": stats.duplicate(), "level": level, "xp": xp,
+		"stats": stats.duplicate(), "level": level,
 		"affinity": affinity.duplicate(), "expertise": expertise.duplicate(),
 		"cosmetics": cosmetics.duplicate(),
 		"perks": perks.duplicate(), "known_skills": known_skills.duplicate(),
 		"skill_ranks": skill_ranks.duplicate(), "skill_loadout": skill_loadout.duplicate(true),
 		"skill_picks": skill_picks.duplicate(),
 		"bonus_perks": bonus_perks.duplicate(), "bonus_skills": bonus_skills.duplicate(),
-		"rogue": rogue, "next_immune": next_immune.duplicate(),
+		"next_immune": next_immune.duplicate(),
 		"next_brace": next_brace.duplicate(), "fight_buff": fight_buff.duplicate(),
 		"focus_element": focus_element,
 	}

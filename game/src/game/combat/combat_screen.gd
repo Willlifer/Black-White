@@ -126,9 +126,6 @@ func _ready() -> void:
 	rig.follow(focus, true)
 	ui.feed("[b]%s[/b]" % board.name)
 	_queue.clear()          # setup's own events aren't replayed; show their state directly
-	for e in battle.history:   # D129: except a rogue's line when it opens the fight
-		if e.type == "disobey":
-			_queue.append(e)
 	ui.set_order(battle.queue.slice(maxi(battle.turn_index, 0)), battle.current(), BWTurnQueue.build(battle.units))
 	ui.set_acting(battle.current(), battle.tiles)
 	if battle.objective_mode():                      # ---- D140/D145: the objective, said once
@@ -321,6 +318,11 @@ func _on_action(id: String) -> void:
 		"attack":
 			_skill = {}
 			_show_options()
+		"swap":                                          # ---- D181/D195: free, unlimited
+			if _player_turn() and not ui.forecast_open() and battle.can_swap(battle.current()):
+				_skill = {}
+				battle.swap_weapon(battle.current())
+				_after_events()
 		"cancel":
 			if ui.forecast_open():
 				ui.hide_forecast()
@@ -446,7 +448,8 @@ func _show_options(path: Array = [], splash: Array = [], splash_el: String = "")
 	if u == null:
 		ranges.clear()
 		return
-	ui.set_skills(u, battle.skills_for(u), "" if _skill.is_empty() else "%s|%s" % [_skill.key, _skill.element])
+	ui.set_skills(u, battle.skills_for(u), "" if _skill.is_empty() else "%s|%s" % [_skill.key, _skill.element],
+		_skill.is_empty() and battle.can_swap(u))           # ---- D181: Swap weapon under Attack
 	var rim := BWLook.element_color(u.element)
 	var splash_col := BWLook.element_color(splash_el) if splash_el != "" else Color(0.15, 0.15, 0.17)
 	if not _skill.is_empty() and _skill.has("first"):
@@ -522,7 +525,7 @@ func _after_events() -> void:
 		if battle.over:
 			break
 		var u := battle.current()
-		if u and BWAI.controls(u, autoplay):          # enemies, autoplay, and a rogue (D129)
+		if u and BWAI.controls(u, autoplay):          # enemies and autoplay
 			await get_tree().create_timer(0.35).timeout
 			BWAI.take_turn(battle)
 			continue
@@ -542,7 +545,7 @@ func _after_events() -> void:
 		return
 	ui.set_acting(battle.current(), battle.tiles)
 	_show_options()
-	ui.set_actions_visible(battle.current() != null and battle.current().team == "player" and not battle.current().rogue)
+	ui.set_actions_visible(battle.current() != null and battle.current().team == "player")
 
 
 func _play(e: Dictionary) -> void:
@@ -567,6 +570,8 @@ func _play(e: Dictionary) -> void:
 						await _animate_leap(_views[e.unit], e.path)
 				"charge", "shove", "knockback", "pull", "push": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
 				_: await _animate_move(_views[e.unit], e.path)
+		"swap":                                             # ---- D181: put away, draw
+			await _animate_swap(_views[e.unit], e)
 		"undo_move":
 			var uv: BWUnitView = _views[e.unit]
 			var tw := create_tween()
@@ -595,6 +600,12 @@ func _play(e: Dictionary) -> void:
 			ui.feed("[b]%s eruption[/b] (%s)" % [str(e.element).capitalize(), str(e.get("name", ""))])
 			_shake(0.1)
 			board_view.refresh_tiles()
+		"enchant":                                   # ---- D196-D205: an enchantment fires (BWEnchant)
+			var nv: BWUnitView = _views.get(str(e.get("unit", "")))
+			if nv:
+				_float_text(nv, str(e.get("text", e.get("name", ""))), Color.WHITE, 0.8)
+				nv.refresh()
+			ui.feed("[b]%s[/b]: %s" % [str(e.get("name", "")), str(e.get("text", ""))])
 		"stat_up":
 			_float_text(_views[e.unit], "%s +%d %s" % [e.name, int(e.amount), "/".join(e.stats).to_upper()], Color.WHITE, 0.9)
 		"guard":
@@ -604,6 +615,10 @@ func _play(e: Dictionary) -> void:
 			ui.feed("%s may move %d more" % [_name(e.unit), int(e.hexes)])
 		"displace_resisted":
 			_float_text(_views[e.unit], "held firm", Color.WHITE, 0.6)
+		"immune":                                   # D209: a Blank / Being shrugs off the ground or an arc
+			if _views.has(e.unit):
+				_float_text(_views[e.unit], "immune", Color.WHITE, 0.6)
+			ui.feed("%s is immune (%s)" % [_name(e.unit), str(e.get("class", ""))])
 		"skill":
 			var sname := str(BWSkills.get_skill(e.skill).get("name", e.skill))
 			var call := _callout_for(str(e.skill), str(e.get("element", "")))   # ---- D100: before the retarget suffix
@@ -729,11 +744,6 @@ func _play(e: Dictionary) -> void:
 				_float_text(_views[e.unit], str(e.text).trim_prefix(_name(e.unit) + " "), BWLook.element_color(
 					str(e.get("element", battle._unit(e.unit).element))), 1.0)
 			ui.feed(str(e.text))
-		"disobey":                                   # D129: the rogue's line, its first turn each battle
-			if _views.has(e.unit):
-				rig.follow(_views[e.unit].global_position)
-			barks.disobey(battle._unit(e.unit), str(e.line))
-			await get_tree().create_timer(1.6).timeout
 		"growth":
 			for g in e.events:
 				if g.type == "level":
@@ -1067,7 +1077,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		var r: Dictionary = results[k]
 		var t: BWUnitView = targets[k]
 		var res: Dictionary = r.result
-		var label := "MISS" if not res.hit else str(res.damage)
+		var label := ("IMMUNE" if res.get("immune", false) else "MISS") if not res.hit else str(res.damage)   # D209
 		if res.crit: label += "  CRIT"
 		if res.glance: label += "  glance"
 		if res.resisted: label += "  resisted"
@@ -1194,14 +1204,14 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	for k in results.size():
 		var t: BWUnitView = targets[k]
 		var rk: Dictionary = (results[k] as Dictionary).result
-		var num := "MISS" if not rk.hit else str(rk.damage)
+		var num := ("IMMUNE" if rk.get("immune", false) else "MISS") if not rk.hit else str(rk.damage)   # D209
 		if rk.get("crit", false) and rk.hit:
 			num += "  CRIT"
 		if BWSettings.value("show_numbers"):         # ---- D124
 			feel.float_number(t, num + (("  " + label_text) if label_text != "" and k == 0 else ""), rk, 0.7)   # ---- D170
 		_float_tags(t, results[k])                   # D86/D87
 		t.refresh()
-		lines.append("%s %s" % [t.unit.name, "miss" if not rk.hit else str(rk.damage)])
+		lines.append("%s %s" % [t.unit.name, ("immune" if rk.get("immune", false) else "miss") if not rk.hit else str(rk.damage)])
 	feel.shake_blows(targets, results)               # ---- D170: gentle, scaled to the hit
 	ui.feed("%s%s → %s" % [a.unit.name, (" " + label_text) if label_text != "" else "", ", ".join(lines)])
 	await _hold(0.45)
@@ -1312,6 +1322,8 @@ func _dodge_shift(a: BWUnitView, t: BWUnitView) -> void:
 ## pistols fire a BULLET with its tracer and a muzzle flash, spells and
 ## reach weapons send a spinning BOLT wrapped in the element aura.
 func _projectile(a: BWUnitView, d: BWUnitView, spell: bool, element: String = "", hit: bool = true) -> float:
+	if not spell and a.unit.imbue() != "":
+		element = a.unit.imbue()                        # ---- D182: an imbued weapon's shot carries its element
 	if ranged and ranged.handles(a, spell):          # ---- D165: arrows / thrown blades (vfx_ranged.gd)
 		return ranged.shoot(a, d, element, hit)
 	var kind := BWProjectileFlight.kind_for(a.unit.weapon_class, spell)
@@ -1470,6 +1482,31 @@ func _float_status(v: BWUnitView, key: String, label: String, rule: String) -> v
 # ---- end D100 / D101 / D102 ----
 
 
+## D191/D195: the swap announcement is a tiny white tag (smaller than a status
+## floater; the animation carries the swap), the weapon type in sentence case:
+## a short rise, then a fade.
+func _float_swap(v: Node3D, text: String) -> void:
+	var l := Label3D.new()
+	l.text = text
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.fixed_size = true
+	l.pixel_size = 0.0016
+	l.font_size = 16
+	l.outline_size = 6
+	l.modulate = Color(0.94, 0.94, 0.96)
+	l.outline_modulate = Color.BLACK
+	l.render_priority = 20
+	l.outline_render_priority = 19
+	add_child(l)
+	l.global_position = v.global_position + Vector3(0, _label_height(v), 0)
+	var tw := create_tween()
+	tw.tween_property(l, "global_position", l.global_position + Vector3(0, 0.3, 0), 0.7).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.3).set_delay(0.45)
+	tw.parallel().tween_property(l, "outline_modulate:a", 0.0, 0.3).set_delay(0.45)
+	tw.tween_callback(l.queue_free)
+
+
 # ---------------------------------------------------------------- helpers
 
 ## D86/D87: the named riders on one blow ("Spark", "Shatter", "Backstab" ...)
@@ -1587,3 +1624,23 @@ func _pulse(e: Dictionary) -> void:
 	_shake(0.12)
 
 # ---- end D140/D145 ----
+
+
+## D181/D195: the weapon swap, ~0.5 s: the arm reaches back and the weapon in
+## hand travels to its carry spot (whoosh), the unit re-dresses, and the other
+## weapon travels from its carry spot into the hand (clink)
+## (BWCharacter.animate_swap). Hold-to-skip and Minimal: the re-dress only.
+func _animate_swap(v: BWUnitView, e: Dictionary) -> void:
+	var u := battle._unit(str(e.unit))
+	var quick := skipping or str(BWSettings.value("cutscenes")) == "minimal"
+	var ch := v.character
+	if ch == null or quick:
+		v.refresh_equipment()
+	else:
+		BWSfx.play("swing_light", v, { "pitch": 1.35, "gain_db": -8.0, "tag": "swap" })
+		await ch.animate_swap(func(): BWSfx.play("hit_block", v, { "pitch": 1.7, "gain_db": -12.0, "tag": "swap" }))
+		v.refresh_equipment()
+	_float_swap(v, BWText.weapon(str(e.get("weapon_class", ""))))   # D191: small and white, like a status tag
+	if u:
+		ui.feed("%s draws %s" % [u.name, BWRun.item_name(u.equipment.get("main_hand", {}))])
+		ui.set_acting(u, battle.tiles)

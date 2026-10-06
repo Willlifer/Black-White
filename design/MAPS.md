@@ -315,7 +315,7 @@ rules are ELEMENTS.md §5.5. In short:
   ignites grass (restored entries count as spread, not cast).
 - Perks read it as normal ground: Undertow pulls toward static water 3,
   Shadowstep jumps between static dark hexes, Coal Engine and Heat Rush run
-  on static fire, Waterwalking crosses static water free.
+  on static fire, Waterwalking crosses its first static water hex each turn free (D204).
 - **The look** (BWBoardView, D116): an inlaid rim cut into the tile, an ink
   ring, a band in the element's colour, an inner ink ring, and six ink
   wedges notched in from the corners with a small colour lozenge at each
@@ -414,7 +414,7 @@ Walking the causeways is fast but leaves a unit standing in a line. Wading
 is slow. The island is the high point in the middle, but anyone reaching it
 stands in a ring of deep water: one thunder detonation there is a 23% blast
 with half splash. **Undertow** turns the whole lake into a magnet, because
-static water 3 always exists. **Waterwalking** makes the lake a road.
+static water 3 always exists. **Waterwalking** makes one lake hex a turn free (D204).
 **Flow State**, **Tidal Guard** and **Current Push** have water everywhere.
 
 ## 7. Catacombs (`catacombs.json`, 13×13, 159 cells, 1 static, 58 seeded)
@@ -541,6 +541,59 @@ seeded shuffle of the run's seed (`BWRun.shuffled_maps`, its own rng, so loot
 rolls don't move): nine maps for nine slots, no repeats. The order is saved
 (`map_order`); an older save re-derives it from its seed. The Bridge is back
 in the pool.
+
+## Rooms: the map queue (D186–D190, D208)
+
+*Refines D145: the shuffle is now a queue, and each fight from 3 on offers two maps.*
+**Fights 1 and 2 have no room choice** (D208): they go straight to one battle
+on the queue's front map against the Standard squad, with no room screen.
+From fight 3, before every fight except the Obelisks (4) and the Giant, the
+run offers two rooms (`BWRooms`, src/core/rooms.gd), each with its own map and
+enemies: Standard takes the queue's first map, Hard the second. The map you
+play leaves the queue; the **unchosen map goes to the back** of the queue, so
+it can come back, but the next offer shows fresh maps first. Always taking
+Standard plays all nine pool maps once (queue slots 0, 1, 2, 4, 6, 8, 5, 3, 7
+of the shuffle). `map_for(n)` is the chosen room's map for the current fight
+and a projection (every room Standard) for later fights. The queue, the
+current offer and the played rooms are saved (save v7; a room may carry an
+`encounter`).
+
+## Special encounters (D208–D213)
+
+From fight 3, about a third of the offers (`BWEncounters.RATE` 0.34, seeded per
+run and fight) put a **special encounter** in the Hard room's place, on the
+Hard room's map. It is a Hard room: the Hard tag and Hard pay (4 drops a tier
+up on a win, whatever the head count), and nobody from it can be recruited. It
+is built when met at the **squad's level** (enemy level = squad level), base
+stats from the class profiles × the fight's curve multiplier (held to
+0.9–1.1, since there is no stage lag) × the Hard ×1.18 × the kind's own knob
+(`src/core/encounters.gd`, tuned in D212):
+
+| Encounter | Squad | Rules | Card hint |
+|---|---|---|---|
+| **Horde** | 10 grunts: sword / hatchet / axe / lance, elementless, no armour | low HP (a share of their own HP) | Ten weak foes |
+| **Colossus** | 1 spear fighter on 7 hexes (size 2), elementless | a big HP pool; reach 2; **line thrust**: its basic hits every foe on the 3 hexes straight out from its body toward the target (the rest at 75%); can't be displaced | One giant spear |
+| **Blanks** | 3, random weapons, no element | **immune to elemental damage** and every element effect; **×2 from melee** physical strikes | Immune to elements, ×2 from melee |
+| **Elemental Beings** | 3, each a random (different) element and weapon | **immune to physical damage** | Immune to physical: use element skills and the ground |
+
+**Damage classes** (author's ruling, `BWFormulas.damage_class`, the one place):
+- **Physical**: weapon basic attacks, even with an imbued weapon; weapon skills cast without an element; slams.
+- **Elemental**: any skill cast with an element; staff spells (the staff's basic too); tile damage (fire, dark, shroud, steam, eruptions); detonations; chain arcs.
+- Neither: obelisk pulses, thorns, Death Knell, Covering shares.
+
+An immune blow deals 0 and carries nothing (no status, no knockback); the
+forecast says "Immune: physical" / "Immune: elemental" and the view floats
+IMMUNE. Against a Blank an imbued basic strikes as plain steel: no element
+bonus, no paint, no element riders, and no elemental status lands on it.
+Melee is the D142 split (daggers and staves only adjacent). The AI reads all
+of it from the forecasts (an immune blow is no target), so both sides play
+the counters without special cases.
+
+**Spawns** (D211): enemy i takes spawn i; past the map's three (the Horde) or
+where a footprint doesn't fit (the Colossus), the free hex nearest the
+spawns, inside the map's enemy deploy zone first (`BWBattle.enemy_layout`,
+shared with the pre-battle screen). The turn order shows 8 + 5 portraits and
+a "+N" for the rest of a crowd.
 
 ## 10. Obelisks (`obelisks.json`, 17×13, 173 cells, 31 seeded), objective map (D140–D145)
 

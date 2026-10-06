@@ -1,12 +1,13 @@
 class_name BWItemCard
 extends PanelContainer
-## The item detail card, read BEFORE committing (equipment, shop, re-imbue):
+## The item detail card, read BEFORE committing (equipment, shop, scrolls):
 ##   name in the element colour, tier badge, kind and infusion
 ##   stat lines with the delta against what the unit wears in that slot now
 ##     (+2 in white, −1 dimmed, ±0 faint)
-##   the enchantment's passive (its effect_text) or "No passive"
+##   the enchantment's passive (its effect_text) or "No passive"; a cursed
+##     row (D201) carries the curse mark and spells out its cost
 ##   the ability it teaches after BWRun.LEARN_BATTLES battles worn
-##   whether this unit can equip it (weapon tier vs expertise)
+##   for a weapon, its expertise line (anyone can wield it, D180)
 ## Frame weight (BWStyle.frame_style), the same as the combat unit cards.
 
 const W := 420.0
@@ -19,6 +20,8 @@ var _vs: Label
 var _stats: GridContainer
 var _passive: RichTextLabel
 var _teach: RichTextLabel
+var _teach_title: Label
+var _passive_title: Label
 var _check: RichTextLabel
 var _hint: Label
 var _empty: Label
@@ -72,10 +75,12 @@ func _init() -> void:
 	_stats.add_theme_constant_override("h_separation", 18)
 	_stats.add_theme_constant_override("v_separation", 2)
 	_body.add_child(_stats)
-	_body.add_child(BWStyle.section_label("Passive"))
+	_passive_title = BWStyle.section_label("Passive")
+	_body.add_child(_passive_title)
 	_passive = _rich(BWStyle.F_SMALL - 2)
 	_body.add_child(_passive)
-	_body.add_child(BWStyle.section_label("Teaches after %d battles worn" % BWRun.LEARN_BATTLES))
+	_teach_title = BWStyle.section_label(TEACH_TITLE)
+	_body.add_child(_teach_title)
 	_teach = _rich(BWStyle.F_SMALL - 2)
 	_body.add_child(_teach)
 	_body.add_child(HSeparator.new())
@@ -103,6 +108,7 @@ func _rich(fs: int) -> RichTextLabel:
 
 
 const EMPTY_TEXT := "Hover or select an item to read it before you equip it."
+const TEACH_TITLE := "Teaches after %d battles worn" % BWRun.LEARN_BATTLES
 
 
 ## The resting state; `text` for this once ("Head: empty ..."), else the default.
@@ -126,17 +132,26 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 		return
 	_body.visible = true
 	_empty.visible = false
+	_stats.visible = true
+	_passive_title.visible = true
+	_teach_title.visible = true
 	_icon.set_item(item)
 	var col := BWGearText.readable(BWGearText.item_color(item))
 	_name.text = "[b][color=#%s]%s[/color][/b]" % [BWGearText.hex(col), BWGearText.plain_name(item)]
 	_kind.text = "%s   ·   Tier %s" % [BWGearText.kind(item), str(item.tier)]
+	if BWEffects.cursed(BWGearText.enchant(item)):
+		_kind.text += "   ·   %s cursed" % BWRun.CURSE_MARK       # D201: the cost is spelled out under Passive
 	for c in _infusion.get_children():
 		c.queue_free()
 	var el := BWGearText.item_element(item)
 	_infusion.add_child(BWGearText.Swatch.new(el, 14.0))
 	var il := Label.new()
 	il.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-	il.text = ("%s infusion" % el.capitalize()) if el != "" else "No infusion"
+	var weapon := str(item.slot) == "main_hand"
+	if weapon:                                   # D182: a weapon's element is its imbue
+		il.text = ("Imbued with %s" % el.capitalize()) if el != "" else "No imbue (tiers C and up carry one)"
+	else:
+		il.text = ("%s infusion" % el.capitalize()) if el != "" else "No infusion"
 	il.add_theme_color_override("font_color", BWGearText.readable(BWLook.element_color(el)) if el != "" else BWStyle.FAINT)
 	_infusion.add_child(il)
 	# stats with deltas
@@ -190,7 +205,16 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	if p == "":
 		_passive.text = "[color=#%s]No passive[/color]" % BWGearText.hex(BWStyle.FAINT)
 	else:
-		_passive.text = "[color=#%s]■[/color] %s" % [BWGearText.hex(col), BWGlossary.markup(p)]
+		_passive.text = "[color=#%s]■[/color] %s" % [BWGearText.hex(col if not weapon else BWStyle.TEXT), BWGlossary.markup(p)]
+	_passive.text += curse_line(BWGearText.enchant(item))       # D201
+	if weapon and el != "":                      # D182: the imbue is the weapon's second enchantment
+		var ec := BWGearText.hex(BWGearText.readable(BWLook.element_color(el)))
+		_passive.text += "
+[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]
+		var ie := BWData.row("enchantments", str(item.get("imbue_enchant", "")))
+		if not ie.is_empty():                    # D206: the imbue's own element enchantment (while drawn)
+			_passive.text += "\n[color=#%s]■ %s imbue · %s:[/color] %s%s" % [ec, el.capitalize(), BWGearText.row_name(ie),
+				BWGlossary.markup(str(ie.get("effect_text", ""))), curse_line(ie)]
 	# teaches
 	var t := BWGearText.teaches(item)
 	if t.is_empty():
@@ -212,5 +236,50 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 		_check.visible = true
 		var ck := BWGearText.equip_check(run, u, item)
 		_check.text = ("[b]✓[/b]  %s" % ck[1]) if ck[0] else "[color=#%s][b]✕[/b]  %s[/color]" % [BWGearText.hex(BWStyle.TEXT_DIM), ck[1]]
+	_hint.text = str(opts.get("hint", ""))
+	_hint.visible = _hint.text != ""
+
+
+## D201: a cursed row's cost, spelled out under its passive ("" when not cursed).
+static func curse_line(row: Dictionary) -> String:
+	if row.is_empty() or not BWEffects.cursed(row):
+		return ""
+	return "\n[b]%s Cursed:[/b] %s" % [BWRun.CURSE_MARK, BWGlossary.markup(str(row.get("cost_text", "")))]
+
+
+## D203: an imbuement scroll (BWRun.scrolls): its element, the row it holds,
+## what it does to armour and to a weapon, and its price. opts: hint, pay
+## (the loose items picked so far).
+func show_scroll(s: Dictionary, opts: Dictionary = {}) -> void:
+	if s.is_empty():
+		clear()
+		return
+	_body.visible = true
+	_empty.visible = false
+	_icon.set_item(s)
+	var el := str(s.get("element", ""))
+	var row := BWData.row("enchantments", str(s.get("enchant", "")))
+	var col := BWGearText.readable(BWLook.element_color(el))
+	var cursed := BWEffects.cursed(row)
+	_name.text = "[b][color=#%s]Scroll of %s%s[/color][/b]" % [BWGearText.hex(col), el.capitalize(), (" " + BWRun.CURSE_MARK) if cursed else ""]
+	_kind.text = "Imbuement scroll   ·   Tier %s" % str(s.get("tier", "E"))
+	for c in _infusion.get_children():
+		c.queue_free()
+	_infusion.add_child(BWGearText.Swatch.new(el, 14.0))
+	var il := Label.new()
+	il.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	il.text = "%s · %s" % [el.capitalize(), BWGearText.row_name(row)]
+	il.add_theme_color_override("font_color", col)
+	_infusion.add_child(il)
+	var pay: Array = opts.get("pay", [])
+	_vs.text = "" if pay.is_empty() else "Paying with: %s" % ", ".join(pay.map(func(it): return BWGearText.plain_name(it)))
+	_vs.visible = _vs.text != ""
+	_stats.visible = false
+	_passive_title.visible = false               # the scroll card is tighter: no section titles
+	_passive.text = "[color=#%s]■[/color] [b]%s[/b]: %s%s" % [BWGearText.hex(col), BWGearText.row_name(row),
+		BWGlossary.markup(str(row.get("effect_text", ""))), curse_line(row)]
+	_teach_title.visible = false
+	_teach.text = BWGlossary.markup("[b]Armour:[/b] replaces its enchantment.  [b]Weapon:[/b] imbues it with %s and this enchantment (its own enchantment stays)." % el.capitalize())
+	_check.visible = false
 	_hint.text = str(opts.get("hint", ""))
 	_hint.visible = _hint.text != ""

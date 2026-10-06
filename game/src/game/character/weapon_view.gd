@@ -196,6 +196,8 @@ func attach_to(r: BWCharacterRig) -> bool:
 		r.attach(offhand_view, off)
 		if aura_element != "":
 			offhand_view.set_aura(aura_element, aura_strength)
+		elif imbue_element != "":
+			offhand_view.set_imbue(imbue_element)
 	return true
 
 
@@ -397,9 +399,27 @@ func clear_aura() -> void:
 	aura_element = ""
 	aura_strength = 0.0
 	for mi in meshes():
-		mi.set_instance_shader_parameter("accent", Color(1, 1, 1, 0))
+		mi.set_instance_shader_parameter("accent", _imbue_accent())
 	if is_instance_valid(offhand_view):
 		offhand_view.clear_aura()
+
+
+## D182: an imbued weapon's accent (edges, gems, fletching side) carries its
+## element's colour at rest; an aura still overrides it while it burns.
+var imbue_element := ""
+
+
+func set_imbue(element: String) -> void:
+	imbue_element = element
+	if aura_element == "":
+		for mi in meshes():
+			mi.set_instance_shader_parameter("accent", _imbue_accent())
+	if is_instance_valid(offhand_view):
+		offhand_view.set_imbue(element)
+
+
+func _imbue_accent() -> Color:
+	return Color(BWLook.element_color(imbue_element), 0.9) if imbue_element != "" else Color(1, 1, 1, 0)
 
 
 func has_aura() -> bool:

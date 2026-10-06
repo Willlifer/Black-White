@@ -93,17 +93,6 @@ func on_start() -> void:
 		_say("battle_start", sq[rng.randi() % sq.size()], null, true)
 
 
-## D129: a rogue refuses orders, its first turn each battle: the line as a
-## bubble over it, its voice (a laugh at its pitch), and the feed. Always said.
-func disobey(u: BWUnit, line: String) -> void:
-	if u == null:
-		return
-	_bubble(u, line)
-	BWVoice.say(self, "laugh", float(u.cosmetics.get("voice_pitch", 1.0)))
-	screen.ui.feed("[i]%s: “%s”[/i]" % [u.name, line])
-	_last_time = Time.get_ticks_msec() / 1000.0
-
-
 func on_won() -> void:
 	var sq := _squad()
 	if not sq.is_empty():

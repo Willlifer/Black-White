@@ -12,8 +12,10 @@ extends SceneTree
 ##   branch      everyone Branches out
 ##   wander      everyone Wanders
 ##   mixed       slots 1-4 Specialize, 5 Branches out, 6 Wanders (recruits Specialize)
-## Found weapons are equipped only in the unit's own class or one it has
-## expertise in; rogues (Wander's jackpot) still deploy, and play themselves.
+## D175: a day offers each unit two of the three, so a policy is a preference:
+## its choice when offered, else the first offered of FALLBACK's order.
+## Branch out takes its first card (D176). Found weapons are equipped only in
+## the unit's own class or one it has expertise in.
 ## Prints win rate and rounds per fight, survivors, and the Giant's HP left.
 
 const POLICIES := {
@@ -24,11 +26,22 @@ const POLICIES := {
 }
 
 
+## When the policy's choice isn't offered today (D175), the first offered of these.
+const FALLBACK := ["specialize", "wander", "branch_out"]
+
+
 ## The policy's choice for squad slot i (a list shorter than the squad repeats
-## its first entry: one-word policies, recruits under "mixed").
-static func choice_for(pol: String, i: int) -> String:
+## its first entry: one-word policies, recruits under "mixed"), among the
+## day's `offered` choices (BWRun.day_choices; empty = any).
+static func choice_for(pol: String, i: int, offered: Array = []) -> String:
 	var l: Array = POLICIES[pol]
-	return str(l[i] if i < l.size() else l[0])
+	var want := str(l[i] if i < l.size() else l[0])
+	if offered.is_empty() or want in offered:
+		return want
+	for c in FALLBACK:
+		if c in offered:
+			return c
+	return str(offered[0])
 
 
 func _init() -> void:
@@ -47,7 +60,6 @@ func _init() -> void:
 		for f in BWRun.BOSS_FIGHT:
 			wins.append(0); rounds.append([]); alive.append(0)
 		var boss_left: Array = []
-		var rogues := 0
 		for s in runs:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = seed0 + s
@@ -88,13 +100,11 @@ func _init() -> void:
 					break
 				var plan: Array = []
 				for i in run.squad.size():
-					plan.append([run.squad[i].id, choice_for(pol, i)])
+					plan.append([run.squad[i].id, choice_for(pol, i, run.day_choices(run.squad[i]))])
 				run.progress_day(plan)
 				for u in run.squad:
 					BWPicks.auto_resolve(u)
-			rogues += run.squad.filter(func(u): return u.rogue).size()
 		var out: PackedStringArray = ["POLICY %s (%d runs)" % [pol, runs]]
-		out.append("  rogues at the end: %d" % rogues)
 		for f in BWRun.BOSS_FIGHT:
 			var r: Array = rounds[f]
 			r.sort()

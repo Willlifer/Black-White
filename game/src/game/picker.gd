@@ -1,9 +1,9 @@
 class_name BWPicker
 extends Control
 ## The pick panel (D90/D91): a centred box of cards over a dim scrim, one
-## card per option of a BWPicks request. Element perks show the element's
-## five perks (owned ones greyed); a weapon-skill pick shows "Improve" for
-## each skill the unit knows and "Learn" for each it could learn.
+## card per option of a BWPicks request. D174: two cards, drawn at random
+## (BWPicks.options): two element perks the unit doesn't own, or two of
+## "Improve" a known skill / "Learn" a new one.
 ##
 ##   var p := BWPicker.new(unit, request, "Rank up")
 ##   add_child(p)                    # anywhere: it fills its parent's rect
@@ -142,10 +142,9 @@ func _subtitle() -> String:
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		var n := BWPicks.perks_of(el).size()
-		return "Affinity rank %d in %s: pick %d of %d. Rank %d grants them all." % [unit.affinity_rank(el), el,
-			BWPicks.owned(unit, el).size() + 1, n, BWPicks.ALL_RANK]
-	return "A new expertise letter: improve a skill you know, or learn a new one. You equip up to %d." \
-		% BWUnit.loadout_cap(str(request.get("weapon", "")))
+		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank %d grants them all." % [
+			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n, BWPicks.ALL_RANK]
+	return "A new expertise letter: two ways to grow, drawn for you. You equip up to %d." % BWUnit.loadout_cap(str(request.get("weapon", "")))
 
 
 ## Mid-fight: keep the top of the screen (the unit, its marked tile) clear.

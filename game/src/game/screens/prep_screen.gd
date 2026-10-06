@@ -98,7 +98,7 @@ func _build_ui() -> void:
 	# on to the first fight
 	_cont = BWDowntimeWidgets.ProgressArrow.new()
 	_cont.lines = ["CONTINUE", "TO FIGHT %d" % run.fight]
-	_cont.sub_text = "%s  ·  Enter" % str(BWBoard.load_file("res://maps/%s.json" % run.map_for(run.fight)).name)
+	_cont.sub_text = ("Choose a room  ·  Enter" if BWRooms.has_choice(run.fight) else "Enter")     # D190; D208: no room before fight 3
 	_cont.set_count(_views.size(), _views.size())
 	_cont.anchor_left = 1.0
 	_cont.anchor_right = 1.0

@@ -78,6 +78,101 @@ class ChoiceTile:
 		draw_string(f, Vector2(size.x - 20, 22), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ink.r, ink.g, ink.b, 0.4))
 
 
+## D176: Branch out with its two cards shown before committing: the frame
+## and name like a ChoiceTile, and under them one card per pairing (the new
+## element in its colour, "+ the <class>"). A card press is the choice;
+## `picked(i)` fires. `chosen` = the card taken (-1 none).
+class BranchTile:
+	extends Control
+	signal picked(i: int)
+	var cards: Array = []
+	var chosen := -1
+	var buttons: Array = []
+
+	func _init(p_cards: Array, first_key: int) -> void:
+		cards = p_cards
+		custom_minimum_size = Vector2(300, 128)
+		mouse_filter = Control.MOUSE_FILTER_PASS
+		var row := HBoxContainer.new()
+		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		row.offset_left = 10
+		row.offset_right = -10
+		row.offset_top = 40
+		row.offset_bottom = -10
+		row.add_theme_constant_override("separation", 10)
+		add_child(row)
+		for i in cards.size():
+			var b := BranchCard.new(cards[i], str(first_key + i), self, i)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.pressed.connect(func(): picked.emit(i))
+			row.add_child(b)
+			buttons.append(b)
+
+	func set_chosen(i: int) -> void:
+		chosen = i
+		queue_redraw()
+		for b in buttons:
+			b.queue_redraw()
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var lit := chosen >= 0
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.07, 0.07, 0.08, 0.94)
+		sb.set_corner_radius_all(8)
+		sb.border_color = Color.WHITE if lit else Color(1, 1, 1, 0.55)
+		sb.set_border_width_all(3 if lit else 1)
+		sb.anti_aliasing = true
+		draw_style_box(sb, r)
+		BWDowntimeWidgets.draw_icon(self, "branch_out", Rect2(Vector2(14, 8), Vector2(26, 26)), Color.WHITE)
+		var f := get_theme_font("font", "Label")
+		draw_string(f, Vector2(48, 29), str(BWDowntimeWidgets.info("branch_out")[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, BWStyle.F_BODY + 2, Color.WHITE)
+		draw_string(f, Vector2(0, 28), "take one  ", HORIZONTAL_ALIGNMENT_RIGHT, size.x - 8, 14, Color(1, 1, 1, 0.45))
+
+
+## One Branch out card inside a BranchTile.
+class BranchCard:
+	extends Button
+	var opt: Dictionary
+	var key := ""
+	var tile
+	var index := 0
+
+	func _init(o: Dictionary, k: String, t, i: int) -> void:
+		opt = o
+		key = k
+		tile = t
+		index = i
+		focus_mode = Control.FOCUS_NONE
+		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+			add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var el := str(opt.get("element", ""))
+		var ec := BWLook.element_color(el) if el != "" else Color.WHITE
+		var on: bool = tile.chosen == index
+		var hover := is_hovered()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.97, 0.97, 0.97) if on else (Color(0.16, 0.16, 0.18, 0.96) if hover else Color(0.04, 0.04, 0.05, 0.95))
+		sb.set_corner_radius_all(6)
+		sb.border_color = ec if (hover or on) else Color(ec.r, ec.g, ec.b, 0.7)
+		sb.set_border_width_all(3 if (hover or on) else 2)
+		sb.border_width_left = 9
+		sb.anti_aliasing = true
+		draw_style_box(sb, r)
+		var f := get_theme_font("font", "Label")
+		var ink := Color.BLACK if on else Color.WHITE
+		draw_string(f, Vector2(size.x - 18, 18), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(ink.r, ink.g, ink.b, 0.4))
+		var name_col := ec.darkened(0.25) if on else BWGearText.readable(ec).lightened(0.35 if ec.get_luminance() < 0.3 else 0.0)
+		draw_string(f, Vector2(18, size.y * 0.5 - 2), el.capitalize() if el != "" else "—", HORIZONTAL_ALIGNMENT_LEFT, size.x - 30, BWStyle.F_BODY + 2, name_col)
+		var wc := str(opt.get("weapon", ""))
+		if wc != "":
+			draw_string(f, Vector2(18, size.y * 0.5 + 22), "+ the " + BWRun.class_name_of(wc), HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, BWStyle.F_SMALL, ink)
+
+
 ## A locked-in action under a unit's spotlight: a white chip with the glyph
 ## and a word (the element's name in its colour), or an empty dashed slot.
 class Chip:

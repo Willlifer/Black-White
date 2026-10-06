@@ -314,6 +314,10 @@ func test_overcap_mid_fight(t) -> void:
 	var pend := b.pending_picks("player")
 	t.eq(pend[0][1].kind, "skill", "a skill pick owed")
 	var learn := ""
+	for k in 64:                                     # D174: re-salt until a Learn is among the two
+		if BWPicks.options(me, pend[0][1]).any(func(o): return o.kind == "learn"):
+			break
+		me.pick_seed += 1
 	for o in BWPicks.options(me, pend[0][1]):
 		if o.kind == "learn":
 			learn = o.skill
@@ -335,7 +339,7 @@ func test_improve_needs_a_plus_rider(t) -> void:
 	BWPicks.auto_resolve(u)
 	u.expertise["sword"] = 10
 	var req := BWPicks.next_request(u)
-	var imp := BWPicks.options(u, req).filter(func(o): return o.kind == "improve")
+	var imp := BWPicks.all_options(u, req).filter(func(o): return o.kind == "improve")
 	t.ok(not imp.is_empty(), "something improvable")
 	for o in imp:
 		var row := BWSkills.get_skill(o.skill)
@@ -361,8 +365,8 @@ func test_enemy_scaling(t) -> void:
 	t.eq(BWRun.enemy_stage(5), 3, "fight 5 uses fight 3 (D133: two behind for 3-5)")
 	t.eq(BWRun.enemy_stage(7), 6, "fight 7 uses fight 6 (one behind for 6-8)")
 	t.eq(BWRun.enemy_stage(9), 9, "fight 9 is level with you")
-	# fight: [tier, level, expertise rank]
-	var want := { 1: ["E", 1, 0], 5: ["D", 2, 1], 7: ["C", 4, 2], 9: ["A", 6, 4] }
+	# fight: [tier, level, expertise rank]; D194: an enemy's level is its stage
+	var want := { 1: ["E", 1, 0], 5: ["D", 3, 1], 7: ["C", 6, 2], 9: ["A", 9, 4] }
 	for n in want:
 		var es := run.enemies_for(n)
 		for u in es:
@@ -392,7 +396,10 @@ func test_enemy_curve(t) -> void:
 			for k in BWUnit.STATS:
 				base += int(row[k])
 				now += int(u.stats[k])
-			t.eq(now, roundi(base * c.mult), "fight %d: %s's base stats total x%.2f" % [n, u.name, c.mult])
+			if u.level == 1:
+				t.eq(now, roundi(base * c.mult), "fight %d: %s's base stats total x%.2f" % [n, u.name, c.mult])
+			else:                        # D194: levelled first (its stage), then scaled
+				t.ok(now >= roundi(base * c.mult), "fight %d: %s levelled, then x%.2f" % [n, u.name, c.mult])
 			t.eq(u.hp, u.max_hp(), "HP follows CON")
 	t.ok(BWRun.enemy_curve(1).mult < 1.0, "fight 1: below full strength")
 	# D139: armour 0 / 1 / 2 / full by fight, at the stage's tier

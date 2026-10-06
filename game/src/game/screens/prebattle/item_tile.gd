@@ -111,12 +111,17 @@ func _draw() -> void:
 	if item.is_empty():
 		_draw_empty(r)
 	else:
-		var tex := BWItemIcons.for_item(item)
-		if tex:
+		var tex: Texture2D = null if str(item.get("kind", "")) == "scroll" else BWItemIcons.for_item(item)
+		if str(item.get("kind", "")) == "scroll":           # D203: drawn, not rendered
+			BWItemIcons.draw_scroll(self, r.grow(-s.x * 0.08), str(item.get("element", "")))
+		elif tex:
 			draw_texture_rect(tex, r.grow(-6), false)
 		else:
 			# not rendered yet: the slot glyph as a placeholder
 			_slot_glyph(str(item.get("slot", "")), r.grow(-s.x * 0.28), Color(1, 1, 1, 0.25))
+		if BWEffects.cursed(str(item.get("enchant", ""))):    # D201: the curse mark
+			var cp := maxf(16.0, s.x * 0.22)
+			BWItemIcons.draw_curse(self, Vector2(s.x - cp - 4, 4), cp)
 		if blocked:
 			draw_rect(r.grow(-1), Color(0, 0, 0, 0.55))
 			for k in range(-int(s.x), int(s.x), 10):

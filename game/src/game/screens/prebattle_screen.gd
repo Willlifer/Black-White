@@ -2,7 +2,7 @@ class_name BWPrebattleScreen
 extends Node3D
 ## Brief: review units, equip skills/armour/weapons, check stats and
 ## affinities; select 3; place them in the rows opposite the enemy start;
-## "Begin battle". The shop (1-for-1 trades) and re-imbue live here too,
+## "Begin battle". The shop (1-for-1 trades, imbuement scrolls, D203) lives here too,
 ## because the brief allows inventory changes at any time.
 ##
 ## Layout (1600×900 design space, BWStyle weights):
@@ -13,7 +13,7 @@ extends Node3D
 ##                empty ground orbits, right-drag pans, wheel zooms, Q/E
 ##                rotate, Space recentres), fitted so every deploy hex and
 ##                the enemy start sit in the free space between the panels
-##   bottom       Info · Equipment · Shop & Re-imbue · Begin battle
+##   bottom       Info · Equipment · Shop · Begin battle
 ##   overlays     BWGearPanel (paperdoll + inventory) and BWShopPanel, over
 ##                the left and centre; the stat panel stays visible beside them
 ## Placement (author, 10/4: "click and drag to place … it defaults to swapping"):
@@ -39,6 +39,7 @@ var _sel: BWUnit
 var _deployed: Array = []        # BWUnit, up to 3
 var _placed := {}                # unit id -> Vector2i
 var _views := {}                 # unit id -> BWUnitView (placed only)
+var _enemy_at: Array = []        # D211: where each enemy starts (BWBattle.enemy_layout)
 var _enemies: Array = []         # BWUnit
 var _enemy_views := {}           # unit id -> BWUnitView
 var _ui: CanvasLayer
@@ -80,12 +81,13 @@ func _ready() -> void:
 	rig.clicked.connect(_on_map_click)
 	# Show who you're facing at their start.
 	_enemies = run.enemies_for(run.fight)
+	_enemy_at = BWBattle.enemy_layout(_board, _enemies, _board.spawns.player)   # D211: a Horde fans out, a Colossus fits
 	for i in _enemies.size():
 		var fv := BWUnitView.new()
 		_enemies[i].team = "enemy"
 		add_child(fv)
 		fv.setup(_enemies[i])
-		fv.position = _bv.top_center(_board.spawns.enemy[i])
+		fv.position = _bv.top_center(_enemy_at[i])
 		fv.face(_bv.top_center(_board.spawns.player[0]))
 		_enemy_views[_enemies[i].id] = fv
 	# D156: render every portrait the fight will show now, one per ~2 frames,
@@ -250,7 +252,7 @@ func _build_ui() -> void:
 	var info := _bar_button(bar, "Info", open_codex)
 	info.tooltip_text = "The codex: stats, elements, weapons, terrain  [I]"
 	_bar_button(bar, "Equipment", func(): _open_overlay(_equip))
-	_bar_button(bar, "Shop & Re-imbue", func(): _open_overlay(_shop))
+	_bar_button(bar, "Shop", func(): _open_overlay(_shop))   # D202: re-imbue is gone; scrolls live in the shop
 	_begin = _bar_button(bar, "Begin battle", _try_begin)
 	_begin.custom_minimum_size = Vector2(200, 0)
 
@@ -676,7 +678,7 @@ func _update_hover(p: Vector2) -> void:
 	else:
 		var h := _bv.pick(_cam, p)
 		for i in _enemies.size():
-			if i < _board.spawns.enemy.size() and _board.spawns.enemy[i] == h:
+			if i < _enemy_at.size() and (_enemy_at[i] == h or BWHex.distance(_enemy_at[i], h) < _enemies[i].size):
 				u = _enemies[i]
 		if u == null:
 			id = _unit_under(p, _views)

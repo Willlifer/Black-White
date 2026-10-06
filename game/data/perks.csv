@@ -1,5 +1,5 @@
 id,element,name,effect_text,effect_key,params
-water_walk,water,Waterwalking,Entering a water hex costs you 0 move at any level.,move_cost,on=water;cost=0
+water_walk,water,Waterwalking,The first water hex you cross each turn costs no move.,move_cost,on=water;cost=0;once=1
 water_flow,water,Flow State,You and your allies standing in water get +3/+6/+9 avoid (water 1/2/3).,stand_on_mod,on=water;side=def;stage=avoid;per_point=3;team=1
 water_push,water,Current Push,Attacking from water: +5/+10/+15% damage (water 1/2/3).,stand_on_mod,on=water;side=att;stage=dmg;per_point=5
 water_guard,water,Tidal Guard,While you stand in water: +15 glance chance per water level (15/30/45).,stand_on_mod,on=water;side=def;stage=glance;per_point=15

@@ -33,6 +33,11 @@ func _ready() -> void:
 	_learn(players[0], "transfer")
 	players[0].stats["spd"] = 40     # the staff first, for the Transfer clicks
 	_learn(players[2], "fan_of_knives")
+	# D181: the axe holder carries a bow too (the swap probe)
+	var kit := BWRun.new()
+	players[1].equipment["main_hand"] = kit.make_item(players[1].weapon_model, "E")
+	players[1].equipment["second"] = kit.make_item("shortbow", "C")
+	players[1].sync_weapon()
 	screen = BWCombatScreen.new()
 	screen.configure("res://maps/arena.json", players, enemies, [], 3)
 	get_parent().add_child.call_deferred(screen)
@@ -113,6 +118,8 @@ func _run() -> void:
 		if p.team != "player":
 			await _wait_ready()
 			continue
+		if not _swap_done and not p.second_weapon().is_empty():
+			await _swap_probe(p)                     # D181
 		var reach := b.reachable(p)
 		var spot := p.pos
 		var foe: BWUnit = null
@@ -153,6 +160,7 @@ func _run() -> void:
 			await _key(KEY_T)
 			await _wait_ready()
 	_check(_fan_done, "the confirm-step skill was probed")
+	_check(_swap_done, "the weapon swap was probed")
 	var names: Array = screen.last_tiers.map(func(x): return str(x[1]))
 	_check(not names.is_empty() and names.all(func(n): return n in BWCutsceneTier.NAMES), "every blow got a tier (%s)" % ", ".join(names.slice(0, 8)))
 	_check(screen.last_tiers.any(func(x): return x[0] == "attack" and (x[1] == "minimal" or x[1] == "full")), "basic attacks play minimal (or full on a crit / KO)")
@@ -161,6 +169,60 @@ func _run() -> void:
 
 
 var _fan_done := false
+var _swap_done := false
+
+
+## D181: click "Swap weapon" (right under Attack): the class, the menu's
+## skills and the attack range change; the action and the move are unspent;
+## the button stays (D195: unlimited) and swaps back and forth.
+func _swap_probe(p: BWUnit) -> void:
+	_swap_done = true
+	var b := screen.battle
+	await _wait_ready()
+	var btn: Control = screen.ui.find_child("swap_weapon", true, false)
+	_check(btn != null and btn.is_visible_in_tree(), "the menu offers Swap weapon")
+	if btn == null:
+		return
+	var kids: Array = btn.get_parent().get_children()
+	var atk := kids.filter(func(c): return c is Button and (c as Button).text == "Attack")
+	_check(not atk.is_empty() and kids.find(btn) == kids.find(atk[0]) + 1, "directly under Attack")
+	var before: Array = b.skills_for(p).map(func(r): return str(r.key))
+	var wc0 := p.weapon_class
+	var rng0 := b.weapon_range(p)
+	if OS.get_environment("SWAP_SHOTS") != "":
+		await _shot_to(OS.get_environment("SWAP_SHOTS") + "/weapons2_menu_before.png")
+	await _move(_ctl_center(btn))
+	await _press(_ctl_center(btn), true)
+	await _press(_ctl_center(btn), false)
+	await get_tree().create_timer(0.2).timeout
+	await _wait_ready()
+	_check(p.weapon_class == "bow" and p.weapon_class != wc0, "the swap draws the bow (%s -> %s)" % [wc0, p.weapon_class])
+	_check(b.weapon_range(p) == 6 and rng0 != 6, "the attack range follows (%d -> %d)" % [rng0, b.weapon_range(p)])
+	var after: Array = b.skills_for(p).map(func(r): return str(r.key))
+	_check(after != before and after.all(func(k): return k in BWSkillRegistry.expand(p.fight_loadout("bow"))), "the action bar shows the bow's skills (%s)" % [after])
+	_check(not p.acted and b.can_move(p), "free: the action and the move are unspent")
+	if OS.get_environment("SWAP_SHOTS") != "":
+		await get_tree().create_timer(0.4).timeout
+		await _shot_to(OS.get_environment("SWAP_SHOTS") + "/weapons2_menu_after.png")
+	# D195: unlimited: the entry stays and swaps back, then forward again
+	for want in [wc0, "bow"]:
+		var again: Control = screen.ui.find_child("swap_weapon", true, false)
+		_check(again != null and again.is_visible_in_tree(), "Swap weapon is still offered (to %s)" % want)
+		if again == null:
+			return
+		await _move(_ctl_center(again))
+		await _press(_ctl_center(again), true)
+		await _press(_ctl_center(again), false)
+		await get_tree().create_timer(0.2).timeout
+		await _wait_ready()
+		_check(p.weapon_class == want, "swapped to %s (%s)" % [want, p.weapon_class])
+	_check(not p.acted and b.can_move(p), "still free after three swaps")
+
+
+func _shot_to(path: String) -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
 
 
 # ---- D160/D161 readability probe ----

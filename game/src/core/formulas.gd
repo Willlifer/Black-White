@@ -17,7 +17,7 @@ const OPPOSITE := {
 const BASE_HIT := 80.0
 const HP_BASE := 100
 const HP_PER_CON := 2           # D34 (brief said 5)
-const HP_PER_LEVEL := 10        # D137: HP grows with level, both sides
+const HP_PER_LEVEL := 15        # D137, D178: HP grows with level, both sides (was 10)
 const BASE_GLANCE := 10.0
 const BASE_AVOID := 5.0
 const BASE_RESIST := 10.0
@@ -83,17 +83,17 @@ static func _prod(mods: Array, stage: String) -> Array:
 	return [s, f, v]
 
 
-## D137: HP = 100 + 2 × CON + 10 × level. A unit with a fixed pool (the
+## D137, D178: HP = 100 + 2 × CON + 15 × level. A unit with a fixed pool (the
 ## Giant, D138) shows that instead.
 static func hp(u: BWUnit) -> Dictionary:
 	if u.fixed_hp > 0:
-		return calc("HP", u.fixed_hp, "fixed (the Giant)", "%d" % u.fixed_hp)
+		return calc("HP", u.fixed_hp, "fixed (%s)" % ("the Giant" if u.id == "boss" else "its own pool"), "%d" % u.fixed_hp)
 	var con := u.stat("con")
 	return calc("HP", hp_value(con, u.level), HP_TEXT,
 		"%d + %d × %d + %d × %d" % [HP_BASE, HP_PER_CON, con, HP_PER_LEVEL, u.level])
 
 
-const HP_TEXT := "100 + 2 × CON + 10 × level"
+const HP_TEXT := "100 + 2 × CON + 15 × level"
 
 
 static func hp_value(con: int, level: int) -> int:
@@ -239,6 +239,27 @@ static func glance_mult(mods: Array) -> Array:
 	return [mult, "" if txt == "" else "50%% reduction%s → %.0f%% damage" % [txt, mult * 100.0]]
 
 
+## D198 Advantage (Second Opinion, Stubborn): the resist is rolled twice and
+## the side holding it keeps the better roll. Mods of stage "resist_adv":
+## +1 for the attacker, -1 for the defender (both cancel). Returns
+## [sign, effective chance, label text, unit ids].
+static func resist_advantage(mods: Array, base: float) -> Array:
+	var s := 0
+	var ids: Array = []
+	var txt := ""
+	for m in mods:
+		if m.stage == "resist_adv":
+			s += signi(int(m.value))
+			ids.append(str(m.get("who", "")))
+			txt += " + " + str(m.label)
+	var r := clampf(base / 100.0, 0.0, 1.0)
+	if s > 0:
+		return [1, 100.0 * r * r, txt, ids]
+	if s < 0:
+		return [-1, 100.0 * (1.0 - (1.0 - r) * (1.0 - r)), txt, ids]
+	return [0, base, txt, ids]
+
+
 ## Crit multiplier: ×1.5 plus crit_mult mods (Serrated +0.5, Visor −0.25).
 static func crit_mult(mods: Array) -> Array:
 	var c := _pts(mods, "crit_mult")
@@ -298,6 +319,65 @@ static func resist_chance(dfn: BWUnit, element: String, mods: Array = []) -> Dic
 		"10 + %d + %.1f%s" % [r, e, m[2]])
 
 
+## D209 (author's ruling): every blow and every point of ground damage is
+## PHYSICAL or ELEMENTAL, decided here and nowhere else.
+##   PHYSICAL   weapon basic attacks, even with an imbued weapon; weapon skills
+##              cast without an element; slams (a body hitting rock or a unit)
+##   ELEMENTAL  any skill cast with an element, staff spells (basic or skill),
+##              tile damage (fire, dark, shroud, steam, eruptions), detonations
+##              and chain arcs
+##   ""         neither: obelisk pulses, thorns, Death Knell, Covering shares
+## `action`: { source: "basic" | "skill" | "tile" | "detonation" | "chain" |
+## "slam" | other, kind: WEAPON | SKILL | SPELL, element }.
+const PHYSICAL := "physical"
+const ELEMENTAL := "elemental"
+const BLANK_MELEE_MULT := 2.0
+
+
+static func damage_class(action: Dictionary) -> String:
+	var src := str(action.get("source", "basic"))
+	match src:
+		"tile", "detonation", "chain":
+			return ELEMENTAL
+		"slam":
+			return PHYSICAL
+		"basic", "skill":
+			if str(action.get("kind", "")) == SPELL:
+				return ELEMENTAL                     # staff spells
+			if src == "basic":
+				return PHYSICAL                      # even imbued
+			return ELEMENTAL if str(action.get("element", "")) != "" else PHYSICAL
+	return ""
+
+
+## D209: what a special encounter's body does to one blow of class `cls`
+## (`melee`: struck from melee reach): a forecast mod, or {}.
+##   Blank   elemental: immune; physical from melee: x2
+##   Being   physical: immune
+static func encounter_mod(dfn: BWUnit, cls: String, melee: bool) -> Dictionary:
+	match dfn.encounter:
+		"blank":
+			if cls == ELEMENTAL:
+				return { "stage": "immune", "value": 0.0, "label": "Immune: elemental", "tag": "Immune" }
+			if cls == PHYSICAL and melee:
+				return { "stage": "dmg", "value": BLANK_MELEE_MULT, "label": "×2: melee vs Blank", "tag": "×2 melee" }
+		"being":
+			if cls == PHYSICAL:
+				return { "stage": "immune", "value": 0.0, "label": "Immune: physical", "tag": "Immune" }
+	return {}
+
+
+## D209: does `dfn` take nothing from damage of class `cls`?
+static func immune_to(dfn: BWUnit, cls: String) -> bool:
+	return str(encounter_mod(dfn, cls, false).get("stage", "")) == "immune"
+
+
+## D209: a Blank strips the element riders off a basic attack (an imbued
+## weapon still cuts it, but paints, statuses and element bonuses don't land).
+static func strips_element(dfn: BWUnit) -> bool:
+	return dfn != null and dfn.encounter == "blank"
+
+
 ## Everything the pre-combat window shows, plus the expected damage.
 static func forecast(att: BWUnit, dfn: BWUnit, kind: String, power: int, element: String = "", hit_bonus: float = 0.0, crit_bonus: float = 0.0, dmg_mult: float = 1.0, mods: Array = []) -> Dictionary:
 	var magic := is_magic(kind, element)
@@ -319,16 +399,37 @@ static func forecast(att: BWUnit, dfn: BWUnit, kind: String, power: int, element
 	}
 	if magic:
 		out["resist"] = resist_chance(dfn, element, mods)
+		var adv := resist_advantage(mods, out.resist.value)
+		if not (adv[3] as Array).is_empty():
+			out["adv_units"] = adv[3]                    # spent on the roll (BWEnchant.roll_blow)
+		if int(adv[0]) != 0:
+			out["resist_adv"] = int(adv[0])
+			out["resist_base"] = float(out.resist.value)
+			out.resist = calc("Resist", adv[1], str(out.resist.formula) + "  [advantage" + str(adv[2]) + "]",
+				"%s  [%.0f%% rolled twice → %.0f%%]" % [out.resist.values, out.resist.value, adv[1]])
+	# D201 Gambler's: hits that don't crit deal a share (glances and clean hits)
+	var nx := _prod(mods, "nocrit_x")
+	out["nocrit_mult"] = float(nx[0])
+	if nx[1] != "":
+		out.crit = calc("Crit", out.crit.value, str(out.crit.formula) + "  [other hits%s]" % nx[1], str(out.crit.values) + "  [×%.2f]" % nx[0])
 	var p_hit: float = out.hit.value / 100.0
 	var p_gl: float = out.glance.value / 100.0
 	var p_cr: float = out.crit.value / 100.0
 	var p_rs: float = out.resist.value / 100.0 if magic else 0.0
 	var d: float = out.damage.value
 	# D26: on a hit, glance is rolled first; only a clean (non-glancing) hit can crit.
-	var per_hit: float = p_gl * d * out.glance_mult + (1.0 - p_gl) * (p_cr * d * out.crit_mult + (1.0 - p_cr) * d)
+	var nc: float = out.nocrit_mult
+	var per_hit: float = p_gl * d * out.glance_mult * nc + (1.0 - p_gl) * (p_cr * d * out.crit_mult + (1.0 - p_cr) * d * nc)
 	per_hit *= (1.0 - p_rs) + p_rs * RESIST_MULT
 	out["expected"] = calc("Expected damage", per_hit * p_hit,
 		"hit × (glance/crit/clean mix) × resist mix", "%.0f%% hit, %.1f per hit" % [out.hit.value, per_hit])
+	for m in mods:                                   # D209: an immune body takes nothing from this blow
+		if str(m.stage) == "immune":
+			out["immune"] = str(m.label)
+			out.damage = calc("Damage", 0, str(m.label), "0")
+			out.expected = calc("Expected damage", 0.0, str(m.label), "0")
+			out["notes"] = [str(m.label)]
+			break
 	return out
 
 
@@ -360,6 +461,10 @@ static func consume_power(base: int, per_point: int, points: int, element: Strin
 static func resolve(fc: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var r := { "hit": false, "glance": false, "crit": false, "resisted": false,
 		"damage": 0, "secondary": true, "rolls": {} }
+	if fc.has("immune"):                           # D209: nothing lands, nothing rides along
+		r.secondary = false
+		r["immune"] = true
+		return r
 	var roll := rng.randf() * 100.0
 	r.rolls["hit"] = roll
 	if roll >= fc.hit.value:
@@ -377,10 +482,17 @@ static func resolve(fc: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 		if roll < fc.crit.value:
 			r.crit = true
 			dmg *= float(fc.get("crit_mult", CRIT_MULT))   # FX hook: Serrated, Visor
+	if not r.crit:
+		dmg *= float(fc.get("nocrit_mult", 1.0))           # D201 Gambler's
 	if fc.magic:
 		roll = rng.randf() * 100.0
 		r.rolls["resist"] = roll
-		if roll < fc.resist.value:
+		var adv := int(fc.get("resist_adv", 0))
+		if adv != 0:                                      # D198 Advantage: a second roll, the better kept
+			var roll2 := rng.randf() * 100.0
+			r.rolls["resist2"] = roll2
+			roll = maxf(roll, roll2) if adv > 0 else minf(roll, roll2)
+		if roll < float(fc.get("resist_base", fc.resist.value)):
 			r.resisted = true
 			r.secondary = false
 			dmg *= RESIST_MULT

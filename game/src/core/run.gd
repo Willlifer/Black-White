@@ -23,38 +23,63 @@ const MAP_POOL := ["arena", "paintball", "bridge", "lake", "chapel", "ravine", "
 const MAPS := ["arena", "paintball", "bridge", "lake", "obelisks", "chapel", "ravine", "catacombs", "tinderbox", "forge"]
 ## D145: the shuffled pool for the nine plain slots, in slot order (fights 1-3, 5-10).
 var map_order: Array = []
+## D186-D188 rooms (BWRooms): the unplayed maps, front first (seeded from
+## map_order; the unchosen room's map goes to the back); the current fight's
+## offer { fight, rooms: [standard, hard], chosen }; and per fight played
+## ("n" -> { kind, map }).
+var map_queue: Array = []
+var room_offer := {}
+var room_log := {}
 const TIERS := ["E", "D", "C", "B", "A"]
 const TIER_RANGE := { "E": [0, 3], "D": [1, 6], "C": [2, 9], "B": [3, 12], "A": [4, 15] }
 const ARMOR_SLOTS := ["head", "chest", "legs"]
 const SLOTS := ["head", "chest", "legs", "main_hand"]
+## D180: the slot boxes a unit has: the four worn slots plus the carried weapon.
+const GEAR_SLOTS := ["head", "chest", "legs", "main_hand", "second"]
 const LEARN_BATTLES := 2          # brief: learn an item's ability after wearing it 2 battles
 const SHOP_STOCK := 5
+## D203: the stock per visit: one of each armour slot and two weapons, at the
+## current tier (traded 1-for-1 as before).
+const SHOP_SLOTS := ["head", "chest", "legs", "main_hand", "main_hand"]
+## D203: the featured imbuement scrolls, one per element, re-rolled after every
+## battle. Each holds one element row; it costs SCROLL_COST loose items.
+const SCROLL_COST := 2
 
 ## D127 downtime (replaces D37/D85's eight actions): each unit takes one of
 ## three choices a day. The screen shows only the names (author: no effect
 ## text); the rules are BWRun.downtime().
 const DOWNTIME_CHOICES := ["specialize", "branch_out", "wander"]
 const CHOICE_NAMES := { "specialize": "Specialize", "branch_out": "Branch out", "wander": "Wander" }
-const DAY_XP := 50                # every choice
 const SPECIALIZE_POINTS := 5      # half a rank (POINTS_PER_RANK 10) in the element and the weapon class
 const SPECIALIZE_ROLL := 0.5      # each: a free pick, else a find
 const BRANCH_POINTS := 10         # a full rank
 ## D129 Wander: nine effects, each rolled on its own at WANDER_ROLL.
 const WANDER_ROLL := 0.20
-const WANDER_EFFECTS := ["xp", "element", "weapon", "find_weapon", "find_armour", "recruit",
+## D179: "stat" (+1 to a random stat, for good) replaces the old +50 XP.
+const WANDER_EFFECTS := ["stat", "element", "weapon", "find_weapon", "find_armour", "recruit",
 	"status_immunity", "element_brace", "stat_buff"]
-const WANDER_XP := 50             # the "xp" effect
-const WANDER_CONSOLATION_XP := 100   # all nine missed (and no jackpot)
-## All nine missed, then this roll: +5000 XP and the unit goes rogue for good.
-## 0.8^9 x 0.05 = about 0.67% a wander (author 2026-10-05).
+const WANDER_STAT_POINT := 1      # the "stat" effect and the consolation: +1, permanent
+## All nine missed, then this roll is the jackpot: 0.8^9 x 0.05 = about 0.67%
+## a wander (author 2026-10-05). D177 (replaces +5000 XP and the rogue): the
+## nine effects are rolled again at WANDER_JACKPOT_ROLL each (one recruit a
+## day still); if that misses everything too, the consolation (+1 to a random
+## stat, D179; it was +100 XP).
 const WANDER_JACKPOT_EXTRA_ROLL := 0.05
-const WANDER_JACKPOT_XP := 5000
+const WANDER_JACKPOT_ROLL := 0.30
 const WANDER_STAT_BUFF := 10
+## D175: a day offers each unit DOWNTIME_OFFER of the three choices, drawn per
+## unit per day from the run seed (day_choices), so it is stable all day.
+const DOWNTIME_OFFER := 2
 const IMMUNE_STATUSES := ["staggered", "blinded", "pinned", "drenched", "scorched", "shrouded"]
 const SHRUG := { "staggered": "staggers", "blinded": "blinding", "pinned": "pins", "drenched": "drenching",
 	"scorched": "scorching", "shrouded": "shrouding" }
 ## D129: set by a wanderer's recruit; later wanderers that day skip the roll.
 var recruited_today := false
+## D176: the day's Branch out cards per unit id, rolled when first asked
+## (branch_preview) and kept for that day, so what the hall shows is what
+## Branch out gives. Not saved: a reload re-derives the same roll.
+var _branch_cards := {}
+var _branch_day := -1
 
 ## Save format. 1: the first; 2 (D92): adds each unit's picks (perks,
 ## known_skills, skill_ranks, skill_loadout, skill_picks). from_dict
@@ -66,7 +91,16 @@ var recruited_today := false
 ## old eight actions carries over. 5 (D150): the renamed, rolled roster —
 ## adds `roster_seed` and `roster` (the 20 rolled rows); older saves name
 ## characters that no longer exist and are refused (can_load), never migrated.
-const SAVE_VERSION := 5
+## 6 (D184): units may carry a second weapon (equipment "second") and C+
+## weapons an elemental `imbue`; a v5 save loads as is (no second weapon, no
+## imbues: both read as absent).
+## 7 (D189): the rooms: `map_queue`, `room_offer` (the two rooms on offer,
+## so a save mid-choice shows the same two) and `room_log`; an older save
+## derives them from map_order (fights already played took their D145 slot).
+## 8 (D203): the shop's seven imbuement `scrolls`; an older save rolls them.
+## 9 (D206): an imbue carries an element enchantment (`imbue_enchant`); older
+## imbued weapons roll one on load.
+const SAVE_VERSION := 9
 const OLDEST_LOADABLE := 5
 
 var rng := RandomNumberGenerator.new()
@@ -78,6 +112,7 @@ var day := 1
 var trust := {}                   # "a|b" (sorted ids) -> points
 var last_enemies: Array = []      # unit dicts from the last fight, for recruiting
 var shop: Array = []
+var scrolls: Array = []           # D203: { uid, kind: "scroll", element, enchant, tier, sold }
 var learned := {}                 # unit id -> [ability ids]
 var ability_ranks := {}           # unit id -> { ability id: rank }
 var equipped_ability := {}        # unit id -> { type: ability id }
@@ -102,8 +137,11 @@ static func start(chosen_ids: Array, p_seed: int, p_roster: Array = [], p_roster
 	r.rng.seed = p_seed
 	r.roster_rows = (p_roster if not p_roster.is_empty() else BWData.table("roster")).duplicate(true)
 	r.roster_seed = p_roster_seed if not p_roster.is_empty() else BWData.roster_seed
+	r.map_order = shuffled_maps(p_seed)          # D145
+	r.map_queue = r.map_order.duplicate()        # D187
 	for id in chosen_ids:
 		var u := BWUnit.from_roster(r.roster_row(id))
+		r.seed_unit(u)                   # D174
 		r.squad.append(u)
 		r.learned[u.id] = []
 		r.ability_ranks[u.id] = {}
@@ -157,8 +195,11 @@ func map_for(n: int) -> String:
 		return OBJECTIVE_MAP
 	if map_order.is_empty():
 		map_order = shuffled_maps(seed_value)
-	var slot := (n - 1) if n < OBJECTIVE_FIGHT else (n - 2)     # fights 1-3 -> 0-2, 5-10 -> 3-8
-	return str(map_order[slot % map_order.size()])
+		if map_queue.is_empty() and room_log.is_empty():
+			map_queue = map_order.duplicate()
+	# D187: the chosen room's map (the Standard room's until a choice; later
+	# fights: as if every room from here on were Standard).
+	return BWRooms.projected_map(self, n)
 
 
 ## D145: MAP_POOL in a Fisher-Yates shuffle on its own rng seeded from the run
@@ -207,8 +248,45 @@ func make_item(base_id: String, tier: String, enchant_id: String = "?") -> Dicti
 		"uid": "it%d" % _uid, "base": base_id, "slot": str(base.slot), "weight": str(base.weight),
 		"tier": tier, "stats": stats, "enchant": "", "worn": {},
 	}
-	item.enchant = _roll_enchant(base_id) if enchant_id == "?" else enchant_id
+	item.enchant = _roll_enchant(base_id, tier) if enchant_id == "?" else enchant_id
+	# D182: a C, B or A weapon also rolls an elemental imbue (its own rng off
+	# the item's uid, so the run's rng stream and every older roll are unchanged).
+	if str(base.slot) == "main_hand" and TIERS.find(tier) >= TIERS.find(IMBUE_TIER):
+		item["imbue"] = roll_imbue(seed_value, str(item.uid))
+		item["imbue_enchant"] = roll_imbue_enchant(seed_value, str(item.uid), str(item.imbue), tier)   # D206
 	return item
+
+
+## D182: weapons of this tier and up carry an elemental imbue as well as their enchantment.
+const IMBUE_TIER := "C"
+
+
+## D182: the imbue for a fresh weapon: one of the seven elements, from the
+## run seed and the item's uid alone.
+## D206: the imbue's element enchantment: one of that element's rows unlocked
+## at the item's tier (D200 weights), from its own rng (run seed, uid).
+static func roll_imbue_enchant(p_seed: int, uid: String, element: String, tier: String) -> String:
+	var pool: Array = []
+	for e in BWData.table("enchantments"):
+		var w := ench_weight(e, tier)
+		if w > 0 and str(e.element) == element:
+			pool.append([str(e.id), w])
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("imbue_ench|%d|%s" % [p_seed, uid])
+	return _weighted(pool, r)
+
+
+## D206 save v9: weapons imbued before the imbue carried an enchantment get one.
+static func migrate_imbues(items: Array, p_seed: int) -> void:
+	for it in items:
+		if it is Dictionary and str(it.get("imbue", "")) != "" and str(it.get("imbue_enchant", "")) == "":
+			it["imbue_enchant"] = roll_imbue_enchant(p_seed, str(it.get("uid", "")), str(it.imbue), str(it.get("tier", "C")))
+
+
+static func roll_imbue(p_seed: int, uid: String) -> String:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("imbue|%d|%s" % [p_seed, uid])
+	return BWFormulas.ELEMENTS[r.randi() % BWFormulas.ELEMENTS.size()]
 
 
 func random_item(tier: String) -> Dictionary:
@@ -216,66 +294,190 @@ func random_item(tier: String) -> Dictionary:
 	return make_item(str(all[rng.randi() % all.size()].id), tier)
 
 
-func _roll_enchant(base_id: String) -> String:
+## D200: tiers only unlock families. A row rolls from its own `tier` up; at
+## its own tier (D and up) it weighs double, so new rows show up. Cursed rows
+## weigh the same as everything else (D201).
+static func ench_weight(row: Dictionary, tier: String) -> int:
+	var t := TIERS.find(str(row.get("tier", "E")))
+	var ti := TIERS.find(tier)
+	if t < 0 or t > ti:
+		return 0
+	return 2 if t == ti and t > 0 else 1
+
+
+## A weighted pick from [[id, weight]] with one draw of `r`.
+static func _weighted(pool: Array, r: RandomNumberGenerator) -> String:
+	var total := 0
+	for p in pool:
+		total += int(p[1])
+	if total <= 0:
+		return ""
+	var k := r.randi() % total
+	for p in pool:
+		k -= int(p[1])
+		if k < 0:
+			return str(p[0])
+	return str(pool.back()[0])
+
+
+func _roll_enchant(base_id: String, tier: String = "E") -> String:
 	var pool: Array = []
 	for e in BWData.table("enchantments"):
-		if base_id in BWData.list(e.applies_to):
-			pool.append(str(e.id))
-	return pool[rng.randi() % pool.size()] if not pool.is_empty() else ""
+		var w := ench_weight(e, tier)
+		if w > 0 and base_id in BWData.list(e.applies_to):
+			pool.append([str(e.id), w])
+	return _weighted(pool, rng)
 
 
 static func item_name(item: Dictionary) -> String:
 	var base := BWData.row("equipment", item.get("base", ""))
 	var plain := str(base.get("name", item.get("base", "?")))
 	var ench := BWData.row("enchantments", item.get("enchant", ""))
+	var imb := str(item.get("imbue", ""))
+	if imb != "":
+		plain = "%s %s" % [imb.capitalize(), plain]      # D182: "Keen Fire Dagger", "Fire Flamberge of Cleaving"
 	var named := plain
 	if not ench.is_empty():
 		named = str(ench.name_pattern).replace("{item}", plain)
+		if BWEffects.cursed(ench):
+			named += " " + CURSE_MARK             # D201: a cursed row shows its mark
 	return "%s [%s]" % [named, item.get("tier", "E")]
 
 
+## D201: the curse mark in names (the tile and the card draw their own).
+const CURSE_MARK := "†"
+
+
+## The item's colour element: an armour enchantment's element, or a
+## weapon's imbue (D182).
 static func item_element(item: Dictionary) -> String:
+	var imb := str(item.get("imbue", ""))
+	if imb != "":
+		return imb
 	return str(BWData.row("enchantments", item.get("enchant", "")).get("element", ""))
 
 
-## Brief: equipping a weapon needs that weapon class's expertise at the
-## item's rank or better. Armour has no requirement.
-func can_equip(u: BWUnit, item: Dictionary) -> bool:
-	if item.slot != "main_hand":
-		return true
-	return u.expertise_rank(item.weight) >= TIERS.find(item.tier)
+## D180 (author, supersedes the brief's expertise gate): anyone can equip
+## anything. Expertise still sets hit chance and the class's skill picks.
+func can_equip(_u: BWUnit, item: Dictionary) -> bool:
+	return not item.is_empty()
 
 
-func equip(u: BWUnit, item: Dictionary) -> bool:
+## Equip a loose item. A weapon goes to the main hand, or with `slot`
+## "second" (D180) to the carried slot; what was there goes to the inventory.
+func equip(u: BWUnit, item: Dictionary, slot: String = "") -> bool:
 	if not can_equip(u, item) or not item in inventory:
 		return false
+	var to := str(item.slot) if slot == "" else slot
+	if to == BWUnit.SECOND and str(item.slot) != "main_hand":
+		return false
+	if to != BWUnit.SECOND and to != str(item.slot):
+		return false
 	inventory.erase(item)
-	var old: Dictionary = u.equipment.get(item.slot, {})
+	var old: Dictionary = u.equipment.get(to, {})
 	if not old.is_empty():
 		inventory.append(old)
-	u.equipment[item.slot] = item
-	if item.slot == "main_hand":
+	u.equipment[to] = item
+	if to == "main_hand":
 		u.weapon_class = item.weight
 		u.weapon_model = item.base
 	return true
 
 
+## D180: swap the active and the carried weapon outside a battle (the gear panel).
+func swap_weapons(u: BWUnit) -> bool:
+	return u.swap_weapons()
+
+
 func unequip(u: BWUnit, slot: String) -> void:
 	if slot == "main_hand":
-		return              # never empty-handed
+		return              # never empty-handed (the carried weapon comes off freely)
 	var old: Dictionary = u.equipment.get(slot, {})
 	if not old.is_empty():
 		u.equipment.erase(slot)
 		inventory.append(old)
 
 
+## D203: one head, one chest, one legs piece and two weapons at the current
+## tier, then the seven scrolls re-rolled.
 func restock_shop() -> void:
 	shop.clear()
-	for i in SHOP_STOCK:
-		shop.append(random_item(tier_for(fight)))
+	var tier := tier_for(fight)
+	for slot in SHOP_SLOTS:
+		var bases: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == slot)
+		shop.append(make_item(str(bases[rng.randi() % bases.size()].id), tier))
+	roll_scrolls()
 
 
-## 1-for-1 trade: give an inventory item, take a shop item.
+## D203: the seven featured scrolls for this visit: per element, one of its
+## element rows unlocked at the shop's tier (D200 weights), from its own rng
+## (run seed, fight, element), so the run's own rolls don't move.
+func roll_scrolls() -> void:
+	scrolls.clear()
+	var tier := tier_for(fight)
+	for el in BWFormulas.ELEMENTS:
+		var pool: Array = []
+		for e in BWData.table("enchantments"):
+			var w := ench_weight(e, tier)
+			if w > 0 and str(e.element) == el:
+				pool.append([str(e.id), w])
+		var r := RandomNumberGenerator.new()
+		r.seed = hash("scroll|%d|%d|%s" % [seed_value, fight, el])
+		scrolls.append({ "uid": "scroll_%s_%d" % [el, fight], "kind": "scroll", "element": el,
+			"enchant": _weighted(pool, r), "tier": tier, "sold": false })
+
+
+## D203: may `scroll` be bought with the two loose items in `give` and used on
+## `target` (an item the run owns: loose, or worn by the squad, not one given)?
+func can_use_scroll(scroll: Dictionary, give: Array, target: Dictionary) -> bool:
+	if not scroll in scrolls or scroll.get("sold", false) or str(scroll.get("enchant", "")) == "":
+		return false
+	if give.size() != SCROLL_COST or give[0] == give[1]:
+		return false
+	for g in give:
+		if not g in inventory:
+			return false
+	if target.is_empty() or target in give:
+		return false
+	return target in inventory or owner_of(target) != null
+
+
+## The squad unit wearing or carrying `item`, or null.
+func owner_of(item: Dictionary) -> BWUnit:
+	for u in squad:
+		for slot in GEAR_SLOTS:
+			if u.equipment.get(slot, {}) == item:
+				return u
+	return null
+
+
+## D203: pay two loose items for the scroll and use it on `target`. The given
+## items are gone; the scroll is spent until the next battle's re-roll.
+func use_scroll(scroll: Dictionary, give: Array, target: Dictionary) -> bool:
+	if not can_use_scroll(scroll, give, target):
+		return false
+	for g in give:
+		inventory.erase(g)
+	apply_scroll(scroll, target)
+	scroll["sold"] = true
+	return true
+
+
+## D203: what a scroll does to an item. Armour: its enchantment is overwritten
+## with the scroll's row. A weapon (D206): its imbue becomes the scroll's element
+## AND its row (the imbue's enchantment), replacing any old imbue, at any tier
+## (an E/D weapon gains one); the weapon's own enchantment stays (D38).
+## Supersedes D203's element-only weapon call.
+static func apply_scroll(scroll: Dictionary, item: Dictionary) -> void:
+	if str(item.get("slot", "")) == "main_hand":
+		item["imbue"] = str(scroll.element)          # D206: the element and its enchantment, together
+		item["imbue_enchant"] = str(scroll.enchant)
+	else:
+		item["enchant"] = str(scroll.enchant)
+
+
+## 1-for-1 trade: give an inventory item, take a shop item. (D202: re-imbue,
+## D38/D183, is gone; the shop's scrolls replace it.)
 func trade(give: Dictionary, take: Dictionary) -> bool:
 	if not give in inventory or not take in shop:
 		return false
@@ -283,28 +485,6 @@ func trade(give: Dictionary, take: Dictionary) -> bool:
 	shop.erase(take)
 	inventory.append(take)
 	shop.append(give)
-	return true
-
-
-## Read-only: would reimbue(from, to) succeed? (Same rule; for the UI.)
-static func can_reimbue(from: Dictionary, to: Dictionary) -> bool:
-	var ench := BWData.row("enchantments", from.get("enchant", ""))
-	if ench.is_empty() or from == to or from.is_empty() or to.is_empty():
-		return false
-	return (from.slot != "main_hand" and to.slot != "main_hand") or to.base in BWData.list(ench.applies_to)
-
-
-## Disenchant `from` and apply its enchantment to `to` (D38: armour
-## enchantments move between armour; weapon ones only to items they list).
-func reimbue(from: Dictionary, to: Dictionary) -> bool:
-	var ench := BWData.row("enchantments", from.get("enchant", ""))
-	if ench.is_empty() or from == to:
-		return false
-	var ok: bool = (from.slot != "main_hand" and to.slot != "main_hand") or to.base in BWData.list(ench.applies_to)
-	if not ok:
-		return false
-	to.enchant = from.enchant
-	from.enchant = ""
 	return true
 
 
@@ -378,12 +558,21 @@ const ENEMY_STAGE_LAG := 2        # the D99 lag; fights past the table use it
 ## Fight n -> [stage lag, base-stat multiplier, perks on, armour pieces].
 ## Index 0 = fight 1. D139: armour pieces (head / chest / legs, random slots,
 ## random bases and enchants at the stage's tier) ramp 0, 1, 2, then all 3.
+## D179 re-tune (a level per WON fight, no XP: the squad is ~1-2 levels lower
+## than under XP, and a loss no longer levels it): multipliers down from
+## D139's 0.9, 1.5, 2.1, 2.2, 2.1, 1.6, 1.8, 1.7, 1.6, 1.75; "mixed", 24
+## runs: wins 70 70 78 41 70 70 66 58 54 62 %, the Giant 87 %.
+## D194 re-tune (a level after every fight, LEVEL_ON_LOSS; enemy level =
+## its stage, BWRooms.LEVELS_PER_STAGE 1; enemies carry a second weapon from
+## fight 3, D193): see DECISIONS D194 for the measured table.
 const ENEMY_CURVE := [
-	[0, 0.9, false, 0], [0, 1.5, false, 1],                       # 1-2: gentle start, no perks
-	[2, 2.1, true, 2], [2, 2.2, true, 3], [2, 2.1, true, 3],      # 3-5: two fights behind (4: generic; the obelisk map tunes its own)
-	[1, 1.6, true, 3], [1, 1.8, true, 3], [1, 1.7, true, 3],      # 6-8: one behind
-	[0, 1.6, true, 3], [0, 1.75, true, 3],                        # 9-10: level with you
+	[0, 0.85, false, 0], [0, 0.95, false, 1],                     # 1-2: gentle start, no perks
+	[2, 1.7, true, 2], [2, 0.7, true, 3], [2, 1.25, true, 3],     # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
+	[1, 0.9, true, 3], [1, 1.1, true, 3], [1, 1.0, true, 3],      # 6-8: one behind
+	[0, 0.97, true, 3], [0, 1.0, true, 3],                        # 9-10: level with you
 ]
+## D193: enemies carry a second weapon (a random other class) from this fight.
+const ENEMY_SECOND_FROM := 3
 ## Gear tier -> [affinity rank in the unit's own element, expertise rank in
 ## its weapon]. Expertise also matches the tier, so the weapon is legal.
 const ENEMY_RANKS := { "E": [1, 0], "D": [1, 1], "C": [2, 2], "B": [2, 3], "A": [3, 4] }
@@ -437,28 +626,33 @@ static func scale_stats(u: BWUnit, mult: float) -> void:
 ## built at enemy_stage(n) (ENEMY_CURVE, D133): levelled, base stats scaled, geared at that stage's tier, ranked by
 ## ENEMY_RANKS and auto-picked (BWPicks.auto_resolve: perks, then improve /
 ## learn skills, data order, no rng). The boss is its own thing.
-func enemies_for(n: int) -> Array:
+func enemies_for(n: int, room: Dictionary = {}) -> Array:
+	# D186: a room's squad (`room` from BWRooms; empty = fight n's chosen room,
+	# the Standard one until a choice is made)
+	if room.is_empty() and n < BOSS_FIGHT:
+		room = BWRooms.room_for(self, n)
+	if str(room.get("encounter", "")) != "":
+		return BWEncounters.build(self, n, str(room.encounter))   # D208: a special encounter
+	var build := BWRooms.enemy_build(n, str(room.get("kind", BWRooms.STANDARD)))
 	var erng := RandomNumberGenerator.new()
-	erng.seed = seed_value * 7919 + n
+	erng.seed = seed_value * 7919 + n + (104729 if room.get("kind", "") == BWRooms.HARD else 0)
 	if n >= BOSS_FIGHT:
 		var boss := make_boss()
+		seed_unit(boss)                  # D174
 		BWPicks.auto_resolve(boss)
 		return [boss]
-	var pool: Array = []
-	for row in roster_rows:
-		if unit(str(row.id)) == null:
-			pool.append(row)
 	var out: Array = []
-	var stage := enemy_stage(n)
-	var curve := enemy_curve(n)
+	var stage := int(build.stage)        # D188: a Hard room builds further on
+	var curve := build
 	var tier := tier_for(stage)
 	var ranks: Array = ENEMY_RANKS[tier]
-	for i in DEPLOY:
-		var row: Dictionary = pool.pop_at(erng.randi() % pool.size())
+	for id in room.enemies:
+		var row: Dictionary = roster_row(str(id))
 		var u := BWUnit.from_roster(row)
 		u.id = "%s_f%d" % [u.id, n]
-		var levels := (stage - 1) * 2 / 3
-		BWProgression.add_xp(u, levels * BWProgression.XP_PER_LEVEL)
+		seed_unit(u)                     # D174: its two-card picks, from the run seed
+		var levels := int(build.levels)
+		BWProgression.level_up(u, levels)          # D179: levels, not XP
 		scale_stats(u, float(curve.mult))
 		var save := rng.state
 		rng.seed = erng.randi()
@@ -470,10 +664,23 @@ func enemies_for(n: int) -> Array:
 			var bases: Array = BWData.table("equipment").filter(func(r): return r.slot == slot)
 			var a: Dictionary = bases[erng.randi() % bases.size()]
 			u.equipment[slot] = make_item(str(a.id), tier)
+		# D193: from fight ENEMY_SECOND_FROM a carried weapon of a random
+		# other class at the same tier (and the same expertise), for the AI's swap (D181).
+		var wc2 := ""
+		if n >= ENEMY_SECOND_FROM:
+			var others: Array = weapon_classes().filter(func(c): return c != u.weapon_class)
+			wc2 = str(others[erng.randi() % others.size()])
+			var models: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc2)
+			if not models.is_empty():
+				u.equipment[BWUnit.SECOND] = make_item(str(models[erng.randi() % models.size()].id), tier)
+			else:
+				wc2 = ""
 		rng.state = save
 		if u.element != "":
 			u.affinity[u.element] = maxi(int(u.affinity.get(u.element, 0)), int(ranks[0]) * BWUnit.POINTS_PER_RANK)
 		u.expertise[u.weapon_class] = int(ranks[1]) * BWUnit.POINTS_PER_RANK
+		if wc2 != "":
+			u.expertise[wc2] = int(ranks[1]) * BWUnit.POINTS_PER_RANK
 		BWPicks.auto_resolve(u)          # D90/D99: perks and skills from those ranks, the AI's way
 		if not curve.perks:
 			u.perks.clear()              # D133: no perk picks this fight (skills stand)
@@ -508,9 +715,17 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 		report["objective"] = objectives.map(func(o): return { "id": o.id, "name": o.name, "hp": o.hp, "max": o.max_hp(), "broken": not o.alive() })
 	report["stats"] = BWBattleStats.tally(history, deployed + enemies + objectives)
 	record_stats(won, report.stats, deployed)
+	var room := BWRooms.close_fight(self)          # D186-D188: log the room, move the map queue on
+	report["room"] = str(room.get("kind", BWRooms.STANDARD))
+	report["map"] = str(room.get("map", ""))
+	if room.has("encounter"):
+		report["encounter"] = str(room.encounter)
 	if won:
-		for e in defeated:
-			var item := random_item(tier_for(fight))
+		var hard: bool = report.room == BWRooms.HARD
+		var enc: bool = room.has("encounter")         # D208: an encounter pays as a three-enemy Hard room
+		var drops := (DEPLOY if enc else defeated.size()) + (BWRooms.HARD_EXTRA_DROPS if hard else 0)
+		for i in drops:
+			var item := random_item(BWRooms.loot_tier(self, report.room))   # D188: Hard pays a tier up
 			inventory.append(item)
 			report.loot.append(item)
 	for u in deployed:
@@ -529,9 +744,15 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 	for i in deployed.size():
 		for j in range(i + 1, deployed.size()):
 			add_trust(deployed[i].id, deployed[j].id, 1)
-	last_enemies = enemies.map(func(e): return e.to_dict())
+	last_enemies = enemies.filter(func(e): return e.encounter == "").map(func(e): return e.to_dict())   # D208: encounter bodies don't join
+	# D179/D194: every fight, won or lost, levels every squad unit, deployed or benched (no XP).
+	report["levels"] = {}
+	if won or BWProgression.LEVEL_ON_LOSS:
+		for u in squad:
+			var ev: Array = BWProgression.level_up(u, 1)
+			report.levels[u.id] = ev[0].gains
 	# Author 2026-10-04 (supersedes D39): a lost fight doesn't end the run. You
-	# keep the XP and growth, get no spoils, and move on to the next fight.
+	# keep the growth, get no spoils, and move on to the next fight.
 	# The Giant is still the end either way.
 	if won or fight < BOSS_FIGHT:
 		fight += 1
@@ -583,10 +804,14 @@ func trust_stage(a: String, b: String) -> String:
 ##   { unit, name, choice, ok, headline, text (= headline), lines: [{ text,
 ##     element, item }], items: [found items], successes: [wander effects],
 ##     jackpot, levels }
-##   Branch out also carries `options` ([{ element, weapon }], one or two)
-##   and `pending` until branch_pick() applies the one the player took
-##   (`auto` = the first, at once: the AI's and the sim's way).
-func downtime(u: BWUnit, choice: String, auto: bool = true) -> Dictionary:
+##   Branch out also carries `options` ([{ element, weapon }], one or two:
+##   the day's branch_preview, D176) and `pending` until branch_pick()
+##   applies one. `option` >= 0 = the card the player took in the hall
+##   (D176: chosen before the day, applied at once); else `auto` = the first,
+##   at once (the AI's and the sim's way); else it waits for branch_pick.
+## This doesn't police day_choices (D175): the screen and the sims offer
+## only the day's two.
+func downtime(u: BWUnit, choice: String, auto: bool = true, option: int = -1) -> Dictionary:
 	var rep := { "unit": u.id, "name": u.name, "choice": choice, "ok": true, "headline": "",
 		"lines": [], "items": [], "successes": [], "jackpot": false, "levels": 0 }
 	var lv := u.level
@@ -594,8 +819,8 @@ func downtime(u: BWUnit, choice: String, auto: bool = true) -> Dictionary:
 		"specialize": _specialize(u, rep)
 		"branch_out":
 			_branch_out(u, rep)
-			if auto and rep.get("pending", false):
-				branch_pick(u, rep, 0)
+			if rep.get("pending", false) and (option >= 0 or auto):
+				branch_pick(u, rep, clampi(option, 0, rep.options.size() - 1))
 		"wander": _wander(u, rep)
 		_:
 			rep.ok = false
@@ -605,22 +830,54 @@ func downtime(u: BWUnit, choice: String, auto: bool = true) -> Dictionary:
 	return rep
 
 
-## Run a day: every [unit id, choice] in order. Returns the reports.
-## `auto` false leaves Branch out's options for the player (branch_pick).
+## Run a day: every [unit id, choice] (or [unit id, "branch_out", card
+## index], D176) in order. Returns the reports. `auto` false leaves a Branch
+## out without a card index for the player (branch_pick).
 func progress_day(plan: Array, auto: bool = true) -> Array:
 	var out: Array = []
 	recruited_today = false
 	for p in plan:
 		var u := unit(str(p[0]))
 		if u:
-			out.append(downtime(u, str(p[1]), auto))
+			out.append(downtime(u, str(p[1]), auto, int(p[2]) if p.size() > 2 else -1))
 	day += 1
 	return out
 
 
+## D174: a unit's pick salt, from the run seed and its id (never saved).
+func seed_unit(u: BWUnit) -> void:
+	u.pick_seed = hash("picks|%d|%s" % [seed_value, u.id])
+
+
+## D175: the day's DOWNTIME_OFFER choices for `u` (DOWNTIME_CHOICES order),
+## drawn from the run seed, the day and the unit id: stable all day, fresh
+## each day, reproducible.
+func day_choices(u: BWUnit) -> Array:
+	var drop := absi(hash("day|%d|%d|%s" % [seed_value, day, u.id])) % DOWNTIME_CHOICES.size()
+	var out: Array = DOWNTIME_CHOICES.duplicate()
+	out.remove_at(drop)
+	return out
+
+
+## D176: the Branch out cards `u` would get today ([{ element, weapon }], one
+## or two; empty = nothing new left). Rolled once a day per unit on its own
+## rng (run seed, day, unit id; the run's rng is untouched), then kept, so
+## the hall can show them before the player commits and Branch out gives
+## exactly those.
+func branch_preview(u: BWUnit) -> Array:
+	if _branch_day != day:
+		_branch_cards = {}
+		_branch_day = day
+	if not _branch_cards.has(u.id):
+		var brng := RandomNumberGenerator.new()
+		brng.seed = hash("branch|%d|%d|%s" % [seed_value, day, u.id])
+		_branch_cards[u.id] = branch_options(u, brng)
+	return (_branch_cards[u.id] as Array).duplicate(true)
+
+
 ## Specialize: +half a rank in the unit's focus element (D132) and its weapon
 ## class; 50% a free skill pick in the class (else a weapon of that class),
-## 50% a free perk pick in the element (else armour attuned to it); +50 XP.
+## 50% a free perk pick in the element (else armour attuned to it).
 func _specialize(u: BWUnit, rep: Dictionary) -> void:
 	var el := u.focus()                          # D132: the focus element (native by default)
 	var wc := u.weapon_class
@@ -652,20 +909,18 @@ func _specialize(u: BWUnit, rep: Dictionary) -> void:
 		if not a.is_empty():
 			gained.append(item_name(a))
 			_line(rep, "New equipment: " + item_name(a), el, a)
-	gained.append("%d experience" % DAY_XP)
-	_xp(u, rep, DAY_XP)
 	rep.headline = "I specialized and gained %s, feeling confident." % _and(gained)
 
 
 ## Branch out (D128): up to two options, each a pairing of a new element
 ## (one at rank 0) and a new weapon class (another one still at E), for the
-## player to pick from on the result card. Nothing left at all: +50 XP and a
-## line saying so.
+## player to pick from on the result card. Nothing left at all: +1 to a
+## random stat (D179; was +50 XP) and a line saying so.
 func _branch_out(u: BWUnit, rep: Dictionary) -> void:
-	rep["options"] = branch_options(u)
+	rep["options"] = branch_preview(u)           # D176: the cards the hall showed
 	if rep.options.is_empty():
-		_xp(u, rep, DAY_XP)
-		rep.headline = "I branched out, but there was nothing new left to try."
+		var s := _stat_point(u)
+		rep.headline = "I branched out, but there was nothing new left to try. The practice did me good (+1 %s)." % s.to_upper()
 		return
 	rep["pending"] = true
 	rep.headline = "I branched out. Which way should I go?"
@@ -673,12 +928,12 @@ func _branch_out(u: BWUnit, rep: Dictionary) -> void:
 
 ## The day's Branch out options: [{ element, weapon }], two distinct
 ## pairings where the unit has room for two, else one ("" = that half has
-## nothing left). Rolled on the run's rng.
-func branch_options(u: BWUnit) -> Array:
+## nothing left). Rolled on `roll` (branch_preview's day rng), else the run's.
+func branch_options(u: BWUnit, roll: RandomNumberGenerator = null) -> Array:
 	var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) == 0)
 	var wcs: Array = weapon_classes().filter(func(c): return c != u.weapon_class and u.expertise_rank(c) == 0)
-	_shuffle(els)
-	_shuffle(wcs)
+	_shuffle(els, roll)
+	_shuffle(wcs, roll)
 	var out: Array = []
 	for k in mini(2, maxi(els.size(), wcs.size())):
 		out.append({ "element": els[mini(k, els.size() - 1)] if not els.is_empty() else "",
@@ -688,8 +943,8 @@ func branch_options(u: BWUnit) -> Array:
 
 ## Apply the Branch out option the player took: a full rank in its element
 ## and its class (each owes its first pick through the normal flow), a weapon
-## of that class and armour attuned to that element (this fight's tier), +50
-## XP. False if `rep` has nothing pending or `i` is out of range.
+## of that class and armour attuned to that element (this fight's tier).
+## False if `rep` has nothing pending or `i` is out of range.
 func branch_pick(u: BWUnit, rep: Dictionary, i: int) -> bool:
 	if not rep.get("pending", false) or i < 0 or i >= rep.options.size():
 		return false
@@ -705,18 +960,15 @@ func branch_pick(u: BWUnit, rep: Dictionary, i: int) -> bool:
 	if new_wc != "":
 		u.expertise[new_wc] = int(u.expertise.get(new_wc, 0)) + BRANCH_POINTS
 		_line(rep, "A full level in %s expertise  (now %s)" % [class_name_of(new_wc), u.expertise_letter(new_wc)])
-		# The find must be wieldable with the expertise just gained: the
-		# fight's tier, capped at the unit's new letter in that class.
-		var cap := TIERS.find(u.expertise_letter(new_wc))
-		var wt: String = TIERS[mini(TIERS.find(tier_for(fight)), maxi(cap, 0))]
-		var w := _find_weapon(rep, new_wc, wt)
+		# D192: the find is the fight's tier. Expertise no longer gates
+		# equipping (D180), so it isn't capped at the new letter.
+		var w := _find_weapon(rep, new_wc, tier_for(fight))
 		if not w.is_empty():
 			_line(rep, "New equipment: " + item_name(w), item_element(w), w)
 	if new_el != "":
 		var a := _find_armour(rep, new_el, tier_for(fight))
 		if not a.is_empty():
 			_line(rep, "New equipment: " + item_name(a), new_el, a)
-	_xp(u, rep, DAY_XP)
 	var can: Array = []
 	if new_el != "":
 		can.append(new_el)
@@ -728,48 +980,64 @@ func branch_pick(u: BWUnit, rep: Dictionary, i: int) -> bool:
 	return true
 
 
-func _shuffle(a: Array) -> void:
+func _shuffle(a: Array, roll: RandomNumberGenerator = null) -> void:
+	var g := roll if roll != null else rng
 	for i in range(a.size() - 1, 0, -1):
-		var j := rng.randi() % (i + 1)
+		var j := g.randi() % (i + 1)
 		var t = a[i]
 		a[i] = a[j]
 		a[j] = t
 
 
-## Wander: +50 XP, then each of WANDER_EFFECTS rolled on its own at
-## WANDER_ROLL (one that can't happen counts as a miss). All nine missed:
-## +100 XP, unless WANDER_JACKPOT_EXTRA_ROLL lands: +5000 XP instead, and the
-## unit goes rogue for good (D129).
+## Wander: each of WANDER_EFFECTS rolled on its own at WANDER_ROLL (one that
+## can't happen counts as a miss). All nine missed: the consolation, +1 to a
+## random stat (D179), unless WANDER_JACKPOT_EXTRA_ROLL lands (D177,
+## replacing D129's +5000 XP and the rogue): the nine are rolled again at
+## WANDER_JACKPOT_ROLL each (one recruit a day still); if those all miss
+## too, the consolation.
 func _wander(u: BWUnit, rep: Dictionary) -> void:
-	_xp(u, rep, DAY_XP)
-	for eff in WANDER_EFFECTS:
-		if eff == "recruit" and recruited_today:
-			continue                             # D129: one recruit a day, squad-wide; a skipped roll is a miss
-		if rng.randf() < WANDER_ROLL and _wander_effect(u, str(eff), rep):
-			rep.successes.append(eff)
+	_wander_rolls(u, rep, WANDER_ROLL)
 	if not rep.successes.is_empty():
 		rep.headline = "I wandered off for the day. Here's what happened:"
 		return
 	if rng.randf() < WANDER_JACKPOT_EXTRA_ROLL:
-		var lv := u.level
-		BWProgression.add_xp(u, WANDER_JACKPOT_XP)
-		u.rogue = true
 		rep.jackpot = true
-		rep.lines = []
-		rep.headline = "I wandered and ran into a being of unlimited benevolence"
-		_line(rep, "+%d levels" % (u.level - lv))
-		_line(rep, "+ no longer fear god")
+		_wander_rolls(u, rep, WANDER_JACKPOT_ROLL)
+		if not rep.successes.is_empty():
+			rep.headline = "I wandered and ran into a being of unlimited benevolence…"
+			return
+		var s0 := _stat_point(u)
+		rep.headline = "I wandered and ran into a being of unlimited benevolence… it just smiled. I feel a little stronger for it (+1 %s)" \
+			% s0.to_upper()
 		return
-	_xp(u, rep, WANDER_CONSOLATION_XP, false)
-	rep.headline = "I wandered. Nothing happened, but the walk did me good (+%d XP)" % WANDER_CONSOLATION_XP
+	var s := _stat_point(u)
+	rep.headline = "I wandered. Nothing happened, but the walk did me good (+1 %s)" % s.to_upper()
+
+
+## D179: +WANDER_STAT_POINT to a random base stat, for good. Returns the stat.
+func _stat_point(u: BWUnit) -> String:
+	var s: String = BWUnit.STATS[rng.randi() % BWUnit.STATS.size()]
+	u.stats[s] = mini(int(u.stats.get(s, 0)) + WANDER_STAT_POINT, BWUnit.STAT_CAP)
+	return s
+
+
+## Each of WANDER_EFFECTS rolled on its own at `chance`; the hits go into
+## rep.successes (and their lines). The recruit is skipped once someone has
+## recruited today (D129: a skipped roll is a miss).
+func _wander_rolls(u: BWUnit, rep: Dictionary, chance: float) -> void:
+	for eff in WANDER_EFFECTS:
+		if eff == "recruit" and recruited_today:
+			continue
+		if rng.randf() < chance and _wander_effect(u, str(eff), rep):
+			rep.successes.append(eff)
 
 
 ## One wander effect. False when it can't happen (a missed roll).
 func _wander_effect(u: BWUnit, eff: String, rep: Dictionary) -> bool:
 	match eff:
-		"xp":
-			_xp(u, rep, WANDER_XP, false)
-			_line(rep, "I learned something on the road.  (+%d more XP)" % WANDER_XP)
+		"stat":                                  # D179: was +50 XP
+			var s := _stat_point(u)
+			_line(rep, "The road toughened me up.  (+%d %s, for good)" % [WANDER_STAT_POINT, s.to_upper()])
 		"element":
 			var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) < BWUnit.MAX_AFFINITY_RANK)
 			if els.is_empty():
@@ -857,12 +1125,14 @@ func recruit(id: String = "") -> BWUnit:
 	last_enemies.erase(pick)
 	var base_id := str(pick.id).split("_f")[0]
 	var nu := BWUnit.from_roster(roster_row(base_id))
-	nu.level = int(pick.level)
-	nu.stats = Dictionary(pick.stats).duplicate()
 	nu.equipment["main_hand"] = make_item(nu.weapon_model, tier_for(fight))
+	# D179: joins at the squad's level (the highest in it), grown from its
+	# roster stats the way a squad unit grows (not the enemy's scaled sheet).
+	BWProgression.level_up(nu, squad_level() - nu.level)
 	var fists: Array = BWData.table("equipment").filter(func(row): return str(row.weight) == "fists")
 	if not fists.is_empty():
 		inventory.append(make_item(str(fists[rng.randi() % fists.size()].id), "E"))
+	seed_unit(nu)                        # D174
 	squad.append(nu)
 	learned[nu.id] = []
 	ability_ranks[nu.id] = {}
@@ -893,7 +1163,7 @@ func _find_weapon(rep: Dictionary, wc: String, tier: String) -> Dictionary:
 func _find_armour(rep: Dictionary, el: String, tier: String) -> Dictionary:
 	var pairs: Array = []
 	for e in BWData.table("enchantments"):
-		if str(e.element) != el:
+		if str(e.element) != el or ench_weight(e, tier) <= 0:
 			continue
 		for b in BWData.list(e.applies_to):
 			if str(BWData.row("equipment", b).get("slot", "main_hand")) != "main_hand":
@@ -907,11 +1177,13 @@ func _find_armour(rep: Dictionary, el: String, tier: String) -> Dictionary:
 	return a
 
 
-func _xp(u: BWUnit, rep: Dictionary, amount: int, line: bool = true) -> void:
-	var lv := u.level
-	BWProgression.add_xp(u, amount)
-	if line:
-		_line(rep, "+%d XP%s" % [amount, "  (now level %d)" % u.level if u.level > lv else ""])
+## D179: the squad's level, the highest among its units (all equal unless an
+## old save brought different levels in).
+func squad_level() -> int:
+	var lv := 1
+	for u in squad:
+		lv = maxi(lv, u.level)
+	return lv
 
 
 func _line(rep: Dictionary, text: String, element: String = "", item: Dictionary = {}) -> void:
@@ -978,11 +1250,12 @@ func to_dict() -> Dictionary:
 		# seed and rng state as strings: JSON numbers are doubles and would truncate them
 		"version": SAVE_VERSION, "seed": str(seed_value), "rng_state": str(rng.state), "fight": fight, "day": day,
 		"squad": sq, "inventory": inventory.duplicate(true), "trust": trust.duplicate(),
-		"last_enemies": last_enemies.duplicate(true), "shop": shop.duplicate(true),
+		"last_enemies": last_enemies.duplicate(true), "shop": shop.duplicate(true), "scrolls": scrolls.duplicate(true),
 		"learned": learned.duplicate(true), "ability_ranks": ability_ranks.duplicate(true),
 		"equipped_ability": equipped_ability.duplicate(true), "uid": _uid,
 		"stats": stats.duplicate(true),
 		"map_order": (map_order if not map_order.is_empty() else shuffled_maps(seed_value)).duplicate(),   # D145
+		"map_queue": map_queue.duplicate(), "room_offer": room_offer.duplicate(true), "room_log": room_log.duplicate(true),   # D189
 		"roster_seed": str(roster_seed), "roster": roster_rows.duplicate(true),
 	}
 
@@ -1018,6 +1291,7 @@ static func from_dict(d: Dictionary) -> BWRun:
 		r.map_order = shuffled_maps(r.seed_value)
 	r.fight = int(d.fight)
 	r.day = int(d.day)
+	BWRooms.load_state(r, d)                     # D189: the map queue, the offer, the log (v6-: migrated)
 	for ud in d.squad:
 		var u := BWUnit.from_roster(r.roster_row(str(ud.id)))
 		u.element = str(ud.get("element", u.element))
@@ -1026,7 +1300,7 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.weapon_model = ud.weapon_model
 		u.stats = ud.stats.duplicate()
 		u.level = int(ud.level)
-		u.xp = int(ud.xp)
+		# D179: no XP; an old save's "xp" is ignored, its level kept
 		u.affinity = ud.affinity.duplicate()
 		u.expertise = ud.expertise.duplicate()
 		u.equipment = ud.equipment.duplicate(true)
@@ -1039,7 +1313,8 @@ static func from_dict(d: Dictionary) -> BWRun:
 		# D132 save v4: the downtime outcomes that last (defaults when older)
 		u.bonus_perks = _ints(ud.get("bonus_perks", {}))
 		u.bonus_skills = _ints(ud.get("bonus_skills", {}))
-		u.rogue = bool(ud.get("rogue", false))
+		# D177: the rogue is gone; an old save's "rogue" flag is dropped here
+		r.seed_unit(u)                   # D174: derived, never saved
 		u.next_immune = Array(ud.get("next_immune", [])).map(func(x): return str(x))
 		u.next_brace = Array(ud.get("next_brace", [])).map(func(x): return str(x))
 		u.fight_buff = _ints(ud.get("fight_buff", {}))
@@ -1053,9 +1328,16 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.hp = u.max_hp()
 		r.squad.append(u)
 	r.inventory = d.inventory.duplicate(true)
+	migrate_imbues(r.inventory, r.seed_value)              # D206 (save v9)
+	for u in r.squad:
+		migrate_imbues(u.equipment.values(), r.seed_value)
 	r.trust = d.trust.duplicate()
 	r.last_enemies = d.last_enemies.duplicate(true)
 	r.shop = d.shop.duplicate(true)
+	migrate_imbues(r.shop, r.seed_value)                   # D206
+	r.scrolls = Array(d.get("scrolls", [])).duplicate(true)      # D203 (save v8)
+	if r.scrolls.size() != BWFormulas.ELEMENTS.size():
+		r.roll_scrolls()
 	r.learned = d.learned.duplicate(true)
 	r.ability_ranks = d.ability_ranks.duplicate(true)
 	r.equipped_ability = d.equipped_ability.duplicate(true)

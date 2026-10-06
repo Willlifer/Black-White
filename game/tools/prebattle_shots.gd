@@ -1,6 +1,7 @@
 extends SceneTree
 ## Review renders of the pre-battle screen (placement with an enemy hovered,
-## a drag, the paperdoll with an item card, the stat panel, shop, re-imbue)
+## a drag, the paperdoll with an item card, the stat panel, the shop and its
+## scroll flow; D203: tools/ench2_shots.gd has the full shop review)
 ## on a sample run, written as ui_prebattle_*.png:
 ##   SHOTS=<dir> [MODE=place|gear|shop] godot --path . --script res://tools/prebattle_shots.gd
 ## Needs a window (real renders, not headless).
@@ -92,16 +93,12 @@ func _go() -> void:
 			pre._shop._on_shop_item_selected(r[1].item)
 		await _wait(0.8)
 		await _shot("ui_prebattle_shop")
-		pre._shop.set_mode("reimbue")
+		pre._shop.pick_scroll(run.scrolls[0])          # D203: the scroll flow replaced re-imbue
 		await _wait(0.2)
 		var s := pre._shop._left.get_children()
-		if s.size() > 0 and s[0] is BWItemTile:
-			pre._shop._pick_mine(s[0].item)
-			await _wait(0.1)
-			var t := pre._shop._right.get_children()
-			if t.size() > 0 and t[0] is BWItemTile:
-				pre._shop.theirs = t[0].item
-				pre._shop.refresh()
+		if s.size() > 1 and s[0] is BWItemTile:
+			pre._shop._toggle_pay(s[0].item)
+			pre._shop._toggle_pay(s[1].item)
 		await _wait(0.6)
-		await _shot("ui_prebattle_reimbue")
+		await _shot("ui_prebattle_scroll")
 	quit(0)

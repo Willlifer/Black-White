@@ -8,7 +8,7 @@ first, then fix the data.
 
 | Key | Name | Does |
 |---|---|---|
-| `con` | Constitution | HP = 100 + 2·con + 10·level (D34, D137; the Giant is a fixed 500, D138) |
+| `con` | Constitution | HP = 100 + 2·con + 15·level (D34, D137, D178; the Giant is a fixed 500, D138) |
 | `str` | Strength | Martial weapon damage, skill damage |
 | `dex` | Dexterity | Dexterous weapon damage, hit, crit, avoid, skill damage |
 | `wil` | Willpower | Spell damage. Replaces wisdom and intelligence. |
@@ -72,16 +72,31 @@ Affinity: ranks 0–10, at 10 points per rank. Each rank gives +5% damage with t
 
 ## Progression
 
-- 100 XP per level. Each level adds 1–2 to stats, biased by equipped weapon and armour (see the brief).
-- An attack gives 10 XP, +1 affinity in the element used, and +1 expertise in the weapon used.
-- A knockout gives 30 XP, +3 affinity, and +3 expertise.
+- **No XP (D179).** Every squad unit, deployed or benched, gains exactly 1 level after **every fight, won or lost** (D194: `BWProgression.LEVEL_ON_LOSS` = true; false would level on wins only). Squad level = the fight number. Each level adds 1–2 to stats, biased by equipped weapon and armour (see the brief).
+- An attack gives +1 affinity in the element used and +1 expertise in the weapon used.
+- A knockout gives +3 affinity and +3 expertise.
+- Recruits join at the squad's level. Enemies are levelled by the room's stage (`BWRooms`), not the squad.
+- HP = 100 + 2·CON + 15·level (D178).
+
+## Downtime (D127–D132, D175–D177, D179)
+
+Each unit takes one choice a day. **A day offers each unit 2 of the 3** (`BWRun.day_choices`: seeded by the run, the day and the unit, stable all day), shown by name only:
+
+- **Specialize**: +½ rank in the focus element and the held class; 50% a free skill pick (else a weapon of the class), 50% a free perk pick (else armour attuned to the element).
+- **Branch out**: two cards, each a new element (rank 0) + a new class (at E). **The cards are rolled when the day starts and shown on the Branch out tile** (`BWRun.branch_preview`); pressing a card is the choice. It gives a full rank in each, a weapon of the class and armour of the element, both at the fight's tier (D192: no cap at the new expertise letter). Choosing another activity discards the cards. Nothing new left: +1 to a random stat.
+- **Wander**: nine effects, each at 20%: +1 to a random stat (permanent); +1 rank in a random element; +1 rank in a random class; a weapon find; an armour find; a recruit from the last fight (one a day, squad-wide); a status immunity, an element brace and +10 to a stat for the next fight. All nine missed: +1 to a random stat, unless the 5% jackpot roll lands: "a being of unlimited benevolence" rerolls the nine at 30% each (still one recruit a day); if that misses too, +1 to a random stat.
+- No XP from any choice (D179). There is no rogue (D177).
 
 ## Equipment slots
 
 `head chest legs main_hand`. Armour weight classes: `heavy ranger wizard`.
 Every piece has stats plus one built-in enchantment. Armour enchantments
 change how an element behaves; weapon enchantments change how the weapon
-attacks.
+attacks. `enchantments.csv` (D196–D205) adds `tier` (E–A, the lowest tier a
+row drops at), `family`, `cursed` (0/1), `cost_text`, `also` (extra records,
+`key(a=1;b=2) | ...`) and `drawback` (the cost's params); see
+ENCHANTMENTS-v2.md §0. The shop's imbuement scrolls are run state
+(`BWRun.scrolls`, save v8), not a table.
 
 ## Friendliness
 

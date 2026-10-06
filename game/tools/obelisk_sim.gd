@@ -66,7 +66,7 @@ func _policy(pol: String, runs: int, tries: int) -> void:
 				BWPicks.auto_resolve(u)
 			var plan: Array = []
 			for i in run.squad.size():
-				plan.append([run.squad[i].id, CampaignSim.choice_for(pol, i)])
+				plan.append([run.squad[i].id, CampaignSim.choice_for(pol, i, run.day_choices(run.squad[i]))])
 			run.progress_day(plan)
 			for u in run.squad:
 				BWPicks.auto_resolve(u)

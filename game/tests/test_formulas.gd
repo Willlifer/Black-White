@@ -15,13 +15,13 @@ func _dfn() -> BWUnit:
 
 
 func test_hp(t) -> void:
-	t.eq(BWFormulas.hp(_dfn()).value, 122, "HP = 100 + 2 × 6 + 10 × 1")
-	t.eq(_dfn().max_hp(), 122, "unit max_hp agrees")
-	t.eq(str(BWFormulas.hp(_dfn()).values), "100 + 2 × 6 + 10 × 1", "the breakdown shows the level term")
+	t.eq(BWFormulas.hp(_dfn()).value, 127, "HP = 100 + 2 × 6 + 15 × 1 (D178)")
+	t.eq(_dfn().max_hp(), 127, "unit max_hp agrees")
+	t.eq(str(BWFormulas.hp(_dfn()).values), "100 + 2 × 6 + 15 × 1", "the breakdown shows the level term")
 	var u := _dfn()
 	u.level = 7
-	t.eq(u.max_hp(), 182, "D137: level 7 = 100 + 12 + 70")
-	t.eq(BWFormulas.hp(u).value, 182, "the calc agrees")
+	t.eq(u.max_hp(), 217, "D178: level 7 = 100 + 12 + 105")
+	t.eq(BWFormulas.hp(u).value, 217, "the calc agrees")
 	u.fixed_hp = 500
 	t.eq(u.max_hp(), 500, "D138: a fixed pool overrides the formula")
 	t.eq(BWFormulas.hp(u).value, 500, "and the calc shows it")

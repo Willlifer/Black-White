@@ -181,9 +181,9 @@ func test_siphon(t) -> void:
 
 func test_tile_damage_resist(t) -> void:
 	var u := BWUnit.from_roster({ "id": "u", "weapon_class": "sword", "element": "fire", "con": 4 })
-	t.eq(BWTiles.tile_damage(u, 12.0, "fire"), 13, "D137 118 HP × 12% × (1 − 5%) = 13.5 → 13")
+	t.eq(BWTiles.tile_damage(u, 12.0, "fire"), 14, "D178 123 HP × 12% × (1 − 5%) = 14.0 → 14")
 	u.affinity["fire"] = 1000
-	t.eq(BWTiles.tile_damage(u, 12.0, "fire"), 7, "own rank 10 = 50%: 118 × 12% × 50% = 7.1 → 7")
+	t.eq(BWTiles.tile_damage(u, 12.0, "fire"), 7, "own rank 10 = 50%: 123 × 12% × 50% = 7.4 → 7")
 	u.affinity["water"] = 1000
 	u.affinity["ice"] = 1000
 	t.eq(BWTiles.tile_damage(u, 12.0, "fire"), 4, "50 + 25 + 25 capped at 75%: 3.5 → 4")

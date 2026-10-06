@@ -80,6 +80,8 @@ static func key_for(u: BWUnit) -> String:
 			parts.append("%s-%s" % [lk.armour[slot], lk.armour_element])
 		else:
 			parts.append("")
+	if u.encounter != "":
+		parts.append("enc-%s-%s" % [u.encounter, u.element])   # D213: the Blank's wash, the Being's glow
 	return "_".join(parts).replace(",", "+").replace("#", "").replace(":", "-").replace(" ", "")
 
 
@@ -272,7 +274,7 @@ func _render(key: String, u: BWUnit) -> Texture2D:
 		if c.weapon:
 			c.weapon.visible = false
 		c.set_process(false)
-		if u.size > 1:                           # the Giant: framed close, it fills the plate
+		if u.size > 1 and u.encounter == "":     # the Giant: framed close, it fills the plate (the Colossus is a figure)
 			centre = Vector3(0.0, 1.70, 0.0)
 			size = 0.98
 			yaw = 32.0

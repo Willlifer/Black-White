@@ -2,7 +2,9 @@ extends RefCounted
 ## D127-D132: the three-choice downtime (Specialize, Branch out, Wander), the
 ## picks they grant, Branch out's two options, Wander's odds and outcomes
 ## (status immunity, the next-battle brace and buff, one recruit a day, the
-## rogue), the focus element, weapon-class switching, save v4.
+## jackpot's reroll), the focus element, weapon-class switching, save v4.
+## D175-D177: two of the three choices a day, Branch out's cards shown before
+## committing, the jackpot rerolls (no rogue).
 
 const C := Vector2i(4, 4)
 const E := Vector2i(5, 4)
@@ -21,8 +23,12 @@ func _run(seed_value: int = 1) -> BWRun:
 	return r
 
 
-func _total_xp(u: BWUnit) -> int:
-	return u.level * BWProgression.XP_PER_LEVEL + u.xp
+## D179: no XP; the day's permanent stat points show in the base-stat total.
+func _stat_total(u: BWUnit) -> int:
+	var n := 0
+	for k in BWUnit.STATS:
+		n += int(u.stats[k])
+	return n
 
 
 func _board(n: int = 11) -> BWBoard:
@@ -71,6 +77,33 @@ func test_three_choices_and_names(t) -> void:
 	t.ok(not r.downtime(r.squad[0], "rest").ok, "the old actions are gone")
 
 
+## D175: each unit is offered two of the three, per day, from the run seed:
+## stable all day (and across a reload), fresh the next day.
+func test_day_choices(t) -> void:
+	t.eq(BWRun.DOWNTIME_OFFER, 2, "two of the three (D175)")
+	var r := _run()
+	var combos := {}
+	var differs := false
+	for d in 12:
+		r.day = 1 + d
+		for u in r.squad:
+			var c := r.day_choices(u)
+			t.eq(c.size(), 2, "day %d %s: two choices" % [r.day, u.id])
+			t.ok(c.all(func(x): return x in BWRun.DOWNTIME_CHOICES), "real choices")
+			t.ok(c[0] != c[1], "two different")
+			t.eq(c, BWRun.DOWNTIME_CHOICES.filter(func(x): return x in c), "in the usual order")
+			t.eq(r.day_choices(u), c, "stable for the day")
+			combos[str(c)] = true
+			if r.day > 1:
+				r.day -= 1
+				differs = differs or r.day_choices(u) != c
+				r.day += 1
+	t.eq(combos.size(), 3, "every pair turns up: %s" % [combos.keys()])
+	t.ok(differs, "a new day can offer a different pair")
+	var r2 := BWRun.from_dict(JSON.parse_string(JSON.stringify(r.to_dict())))
+	t.ok(r.squad.all(func(u): return r2.day_choices(r2.unit(u.id)) == r.day_choices(u)), "a reload offers the same")
+
+
 func test_specialize_both_branches(t) -> void:
 	var seen := { "skill": 0, "weapon": 0, "perk": 0, "armour": 0 }
 	for s in 40:
@@ -81,12 +114,12 @@ func test_specialize_both_branches(t) -> void:
 		var aff := int(u.affinity.get(el, 0))
 		var exp_ := int(u.expertise.get(wc, 0))
 		var rank := u.affinity_rank(el)
-		var xp := _total_xp(u)
+		var xp := _stat_total(u)
 		var inv := r.inventory.size()
 		var rep := r.downtime(u, "specialize")
 		t.eq(int(u.affinity[el]) - aff, 5, "seed %d: +half a level in the element" % s)
 		t.eq(int(u.expertise[wc]) - exp_, 5, "seed %d: +half a level in the weapon" % s)
-		t.eq(_total_xp(u) - xp, 50, "seed %d: +50 XP" % s)
+		t.eq(_stat_total(u) - xp, 0, "seed %d: no stat points (and no XP, D179)" % s)
 		t.eq(u.affinity_rank(el), rank, "seed %d: the perk point doesn't move the rank (5 points from 10)" % s)
 		var weapons: Array = rep.items.filter(func(it): return it.slot == "main_hand")
 		var armour: Array = rep.items.filter(func(it): return it.slot != "main_hand")
@@ -136,16 +169,17 @@ func test_specialize_impossible_counts_as_a_fail(t) -> void:
 func test_branch_out(t) -> void:
 	for s in 20:
 		var r := _run(500 + s)
+		r.day = 1 + s                                  # D176: the cards are rolled per day
 		var u: BWUnit = r.squad[1]
 		var own := u.weapon_class
 		var aff := u.affinity.duplicate()
 		var exp_ := u.expertise.duplicate()
-		var xp := _total_xp(u)
+		var xp := _stat_total(u)
 		var rep := r.downtime(u, "branch_out", false)
 		t.ok(rep.pending and rep.options.size() == 2, "seed %d: two options wait for the player" % s)
 		t.eq(u.affinity, aff, "seed %d: nothing applied before the pick (affinity)" % s)
 		t.eq(u.expertise, exp_, "seed %d: (expertise)" % s)
-		t.eq(_total_xp(u), xp, "seed %d: (XP)" % s)
+		t.eq(_stat_total(u), xp, "seed %d: (stats)" % s)
 		var o0: Dictionary = rep.options[0]
 		var o1: Dictionary = rep.options[1]
 		t.ok(o0.element != o1.element and o0.weapon != o1.weapon, "seed %d: two different pairings %s / %s" % [s, o0, o1])
@@ -167,7 +201,7 @@ func test_branch_out(t) -> void:
 		var a: Array = rep.items.filter(func(it): return it.slot != "main_hand")
 		t.ok(w.size() == 1 and w[0].weight == wc and w[0].tier == r.tier_for(r.fight), "seed %d: a %s of this fight's tier" % [s, wc])
 		t.ok(a.size() == 1 and BWRun.item_element(a[0]) == el, "seed %d: armour attuned to %s" % [s, el])
-		t.eq(_total_xp(u) - xp, 50, "seed %d: +50 XP" % s)
+		t.eq(_stat_total(u) - xp, 0, "seed %d: no stat points (and no XP, D179)" % s)
 		t.ok(str(rep.headline).contains(el) and str(rep.headline).contains(BWRun.class_name_of(wc)), rep.headline)
 		var kinds := BWPicks.pending(u).map(func(q): return "%s:%s" % [q.kind, q.get("element", q.get("weapon", ""))])
 		t.ok(("perk:" + el) in kinds and ("skill:" + wc) in kinds, "seed %d: the new element's first perk and a %s skill pick owed: %s" % [s, wc, kinds])
@@ -197,10 +231,42 @@ func test_branch_out(t) -> void:
 		u3.affinity[e] = maxi(int(u3.affinity.get(e, 0)), 10)
 	for c in BWRun.weapon_classes():
 		u3.expertise[c] = maxi(int(u3.expertise.get(c, 0)), 10)
-	var xp3 := _total_xp(u3)
+	var xp3 := _stat_total(u3)
+	r3.day += 1                                      # a new day: new cards
 	var rep4 := r3.downtime(u3, "branch_out", false)
 	t.ok(rep4.options.is_empty() and not rep4.get("pending", false), "nothing new to try: no options")
-	t.ok(str(rep4.headline).contains("nothing new") and _total_xp(u3) - xp3 == 50, rep4.headline)
+	t.ok(str(rep4.headline).contains("nothing new") and _stat_total(u3) - xp3 == 1, "+1 to a stat: " + rep4.headline)
+
+
+## D176: the cards are rolled when the day starts and shown in the hall;
+## Branch out gives exactly those, and the card taken in the hall (the plan's
+## third entry) is applied at once. Another choice leaves them unused.
+func test_branch_preview(t) -> void:
+	for s in 12:
+		var r := _run(800 + s)
+		r.day = 1 + s
+		var u: BWUnit = r.squad[s % 6]
+		var cards := r.branch_preview(u)
+		t.ok(cards.size() == 2, "seed %d: two cards before committing" % s)
+		t.eq(r.branch_preview(u), cards, "seed %d: the same cards each time it's asked" % s)
+		var rngs := r.rng.state
+		var re := BWRun.from_dict(JSON.parse_string(JSON.stringify(r.to_dict())))
+		t.eq(re.branch_preview(re.unit(u.id)), cards, "seed %d: a reload shows the same" % s)
+		t.eq(r.rng.state, rngs, "seed %d: the preview leaves the run's rng alone" % s)
+		var pick := s % 2
+		var reps := r.progress_day([[u.id, "branch_out", pick]], false)
+		var rep: Dictionary = reps[0]
+		t.eq(rep.options, cards, "seed %d: Branch out gives the previewed cards" % s)
+		t.ok(not rep.get("pending", false) and int(rep.picked) == pick, "seed %d: the hall's card %d, applied at once" % [s, pick + 1])
+		t.eq(u.affinity_rank(str(cards[pick].element)), 1, "seed %d: its element" % s)
+		t.eq(u.expertise_letter(str(cards[pick].weapon)), "D", "seed %d: its class" % s)
+		t.eq(u.affinity_rank(str(cards[1 - pick].element)), 0, "seed %d: the other card unused" % s)
+	# another choice discards them: nothing of the cards is applied
+	var r2 := _run(3)
+	var w: BWUnit = r2.squad[0]
+	var c2 := r2.branch_preview(w)
+	r2.progress_day([[w.id, "specialize"]])
+	t.ok(c2.all(func(c): return w.affinity_rank(str(c.element)) == 0), "Specialize instead: the cards' elements untouched")
 
 
 # ------------------------------------------------------------------ wander
@@ -210,8 +276,9 @@ func test_wander_constants(t) -> void:
 	t.eq(BWRun.WANDER_EFFECTS.size(), 9, "nine effects")
 	t.near(BWRun.WANDER_JACKPOT_EXTRA_ROLL, 0.05, 0.0001, "the jackpot's extra roll (author: 0.05)")
 	t.near(pow(1.0 - BWRun.WANDER_ROLL, 9) * BWRun.WANDER_JACKPOT_EXTRA_ROLL, 0.0067, 0.0001, "≈0.67% a wander")
-	t.eq(BWRun.WANDER_CONSOLATION_XP, 100, "nothing happened: +100 XP")
-	t.eq(BWRun.WANDER_JACKPOT_XP, 5000, "the jackpot: +5000 XP")
+	t.eq(BWRun.WANDER_STAT_POINT, 1, "the stat effect and the consolation: +1, for good (D179)")
+	t.ok(not "xp" in BWRun.WANDER_EFFECTS and "stat" in BWRun.WANDER_EFFECTS, "no XP effect")
+	t.near(BWRun.WANDER_JACKPOT_ROLL, 0.30, 0.0001, "the jackpot rerolls the nine at 30% (D177)")
 
 
 ## 10k seeded wanders on fresh units, each with past enemies to meet: every
@@ -235,8 +302,8 @@ func test_wander_probabilities(t) -> void:
 		var rep := r.downtime(u, "wander")
 		for k in rep.successes:
 			hits[k] = int(hits.get(k, 0)) + 1
-		if rep.successes.is_empty():
-			none += 1
+		if rep.successes.is_empty() or rep.jackpot:
+			none += 1                                  # the first nine all missed
 		if rep.jackpot:
 			jack += 1
 	for k in BWRun.WANDER_EFFECTS:
@@ -268,7 +335,7 @@ func test_one_recruit_a_day(t) -> void:
 
 
 ## Every outcome checked against its report, over seeded wanders: the extra
-## XP, finds, immunities, the buff, a recruit; the consolation; a card with
+## stat point, finds, immunities, the buff, a recruit; the consolation; a card with
 ## two or more successes.
 func test_wander_outcomes(t) -> void:
 	var multi := 0
@@ -279,16 +346,16 @@ func test_wander_outcomes(t) -> void:
 		var e := r.enemies_for(1)
 		r.last_enemies = e.map(func(x): return x.to_dict())
 		var u: BWUnit = r.squad[0]
-		var xp := _total_xp(u)
+		var xp := _stat_total(u)
 		var sq := r.squad.size()
 		var rep := r.downtime(u, "wander")
 		var succ: Array = rep.successes
 		if rep.jackpot:
 			found_jackpot = true
 			continue
-		var want := 50 + (50 if "xp" in succ else 0) + (100 if succ.is_empty() else 0)
-		var gained := _total_xp(u) - xp
-		t.eq(gained, want, "seed %d: XP %s" % [s, succ])
+		var want := (1 if "stat" in succ else 0) + (1 if succ.is_empty() else 0)
+		var gained := _stat_total(u) - xp
+		t.eq(gained, want, "seed %d: stat points %s" % [s, succ])
 		t.eq(r.squad.size() - sq, 1 if "recruit" in succ else 0, "seed %d: recruit" % s)
 		t.eq(u.next_immune.size(), 1 if "status_immunity" in succ else 0, "seed %d: status immunity for the next fight" % s)
 		t.eq(u.next_brace.size(), 1 if "element_brace" in succ else 0, "seed %d: braced for the next fight" % s)
@@ -301,39 +368,70 @@ func test_wander_outcomes(t) -> void:
 		t.eq(w.size(), 1 if "find_weapon" in succ else 0, "seed %d: weapon find" % s)
 		t.eq(a.size(), 1 if "find_armour" in succ else 0, "seed %d: armour find" % s)
 		t.ok(rep.items.all(func(it): return it.tier in tiers), "seed %d: finds at this tier or one up" % s)
-		t.eq(rep.lines.size(), 1 + succ.size(), "seed %d: one line per success (+ the day's XP)" % s)
+		t.eq(rep.lines.size(), succ.size(), "seed %d: one line per success" % s)
 		if succ.size() >= 2:
 			multi += 1
 		if succ.is_empty():
 			consolation += 1
-			t.ok(str(rep.headline).contains("Nothing happened") and str(rep.headline).contains("+100 XP"), rep.headline)
+			t.ok(str(rep.headline).contains("Nothing happened") and str(rep.headline).contains("(+1 "), rep.headline)
 	t.ok(multi > 0, "some wanders land two or more (%d)" % multi)
 	t.ok(consolation > 0, "some land nothing (%d)" % consolation)
 	t.ok(true, "a jackpot in these seeds: %s" % found_jackpot)
 
 
+## D177: the jackpot rerolls the nine at 30% each (no +5000 XP, no rogue);
+## a reroll that misses everything too gives the consolation (+1 to a stat).
 func test_wander_jackpot(t) -> void:
 	var r := _run()
-	r.last_enemies.clear()
+	var e := r.enemies_for(1).map(func(x): return x.to_dict())
+	var six := r.squad.duplicate()
 	var row := BWData.row("roster", _ids()[0])
-	for s in 20000:
+	var jack := 0
+	var hits := 0
+	var empty := 0
+	var recruits := 0
+	for s in 30000:
 		r.rng.seed = s
+		r.squad = six.duplicate()
+		r.last_enemies = e.duplicate(true)
+		r.recruited_today = false
 		var u := BWUnit.from_roster(row)
-		var lv := u.level
+		var xp := _stat_total(u)
 		var rep := r.downtime(u, "wander")
 		if not rep.jackpot:
 			continue
-		t.ok(u.rogue, "the jackpot makes it a rogue, for good")
-		t.eq(u.level - lv, 50, "+5000 XP = 50 levels")
-		t.eq(rep.headline, "I wandered and ran into a being of unlimited benevolence", "the author's line")
-		t.eq(rep.lines.map(func(l): return l.text), ["+50 levels", "+ no longer fear god"], "its two lines")
-		t.ok(rep.successes.is_empty(), "only when all nine missed")
-		t.eq(rep.levels, 50, "the report counts the levels")
-		return
-	t.ok(false, "no jackpot in 20000 seeds")
+		jack += 1
+		t.ok(str(rep.headline).begins_with("I wandered and ran into a being of unlimited benevolence"), rep.headline)
+		t.ok(not "rogue" in u.to_dict(), "seed %d: no rogue" % s)
+		t.eq(u.level, 1, "seed %d: no levels from wandering" % s)
+		var succ: Array = rep.successes
+		hits += succ.size()
+		if "recruit" in succ:
+			recruits += 1
+		var want := (1 if "stat" in succ else 0) + (1 if succ.is_empty() else 0)
+		t.eq(_stat_total(u) - xp, want, "seed %d: stat points for %s" % [s, succ])
+		t.eq(rep.lines.size(), succ.size(), "seed %d: a line per rerolled gain" % s)
+		if succ.is_empty():
+			empty += 1
+			t.ok(str(rep.headline).contains("(+1 "), "seed %d: the reroll missed too: +1 to a stat" % s)
+	t.ok(jack >= 120, "jackpots in 30000 wanders: %d (about 0.67 percent)" % jack)
+	t.near(float(hits) / maxf(jack * 9, 1), 0.30, 0.05, "rerolled effects land about 30 percent (%d of %d)" % [hits, jack * 9])
+	t.ok(recruits > 0, "the reroll can recruit (%d)" % recruits)
+	t.ok(true, "rerolls that missed everything: %d" % empty)
+	# the reroll still honours one recruit a day
+	var r2 := _run()
+	r2.last_enemies = e.duplicate(true)
+	r2.recruited_today = true
+	var before := r2.squad.size()
+	for s in 20000:
+		r2.rng.seed = s
+		var rep2 := r2.downtime(BWUnit.from_roster(row), "wander")
+		if rep2.jackpot:
+			t.ok(not "recruit" in rep2.successes, "seed %d: no second recruit today" % s)
+	t.eq(r2.squad.size(), before, "nobody joined after today's recruit")
 
 
-# ------------------------------------------------------------------ battle: immunity, buff, rogue
+# ------------------------------------------------------------------ battle: immunity, buff
 
 func test_element_brace(t) -> void:
 	# set before the battle, it lasts that battle only
@@ -423,38 +521,20 @@ func test_next_battle_buff_expires(t) -> void:
 	t.eq(u.stat("str"), base, "gone the battle after")
 
 
-func test_rogue_ai_control(t) -> void:
+## D177: no rogue. BWAI plays enemies (and everyone under autoplay), never
+## a player unit; a save that still carries the old flag loads without it.
+func test_no_rogue(t) -> void:
 	var me := _u("me", "sword", "fire", { "con": 60 })
-	var rogue := _u("rogue", "sword", "fire", { "con": 60, "str": 30, "spd": 9 })
-	rogue.rogue = true
 	var foe := _u("f", "axe", "water", { "con": 20 })
 	foe.team = "enemy"
-	t.ok(BWAI.controls(rogue) and BWAI.controls(foe) and not BWAI.controls(me), "BWAI plays the rogue and the enemy, not you")
+	t.ok(BWAI.controls(foe) and not BWAI.controls(me), "BWAI plays the enemy, not you")
 	t.ok(BWAI.controls(me, true), "autoplay plays everyone")
-	for round_ in 2:
-		var b := BWBattle.new(_board(), 11 + round_)
-		b.setup([me, rogue], [foe])
-		var guard := 0
-		while not b.over and guard < 400:
-			guard += 1
-			var u := b.current()
-			if BWAI.controls(u):
-				BWAI.take_turn(b)
-			else:
-				b.end_turn()                           # you do nothing; the rogue fights on its own
-		var dis := _events(b, "disobey")
-		t.eq(dis.size(), 1, "battle %d: the line once, at its first turn" % round_)
-		if not dis.is_empty():
-			t.eq(str(dis[0].line), "You do not have enough badges to control me!", "the author's line")
-			var i := b.history.find(dis[0])
-			t.ok(b.history[i - 1].type == "turn" and b.history[i - 1].unit == "rogue", "said as its turn opens")
-		t.ok(b.history.any(func(e): return e.type in ["attack", "skill"] and e.get("unit", "") == "rogue"), "battle %d: it fights" % round_)
-		t.ok(not b.history.any(func(e): return e.type == "attack" and e.unit == "rogue" and e.target == "me"), "it never strikes an ally")
-		t.ok(not b.history.any(func(e): return e.type == "attack" and e.target == "rogue" and e.unit == "me"), "and no ally strikes it")
-		t.ok(b.over, "battle %d ends" % round_)
-		foe.hp = foe.max_hp()
-		me.hp = me.max_hp()
-		rogue.hp = rogue.max_hp()
+	var r := _run()
+	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
+	t.ok(not d.squad[0].has("rogue"), "saves no longer write it")
+	d.squad[0]["rogue"] = true                       # a save from before D177
+	var v: BWUnit = BWRun.from_dict(d).squad[0]
+	t.ok(not BWAI.controls(v) and not "rogue" in v.to_dict(), "an old rogue loads as an ordinary unit")
 
 
 # ------------------------------------------------------------------ weapon class, picks, save
@@ -484,13 +564,12 @@ func test_weapon_class_switching(t) -> void:
 	t.eq(r2.squad[0].weapon_class, other, "a load re-reads the class from the main hand")
 	var big := r.make_item(model, "C")
 	r.inventory.append(big)
-	t.ok(not r.equip(u, big), "a C %s still needs C expertise" % other)
+	t.ok(r.equip(u, big), "D180: a C %s needs no expertise any more" % other)
 
 
 func test_save_v4(t) -> void:
 	var r := _run()
 	var u: BWUnit = r.squad[0]
-	u.rogue = true
 	u.next_immune = ["pinned"]
 	u.next_brace = ["fire"]
 	u.fight_buff = { "dex": 10 }
@@ -500,7 +579,7 @@ func test_save_v4(t) -> void:
 	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
 	t.eq(int(d.version), BWRun.SAVE_VERSION, "save version current (4 added these, D132)")
 	var v: BWUnit = BWRun.from_dict(d).squad[0]
-	t.ok(v.rogue and v.next_immune == ["pinned"] and v.next_brace == ["fire"], "rogue, immunity and brace survive")
+	t.ok(v.next_immune == ["pinned"] and v.next_brace == ["fire"], "immunity and brace survive")
 	t.eq(v.focus_element, "ice", "the focus element survives")
 	t.eq(v.fight_buff, { "dex": 10 }, "the buff survives (ints)")
 	t.eq(v.bonus_perks, { u.element: 1 }, "free perk picks survive")
@@ -512,7 +591,7 @@ func test_save_v4(t) -> void:
 		for k in ["rogue", "next_immune", "next_brace", "fight_buff", "bonus_perks", "bonus_skills", "focus_element"]:
 			ud.erase(k)
 	var m := BWRun.from_dict(old)
-	t.ok(m.squad.all(func(x): return not x.rogue and x.next_immune.is_empty() and x.next_brace.is_empty() and x.focus_element == "" \
+	t.ok(m.squad.all(func(x): return x.next_immune.is_empty() and x.next_brace.is_empty() and x.focus_element == "" \
 		and x.fight_buff.is_empty() and x.bonus_perks.is_empty() and x.bonus_skills.is_empty()), "a v3 save loads with defaults")
 	t.eq(m.pending_picks(), [], "and owes nothing")
 

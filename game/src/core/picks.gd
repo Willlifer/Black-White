@@ -16,13 +16,23 @@ class_name BWPicks
 ## No banking (author): a pick is made as soon as it is owed. The state says
 ## what is owed (ranks against picks already made), so nothing can be carried
 ## over: the screens open the picker at once, and AI / enemy units resolve
-## theirs with auto_resolve(), deterministically (data order, no rng).
+## theirs with auto_resolve(), deterministically (no rng of their own).
+##
+## D174 fewer, better choices: a pick OFFERS only OFFER (2) options, drawn at
+## random from what the unit could take (perks of the element it doesn't own;
+## the class's improve / learn pool). The draw is a hash of the unit's
+## pick_seed (BWRun.seed_unit: the run seed + the unit id), the request and
+## how many picks of that kind it has made, so it is reproducible, survives a
+## save, and the same request shows the same two cards every time it opens.
+## apply() takes only an offered option; the AI takes the first of the two.
+## Rank 3 still grants the element's every perk (settle).
 ##
 ## A request is { kind: "perk", element } or { kind: "skill", weapon }.
 ## A choice id is a perk id, or "improve:<skill>" / "learn:<skill>".
 
 const TABLE := "perks"
 const ALL_RANK := 3                 # affinity rank that grants the whole element
+const OFFER := 2                    # D174: options a pick shows
 
 
 # ---------------------------------------------------------------- perks
@@ -119,9 +129,43 @@ static func settle(u: BWUnit) -> Array:
 	return made
 
 
-## The cards for a request: every option, already-owned ones flagged.
-## [{ id, name, text, element, owned, kind }]
+## D174: the cards a request shows: OFFER options drawn from the ones the
+## unit can take (all_options, not owned), shown in data order. Stable: the
+## same unit, request and pick count give the same cards.
+## [{ id, name, text, element, owned (false), kind }]
 static func options(u: BWUnit, req: Dictionary) -> Array:
+	var free: Array = all_options(u, req).filter(func(o): return not o.owned)
+	if free.size() <= OFFER:
+		return free
+	var draw := RandomNumberGenerator.new()      # a string hash alone mixes too little
+	draw.seed = hash(_offer_salt(u, req))
+	var keyed: Array = []
+	for i in free.size():
+		keyed.append([draw.randi(), i])
+	keyed.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	var take: Array = keyed.slice(0, OFFER).map(func(k): return k[1])
+	take.sort()
+	return take.map(func(i): return free[i])
+
+
+## The ids options() offers.
+static func offered(u: BWUnit, req: Dictionary) -> Array:
+	return options(u, req).map(func(o): return str(o.id))
+
+
+## What a request's draw hashes: the unit's seed, the request, and how many
+## picks of that kind the unit has made (so each new pick draws afresh).
+static func _offer_salt(u: BWUnit, req: Dictionary) -> String:
+	if str(req.get("kind", "")) == "perk":
+		var el := str(req.get("element", ""))
+		return "perk|%d|%s|%d|%s" % [u.pick_seed, el, owned(u, el).size(), u.id]
+	var wc := str(req.get("weapon", ""))
+	return "skill|%d|%s|%d|%s" % [u.pick_seed, wc, int(u.skill_picks.get(wc, 0)), u.id]
+
+
+## Every option of a request, already-owned ones flagged (the codex and the
+## draw's pool). [{ id, name, text, element, owned, kind }]
+static func all_options(u: BWUnit, req: Dictionary) -> Array:
 	var out: Array = []
 	if req.get("kind", "") == "perk":
 		var el := str(req.element)
@@ -163,12 +207,16 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 				return {}
 			if owned(u, el).size() >= allowance(u, el):
 				return {}
+			if not choice in offered(u, req):
+				return {}                        # D174: only one of the two offered
 			u.perks.append(choice)
 			return _record("perk", el, choice, false)
 		"skill":
 			var wc := str(req.weapon)
 			if skill_picks_owed(u, wc) <= 0 or not choice in skill_choices(u, wc):
 				return {}
+			if not choice in offered(u, req):
+				return {}                        # D174: only one of the two offered
 			var parts: PackedStringArray = choice.split(":")
 			var key := parts[1]
 			if parts[0] == "improve":
@@ -182,9 +230,8 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 	return {}
 
 
-## The AI's answer: the first option it can take, data order. Perks: the
-## first not owned. Skills: improve the first equipped skill not improved,
-## else learn the first pool skill not known.
+## The AI's answer: the first of the offered options (D174), data order, so
+## it is deterministic: perks in CSV order, skills improve-before-learn.
 static func auto_choice(u: BWUnit, req: Dictionary) -> String:
 	for o in options(u, req):
 		if not o.owned:

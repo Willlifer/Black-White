@@ -2,7 +2,7 @@ class_name BWFlowProbe
 extends Node
 ## Drives the real BWGame through every screen transition: title → roster
 ## (portrait unpick, codex) → the run-start perk pickers (D90) → the hall's
-## prep (equip, give) → pre-battle → combat (autoplayed; picks auto) →
+## prep (equip, give) → the room select (D190) → pre-battle → combat (autoplayed; picks auto) →
 ## results → downtime (D127: one of three choices each, the day, one result
 ## card per unit, its pickers) → the next pre-battle. Uses each screen's own entry points, not internals of the
 ## rules. `godot --path game -- --flow-probe` (windowed). Exit 0 = passed.
@@ -62,7 +62,12 @@ func _run() -> void:
 	var prep: BWPrepScreen = await _wait_screen(BWPrepScreen)
 	await _probe_prep(prep)
 	_key(KEY_ENTER)
-	var pre: BWPrebattleScreen = await _wait_screen(BWPrebattleScreen, 12.0)
+	# D208: fight 1 has no room choice: straight from the hall to the pre-battle
+	var pre_n: Node = await _wait_any([BWPrebattleScreen, BWRoomScreen], 12.0)
+	_check(pre_n is BWPrebattleScreen, "fight 1: no room screen, straight to the pre-battle")
+	var pre := pre_n as BWPrebattleScreen
+	_check(pre._board.name == BWBoard.load_file("res://maps/%s.json" % game.run.map_queue[0]).name, "on the queue's front map (%s)" % game.run.map_queue[0])
+	_check(pre._enemies.size() == 3, "facing three")
 	_check(game.run != null and game.run.squad.size() == 6, "run started with six")
 	_check(game.run.roster_seed == rolled_seed and game.run.roster_rows.size() == 20 		and str(game.run.roster_rows[3].weapon_model) == str(rolled_rows[3].weapon_model), "the run keeps the screen's roll (D150)")
 	for k in 3:
@@ -88,30 +93,121 @@ func _run() -> void:
 	await _probe_downtime(down)
 	await get_tree().create_timer(BWDowntimeScreen.MIN_CONTINUE + 0.3).timeout
 	_key(KEY_A)                           # the day card: any key goes on
-	var pre2: BWPrebattleScreen = await _wait_screen(BWPrebattleScreen, 20.0)
+	# D208: fight 2 has no room choice either
+	var pre2: Node = await _wait_any([BWPrebattleScreen, BWRoomScreen], 20.0)
+	_check(pre2 is BWPrebattleScreen, "fight 2: no room screen, straight to the pre-battle")
 	_check(pre2 != null and game.run.fight == 2 and game.run.day == 2, "day advanced, on to fight 2")
 	_check(FileAccess.file_exists(BWGame.SAVE_PATH), "run autosaved")
+	# The choice starts at fight 3: skip ahead on paper and take the room flow.
+	game.run.fight = 3
+	game.run.room_offer = {}
+	game.go_rooms()
+	var rooms3: BWRoomScreen = await _wait_screen(BWRoomScreen, 20.0)
+	await _probe_rooms(rooms3, false)
+	var pre3: BWPrebattleScreen = await _wait_screen(BWPrebattleScreen, 20.0)
+	_check(pre3 != null and game.run.map_for(3) == _room_map, "fight 3 plays the room taken by click")
+	_check(pre3._board.name == BWBoard.load_file("res://maps/%s.json" % _room_map).name, "pre-battle is on the chosen room's map (%s)" % _room_map)
 	_finish()
 
 
-## D127 downtime: three name-only tiles; keys 1-3 choose; everyone set
-## enables Progress day; after the 5 s day one card per unit (any key goes
-## on), each followed by that unit's pickers (Branch out always owes a perk
-## and a skill pick); nothing banked; then the day card.
+var _room_map := ""
+var _room_enemies: Array = []
+
+
+## D190 the room select: two cards (Standard, Hard), distinct maps, three
+## enemies each, thumbnails land; hovering a card opens its detail and an
+## enemy's unit card. Before fight 1 (`from_hall`) Esc goes back to the hall
+## and Enter returns to the same two rooms, then key 2 takes Hard; after a
+## day Esc stays, and a click on the Standard card takes it.
+func _probe_rooms(rs: BWRoomScreen, from_hall: bool) -> void:
+	var run := game.run
+	_check(rs.cards.size() == 2 and rs.rooms[0].kind == "standard" and rs.rooms[1].kind == "hard", "two room cards: Standard, Hard (or an encounter, D208)")
+	_check(rs.rooms[0].map != rs.rooms[1].map, "two different maps (%s / %s)" % [rs.rooms[0].map, rs.rooms[1].map])
+	_check(rs.enemies[0].size() == 3 and rs.enemies[1].size() >= 1, "three enemies in the Standard room, a squad in the other")
+	var t := 0.0
+	while not rs.thumbs_ready() and t < 10.0:
+		await get_tree().create_timer(0.2).timeout
+		t += 0.2
+	_check(rs.thumbs_ready(), "both map thumbnails rendered")
+	var offered: Array = rs.rooms.duplicate(true)
+	await _move(rs.cards[1].get_global_rect().position + Vector2(30, 30))
+	_check(rs.hover == 1 and rs._details[1].all(func(d): return d.visible), "hovering a card opens its detail")
+	var cols: Array = rs.cards[1].find_children("*", "VBoxContainer", true, false).filter(func(c): return c.mouse_filter == Control.MOUSE_FILTER_PASS)
+	if not cols.is_empty():
+		await _move(cols[0].get_global_rect().get_center())
+	_check(rs.unit_card.visible and rs.unit_card.unit == rs.enemies[1][0], "hovering an enemy shows its unit card")
+	await _move(Vector2(8, 8))
+	await get_tree().process_frame
+	if from_hall:
+		_key(KEY_ESCAPE)
+		await get_tree().process_frame
+		if game.screen == rs and rs.chosen < 0:
+			_key(KEY_ESCAPE)                  # the first Esc closed a leftover hover card
+		var back: BWPrepScreen = await _wait_screen(BWPrepScreen)
+		_check(back != null, "Esc before fight 1 goes back to the hall")
+		_key(KEY_ENTER)
+		var again: BWRoomScreen = await _wait_screen(BWRoomScreen, 12.0)
+		_check(again.rooms == offered, "the same two rooms again")
+		_room_map = str(offered[1].map)
+		_room_enemies = offered[1].enemies
+		_key(KEY_2)
+		await get_tree().create_timer(0.5).timeout
+		_check(BWRooms.chosen_index(run) == 1, "key 2 takes the Hard room")
+	else:
+		_key(KEY_ESCAPE)
+		await get_tree().create_timer(0.4).timeout
+		_check(game.screen == rs, "after a day Esc doesn't leave the room choice")
+		_room_map = str(offered[0].map)
+		_room_enemies = offered[0].enemies
+		await _click(rs.cards[0].get_global_rect().get_center())
+		await get_tree().create_timer(0.5).timeout
+		_check(BWRooms.chosen_index(run) == 0, "a click takes the Standard room")
+
+
+## D127 downtime: name-only tiles, D175 two of the three per unit (keys
+## 1..n); D176 Branch out shows its two cards on the tile and a card is the
+## choice; everyone set enables Progress day; after the 5 s day one card per
+## unit (any key goes on), each followed by that unit's pickers (Branch out
+## always owes a perk and a skill pick); nothing banked; then the day card.
 func _probe_downtime(down: BWDowntimeScreen) -> void:
 	var run := game.run
-	_check(down._tile_btns.size() == 3 and down._tile_btns.keys() == BWRun.DOWNTIME_CHOICES, "three choice tiles")
-	_check(down._tile_btns.values().all(func(b): return b.tooltip_text == ""), "no tooltip on any tile (names only)")
+	var u0: BWUnit = run.squad[0]
+	_check(down._tile_btns.size() == 2 and down._tile_btns.keys() == run.day_choices(u0), "two tiles, the day's: %s" % [down._tile_btns.keys()])
+	_check(down._tile_btns.values().all(func(b): return b.tooltip_text == ""), "no tooltip on any tile")
 	_check(down._go.disabled, "Progress day waits for everyone")
-	_key(KEY_2)
-	await get_tree().process_frame
-	_check(down._plans[run.squad[0].id] == "branch_out", "key 2 = Branch out for the selected unit")
-	_key(KEY_1)
-	await get_tree().process_frame
-	_check(down._plans[run.squad[0].id] == "specialize", "key 1 changes it to Specialize")
-	var order := ["specialize", "branch_out", "wander"]
+	var bi := -1
 	for i in run.squad.size():
-		down._plans[run.squad[i].id] = order[i % 3]
+		if "branch_out" in run.day_choices(run.squad[i]):
+			bi = i
+			break
+	_check(bi >= 0, "someone is offered Branch out today")
+	if bi >= 0:
+		var ub: BWUnit = run.squad[bi]
+		down._select(bi)
+		await get_tree().process_frame
+		var bt = down._tile_btns["branch_out"]
+		var cards: Array = run.branch_preview(ub)
+		_check(bt is BWDowntimeWidgets.BranchTile and bt.cards == cards and cards.size() == 2, "Branch out shows its two cards before committing: %s" % [cards])
+		var k2 := -1
+		for n in down._keys.size():
+			if down._keys[n] == ["branch_out", 1]:
+				k2 = n
+		_key(KEY_1 + k2)
+		await get_tree().process_frame
+		_check(down._plans[ub.id] == "branch_out" and int(down._branch.get(ub.id, -1)) == 1, "key %d = Branch out's second card" % (k2 + 1))
+		var other: String = run.day_choices(ub).filter(func(c): return c != "branch_out")[0]
+		var ko: int = down._keys.find([other, -1])
+		_key(KEY_1 + ko)
+		await get_tree().process_frame
+		_check(down._plans[ub.id] == other and not down._branch.has(ub.id), "key %d changes it to %s (the cards discarded)" % [ko + 1, other])
+		down._select(0)
+	for i in run.squad.size():
+		var u: BWUnit = run.squad[i]
+		var offer := run.day_choices(u)
+		var c: String = "branch_out" if "branch_out" in offer else str(offer[i % 2])
+		down._plans[u.id] = c
+		if c == "branch_out":
+			down._branch[u.id] = i % 2
 	down._refresh_go()
 	_check(not down._go.disabled, "one choice each enables Progress day")
 	var day_before := run.day
@@ -177,7 +273,8 @@ func _probe_run_start_picks(ps: BWPicksScreen) -> void:
 		var u := pk.unit
 		_check(u == run.squad[i], "picker %d is %s's, in squad order" % [i + 1, run.squad[i].name])
 		_check(pk.request.kind == "perk" and pk.request.element == u.element, "%s: a %s perk" % [u.name, u.element])
-		_check(pk._cards.size() == BWPicks.perks_of(u.element).size(), "a card per %s perk" % u.element)
+		_check(pk._cards.size() == BWPicks.OFFER and pk.options.map(func(o): return str(o.id)) == BWPicks.offered(u, pk.request),
+			"two %s perks drawn for it (D174): %s" % [u.element, BWPicks.offered(u, pk.request)])
 		if i == 0:
 			_key(KEY_2)
 			await get_tree().process_frame

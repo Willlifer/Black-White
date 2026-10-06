@@ -1,8 +1,11 @@
 class_name BWDowntimeScreen
 extends Node3D
 ## Brief: your units in various poses, each under their own spotlight, in an
-## empty marble school hall (D83). D127: each unit takes ONE of three choices
-## (Specialize, Branch out, Wander), shown by name only. "Progress day" plays
+## empty marble school hall (D83). D127: each unit takes ONE choice
+## (Specialize, Branch out, Wander), shown by name only. D175: a day offers
+## each unit two of the three (BWRun.day_choices). D176: Branch out's two
+## cards (BWRun.branch_preview) show on its tile; pressing a card is the
+## choice, so the pairing is known before committing. "Progress day" plays
 ## a 5 s day of units acting their choice out (Specialize: training at the
 ## dummy; Branch out: trying an unfamiliar weapon; Wander: walking off into
 ## the dark and coming back). Then the results, slowly: one unit at a time
@@ -40,6 +43,9 @@ var _views: Array = []
 var _spot_ids: Array = []
 var _home: Array = []               # each view's standing position and yaw
 var _plans := {}                    # unit id -> its choice ("" = none yet)
+var _branch := {}                   # D176: unit id -> the Branch out card taken
+var _keys: Array = []               # D176: hotkey n -> [choice, card index or -1] for the selected unit
+var _tiles_for := ""                # the unit the tiles were built for
 var _asked := {}                    # unit id -> the "ask" bark played today (BARKS.md: once per unit per day)
 var _sel := 0
 var _cam: Camera3D
@@ -376,15 +382,38 @@ func _build_actions() -> void:
 	_tiles.add_theme_constant_override("separation", 12)
 	_tiles.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(_tiles)
-	var key := 1
-	for c in BWRun.DOWNTIME_CHOICES:
-		var t := BWDowntimeWidgets.ChoiceTile.new(c, str(key))
+
+
+
+## D175/D176: the selected unit's two tiles (its day_choices); Branch out
+## carries its cards. Keys run 1..n over the plain tiles and the cards.
+func _build_tiles(u: BWUnit) -> void:
+	for c in _tiles.get_children():
+		_tiles.remove_child(c)
+		c.queue_free()
+	_tile_btns = {}
+	_keys = []
+	_tiles_for = u.id
+	for c in run.day_choices(u):
+		var cards: Array = run.branch_preview(u) if c == "branch_out" else []
+		if c == "branch_out" and not cards.is_empty():
+			var bt := BWDowntimeWidgets.BranchTile.new(cards, _keys.size() + 1)
+			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bt.size_flags_stretch_ratio = 1.6
+			bt.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			bt.picked.connect(func(i: int): _choose("branch_out", i))
+			_tiles.add_child(bt)
+			_tile_btns[c] = bt
+			for i in cards.size():
+				_keys.append([c, i])
+			continue
+		var t := BWDowntimeWidgets.ChoiceTile.new(c, str(_keys.size() + 1))
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		t.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		t.pressed.connect(_choose.bind(c))
 		_tiles.add_child(t)
 		_tile_btns[c] = t
-		key += 1
+		_keys.append([c, -1])
 
 
 ## A name and the chosen chip under each spotlight.
@@ -429,7 +458,15 @@ func _refresh_tags() -> void:
 		var tag: Dictionary = _tags[i]
 		var c: BWDowntimeWidgets.Chip = tag.chips[0]
 		var ch := str(_plans.get(u.id, ""))
-		c.set_action(ch, str(BWDowntimeWidgets.info(ch)[1]) if ch != "" else "")
+		var bi := int(_branch.get(u.id, -1))
+		if ch == "branch_out" and bi >= 0:
+			# D176: the chip names the card taken (its element, in colour)
+			var card: Dictionary = run.branch_preview(u)[bi]
+			var el := str(card.element)
+			c.set_action(ch, el.capitalize() if el != "" else BWText.weapon(str(card.weapon)),
+				BWLook.element_color(el) if el != "" else Color.TRANSPARENT)
+		else:
+			c.set_action(ch, str(BWDowntimeWidgets.info(ch)[1]) if ch != "" else "")
 		var sel := i == _sel and not _day
 		(tag.name as Label).add_theme_color_override("font_color", Color.WHITE if sel or _day else BWStyle.TEXT_DIM)
 		(tag.name as Label).text = ("▸ " if sel else "") + u.name + ("  ✓" if ch != "" and not _day else "")
@@ -501,21 +538,32 @@ func _refresh_panel() -> void:
 	var u: BWUnit = run.squad[_sel]
 	var ch := str(_plans[u.id])
 	_actions_title.text = ("WHAT WILL %s DO TODAY?" % u.name).to_upper()
-	_actions_count.text = "←/→ next unit" if ch != "" else "pick one  ·  1 – 3"
+	if _tiles_for != u.id:
+		_build_tiles(u)
+	_actions_count.text = "←/→ next unit" if ch != "" else "pick one  ·  1 – %d" % _keys.size()
 	for c in _tile_btns:
-		var t: BWDowntimeWidgets.ChoiceTile = _tile_btns[c]
-		t.chosen = c == ch
-		t.queue_redraw()
+		var t = _tile_btns[c]
+		if t is BWDowntimeWidgets.BranchTile:
+			t.set_chosen(int(_branch.get(u.id, -1)) if c == ch else -1)
+		else:
+			t.chosen = c == ch
+			t.queue_redraw()
 
 
 ## A tile was pressed: that is the unit's choice for the day (another press
-## changes it).
-func _choose(c: String) -> void:
+## changes it). Only the day's two (D175); Branch out with a card (D176).
+func _choose(c: String, card: int = -1) -> void:
 	var u: BWUnit = run.squad[_sel]
-	if _day or not c in BWRun.DOWNTIME_CHOICES:
+	if _day or not c in run.day_choices(u):
 		return
+	if c == "branch_out" and card < 0 and not run.branch_preview(u).is_empty():
+		card = 0
 	var first := str(_plans[u.id]) == ""
 	_plans[u.id] = c
+	if c == "branch_out":
+		_branch[u.id] = card
+	else:
+		_branch.erase(u.id)                     # another choice discards the cards
 	if first or _rng.randf() < 0.5:
 		var react := BWBarks.pick("downtime_advice", u.friendliness, _squad_trust(u), "any", c, _rng)
 		if not react.is_empty():
@@ -528,6 +576,7 @@ func _choose(c: String) -> void:
 
 func _clear_sel() -> void:
 	_plans[(run.squad[_sel] as BWUnit).id] = ""
+	_branch.erase((run.squad[_sel] as BWUnit).id)
 	_refresh_panel()
 	_refresh_tags()
 	_refresh_go()
@@ -576,8 +625,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 					_progress()
 			_:
 				var n: int = ev.keycode - KEY_1
-				if n >= 0 and n < BWRun.DOWNTIME_CHOICES.size():
-					_choose(BWRun.DOWNTIME_CHOICES[n])
+				if n >= 0 and n < _keys.size():
+					_choose(str(_keys[n][0]), int(_keys[n][1]))
 	elif ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 		var best := _unit_at(ev.position)
 		if best >= 0:
@@ -602,9 +651,10 @@ func _progress() -> void:
 	set_process_unhandled_input(false)          # the screen audio's cue: the day starts
 	var plan: Array = []
 	for u in run.squad.slice(0, _views.size()):
-		plan.append([u.id, str(_plans[u.id])])
+		var c := str(_plans[u.id])
+		plan.append([u.id, c, int(_branch.get(u.id, -1))] if c == "branch_out" else [u.id, c])
 	var before := run.squad.size()
-	reports = run.progress_day(plan, false)       # Branch out's options wait for the card
+	reports = run.progress_day(plan, false)       # D176: Branch out applies the hall's card at once
 	var recruits: Array = run.squad.slice(before)
 	# planning UI out; every light up; the camera pulls back to the whole hall
 	var tw := create_tween()
@@ -948,12 +998,6 @@ func _report_card(rep: Dictionary, k: int) -> Control:
 		t.add_theme_font_size_override("bold_font_size", BWStyle.F_BODY + (6 if rep.get("jackpot", false) else 0))
 		t.text = _rich(str(l.text), [it] if not it.is_empty() else [])
 		row.add_child(t)
-	if u != null and u.rogue and rep.get("jackpot", false):
-		var b := RichTextLabel.new()
-		b.bbcode_enabled = true
-		b.fit_content = true
-		b.text = "\n".join(BWCombatUI.badge_lines(u, BWStyle.F_SMALL))
-		v.add_child(b)
 	var foot := Label.new()
 	var owes := u != null and not BWPicks.next_request(u).is_empty()
 	var what := "click to choose what you earned" if owes else "click to go on"

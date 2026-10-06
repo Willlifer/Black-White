@@ -37,7 +37,10 @@ func test_rotation(t) -> void:
 	var pool: Array = BWRun.MAP_POOL.duplicate()
 	pool.sort()
 	t.eq(sorted, pool, "fights 1-3 and 5-10: every pool map once, no repeats")
-	t.eq(seen, BWRun.shuffled_maps(4242), "the order is the seeded shuffle")
+	# D187/D208: fights 1-2 take the front map; rooms take the front two from fight 3; always Standard plays the first,
+	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6, 8, 5, 3, 7.
+	var sh := BWRun.shuffled_maps(4242)
+	t.eq(seen, [0, 1, 2, 4, 6, 8, 5, 3, 7].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
 	var again := BWRun.start(ids, 4242)
 	t.eq(range(1, 11).map(func(n): return again.map_for(n)), range(1, 11).map(func(n): return r.map_for(n)), "same seed, same order")
 	var other := BWRun.start(ids, 4243)

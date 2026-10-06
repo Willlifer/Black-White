@@ -1,6 +1,8 @@
 extends RefCounted
 ## D89 the skill registry, D90/D91 picks (element perks, weapon-skill picks),
 ## D92 the save's version 2. BWSkillRegistry, BWPicks, BWBattle picks_live.
+## D174: a pick offers two options at random (seeded); tests that need a
+## particular option re-salt the unit until it is offered (_offer).
 
 const C := Vector2i(4, 4)
 const E := Vector2i(5, 4)
@@ -55,6 +57,14 @@ func _pad_perks(el: String) -> Array:
 	return added
 
 
+## D174: re-salt `u` until `id` is one of the two options `req` offers.
+func _offer(u: BWUnit, req: Dictionary, id: String) -> void:
+	for k in 256:
+		if id in BWPicks.offered(u, req):
+			return
+		u.pick_seed += 1
+
+
 func _unpad(ids: Array) -> void:
 	var rows := BWData.table("perks")
 	var by_id: Dictionary = BWData._cache[BWData.DATA_DIR + "perks.csv"].by_id
@@ -102,6 +112,7 @@ func test_upgraded_flag(t) -> void:
 	u.expertise["sword"] = 10                       # E -> D: one skill pick
 	var req := BWPicks.next_request(u)
 	t.eq(req, { "kind": "skill", "weapon": "sword" }, "a letter owes a skill pick")
+	_offer(u, req, "improve:striketwice")
 	t.ok(not BWPicks.apply(u, req, "improve:striketwice").is_empty(), "improve Striketwice")
 	t.ok(d.upgraded(u) and u.skill_upgraded("striketwice"), "the def reads the flag")
 	t.ok(not BWSkillRegistry.get_def("riposte").upgraded(u), "only that skill")
@@ -121,9 +132,11 @@ func test_loadout_capped_at_three(t) -> void:
 	BWPicks.auto_resolve(u)
 	u.expertise["daggers"] = 10
 	var req := BWPicks.next_request(u)
-	var opts := BWPicks.options(u, req).map(func(o): return o.id)
+	var opts := BWPicks.all_options(u, req).map(func(o): return o.id)
 	t.ok("learn:test_jab" in opts and "improve:consume" in opts, "learn or improve: %s" % [opts])
-	BWPicks.apply(u, req, "learn:test_jab")
+	t.eq(BWPicks.options(u, req).size(), BWPicks.OFFER, "two of them offered (D174)")
+	_offer(u, req, "learn:test_jab")
+	t.ok(not BWPicks.apply(u, req, "learn:test_jab").is_empty(), "learn the new one")
 	t.ok("test_jab" in u.known("daggers"), "learned")
 	t.eq(u.loadout("daggers").size(), 3, "loadout full: the new skill is known, not equipped")
 	t.ok(not u.set_equipped("daggers", "test_jab", true), "a fourth can't be equipped")
@@ -142,13 +155,74 @@ func test_loadout_capped_at_three(t) -> void:
 func test_run_start_owes_one_perk(t) -> void:
 	var u := _u("p", "sword", "fire")
 	t.eq(BWPicks.pending(u), [{ "kind": "perk", "element": "fire" }], "rank 1 native: one pick")
+	var fire := { "kind": "perk", "element": "fire" }
 	var opts := BWPicks.options(u, BWPicks.pending(u)[0])
-	t.eq(opts.size(), BWPicks.perks_of("fire").size(), "a card per fire perk")
+	t.eq(opts.size(), 2, "two fire perks offered (D174)")
+	t.eq(BWPicks.all_options(u, fire).size(), BWPicks.perks_of("fire").size(), "of the five")
+	_offer(u, fire, "fire_rush")
 	t.ok(BWPicks.apply(u, { "kind": "perk", "element": "water" }, "fire_rush").is_empty(), "wrong element refused")
-	t.ok(not BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_rush").is_empty(), "picked")
+	t.ok(not BWPicks.apply(u, fire, "fire_rush").is_empty(), "picked")
 	t.eq(BWPicks.pending(u), [], "nothing owed after")
-	t.ok(BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_skin").is_empty(), "no banking: rank 1 = one pick")
-	t.ok(BWPicks.options(u, { "kind": "perk", "element": "fire" })[0].owned, "the taken perk shows as owned")
+	t.ok(BWPicks.apply(u, fire, "fire_skin").is_empty(), "no banking: rank 1 = one pick")
+	t.ok(BWPicks.all_options(u, fire)[0].owned, "the taken perk shows as owned")
+	t.ok(not "fire_rush" in BWPicks.offered(u, fire), "and is never offered again")
+
+
+## D174: two options, drawn per unit and pick (reproducible, stable across
+## a save), never one it owns; apply takes only an offered one; the AI takes
+## the first; every option turns up across units.
+func test_two_options(t) -> void:
+	var fire := { "kind": "perk", "element": "fire" }
+	var seen := {}
+	var pairs := {}
+	for k in 60:
+		var u := _u("o%d" % k, "sword", "fire")
+		u.pick_seed = k * 7919
+		var o := BWPicks.offered(u, fire)
+		t.eq(o.size(), 2, "%s: two" % u.id)
+		t.ok(o[0] != o[1], "%s: two different" % u.id)
+		t.eq(BWPicks.offered(u, fire), o, "%s: the same two each time" % u.id)
+		t.eq(BWPicks.auto_choice(u, fire), o[0], "%s: the AI takes the first" % u.id)
+		var other: Array = BWPicks.perks_of("fire").map(func(r): return str(r.id)).filter(func(x): return not x in o)
+		t.ok(BWPicks.apply(u, fire, str(other[0])).is_empty(), "%s: an option not offered is refused" % u.id)
+		for x in o:
+			seen[x] = true
+		pairs[str(o)] = true
+	t.eq(seen.size(), 5, "every fire perk turns up somewhere")
+	t.ok(pairs.size() >= 6, "many different pairs (%d)" % pairs.size())
+	# the next pick draws afresh, from what is left
+	var u := _u("n", "sword", "fire")
+	var first := BWPicks.offered(u, fire)
+	BWPicks.apply(u, fire, str(first[1]))
+	u.affinity["fire"] = 20
+	var second := BWPicks.offered(u, fire)
+	t.ok(second.size() == 2 and not str(first[1]) in second, "rank 2 offers two it doesn't own: %s" % [second])
+	# a run: the same seed offers the same, a save keeps it, another seed differs
+	var r1 := BWRun.start(["aureli", "della"], 41)
+	var r2 := BWRun.start(["aureli", "della"], 41)
+	var o1 := BWPicks.offered(r1.squad[0], BWPicks.next_request(r1.squad[0]))
+	t.eq(BWPicks.offered(r2.squad[0], BWPicks.next_request(r2.squad[0])), o1, "same run seed, same two")
+	var back := BWRun.from_dict(JSON.parse_string(JSON.stringify(r1.to_dict())))
+	t.eq(BWPicks.offered(back.squad[0], BWPicks.next_request(back.squad[0])), o1, "a reload shows the same two")
+	var differ := false
+	for sd in range(42, 62):
+		var r3 := BWRun.start(["aureli", "della"], sd)
+		differ = differ or BWPicks.offered(r3.squad[0], BWPicks.next_request(r3.squad[0])) != o1
+	t.ok(differ, "another run seed can offer another pair")
+	# skills: two of the class's improve / learn pool
+	var w := _u("w", "daggers", "fire")
+	BWPicks.auto_resolve(w)
+	w.expertise["daggers"] = 10
+	var sreq := BWPicks.next_request(w)
+	var so := BWPicks.options(w, sreq)
+	t.eq(so.size(), 2, "a skill pick offers two")
+	t.ok(so.all(func(x): return str(x.id) in BWPicks.skill_choices(w, "daggers")), "from the improve / learn pool")
+	# fewer than two left: what there is
+	var last := _u("l", "sword", "fire")
+	for r in BWPicks.perks_of("fire").slice(0, 4):
+		last.perks.append(str(r.id))
+	last.bonus_perks["fire"] = 4
+	t.eq(BWPicks.options(last, fire).size(), 1, "one perk left: one card")
 
 
 func test_rank_crossing_triggers_a_pick(t) -> void:
@@ -179,6 +253,7 @@ func test_rank_three_grants_all_five(t) -> void:
 	var u := _u("r3", "sword", "fire")
 	for el in BWFormulas.ELEMENTS:
 		t.eq(BWPicks.perks_of(el).size(), 5, "five %s perks (D93)" % el)
+	_offer(u, { "kind": "perk", "element": "fire" }, "fire_skin")
 	BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_skin")
 	u.affinity["fire"] = 30
 	var made := BWPicks.settle(u)
@@ -190,6 +265,7 @@ func test_rank_three_grants_all_five(t) -> void:
 
 func test_perks_feed_the_effects_pipeline(t) -> void:
 	var u := _u("fx", "sword", "fire")
+	_offer(u, { "kind": "perk", "element": "fire" }, "fire_kindling")
 	BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_kindling")
 	u.refresh_effects()
 	var rec: Array = u.effects.filter(func(e): return e.kind == "perk")
@@ -227,8 +303,9 @@ func test_battle_rank_up_pauses_for_the_player(t) -> void:
 	t.eq(pend.size(), 1, "the player owes a pick")
 	t.eq(pend[0][1], { "kind": "perk", "element": "fire" }, "a fire perk")
 	t.ok(b.history.filter(func(e): return e.type == "pick").is_empty(), "nothing chosen for the player")
-	t.ok(b.apply_pick(me, pend[0][1], "fire_skin"), "the screen applies the choice")
-	t.ok(me.effects.any(func(e): return e.source == "fire_skin"), "effects refreshed mid-fight")
+	var take: String = BWPicks.offered(me, pend[0][1])[1]
+	t.ok(b.apply_pick(me, pend[0][1], take), "the screen applies the choice")
+	t.ok(me.effects.any(func(e): return e.source == take), "effects refreshed mid-fight")
 	t.eq(b.pending_picks("player"), [], "resolved")
 	t.eq(b.history.filter(func(e): return e.type == "pick").size(), 1, "one pick event")
 
@@ -243,9 +320,20 @@ func test_ai_auto_picks_deterministically(t) -> void:
 	var ra := BWPicks.auto_resolve(a)
 	var rc := BWPicks.auto_resolve(c)
 	t.eq(ra, rc, "same unit, same picks")
-	t.eq(a.perks, ["thunder_step", "thunder_grounded", "wind_tail"], "data order, element order")
-	t.eq(a.skill_ranks, { "tridentpierce": 2, "vault": 2 }, "improves its equipped skills first")
+	t.eq(a.perks.size(), 3, "two thunder, one wind")
 	t.eq(BWPicks.pending(a), [], "nothing left owed")
+	var d := _u("a", "lance", "thunder")
+	d.affinity["thunder"] = 20
+	d.affinity["wind"] = 10
+	d.expertise["lance"] = 20
+	for guard in 16:
+		var q := BWPicks.next_request(d)
+		if q.is_empty():
+			break
+		var want: String = BWPicks.offered(d, q)[0]
+		t.eq(BWPicks.auto_choice(d, q), want, "the AI takes the first of the two offered (D174)")
+		BWPicks.apply(d, q, want)
+	t.eq(d.perks, a.perks, "and that is what auto_resolve did")
 	# enemies in a run arrive with their native pick made
 	var run := BWRun.start(["aureli", "della"], 11)
 	var e1 := run.enemies_for(3)
@@ -265,10 +353,11 @@ func test_ai_auto_picks_deterministically(t) -> void:
 	b.queue = [foe]
 	b.turn_index = 0
 	b._begin_turn()
+	var expect: String = BWPicks.offered(foe, { "kind": "perk", "element": "fire" })[0]
 	b.use_skill(foe, "striketwice", "fire", C)
 	var picks := b.history.filter(func(e): return e.type == "pick")
 	t.eq(picks.size(), 1, "the enemy picked")
-	t.ok(picks[0].auto and picks[0].id == "fire_skin", "deterministically: the next fire perk")
+	t.ok(picks[0].auto and picks[0].id == expect, "deterministically: the first of its two (%s)" % expect)
 
 
 # ------------------------------------------------------------------ save (D92)
@@ -276,7 +365,8 @@ func test_ai_auto_picks_deterministically(t) -> void:
 func test_picks_persist(t) -> void:
 	var run := BWRun.start(["aureli", "della"], 21)
 	var u: BWUnit = run.squad[0]
-	BWPicks.apply(u, BWPicks.next_request(u), str(BWPicks.perks_of(u.element)[1].id))
+	var preq := BWPicks.next_request(u)
+	BWPicks.apply(u, preq, str(BWPicks.offered(u, preq)[1]))
 	u.expertise[u.weapon_class] = 10
 	var req := BWPicks.next_request(u)
 	BWPicks.apply(u, req, BWPicks.auto_choice(u, req))

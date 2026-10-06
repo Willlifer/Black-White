@@ -8,7 +8,7 @@ const STAT_NAMES := {
 	"con": "Constitution", "str": "Strength", "dex": "Dexterity", "wil": "Willpower",
 	"def": "Defense", "res": "Resistance", "spd": "Speed",
 }
-const SLOT_NAMES := { "head": "Head", "chest": "Chest", "legs": "Legs", "main_hand": "Main hand" }
+const SLOT_NAMES := { "head": "Head", "chest": "Chest", "legs": "Legs", "main_hand": "Main hand", "second": "Second weapon" }
 const WEIGHT_NAMES := { "heavy": "Heavy armour", "ranger": "Ranger gear", "wizard": "Wizard garb" }
 const MINUS := "−"
 
@@ -54,6 +54,14 @@ static func enchant(item: Dictionary) -> Dictionary:
 	return BWData.row("enchantments", str(item.get("enchant", "")))
 
 
+## D203: a row's name without an item: "Explosive …", "… of Ash".
+static func row_name(row: Dictionary) -> String:
+	if row.is_empty():
+		return "—"
+	var pat := str(row.get("name_pattern", row.get("id", "")))
+	return pat.replace("{item}", "…").strip_edges() if pat.begins_with("{item}") else pat.replace("{item}", "").strip_edges()
+
+
 static func passive_text(item: Dictionary) -> String:
 	var e := enchant(item)
 	return str(e.get("effect_text", "")) if not e.is_empty() else ""
@@ -69,11 +77,12 @@ static func teaches(item: Dictionary) -> Array:
 	return out
 
 
-## Stat bonus from worn equipment alone.
+## Stat bonus from worn equipment alone (D180: not the carried weapon).
 static func gear_bonus(u: BWUnit, stat: String) -> int:
 	var v := 0
-	for item in u.equipment.values():
-		v += int(item.get("stats", {}).get(stat, 0))
+	for slot in u.equipment:
+		if slot != BWUnit.SECOND:
+			v += int(u.equipment[slot].get("stats", {}).get(stat, 0))
 	return v
 
 
@@ -82,20 +91,16 @@ static func other_bonus(u: BWUnit, stat: String) -> int:
 	return u.stat(stat) - int(u.stats.get(stat, 0)) - gear_bonus(u, stat)
 
 
-## [ok, line] for "can this unit equip it?" (brief: a weapon needs that
-## class's expertise at the item's tier or better; armour has no rule).
+## [ok, line] for "can this unit equip it?" D180: anyone can wield any
+## weapon; the line says what the unit's expertise in the class brings.
 static func equip_check(run: BWRun, u: BWUnit, item: Dictionary) -> Array:
 	if item.is_empty() or u == null:
 		return [true, ""]
 	if str(item.slot) != "main_hand":
 		return [true, "Armour — anyone can wear it."]
 	var wc := str(item.weight)
-	var need := str(item.tier)
-	var have := u.expertise_letter(wc)
 	var wname := BWText.weapon(wc)
-	if run.can_equip(u, item):
-		return [true, "%s's %s expertise %s meets tier %s." % [u.name, wname, have, need]]
-	return [false, "Needs %s expertise %s — %s has %s." % [wname, need, u.name, have]]
+	return [run.can_equip(u, item), "Anyone can wield it. %s's %s expertise %s sets hit chance and skills." % [u.name, wname, u.expertise_letter(wc)]]
 
 
 ## Weapon classes in data order.

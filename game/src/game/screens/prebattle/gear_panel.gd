@@ -1,7 +1,7 @@
 class_name BWGearPanel
 extends PanelContainer
 ## The equipment view: a paperdoll (the unit's live 3D model with Head,
-## Chest, Legs and Main hand slot boxes around it), the inventory as a grid
+## Chest, Legs, Main hand and Second weapon slot boxes around it, D180), the inventory as a grid
 ## of item tiles, and the item card that reads an item BEFORE you equip it.
 ##
 ##   hover a tile / slot     its card (deltas against what's worn there)
@@ -38,6 +38,7 @@ var _header: HBoxContainer
 var _give_box: HBoxContainer
 var _give_flow: HFlowContainer
 var _give_label: Label
+var _swap_btn: Button              # D180
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -100,23 +101,32 @@ func _init(p_run: BWRun) -> void:
 	rs.add_theme_constant_override("separation", 34)
 	rs.alignment = BoxContainer.ALIGNMENT_CENTER
 	dollrow.add_child(rs)
-	for slot in BWRun.SLOTS:
+	rs.add_theme_constant_override("separation", 10)
+	for slot in BWRun.GEAR_SLOTS:
 		var t := BWItemTile.new({}, 88.0)
 		t.custom_minimum_size = Vector2(88, 88 + 24)
 		t.slot = slot
 		t.source = "slot"
 		t.caption = BWGearText.SLOT_NAMES[slot]
 		t.accept = _accepts_for(slot)
-		t.on_drop = func(it: Dictionary): _equip(it)
+		t.on_drop = func(it: Dictionary): _equip(it, slot)
 		t.hovered.connect(_hover_slot)
 		t.unhovered.connect(_unhover)
 		t.picked.connect(func(tile): _hover_slot(tile); _show_give(tile.item, tile.slot))
 		t.activated.connect(func(tile): _unequip(tile.slot))
+		t.name = "slot_" + slot
 		_slots[slot] = t
-		(rs if slot == "main_hand" else ls).add_child(t)
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(88, 88)
-	rs.add_child(spacer)
+		(rs if slot in ["main_hand", "second"] else ls).add_child(t)
+		if slot == "main_hand":
+			# D180: trade the two weapons (the same free swap combat offers)
+			_swap_btn = Button.new()
+			_swap_btn.name = "swap_weapons"
+			_swap_btn.text = "Swap"
+			_swap_btn.focus_mode = Control.FOCUS_NONE
+			_swap_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+			_swap_btn.tooltip_text = "Draw the second weapon and carry the one in hand.\nIn battle: Swap weapon, under Attack (free, as often as you like)."
+			_swap_btn.pressed.connect(_swap)
+			rs.add_child(_swap_btn)
 	doll.tooltip_text = "Drag to turn the model. Double-click a slot to take it off."
 	_msg = Label.new()
 	_msg.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
@@ -202,6 +212,7 @@ func refresh() -> void:
 		var t: BWItemTile = _slots[slot]
 		t.set_item(unit.equipment.get(slot, {}))
 		t.draggable = slot != "main_hand"
+	_swap_btn.disabled = unit.second_weapon().is_empty()
 	for f in _filter_btns:
 		_filter_btns[f].button_pressed = f == _filter
 	_fill_grid()
@@ -247,7 +258,8 @@ func _fill_grid() -> void:
 ## (item) -> bool for a slot box: the right slot and allowed for this unit.
 func _accepts_for(slot: String) -> Callable:
 	return func(it: Dictionary) -> bool:
-		return unit != null and str(it.get("slot", "")) == slot and it in run.inventory and run.can_equip(unit, it)
+		var kind := "main_hand" if slot == BWUnit.SECOND else slot      # D180: the second slot takes weapons
+		return unit != null and str(it.get("slot", "")) == kind and it in run.inventory and run.can_equip(unit, it)
 
 
 func _hover_tile(t: BWItemTile) -> void:
@@ -276,9 +288,17 @@ func _pick_tile(t: BWItemTile) -> void:
 func _hover_slot(t: BWItemTile) -> void:
 	_peek = false
 	if t.item.is_empty():
-		card.clear("%s: empty. Drag a %s item here." % [BWGearText.SLOT_NAMES[t.slot], BWGearText.SLOT_NAMES[t.slot].to_lower()])
+		if t.slot == BWUnit.SECOND:
+			card.clear("Second weapon: empty. Drag a weapon here to carry it; in battle, Swap weapon draws it (free).")
+		else:
+			card.clear("%s: empty. Drag a %s item here." % [BWGearText.SLOT_NAMES[t.slot], BWGearText.SLOT_NAMES[t.slot].to_lower()])
 		return
-	card.show_item(t.item, unit, run, t.item, { "hint": "Double-click to take it off." if t.slot != "main_hand" else "Never empty-handed: swap weapons by equipping another." })
+	var hint := "Double-click to take it off."
+	if t.slot == "main_hand":
+		hint = "Never empty-handed: swap weapons by equipping another."
+	elif t.slot == BWUnit.SECOND:
+		hint = "Carried, not in hand: no stats or passive until drawn. In battle, Swap weapon draws it (free). Double-click to take it off."
+	card.show_item(t.item, unit, run, t.item, { "hint": hint })
 
 
 ## Off a tile: back to the selection, or an empty card. D171 (author): with
@@ -310,13 +330,16 @@ func _show(it: Dictionary) -> void:
 	card.show_item(it, unit, run, cur, { "hint": "Double-click or drag onto %s to equip." % BWGearText.SLOT_NAMES[str(it.slot)] })
 
 
-func _equip(it: Dictionary) -> void:
+func _equip(it: Dictionary, slot: String = "") -> void:
 	if not it in run.inventory:
 		return
 	if not run.can_equip(unit, it):
 		_msg.text = "✕ " + str(BWGearText.equip_check(run, unit, it)[1])
 		return
-	run.equip(unit, it)
+	if slot != BWUnit.SECOND:
+		slot = ""
+	if not run.equip(unit, it, slot):
+		return
 	_sel = {}
 	_msg.text = "Equipped %s." % BWGearText.plain_name(it)
 	doll.refresh()
@@ -413,16 +436,49 @@ func _focus_row() -> Control:
 	return row
 
 
+## D180: trade the weapon in hand and the carried one.
+func _swap() -> void:
+	if unit == null or not run.swap_weapons(unit):
+		return
+	_msg.text = "Now holding %s; carrying %s." % [BWGearText.plain_name(unit.equipment.get("main_hand", {})),
+		BWGearText.plain_name(unit.second_weapon())]
+	doll.refresh()
+	refresh()
+	changed.emit()
+
+
 ## D89: the skills this unit knows for the weapon it holds, as toggles; up
 ## to BWUnit.loadout_cap equipped (3; the staff keeps its starting 4). An
-## improved skill (an expertise pick) is marked "+".
+## improved skill (an expertise pick) is marked "+". D181: a carried weapon of
+## another class gets its own row (each class keeps its own loadout).
 func _fill_skills() -> void:
 	for c in _skills.get_children():
 		c.queue_free()
-	var wc := unit.weapon_class
+	var classes: Array = [unit.weapon_class]
+	var sec := str(unit.second_weapon().get("weight", ""))
+	if sec != "" and not sec in classes:
+		classes.append(sec)
+	var titles: PackedStringArray = []
+	for wc in classes:
+		titles.append("%s %d/%d" % [BWText.weapon(wc), unit.loadout(wc).size(), BWUnit.loadout_cap(wc)])
+		if classes.size() > 1:
+			var l := Label.new()
+			l.text = BWText.weapon(wc) + ("" if wc == unit.weapon_class else " (carried)")
+			l.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+			l.add_theme_color_override("font_color", BWStyle.LABEL)
+			l.custom_minimum_size = Vector2(0, 30)
+			_skills.add_child(l)
+		_fill_skill_row(wc)
+		if classes.size() > 1 and wc == classes[0]:
+			var br := Control.new()                 # a line break in the flow
+			br.custom_minimum_size = Vector2(480, 0)
+			_skills.add_child(br)
+	_skills_title.text = ("Skills — up to 3 per weapon, staff 4 · " + " · ".join(titles)).to_upper()
+
+
+func _fill_skill_row(wc: String) -> void:
 	var cap := BWUnit.loadout_cap(wc)
 	var on: Array = unit.loadout(wc)
-	_skills_title.text = ("Skills — %s · equip up to %d (%d/%d)" % [wc, cap, on.size(), cap]).to_upper()
 	for k in unit.known(wc):
 		var row := BWSkills.get_skill(k)
 		var b := BWGlossary.TipButton.new()          # D125: the tooltip defines its terms

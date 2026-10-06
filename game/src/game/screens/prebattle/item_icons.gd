@@ -161,6 +161,52 @@ func _render(base_id: String, element: String) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
+## D203: the imbuement scroll, drawn in the tile's own canvas: a rolled B/W
+## scroll (paper, two rolls, inked lines) with a wax seal in the element colour.
+static func draw_scroll(ci: CanvasItem, r: Rect2, element: String) -> void:
+	var s := minf(r.size.x, r.size.y)
+	var o := r.position + (r.size - Vector2(s, s)) / 2.0
+	var ink := Color(0.04, 0.04, 0.05)
+	var paper := Rect2(o + Vector2(0.27, 0.20) * s, Vector2(0.46, 0.56) * s)
+	ci.draw_rect(paper, Color(0.93, 0.92, 0.89))
+	ci.draw_rect(paper, ink, false, maxf(1.5, s * 0.02))
+	for i in 4:
+		var y := paper.position.y + s * (0.10 + 0.085 * i)
+		var x1 := paper.end.x - s * (0.07 if i < 3 else 0.17)
+		ci.draw_line(Vector2(paper.position.x + s * 0.06, y), Vector2(x1, y), Color(0.25, 0.25, 0.27), maxf(1.2, s * 0.018))
+	for y in [0.13, 0.71]:
+		var roll := Rect2(o + Vector2(0.19, y) * s, Vector2(0.62, 0.12) * s)
+		ci.draw_rect(roll, Color(0.80, 0.79, 0.76))
+		ci.draw_rect(Rect2(roll.position + Vector2(0, roll.size.y * 0.62), Vector2(roll.size.x, roll.size.y * 0.38)), Color(0.62, 0.61, 0.58))
+		ci.draw_rect(roll, ink, false, maxf(1.5, s * 0.02))
+		for x in [roll.position.x, roll.end.x]:
+			ci.draw_circle(Vector2(x, roll.get_center().y), s * 0.045, Color(0.70, 0.69, 0.66))
+			ci.draw_arc(Vector2(x, roll.get_center().y), s * 0.045, 0, TAU, 16, ink, maxf(1.2, s * 0.016))
+	var col := BWLook.element_color(element) if element != "" else Color(0.6, 0.6, 0.6)
+	var c := o + Vector2(0.5, 0.74) * s
+	for side in [-1.0, 1.0]:
+		var tail := PackedVector2Array([c + Vector2(side * 0.03, 0) * s, c + Vector2(side * 0.11, 0.20) * s,
+			c + Vector2(side * 0.05, 0.16) * s, c + Vector2(side * 0.0, 0.21) * s])
+		ci.draw_colored_polygon(tail, col.darkened(0.25))
+		var line := tail.duplicate()
+		line.append(tail[0])
+		ci.draw_polyline(line, ink, maxf(1.0, s * 0.012))
+	ci.draw_circle(c, s * 0.11, col.darkened(0.35))
+	ci.draw_circle(c, s * 0.085, col)
+	ci.draw_arc(c, s * 0.055, 0, TAU, 20, col.lightened(0.35), maxf(1.0, s * 0.014))
+	ci.draw_arc(c, s * 0.11, 0, TAU, 24, ink, maxf(1.5, s * 0.02))
+
+
+## D201: the curse mark, a small ink plate with a white dagger-cross, at `at`.
+static func draw_curse(ci: CanvasItem, at: Vector2, px: float) -> void:
+	var c := at + Vector2(px, px) / 2.0
+	ci.draw_circle(c, px * 0.5, Color(0, 0, 0, 0.92))
+	ci.draw_arc(c, px * 0.5, 0, TAU, 20, Color(1, 1, 1, 0.9), maxf(1.0, px * 0.08))
+	var w := maxf(1.5, px * 0.12)
+	ci.draw_line(c + Vector2(0, -px * 0.32), c + Vector2(0, px * 0.34), Color.WHITE, w)
+	ci.draw_line(c + Vector2(-px * 0.2, -px * 0.1), c + Vector2(px * 0.2, -px * 0.1), Color.WHITE, w)
+
+
 static func _is_weapon(base_id: String) -> bool:
 	return str(BWData.row("equipment", base_id).get("slot", "")) == "main_hand"
 

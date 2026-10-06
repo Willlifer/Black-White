@@ -22,6 +22,10 @@ class_name BWAI
 ## (THREAT_BONUS), and with nobody in reach walks to cut off the player unit
 ## nearest an island. The player side (autoplay, the sims) goes for the stone
 ## its weapon isn't dodged by, and hits it unless a KO is on offer.
+## D209 special encounters: the forecast carries the immunities (an immune blow
+## expects 0 and is no target) and the Blank's x2 from melee, so both sides
+## pick element skills and the ground against Elemental Beings and basic
+## strikes against Blanks without a special case.
 
 ## D145: an enemy's attack on a player unit within this many hexes of an
 ## obelisk scores this much more (a fraction of the blow's expected damage).
@@ -35,11 +39,10 @@ const OBJECTIVE_WEIGHT := 2.0
 const OFF_FOCUS_WEIGHT := 0.25
 
 
-## Who BWAI plays: every enemy, and a rogue on the player's side (D129: Wander's
-## jackpot — it fights your enemies on its own, and allies can't target it as
-## they can't target any teammate). `autoplay` = every unit.
+## Who BWAI plays: every enemy (D177 removed D129's rogue, a player unit the
+## AI played). `autoplay` = every unit.
 static func controls(u: BWUnit, autoplay: bool = false) -> bool:
-	return u != null and (autoplay or u.team != "player" or u.rogue)
+	return u != null and (autoplay or u.team != "player")
 
 
 ## Play the current unit's whole turn on `b`. Returns nothing; read b.history.
@@ -50,6 +53,7 @@ static func take_turn(b: BWBattle) -> void:
 	if BWObelisk.is_objective(u):
 		b.obelisk_turn(u)                             # D140: the pulse, then the turn passes
 		return
+	_consider_swap(b, u)                              # D181: draw the carried weapon if it scores better
 	var best := _best_target(b, u, u.pos)
 	if not best.is_empty() and b.objective_mode() and u.team == "player":
 		# D145: a stone within a move beats the foe in reach (move, then strike)
@@ -77,10 +81,49 @@ static func take_turn(b: BWBattle) -> void:
 					b.attack(u, fu.target)
 		elif not best.is_empty():
 			b.attack(u, best.target)
+			if not b.over and u.alive() and "basic" in u.follow_up:
+				var again := _best_target(b, u, u.pos)    # D197 Relentless: the extra attack
+				if not again.is_empty():
+					b.attack(u, again.target)
 	if not b.over and u.alive() and u.follow_up.is_empty():
 		_guard_up(b, u)
 	if not b.over:
 		b.end_turn()
+
+
+## D181/D195: the swap is free (and unlimited), so the AI weighs both weapons
+## once, at the start of its turn (at most one swap per decision: no oscillation):
+## each one's best option this turn (the best basic attack from any hex it can
+## reach, or its best damaging skill from where it stands), and draws the
+## carried weapon when that beats the one in hand by SWAP_MARGIN.
+const SWAP_MARGIN := 1.1
+
+
+static func _consider_swap(b: BWBattle, u: BWUnit) -> void:
+	if not b.can_swap(u) or u.size > 1:
+		return
+	var now := turn_value(b, u)
+	u.swap_weapons()                                  # a look only: swapped back below
+	var other := turn_value(b, u)
+	u.swap_weapons()
+	b.refresh_effects()
+	if other > now * SWAP_MARGIN and other > 0.0:
+		b.swap_weapon(u)
+
+
+## D181: the best this unit could do this turn with the weapon in hand.
+static func turn_value(b: BWBattle, u: BWUnit) -> float:
+	var best := 0.0
+	var reach := b.reachable(u) if b.can_move(u) else { u.pos: { "stop": true } }
+	for h in reach:
+		if reach[h].stop or h == u.pos:
+			var t := _best_target(b, u, h)
+			if not t.is_empty():
+				best = maxf(best, float(t.score))
+	var sk := _best_skill(b, u)
+	if not sk.is_empty():
+		best = maxf(best, float(sk.score))
+	return best
 
 
 ## D87: a free action goes up last (Riposte: once the unit stands where it
@@ -186,6 +229,8 @@ static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:
 		if not b.in_range(u, f, from):
 			continue
 		var fc := b.forecast_basic(u, f, 1.0, "", from)
+		if fc.has("immune"):
+			continue                                        # D209: a Being shrugs off the blow: not a target
 		var ev: float = fc.expected.value
 		var score := ev + (1000.0 if ev >= f.hp else 0.0)   # finishing blows first
 		score += float(fc.get("arc_ev", 0.0))               # D86 chain lightning

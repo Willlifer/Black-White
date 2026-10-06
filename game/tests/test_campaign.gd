@@ -28,6 +28,8 @@ func _play(r: BWRun, n: int, attempt: int = 0) -> Dictionary:
 func test_full_run(t) -> void:
 	var ids := BWData.table("roster").slice(0, 6).map(func(x): return str(x.id))
 	var r := BWRun.start(ids, 4242)
+	for u in r.squad:
+		BWPicks.auto_resolve(u)                    # the run-start picks, as the game asks them
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242
 	var log: PackedStringArray = []
@@ -50,8 +52,8 @@ func test_full_run(t) -> void:
 			n, r.map_for(n), "WON " if res.won else "lost", res.cycles, lv, top, r.inventory.size()])
 		if n >= BWRun.BOSS_FIGHT:
 			break
-		if not res.won:
-			continue            # the sim retries a lost fight; the game ends the run
+		# a loss doesn't end the run (author 2026-10-04): downtime follows either way;
+		# D179: only a win levels the squad
 		# downtime: equip anything better, then two random actions each
 		for u in r.squad:
 			for it in r.inventory.duplicate():
@@ -59,7 +61,8 @@ func test_full_run(t) -> void:
 					r.equip(u, it)
 		var plan: Array = []
 		for u in r.squad:
-			plan.append([u.id, BWRun.DOWNTIME_CHOICES[rng.randi() % BWRun.DOWNTIME_CHOICES.size()]])
+			var offer := r.day_choices(u)                # D175: two of the three
+			plan.append([u.id, offer[rng.randi() % offer.size()]])
 		for line in r.progress_day(plan):
 			t.ok(line.ok, line.text)
 		for u in r.squad:

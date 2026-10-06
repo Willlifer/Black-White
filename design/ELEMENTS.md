@@ -442,7 +442,7 @@ re-forms them.
 - **Perks and the AI** read static hexes as ordinary charge, through the same
   `intensity` / `level_at` / `standing` calls: Undertow pulls toward static
   water 3, Shadowstep jumps between static dark hexes, Coal Engine starts
-  turns on static fire, Waterwalking enters static water for 0.
+  turns on static fire, Waterwalking makes its first static water hex each turn free (D204).
 - **Look** (D116, BWBoardView `_static_rim`): an inlaid rim (ink / element
   band / ink) with six ink wedges notched in at the corners and a colour
   lozenge at each wedge's tip. It draws above the FX layers (sort 0.45) and
@@ -596,7 +596,7 @@ faction-based); **tile effects hurt everyone**, allies included.
    the *unit* (80% damage, no status riders) but not the *tile*.
 4. Detonation damage from step 3 is separate tile damage (§8). It is not
    rolled and a resist from step 2 does not reduce it.
-5. Award XP once per action (§8.4).
+5. Award affinity and expertise once per action (§8.4).
 
 ### 7.4 "Carries the element"
 
@@ -674,10 +674,10 @@ board.
 
 ### 8.4 Growth, credit, and the boss
 
-- **XP and affinity:** one award per action (the brief's "each attack"), for
+- **Affinity and expertise (no XP, D179):** one award per action (the brief's "each attack"), for
   the element the action carried, whether or not it hit. Tile damage itself
   awards nothing. Non-elemental actions (Siphon, Charge without a follow-up)
-  award XP and expertise only.
+  award expertise only.
 - **Knockout credit** from tile damage goes to the tile's `source`, if that
   unit is hostile to the victim. A knockout of your own ally on your own fire
   credits nobody.
@@ -910,7 +910,7 @@ map edge. No damage. Then a follow-up basic attack.
 | E10 | Basic attacks don't paint, except the staff's Channel (target hex, 1 step). | V8's lesson about free area denial; the mage weapon gets to paint. |
 | E11 | The ground changes on every outcome (avoid, glance, resist). Resist protects the unit only. | The brief: secondary effects still apply on avoid. The ground does not roll. |
 | E12 | Learned elements = affinity rank ≥ 1. Basic attacks carry the attuned element (last used, default own). | V8's element submenu and `unit.element`, mapped onto affinity ranks. |
-| E13 | One action = one XP/affinity award, whatever it hit. | Brief's "each attack"; V8 awarded per action too. |
+| E13 | One action = one affinity/expertise award, whatever it hit (no XP since D179). | Brief's "each attack"; V8 awarded per action too. |
 | E14 | Tile knockouts credit the tile's source if hostile; friendly fire credits nobody. | Rewards setting traps without rewarding team-kills. |
 | E15 | Multi-hex units read only their centre hex. | Stops a 7-hex boss taking 7× tile damage. |
 | E16 | Within one action, all hexes resolve against the pre-action board; gale copies apply last; detonation damage is summed per unit. | Order-independent results and one damage number per unit. |
@@ -933,7 +933,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 
 | Element | Perk | Rule | Key |
 |---|---|---|---|
-| Water | Waterwalking | Entering a water hex (any level) costs this unit 0 move. Deliberately broken. | `move_cost` |
+| Water | Waterwalking | The first water hex this unit crosses each turn costs no move (D204; was "any water costs 0"). | `move_cost` `once=1` |
 | Water | Flow State | You and allies standing in water: +3/+6/+9 avoid. | `stand_on_mod` def, team |
 | Water | Current Push | Attacking from water: +5/+10/+15% damage. | `stand_on_mod` att |
 | Water | Tidal Guard | Standing in water: +15 glance per level (15/30/45). Nothing else. | `stand_on_mod` def |

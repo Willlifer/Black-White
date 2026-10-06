@@ -4,10 +4,13 @@ extends Node
 ##   --forecast                  print the balance sheet and exit
 ##   --pace [--support]          AI-vs-AI fight pace (--support: support skills in every kit, D112)
 ##   --combat <map>              jump straight into a fight on maps/<map>.json
-##   --autoplay                  let the AI play the player side too
+##   --autoplay                  let the AI play the player side too (exits 2 s after the battle ends)
+##   --carry                     every unit also carries a second weapon (another class, D193/D195: swaps)
 ##   --boss                      fight the Giant instead
+##   --encounter <kind> [--fight n]  a special encounter (horde|colossus|blank|being, D208)
+##                               against a squad levelled and geared to fight n (default 5)
 ##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
-##   --screen <title|roster|prep|prebattle|downtime|results>   open one screen on a sample run
+##   --screen <title|roster|prep|rooms|prebattle|downtime|results>   open one screen on a sample run
 ##   --ui-probe                  drive combat with synthetic input and check it responds
 ##   --flow-probe                walk the real game through every screen transition
 ##   --ui-shots [dir]            render roster / codex / loading / results review frames
@@ -77,7 +80,7 @@ func _ready() -> void:
 		_one_screen(_arg(args, "--screen", "title"))
 		return
 	if "--combat" in args:
-		_quick_combat(_arg(args, "--combat", "arena"), "--autoplay" in args, int(_arg(args, "--seed", "1")), "--boss" in args)
+		_quick_combat(_arg(args, "--combat", "arena"), "--autoplay" in args, int(_arg(args, "--seed", "1")), "--boss" in args, "--carry" in args)
 		return
 	_start_game()
 
@@ -127,19 +130,53 @@ func _self_test() -> void:
 
 ## A fight with the first three roster entries against three from the
 ## middle of the roster. Development shortcut until the run flow exists.
-func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool = false) -> void:
+func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool = false, carry: bool = false) -> void:
 	var roster := BWData.table("roster")
 	var players: Array = []
 	var enemies: Array = []
 	for i in 3:
 		players.append(BWUnit.from_roster(roster[i]))
 		enemies.append(BWUnit.from_roster(roster[i + 10]))
+	if carry:                            # D195: a carried weapon of another class each, so the AI swaps
+		var run := BWRun.start([], seed_value)
+		var classes := BWRun.weapon_classes()
+		for u in players + enemies:
+			var wc: String = classes[(classes.find(u.weapon_class) + 3) % classes.size()]
+			var m: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc)
+			if not m.is_empty():
+				if u.equipment.get("main_hand", {}).is_empty():
+					var mh := run.make_item(u.weapon_model, "E")
+					if mh.is_empty():
+						continue
+					u.equipment["main_hand"] = mh
+				u.equipment[BWUnit.SECOND] = run.make_item(str(m[0].id), "E")
+				u.expertise[wc] = int(u.expertise.get(u.weapon_class, 0))
+				u.sync_weapon()
 	if boss:
 		enemies = [BWRun.new().make_boss()]
+	var enc := _arg(OS.get_cmdline_user_args(), "--encounter", "")
+	if enc in BWEncounters.KINDS:
+		# D208: a run at fight n: its first three, levelled and geared to the fight, vs the encounter
+		var run := BWRun.start(BWData.table("roster").slice(0, 6).map(func(r): return str(r.id)), seed_value)
+		var n := int(_arg(OS.get_cmdline_user_args(), "--fight", "5"))
+		for u in run.squad:
+			BWProgression.level_up(u, n - u.level)
+			BWPicks.auto_resolve(u)
+			for slot in BWRun.ARMOR_SLOTS:
+				var bases: Array = BWData.table("equipment").filter(func(r): return r.slot == slot)
+				u.equipment[slot] = run.make_item(str(bases[absi(hash(u.id + slot)) % bases.size()].id), run.tier_for(n))
+			u.equipment["main_hand"] = run.make_item(u.weapon_model, run.tier_for(n))
+		run.fight = n
+		players = run.squad.slice(0, 3)
+		run.prepare_for_battle(players)
+		enemies = BWEncounters.build(run, n, enc)
 	var s := BWCombatScreen.new()
 	s.configure("res://maps/%s.json" % map_name, players, enemies, [], seed_value)
 	s.autoplay = autoplay
 	s.finished.connect(func(w, _b): print("battle over: ", w))
+	if autoplay and not "--shot" in OS.get_cmdline_user_args():
+		# D195 check: an autoplay fight exits on its own once it is over (verification runs)
+		s.finished.connect(func(_w, _b): get_tree().create_timer(2.0).timeout.connect(get_tree().quit))
 	add_child(s)
 	BWMusic.play("boss" if boss else "combat")
 
@@ -166,6 +203,11 @@ func _one_screen(which: String) -> void:
 			s.set("run", run)
 		"prep":
 			s = BWPrepScreen.new()
+			s.set("run", run)
+		"rooms":
+			s = BWRoomScreen.new()                  # D190
+			e = run.enemies_for(2)                  # D208: the choice starts at fight 3
+			run.after_fight(true, run.squad.slice(0, 3), e, e, [])
 			s.set("run", run)
 		"results":
 			s = BWResultsScreen.new()

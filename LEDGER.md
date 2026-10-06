@@ -19,15 +19,14 @@ Bugs fixed in the same session never land here. A closed item moves to
 | WATCH | No work now; a named trigger turns it into work. |
 | DEFERRED | Deliberately not now, with the reason. |
 
-Last reviewed: 2026-10-05.
+Last reviewed: 2026-10-06.
 
 ## Live
 
 | ID | Item | State | Unblocked by / note |
 |---|---|---|---|
 | L-1 | Detonations hit very hard: a glazed water 3 + dark 3 blast is about 52% of the occupant's HP. The author: "explosions are very strong". | AWAITING PLAY | Play with the blast preview (D160) on. Then tune `5% + 4%/step`, the glaze ×1.5 and the water bonus, or leave it. |
-| L-2 | The enemy stat multipliers run up to ×2.3 (`ENEMY_CURVE`, D133/D139) to keep up with squad growth. | WATCH | If the late fights feel like stat walls, add an enemy-only HP column and lower the multipliers (the measured options are in DECISIONS "Open"). |
-| L-3 | Late fights run 5–6 rounds median against a 6–9 target. After D137 the author said "the one-shot fest plays a lot better". | AWAITING PLAY | The author's feel after full runs. |
+| L-3 | Fight length: after D194 (enemy level = stage) the sim runs 6–7 rounds median from fight 3 on, the low end of the 6–9 target. After D137 the author said "the one-shot fest plays a lot better". | AWAITING PLAY | The author's feel after full runs. |
 | L-4 | Hair pokes through full helms (seen in the live portraits). | OWED | Full-cover headgear hides or tucks the hair: add a per-item `hides_hair` flag in the equipment data. |
 | L-5 | In the live portrait, a raised bow can cross the face. | WATCH | If the author notices it in play, tighten the framing or fade the weapon in the feed. |
 | L-6 | First-use shader compile hitch of about 50 ms (Rain of Arrows, Tempest, the first cast). | OWED | Pre-warm the VFX shaders and materials during the loading or pre-battle screen. |
@@ -36,10 +35,13 @@ Last reviewed: 2026-10-05.
 | L-9 | Ambiguous glossary links: the axe skill "Charge" goes to the tile term, "light/dark gray" goes to the elements, Covering Fire goes to Overwatch. | OWED | Glossary alias rules (context or exact-phrase precedence). |
 | L-10 | Art docs `design/art/ANIMATION.md` and `CLOTHING.md` still use the pre-D149 roster names. | OWED | A doc pass. |
 | L-11 | Always-Branch-out habits collapse late (29% at fight 10). | WATCH | Only if players hit it. Mixed habits are fine. |
-| L-12 | Always-Wander squads roll rogues often (13 in 24 sim runs), because six wanderers a day means about 54 wanders a run. | WATCH | If rogues feel common in real play, lower `WANDER_JACKPOT_EXTRA_ROLL`. |
 | L-13 | Older animation nits: knockback rarely fires early, fist jabs read small, the bow sling yoke, the planted staff floats. | OWED | An animation pass. |
 | L-14 | Animation wishlist from the hall: rest loop, rummage, greet/handshake, looping training strike, raise-item channel. | DEFERRED | Later polish. Held poses cover it now. |
+| L-17 | Enchantments v2 balance (D196–D205): Relentless with Triumph, Undying vs the Giant, Bloodpact on multi-hit weapons, the 20% heal cap, scroll prices (2 items). | AWAITING PLAY | Full runs; the watch list is ENCHANTMENTS-v2.md §4. The AI never uses Bodyguard swaps on purpose (it may stumble into one). |
 | L-15 | The loading screen is unused since the intro was removed (D84). | WATCH | Reuse it for shader pre-warm (L-6) or delete it. |
+| L-18 | Fight 4 (the Obelisks) wins 45% in the sim against a 70–80% target, and the curve multiplier doesn't move it (0.7–1.5 all gave 41–45%). | AWAITING PLAY | Play it. The sim's AI spreads damage over both stones (L-7); if players also find it hard, tune the stones (D155) or the fight's enemy count, not the curve. |
+| L-19 | Re-tune the curve after the enchantment (D196–D205), shop and special-encounter (landed: D208–D214) lanes land. D194 is deliberately loose: Standard 66–95% per fight, Hard 4–50 points under. | OWED | `RUNS=24 POLICY=mixed ROOMS=standard SHADOW=1` campaign_sim with env CURVE / ELVL / HARD; targets in D194. |
+| L-20 | Special encounters (D208–D213): the sim tuned each to roughly the paired Hard rate (D212), but early Beings (fight 3) and Horde/Colossus at fight 3–5 run low with the sim's weak AI, and nobody has played them. Watch: the Horde's 13-unit turns (pace), whether the Colossus's line thrust reads, whether players find the Being counter. | AWAITING PLAY | Play runs that meet each; knobs are `BWEncounters` *_MULT / *_HP, `RATE`. |
 
 ## Settled
 
@@ -49,6 +51,8 @@ Last reviewed: 2026-10-05.
 | S-2 | Catacombs' tall pillars. | 2026-10-05 | The author keeps them; the middle became seeded dark (D134–D136). |
 | S-3 | Old saves after the roster rename. | 2026-10-05 | Save v5 shows "from an older version" and starts fresh (D149–D154). |
 | S-4 | Obelisk numbers. | 2026-10-05 | The author set 350 HP and 10 per pulse (D155). |
-| S-5 | Wander rogue odds. | 2026-10-05 | 20% rolls, +100 XP when all fail, jackpot only on an extra 5% roll (D127–D132). |
+| S-5 | Wander odds. | 2026-10-06 | 20% rolls; all miss: +1 to a random stat, or on an extra 5% the nine rerolled at 30% (D177, D179). No rogue, no XP. |
 | S-6 | What goes in the GitHub repo. | 2026-10-05 | A barebones export: code, data, maps, runtime audio and art, and the docs. No review renders, references or archive. |
 | S-7 | L-16: Esc stack, stuck item tooltip, tag declutter, callout plate, weapon-type capitals | 2026-10-05 | D171–D173. The stuck card was `_unhover` keeping the last read when nothing was selected |
+| S-8 | L-12: rogues from always-Wander. | 2026-10-06 | D177 removed the rogue: the jackpot now rerolls the nine effects at 30%. |
+| S-9 | L-2: enemy stat multipliers up to ×2.3. | 2026-10-06 | D179 and D194: enemy level = its stage; the multipliers are now 0.7–1.7. |

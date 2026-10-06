@@ -1,14 +1,13 @@
 extends SceneTree
 ## D127-D132 review renders: the three-choice hall, the per-unit result cards
-## and the rogue's line in battle.
+## (D177 removed the rogue and its shot; see tools/choice2_shots.gd for D174-D176).
 ##   [SHOTS=<dir>] godot --path . --script res://tools/downtime2_shots.gd
 ## downtime2_hall.png             the hall: a unit selected, three name-only tiles, its choice made
 ## downtime2_specialize.png       a Specialize card (found items with icons, or free points)
 ## downtime2_branch_options.png   a Branch out card offering its two pairings
 ## downtime2_branch.png           the same card after the pick
 ## downtime2_wander.png           a Wander card with two or more successes
-## downtime2_jackpot.png          the jackpot card (the unit goes rogue)
-## downtime2_rogue.png            the rogue's first turn in battle: its line, the Disobedient badge
+## downtime2_jackpot.png          the jackpot card (the nine rerolled at 30%, D177)
 ## Outcomes are found by seed search on a throwaway run, then replayed on the
 ## shown run with that seed (the run is deterministic). Needs a window.
 var out := ""
@@ -66,8 +65,6 @@ func _go() -> void:
 		await _hall()
 	if mode == "" or mode == "cards":
 		await _cards()
-	if mode == "" or mode == "rogue":
-		await _rogue()
 	quit()
 
 
@@ -127,28 +124,3 @@ func _cards() -> void:
 	print("seeds: specialize %d, branch %d, wander %d, jackpot %d" % [s1, s2, s3, s4])
 	if s4 >= 0:
 		await _card(3, "wander", s4, "downtime2_jackpot")
-
-
-## A rogue (the fastest, so it opens the fight) beside two allies; the shot
-## is taken while its line is up.
-func _rogue() -> void:
-	var run := _run()
-	var squad := run.squad.slice(0, 3)
-	var rogue: BWUnit = squad[1]
-	rogue.rogue = true
-	BWProgression.add_xp(rogue, BWRun.WANDER_JACKPOT_XP)
-	var enemies := run.enemies_for(3)
-	run.prepare_for_battle(squad)
-	var s := BWCombatScreen.new()
-	s.configure("res://maps/arena.json", squad, enemies, [], 77)
-	s.trust_fn = run.trust_stage
-	root.add_child(s)
-	var t := 0.0
-	while t < 40.0:
-		await process_frame
-		t += 1.0 / 60.0
-		# the line is up once its event has been played (left the replay queue)
-		if s.battle != null and s.battle.history.any(func(e): return e.type == "disobey") 				and not s._queue.any(func(e): return e.type == "disobey"):
-			break
-	await _wait(0.6)
-	await _shot("downtime2_rogue")

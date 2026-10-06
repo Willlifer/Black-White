@@ -77,6 +77,7 @@ func setup(u: BWUnit) -> void:
 		# The boss: a giant standing over its whole 7-hex footprint.
 		scale = Vector3.ONE * 2.6
 		_label.pixel_size *= 1.0 / 2.6
+		_hp_label.pixel_size *= 1.0 / 2.6      # D213: the HP number reads at the normal size too (Giant, Colossus)
 	refresh()
 
 
@@ -168,9 +169,9 @@ func head_height() -> float:
 
 func _signature() -> String:
 	var parts: PackedStringArray = [unit.weapon_model]
-	for slot in ["main_hand", "head", "chest", "legs"]:
+	for slot in ["main_hand", "head", "chest", "legs", "second"]:     # D180: the carried weapon too
 		var it: Dictionary = unit.equipment.get(slot, {})
-		parts.append("%s:%s" % [it.get("base", ""), it.get("enchant", "")])
+		parts.append("%s:%s:%s" % [it.get("base", ""), it.get("enchant", ""), it.get("imbue", "")])
 	return "|".join(parts)
 
 

@@ -50,6 +50,12 @@ var auto_pick_teams: Array = ["enemy"]
 ## units arced during the current action (Overcharge: nobody arced twice).
 var _turn_serial := 0
 var _arced := {}
+## D196-D205 (BWEnchant, src/core/enchant_v2.gd): an action counter (the
+## on-event heal cap), the on-kill depth (on-kill never triggers on-kill) and
+## Covering's shares waiting to be paid after the blow.
+var _action_serial := 0
+var _onkill_depth := 0
+var _pending_cover: Array = []
 
 
 func _init(p_board: BWBoard, seed_value: int = 1) -> void:
@@ -72,13 +78,13 @@ func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 		u.begin_battle()
 		u.pos = player_at[i] if i < player_at.size() else board.spawns.player[i]
 		units.append(u)
+	var lay := enemy_layout(board, enemies, units.map(func(p): return p.pos))   # D211: any number, any size
 	for i in enemies.size():
 		var u: BWUnit = enemies[i]
 		u.team = "enemy"
 		u.begin_battle()
-		u.pos = NOWHERE
+		u.pos = lay[i]
 		units.append(u)
-		u.pos = _spawn_hex(u, i)
 	_place_objectives()                       # D140: the map's obelisks, a third side
 	_fx_units = units.filter(func(u: BWUnit): return not u.effects.is_empty())
 	for u in units:
@@ -93,24 +99,74 @@ func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 	_new_cycle()
 
 
-func _spawn_hex(u: BWUnit, i: int) -> Vector2i:
-	var sp: Array = board.spawns.enemy
-	if u.size <= 1:
-		return sp[i]
-	var order: Array = sp.slice(i) + sp.slice(0, i)
-	for h in order:
-		if can_stand(u, h):
-			return h
-	var anchor: Vector2i = sp[i] if i < sp.size() else Vector2i(board.cols / 2, 0)
-	var cells := board.cells()
-	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := BWHex.distance(a, anchor)
-		var db := BWHex.distance(b, anchor)
-		return da < db if da != db else a < b)
-	for h in cells:
-		if can_stand(u, h):
-			return h
-	return anchor
+## D211: where the enemies start. Enemy i takes spawn i; a multi-hex unit the
+## first spawn (from its own, rotating) its whole footprint fits; past the
+## map's spawns (the Horde's ten) or when nothing fits, the free hex nearest
+## the spawns (its own spawn for a multi-hex unit), ties in hex order; a crowd
+## fans out over the enemy half, a hex apart where it can. `taken`: hexes already held (the
+## player's units). Static, so the pre-battle screen shows the same layout.
+static func enemy_layout(bd: BWBoard, enemies: Array, taken: Array = []) -> Array:
+	var occ := {}
+	for h in taken + Array(bd.deploy.get("player", [])) + Array(bd.spawns.get("player", [])):
+		occ[h] = true                              # never on the player's side of the start
+	var sp: Array = bd.spawns.enemy
+	var out: Array = []
+	var cells: Array = []
+	var psp: Array = Array(bd.spawns.get("player", [])) + Array(bd.deploy.get("player", []))
+	for i in enemies.size():
+		var u: BWUnit = enemies[i]
+		var r := maxi(u.size, 1) - 1
+		var pick := NOWHERE
+		if r == 0 and i < sp.size() and not occ.has(sp[i]) and bd.fits(sp[i], 0):
+			pick = sp[i]
+		elif r > 0 and not sp.is_empty():
+			var k := i % sp.size()
+			for h in sp.slice(k) + sp.slice(0, k):
+				if _free_fit(bd, h, r, occ):
+					pick = h
+					break
+		if pick == NOWHERE:
+			var anchors: Array = [sp[i]] if r > 0 and i < sp.size() else sp
+			if anchors.is_empty():
+				anchors = [Vector2i(bd.cols / 2, 0)]
+			if cells.is_empty():
+				cells = bd.cells()
+			var best_d := 1 << 20
+			for h in cells:
+				if not _free_fit(bd, h, r, occ):
+					continue
+				var d := 1 << 20
+				for a in anchors:
+					d = mini(d, BWHex.distance(h, a))
+				if r == 0:
+					# a crowd spreads over the enemy half: crowded hexes and the
+					# player's half cost more (an even spread, readable HP bars)
+					var near_p := 1 << 20
+					for ph in psp:
+						near_p = mini(near_p, BWHex.distance(h, ph))
+					if near_p <= d:
+						d += 1000
+					for nb in BWHex.neighbors(h):
+						if occ.has(nb):
+							d += 2
+				if d < best_d or (d == best_d and h < pick):
+					best_d = d
+					pick = h
+		if pick == NOWHERE:
+			pick = sp[i % sp.size()] if not sp.is_empty() else Vector2i.ZERO
+		out.append(pick)
+		for f in BWHex.area(pick, r):
+			occ[f] = true
+	return out
+
+
+static func _free_fit(bd: BWBoard, h: Vector2i, r: int, occ: Dictionary) -> bool:
+	if not bd.fits(h, r):
+		return false
+	for f in BWHex.area(h, r):
+		if occ.has(f):
+			return false
+	return true
 
 
 func current() -> BWUnit:
@@ -364,6 +420,7 @@ func reachable(u: BWUnit) -> Dictionary:
 		r = _reach_fx(u, budget, blocked, no_stop, opts, rules)
 	if not pull.is_empty():
 		_undertow_filter(u, r, budget, pull)
+	BWEnchant.add_swaps(self, u, r)       # v2 hook: swap mode=move (Bodyguard)
 	return r
 
 
@@ -382,6 +439,8 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 		return false
 	var flow := u.moved
 	var r := reachable(u)
+	if r.has(h) and r[h].has("swap"):
+		return BWEnchant.swap_move(self, u, h, r[h])     # v2 hook: Bodyguard
 	var path := BWBoard.path_to(r, h)
 	if path.is_empty():
 		return false
@@ -402,6 +461,8 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	# D93 Heat Rush: no crossing damage.
 	var no_cross := BWEffects.has(u, "heat_rush")
 	for i in range(1, path.size()):
+		if tiles.intensity(path[i], "water") > 0:          # v2 hook: Tidewalker counts water entered
+			u.fx["on_hexes:water"] = int(u.fx.get("on_hexes:water", 0)) + 1
 		var pct := tiles.crossing_pct(path[i])
 		if pct > 0 and u.alive() and not no_cross:
 			_tile_hurt(u, _tile_dmg(u, pct, "fire"), "fire_cross", str(tiles.at(path[i]).get("source", "")))
@@ -457,6 +518,34 @@ func _reaches_unit(u: BWUnit, at: Vector2i, target: BWUnit, max_range: int) -> b
 	return false
 
 
+## D182: the element a basic attack carries: the weapon's imbue, else the
+## staff's attunement (D5), else none.
+func basic_element(u: BWUnit) -> String:
+	if u.imbue() != "":
+		return u.imbue()
+	return u.attuned if str(u.weapon().get("damage_type", "")) == "spell" else ""
+
+
+## D181/D195: may `u` swap weapons now? Its own turn, a weapon carried, and
+## not inside a follow-up. Free and unlimited (D195): no action, no move.
+func can_swap(u: BWUnit) -> bool:
+	return not over and u != null and u == current() and u.alive() and not u.second_weapon().is_empty() and u.follow_up.is_empty()
+
+
+## D181: draw the carried weapon (free, any number of times a turn, D195). The class, range,
+## damage, enchantment and skills follow the new main hand; cooldowns are
+## per skill and stay. Emits `swap` { unit, from, to, weapon_class }.
+func swap_weapon(u: BWUnit) -> bool:
+	if not can_swap(u):
+		return false
+	var from := str(u.equipment.get("main_hand", {}).get("base", ""))
+	u.swap_weapons()
+	_fx_units = units.filter(func(x: BWUnit): return not x.effects.is_empty())
+	_emit({ "type": "swap", "unit": u.id, "from": from, "to": str(u.equipment.get("main_hand", {}).get("base", "")),
+		"weapon_class": u.weapon_class, "imbue": u.imbue() })
+	return true
+
+
 func attack_targets(u: BWUnit) -> Array:
 	return foes_of(u).filter(func(f: BWUnit): return in_range(u, f))
 
@@ -473,10 +562,13 @@ func forecast_basic(u: BWUnit, target: BWUnit, share: float = 1.0, share_label: 
 	var w := u.weapon()
 	var power := int(w.get("base_dmg", 10))
 	var spell := str(w.get("damage_type", "")) == "spell"
-	var el := u.attuned if spell else ""
+	var el := basic_element(u)
 	var kind := BWFormulas.SPELL if spell else BWFormulas.WEAPON
 	# D87: a pistol's seated round rides the shot (Spark if thunder, +10% if your own element)
 	var rnd := u.loaded if u.weapon_class == "pistols" else ""
+	if not spell and BWFormulas.strips_element(target):
+		el = ""                                # D209: a Blank takes the cut, not the imbue's element
+		rnd = ""
 	var mods := _mods(u, target, kind, el, true, rnd, from)
 	if rnd != "" and rnd == u.element:
 		mods.append({ "stage": "dmg", "value": 1.0 + BWSkills.OWN_ROUND_PCT / 100.0,
@@ -532,6 +624,12 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	if att.fx.get("momentum", false):
 		mods.append({ "stage": "dmg", "value": 1.0 + BWSkills.VAULT_MOMENTUM_PCT / 100.0,
 			"label": "Momentum (Vault): +%d%%" % BWSkills.VAULT_MOMENTUM_PCT, "tag": "Momentum" })
+	# D209: special encounters (Blank, Elemental Being) by the blow's damage class
+	if dfn.encounter != "":
+		var em := BWFormulas.encounter_mod(dfn, BWFormulas.damage_class({ "source": "basic" if basic else "skill", "kind": kind, "element": el }),
+			BWObelisk.attack_type(att, gap(att, dfn, ap)) == "melee")
+		if not em.is_empty():
+			mods.append(em)
 	if _fx_units.is_empty():
 		return mods
 	var e := tiles.at(dfn.pos)
@@ -540,9 +638,23 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 		"moved": int(att.fx.get("moved_hexes", 0)),
 		"height": board.elevation(ap) - board.elevation(dfn.pos),
 		"charged": not e.is_empty() and (int(e.h) != 0 or int(e.v) != 0),
+		# v2 (BWEnchant.mods): Flanker, Planted, Lone Wolf, Resonance, Shieldwall
+		"rear": dfn.facing >= 0 and ap != dfn.pos and BWHex.direction_index(dfn.pos, ap) >= 0 and (BWHex.direction_index(dfn.pos, ap) - dfn.facing + 6) % 6 in [2, 3, 4],
+		"still": not att.moved,
+		"att_alone": _alone(att, ap), "dfn_alone": _alone(dfn, dfn.pos),
+		"charge_levels": 0 if e.is_empty() else absi(int(e.h)) + absi(int(e.v)),
+		"dfn_adjacent": side(dfn.team).filter(func(o): return o != dfn and gap(o, dfn) <= 1).size(),
 	}
 	mods.append_array(BWEffects.attack_mods(att, dfn, kind, el, ctx, _auras))
 	return mods
+
+
+## v2 Lone Wolf: no living ally within 2 of `u` standing at `at`.
+func _alone(u: BWUnit, at: Vector2i) -> bool:
+	for o in side(u.team):
+		if o != u and gap(u, o, at) <= 2:
+			return false
+	return true
 
 
 ## The strikes one basic attack makes: [{unit, share, label, pattern}].
@@ -550,6 +662,8 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 ## (Cleaving's ring around the target). A unit is struck by one line only.
 func basic_strikes(u: BWUnit, target: BWUnit) -> Array:
 	var out: Array = [{ "unit": target, "share": 1.0, "label": "", "pattern": "single" }]
+	if u.encounter == "colossus":
+		return colossus_thrust(u, target)        # D210: the long spear runs through a line
 	for e in BWEffects.list(u, "multi_hit"):
 		if str(BWEffects.p(e, "skill", "")) != "":
 			continue                  # a skill's own rider (Pummeling: Flurry), not the basic attack
@@ -606,6 +720,46 @@ func basic_strikes(u: BWUnit, target: BWUnit) -> Array:
 	return out.filter(func(s): return can_harm(u, s.unit))     # D140: side lines and rings pass over an obelisk
 
 
+## D210: the Colossus's signature. Its spear thrusts THRUST_LEN hexes straight
+## out from its body toward the target: every foe on that line is struck (the
+## target at full, the rest at THRUST_SHARE). A target off the six headings
+## is struck alone.
+const THRUST_LEN := 3
+const THRUST_SHARE := 0.75
+
+
+func thrust_line(u: BWUnit, target: BWUnit) -> Array:
+	var di := BWHex.direction_index(u.pos, target.pos)
+	if di < 0:
+		return []
+	var out: Array = []
+	var h := u.pos
+	for k in maxi(u.size, 1) - 1 + THRUST_LEN:
+		h = BWHex.neighbors(h)[di]
+		if not board.exists(h):
+			break
+		if k >= maxi(u.size, 1) - 1:
+			out.append(h)
+	return out
+
+
+func colossus_thrust(u: BWUnit, target: BWUnit) -> Array:
+	var out: Array = [{ "unit": target, "share": 1.0, "label": "Line thrust", "pattern": "line" }]
+	var line := thrust_line(u, target)
+	var on_line := false
+	for f in target.footprint():
+		on_line = on_line or f in line
+	if not on_line:
+		out[0].label = ""
+		out[0].pattern = "single"
+		return out
+	for h in line:
+		var o := unit_at(h)
+		if o != null and o != target and o.team != u.team and not _struck(out, o) and can_harm(u, o):
+			out.append({ "unit": o, "share": THRUST_SHARE, "label": "Line thrust (through)", "pattern": "line" })
+	return out
+
+
 func _struck(strikes: Array, o: BWUnit) -> bool:
 	for s in strikes:
 		if s.unit == o:
@@ -620,6 +774,8 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 		return {}
 	u.follow_up = []
 	_arced.clear()
+	BWEnchant.begin_action(self, u)            # v2 hook
+	u.fx["_basic"] = true                      # Spotter: a basic attack's blows
 	var target_hex := target.pos
 	var strikes := basic_strikes(u, target)
 	u.acted = true
@@ -634,7 +790,8 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 		if not v.alive() or over:
 			continue
 		var fc := forecast_basic(u, v, s.share, s.label)
-		var res := roll(fc)
+		var res := BWEnchant.roll_blow(self, u, v, fc, true)    # v2 hook: Second Chance, Graze, pity
+		BWEnchant.land(self, u, v, res)                         # v2 hook: Bulwark, Covering, Undying
 		var before := v.hp
 		v.hp = maxi(0, v.hp - res.damage)
 		var ko := not v.alive()
@@ -651,6 +808,7 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 		if first.is_empty():
 			first = res
 		_after_blow(u, v, res, before, "")
+		BWEnchant.after_blow(self, u, v, res, true, true)      # v2 hook
 		_conduct(u, v, int(res.damage))
 		counters.append_array(_riposte_check(v, res))
 		_note_struck(struck, v, res)
@@ -660,21 +818,33 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 	if target.alive() and not first.is_empty() and first.secondary:
 		_knockback_hit(u, target)
 	# FX hook: lay_on hit (Frostbitten) when the blow on the target lands.
-	if not first.is_empty() and first.hit:
+	if not first.is_empty() and first.hit and not BWFormulas.strips_element(target):   # D209: no riders on a Blank
 		_lay_on(u, "hit", { "target_hex": target_hex })
+	elif not first.is_empty():
+		_lay_on(u, "miss", { "target_hex": target_hex })   # v2: Rerouted
 	_lay_on_struck(u, struck)
 	# Basic attacks carry the attuned element for growth (§7.1); only the
 	# staff's Channel paints, onto the target's hex, hit or miss (§7.2, E11).
 	# A pistol shot lays a Reload-seated element on its trail instead.
 	_emit({ "type": "growth", "unit": u.id, "events": _award(u, ko_any, u.attuned) })
 	var spell := str(u.weapon().get("damage_type", "")) == "spell"
-	if spell and u.attuned != "":
+	if u.imbue() != "" and BWFormulas.strips_element(target):
+		pass                                   # D209: the imbue doesn't paint under a Blank
+	elif u.imbue() != "":
+		# D182: an imbued weapon's blow paints its element on the target's
+		# hex, hit or miss, like the staff's Channel; the attunement stays.
+		var att := u.attuned
+		paint([target_hex], u.imbue(), u)
+		u.attuned = att
+	elif spell and u.attuned != "":
 		paint([target_hex], u.attuned, u)
 	_fire_pistol(u, target_hex)
 	_after_action(u, u.attuned if spell else "", true)
 	_answer(counters)
 	_counter_check(u, struck)
 	_overwatch_check(u, struck)               # D97: Covering Fire
+	u.fx.erase("_basic")
+	BWEnchant.end_action(self, u, true)       # v2 hook: Steady Hand, Bloodpact, Pincer, Relentless
 	_check_end()
 	return first
 
@@ -702,11 +872,11 @@ func _guarded(fc: Dictionary, target: BWUnit) -> Dictionary:
 func _annotate(fc: Dictionary, v: BWUnit, att: BWUnit = null) -> Dictionary:
 	_obelisk_dodge(fc, v, att)                 # D142: the obelisks' flat dodge, a named line
 	var notes: Array = fc.get("notes", [])
-	if tiles.conductive(v.pos):
+	if tiles.conductive(v.pos) or BWEnchant.conductive(v):
 		var w := _chain_target(v)
 		if w != null:
 			# D93: Lightning Rod redirects (at its pct), Grounded halves, Overcharge adds a second arc
-			var frac := BWTiles.CHAIN_FRACTION
+			var frac := BWEnchant.chain_frac(att)
 			var rod := _rod_for(w, v)
 			var line := "Conductive (thunder tile): %d%% arcs to %s" % [int(frac * 100), w.name]
 			if rod != null:
@@ -730,6 +900,8 @@ func _annotate(fc: Dictionary, v: BWUnit, att: BWUnit = null) -> Dictionary:
 			notes.append(str(m.label))
 	if v.statuses.has("steadied"):
 		notes.append("Steadied: immune to stagger")   # D94
+	if fc.has("immune"):
+		notes = [str(fc.immune)]                   # D209: "Immune: physical", and no riders that won't land
 	fc["notes"] = notes
 	return fc
 
@@ -879,6 +1051,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 	var p := _plan(u, s, element, target_hex, choice)
 	var el: String = p.element
 	_arced.clear()
+	BWEnchant.begin_action(self, u)            # v2 hook
 	# Direct hits read the ground BEFORE this action changes it (§7.3 step 2).
 	var fcs: Array = []
 	for v in p.victims:
@@ -900,7 +1073,8 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 		var v: BWUnit = p.victims[i]
 		if not v.alive():
 			continue
-		var res := roll(fcs[i])
+		var res := BWEnchant.roll_blow(self, u, v, fcs[i], false)   # v2 hook
+		BWEnchant.land(self, u, v, res)
 		var before := v.hp
 		v.hp = maxi(0, v.hp - res.damage)
 		var ko := not v.alive()
@@ -923,6 +1097,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 	_emit(e)
 	for b in blows:
 		_after_blow(u, b[0], b[1], b[2], "")
+		BWEnchant.after_blow(self, u, b[0], b[1])   # v2 hook
 		_conduct(u, b[0], int(b[1].damage))
 	# Flurry: the remaining strikes, each its own roll and its own "attack"
 	# event (strike k of n, like a Doubleshot), re-forecast so a spent riposte
@@ -933,7 +1108,8 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 			if not v.alive() or over or not u.alive():
 				continue
 			var fc := _skill_forecast(u, s, el, v, p, k)
-			var res := roll(fc)
+			var res := BWEnchant.roll_blow(self, u, v, fc, false)   # v2 hook
+			BWEnchant.land(self, u, v, res)
 			var before := v.hp
 			v.hp = maxi(0, v.hp - res.damage)
 			var ko := not v.alive()
@@ -941,6 +1117,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 			_emit({ "type": "attack", "unit": u.id, "target": v.id, "result": res, "forecast_hit": fc.hit.value, "odds": odds(fc),
 				"ko": ko, "target_hp": v.hp, "strike": k, "strikes": hits, "pattern": key, "skill": key, "tags": _tags(fc) })
 			_after_blow(u, v, res, before, "")
+			BWEnchant.after_blow(self, u, v, res)       # v2 hook
 			_conduct(u, v, int(res.damage))
 			counters.append_array(_riposte_check(v, res))
 			_note_struck(struck, v, res)
@@ -992,6 +1169,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 	_overwatch_check(u, struck)               # D97: Covering Fire
 	if not u.alive():
 		u.follow_up = []
+	BWEnchant.end_action(self, u, BWSkills.is_damaging(key))   # v2 hook
 	_check_end()
 	return e
 
@@ -1245,6 +1423,7 @@ func _answer(counters: Array) -> void:
 				0.0, 0.0, 1.0, _mods(d, t, BWFormulas.SKILL, el, false))
 			_obelisk_dodge(fc, t, d)                 # D142
 			var res := roll(fc)
+			BWEnchant.land(self, d, t, res)          # v2 hook
 			var before: int = t.hp
 			t.hp = maxi(0, t.hp - res.damage)
 			landed = landed or res.hit
@@ -1254,6 +1433,7 @@ func _answer(counters: Array) -> void:
 		_emit({ "type": "riposte", "unit": d.id, "element": el, "hexes": ring, "results": results })
 		for b in blows:
 			_after_blow(d, b[0], b[1], b[2], "riposte")
+			BWEnchant.after_blow(self, d, b[0], b[1])   # v2 hook
 			_conduct(d, b[0], int(b[1].damage))
 		# D87: an answer that lands takes 1 off Riposte's cooldown.
 		var ck := BWSkills.cd_key("riposte", el)
@@ -1305,6 +1485,7 @@ func _hurt_triggers(v: BWUnit, before: int) -> void:
 		if before * 100.0 >= thr * m and v.hp * 100.0 < thr * m:
 			_fire_stat(v, e)
 	_sanctuary_check(v, before)            # D93 Sanctuary
+	BWEnchant.hurt(self, v, before)        # v2 hook: Rally Cry, Lifeline
 
 
 ## A knockout event, plus trigger_stat knockout (the killer: Encore, Crowd
@@ -1318,6 +1499,7 @@ func _ko(victim: BWUnit, by: BWUnit, cause: String = "") -> void:
 		_trigger(by, "knockout")
 	for a in side(victim.team):
 		_trigger(a, "ally_ko")
+	BWEnchant.on_ko(self, victim, by, cause)   # v2 hook: on-kill, ally_kill, ally_ko
 
 
 func _trigger(u: BWUnit, trig: String) -> void:
@@ -1331,6 +1513,9 @@ func _trigger(u: BWUnit, trig: String) -> void:
 ## Grant a trigger_stat's amount to each of its stats for the battle, held to
 ## its cap (per stat) or to one firing with once=1. Emits "stat_up".
 func _fire_stat(u: BWUnit, e: Dictionary) -> void:
+	if float(BWEffects.p(e, "dmg_pct", 0)) != 0.0:
+		BWEnchant.fury(self, u, e)             # v2: Fury banks damage, not stats
+		return
 	var key := "ts:" + str(e.source)
 	var given := int(u.fx.get(key, 0))
 	if int(BWEffects.p(e, "once", 0)) == 1 and given > 0:
@@ -1468,8 +1653,12 @@ func _skill_rider(u: BWUnit, key: String, skill: String, param: String) -> int:
 func _immune(u: BWUnit, what: String) -> bool:
 	if what == "displace" and BWObelisk.is_objective(u):
 		return true                            # D140: an obelisk never moves
+	if what == "displace" and u.encounter == "colossus":
+		return true                            # D210: the Colossus is never moved
 	if what == "displace" and BWEffects.has(u, "eye_of_storm"):
 		return true                            # D93 Eye of the Storm
+	if what == "displace" and BWEnchant.planted(self, u):
+		return true                            # v2: Planted
 	for e in BWEffects.list(u, "immune"):
 		if str(BWEffects.p(e, "what", "")) == what:
 			return true
@@ -1496,7 +1685,10 @@ func _lay_on(u: BWUnit, trigger: String, ctx: Dictionary) -> void:
 	if over or not u.alive():
 		return
 	for e in BWEffects.list(u, "lay_on"):
-		if str(BWEffects.p(e, "trigger", "")) != trigger or e.element == "":
+		var lay_el: String = e.element
+		if lay_el == "" and str(BWEffects.p(e, "element", "")) == "attuned":
+			lay_el = u.attuned                     # v2 Rerouted: your attuned element
+		if str(BWEffects.p(e, "trigger", "")) != trigger or lay_el == "":
 			continue
 		if trigger == "cast" and str(ctx.get("element", "")) != e.element:
 			continue
@@ -1514,7 +1706,7 @@ func _lay_on(u: BWUnit, trigger: String, ctx: Dictionary) -> void:
 		hexes = _on_board(hexes)
 		if hexes.is_empty() or not _chance(e):
 			continue
-		paint(hexes, e.element, u, maxi(1, int(BWEffects.p(e, "step", 1))), false)
+		paint(hexes, lay_el, u, maxi(1, int(BWEffects.p(e, "step", 1))), false)
 
 
 func _lay_on_move(u: BWUnit, path: Array) -> void:
@@ -1551,11 +1743,13 @@ func _counter_check(att: BWUnit, struck: Array) -> void:
 			var share := float(BWEffects.p(e, "dmg_pct", 50)) / 100.0
 			var fc := forecast_basic(v, att, share, "%s (counter)" % e.name)
 			var res := roll(fc)
+			BWEnchant.land(self, v, att, res)        # v2 hook
 			var before := att.hp
 			att.hp = maxi(0, att.hp - res.damage)
 			_emit({ "type": "counter", "unit": v.id, "target": att.id, "result": res,
 				"forecast_hit": fc.hit.value, "odds": odds(fc), "ko": not att.alive(), "target_hp": att.hp, "name": e.name, "tags": _tags(fc) })
 			_after_blow(v, att, res, before, "counter")
+			BWEnchant.after_blow(self, v, att, res)  # v2 hook
 			_conduct(v, att, int(res.damage))
 			_check_end()
 			break
@@ -1568,6 +1762,7 @@ func _situational(u: BWUnit, key: String) -> int:
 	var v := 0.0
 	if key == "move":                      # D93: turn-start and after-action move perks
 		v += float(u.fx.get("start_move", 0)) + float(u.fx.get("extra_move", 0))
+		v += BWEnchant.move_mod(u)             # v2: Leaden's cost
 	if _fx_units.is_empty():
 		return int(v)
 	for a in _auras(u, key):
@@ -1578,9 +1773,9 @@ func _situational(u: BWUnit, key: String) -> int:
 		if e.element in BWTiles.AXIS:
 			var pts := tiles.intensity(u.pos, e.element)
 			if pts > 0:
-				v += float(BWEffects.p(e, "per_point", 0)) * pts + float(BWEffects.p(e, "flat", 0))
+				v += BWEnchant.stand_on(u, e, key, pts)     # D196: % of the stat, the flat value as the floor
 		elif e.element == "ice" and tiles.is_glazed(u.pos) or e.element != "ice" and tiles.carries(u.pos, e.element):
-			v += float(BWEffects.p(e, "flat", 0))
+			v += BWEnchant.stand_on(u, e, key, 0)
 	return int(v)
 
 
@@ -1604,6 +1799,7 @@ func _auras(u: BWUnit, key: String) -> Array:
 		var r := int(BWEffects.p(e, "radius", 0))
 		if (r == 0 or int(BWEffects.p(e, "allies", 0)) == 0) and float(BWEffects.p(e, key, 0)) != 0.0:
 			out.append({ "label": e.name, "value": float(BWEffects.p(e, key)) })
+	out.append_array(BWEnchant.self_auras(self, u, key))   # v2: Lockstep
 	for o in _fx_units:
 		if o == u or not o.alive() or o.team != u.team:
 			continue
@@ -1634,6 +1830,7 @@ func _tile_potency(source: String, element: String) -> float:
 func _tile_dmg(u: BWUnit, pct: float, element: String, mult: float = 1.0) -> int:
 	if u.braced_against(element):
 		mult *= BWUnit.BRACE_TAKEN
+	mult *= BWEnchant.tile_mult(u, element)   # v2: Pyre's cost
 	return BWTiles.tile_damage(u, pct, element, mult * BWEffects.tile_taken(u, element))
 
 
@@ -1667,6 +1864,7 @@ func end_turn() -> void:
 		u.fx["start_move"] = 0                     # D93: turn-start move is spent with the turn
 		u.fx["extra_move"] = 0
 		u.fx["move_notes"] = []
+		BWEnchant.turn_end(self, u)                # v2 hook: Tending, empowerments, Planted
 		_emit({ "type": "turn_end", "unit": u.id })
 	turn_index += 1
 	while turn_index < queue.size() and not queue[turn_index].alive():
@@ -1719,10 +1917,8 @@ func _begin_turn() -> void:
 	_emit({ "type": "turn", "unit": u.id, "team": u.team })
 	if BWObelisk.is_objective(u):
 		return                                     # D140: no ground, perks or statuses; BWAI pulses it
-	if u.rogue and not u.fx.has("disobeyed"):      # D129: the rogue's line, its first turn each battle
-		u.fx["disobeyed"] = true
-		_emit({ "type": "disobey", "unit": u.id, "line": BWUnit.ROGUE_LINE })
 	_perk_turn_start(u)                            # D93: Frost Ward, Frostbite, Glare, move perks
+	BWEnchant.turn_start(self, u)                  # v2 hook: Hearthbound, Sheltering, Beacon, banked move
 	var night := BWEffects.has(u, "nightborn")     # D93 Nightborn: no dark drain on you
 	if u.statuses.has("shrouded") and not night:
 		_tile_hurt(u, _tile_dmg(u, BWSkills.SHROUD_DRAIN_PCT, "dark"), "shrouded", str(u.statuses.shrouded.source))
@@ -1737,7 +1933,7 @@ func _begin_turn() -> void:
 		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", st.source)
 	var heal := _light_heal(u, st)                 # D93 Sanctuary / Glare
 	if heal > 0 and u.alive():
-		_heal(u, heal)
+		_heal(u, heal, "light")
 	if over:
 		return
 	if not u.alive():
@@ -1745,6 +1941,10 @@ func _begin_turn() -> void:
 
 
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
+	var blocked := BWEnchant.heal_blocked(u, cause)     # v2: Hollow, Forsaken
+	if blocked != "":
+		_emit({ "type": "enchant", "unit": u.id, "name": blocked, "text": "can't be healed" })
+		return
 	var amt := maxi(1, roundi(u.max_hp() * pct / 100.0))
 	var healed := mini(amt, u.max_hp() - u.hp)
 	u.hp += healed
@@ -1752,6 +1952,7 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 	if cause != "":
 		e["cause"] = cause
 	_emit(e)
+	BWEnchant.on_healed(self, u, healed, cause)         # v2 hook: Mend-Link
 
 
 ## Lay `element` on hexes for `by`, and deal any detonations (ELEMENTS §3.5,
@@ -1763,8 +1964,9 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 ## (Arcing: splash reaches further), effect_repeat thunder (Thundering: an
 ## echo at 50%), knockback on=trigger thunder (Jolting); on each gale the
 ## caster's knockback on=trigger wind (Howling).
-func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool = true) -> Dictionary:
+func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool = true, extra: Dictionary = {}) -> Dictionary:
 	var o := BWEffects.paint_opts(by, element, hexes, board, cast)
+	o.merge(extra, true)                       # v2: `propagated` (on-kill paint arrives as spread)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
 	if cast:
 		by.attuned = element
@@ -1791,6 +1993,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 				if int(BWEffects.p(e, "next_same", 0)) != 1:
 					mult *= 1.0 + float(BWEffects.p(e, "pct", 0)) / 100.0
 			radius += int(BWEffects.total(src, "element_area_plus", "radius", "thunder"))
+			mult *= BWEnchant.overload(src, int(d.get("points", 0)))   # v2: Overload
 			for e in BWEffects.list(src, "effect_repeat", "thunder"):
 				for k in int(BWEffects.p(e, "extra", 0)):
 					echoes.append(float(BWEffects.p(e, "scale_pct", 100)) / 100.0)
@@ -1819,6 +2022,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(src.pos, d.hex), int(BWEffects.p(e, "hexes", 1))])
 	for u in hurt:
 		_tile_hurt(u, hurt[u][0], "detonation", hurt[u][1])
+	BWEnchant.after_blast(self, hurt)          # v2 hook: Sapping
 	for g in r.gales:
 		for e in BWEffects.list(by, "knockback", "wind"):
 			if str(BWEffects.p(e, "on", "")) != "trigger" or not _chance(e):
@@ -1829,6 +2033,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(g.origin, h), int(BWEffects.p(e, "hexes", 1))])
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
+	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
 	return r
 
 
@@ -1874,9 +2079,20 @@ func _erupt(er: Dictionary) -> void:
 			_displace(u, BWHex.direction_index(u.pos, hex), -push, "pull", true)
 
 
+## D209: `u` takes nothing from damage of class `cls` (BWFormulas.damage_class);
+## emits `immune` so the view can say so.
+func _class_immune(u: BWUnit, cls: String) -> bool:
+	if u == null or u.encounter == "" or not BWFormulas.immune_to(u, cls):
+		return false
+	_emit({ "type": "immune", "unit": u.id, "class": cls })
+	return true
+
+
 func _tile_hurt(u: BWUnit, amount: int, cause: String, source: String) -> void:
 	if amount <= 0 or not u.alive() or BWObelisk.is_objective(u):
 		return                                 # D141: ground, blasts and slams never hurt an obelisk
+	if _class_immune(u, BWFormulas.damage_class({ "source": "tile" if cause in ELEMENTAL_CAUSES else cause })):
+		return                                 # D209: a Blank shrugs off the ground, a Being a slam
 	if cause in ELEMENTAL_CAUSES and _negate(u, cause):
 		return                                 # D93: a Frost Ward / Nightborn took it
 	var before := u.hp
@@ -1924,14 +2140,14 @@ func _chain_target(v: BWUnit, skip: Array = []) -> BWUnit:
 ## 50%; Grounded halves an arc that reaches its holder; a Frost Ward or
 ## Nightborn negates one.
 func _conduct(by: BWUnit, v: BWUnit, amount: int) -> void:
-	if amount <= 0 or over or not tiles.conductive(v.pos) or BWObelisk.is_objective(v):
+	if amount <= 0 or over or not (tiles.conductive(v.pos) or BWEnchant.conductive(v)) or BWObelisk.is_objective(v):
 		return
 	var oc := by != null and BWEffects.has(by, "overcharge")
 	var skip: Array = _arced.keys() if oc else []
 	var w := _chain_target(v, skip)
 	if w == null:
 		return
-	var dealt := _arc(by, v, w, BWTiles.CHAIN_FRACTION * amount)
+	var dealt := _arc(by, v, w, BWEnchant.chain_frac(by) * amount)   # v2: Lightning-Touched
 	if not oc or over:
 		return
 	var w2 := _chain_target(v, _arced.keys() + [w])
@@ -1951,6 +2167,8 @@ func _arc(by: BWUnit, v: BWUnit, w: BWUnit, raw: float, kind: String = "") -> in
 		raw *= float(BWEffects.p(BWEffects.list(rod, "lightning_rod")[0], "pct", 50)) / 100.0
 		w = rod
 	_arced[w] = true
+	if _class_immune(w, BWFormulas.damage_class({ "source": "chain" })):
+		return 0                               # D209: a Blank is never shocked
 	if _negate(w, "chain"):
 		return 0
 	if w.braced_against("thunder"):               # D130: an arc is thunder
@@ -1969,6 +2187,7 @@ func _arc(by: BWUnit, v: BWUnit, w: BWUnit, raw: float, kind: String = "") -> in
 		ev["kind"] = kind
 	ev.merge(e_extra)
 	_emit(ev)
+	BWEnchant.after_arc(self, by, dmg)         # v2 hook: Conductor
 	if not w.alive():
 		var credit: BWUnit = by if by != null and by.team != w.team else null
 		_ko(w, credit, "chain")
@@ -2008,6 +2227,11 @@ func _add_status(v: BWUnit, key: String, by: BWUnit, elemental: int = -1, armed:
 	if BWObelisk.is_objective(v):                 # D141: stone takes no status
 		_emit({ "type": "status_resisted", "unit": v.id, "status": key, "reason": "Stone" })
 		return
+	if BWEnchant.shrug_status(self, v, key, by):  # v2: Unshaken
+		return
+	if BWFormulas.strips_element(v) and (key in BWSkills.ELEMENTAL_STATUS if elemental < 0 else elemental == 1):
+		_emit({ "type": "status_resisted", "unit": v.id, "status": key, "reason": "Immune: elemental" })
+		return                                 # D209: no element effect lands on a Blank
 	var el: bool = key in BWSkills.ELEMENTAL_STATUS if elemental < 0 else elemental == 1
 	if v.immune_to_status(key) or (el and v.braced_against(status_element(key))):
 		_emit({ "type": "status_resisted", "unit": v.id, "status": key,
@@ -2158,6 +2382,10 @@ func _stage_mod(mods: Array, stage: String, value: float, label: String) -> void
 		return
 	if stage == "dmg":
 		mods.append({ "stage": "dmg", "value": 1.0 + value / 100.0, "label": "%s: %+d%%" % [label, int(value)] })
+	elif stage == "def_ignore":
+		mods.append({ "stage": "def_ignore", "value": value / 100.0, "label": "%s: ignores %d%% DEF" % [label, int(value)] })
+	elif stage == "crit_mult":
+		mods.append({ "stage": "crit_mult", "value": value, "label": "%s: %+.1f crit multiplier" % [label, value] })
 	else:
 		mods.append({ "stage": stage, "value": value, "label": "%s: %+d %s" % [label, int(value), stage] })
 
@@ -2209,6 +2437,8 @@ func _perk_mods(att: BWUnit, dfn: BWUnit, ap: Vector2i, mods: Array) -> void:
 				continue
 			var on := str(BWEffects.p(e, "on", ""))
 			var lv := BWEffects.level_at(tiles, dfn.pos, on)
+			if int(BWEffects.p(e, "own", 0)) == 1 and str(tiles.at(dfn.pos).get("glaze_source" if on == "ice" else "source", "")) != o.id:
+				lv = 0                                 # v2 Permafrost: your own glaze only
 			if lv > 0:
 				_stage_mod(mods, str(BWEffects.p(e, "stage", "avoid")), BWEffects.by_level(e, lv),
 					"%s (%s%s)" % [e.name, BWEffects.ground_label(on, lv), "" if o == dfn else ", " + o.name])
@@ -2234,7 +2464,7 @@ func _perk_mods(att: BWUnit, dfn: BWUnit, ap: Vector2i, mods: Array) -> void:
 				int(float(BWEffects.p(e, "per_point", 2)) * fl)] })
 	for e in BWEffects.list(att, "hit_status"):
 		var on := str(BWEffects.p(e, "on", "dark"))
-		if BWEffects.level_at(tiles, dfn.pos, on) >= int(BWEffects.p(e, "min", 1)):
+		if on == "any" or BWEffects.level_at(tiles, dfn.pos, on) >= int(BWEffects.p(e, "min", 1)):
 			var st: Array = BWSkills.STATUS.get(str(BWEffects.p(e, "status", "")), ["?", ""])
 			mods.append({ "stage": "note", "label": "%s: a hit leaves it %s" % [e.name, st[0]] })
 
@@ -2255,7 +2485,9 @@ func _perk_after_blow(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 	if res.secondary:
 		for e in BWEffects.list(att, "hit_status"):
 			var on := str(BWEffects.p(e, "on", "dark"))
-			if BWEffects.level_at(tiles, v.pos, on) >= int(BWEffects.p(e, "min", 1)):
+			if int(BWEffects.p(e, "basic", 0)) == 1 and not att.fx.get("_basic", false):
+				continue                               # v2 Spotter: basic attacks only
+			if on == "any" or BWEffects.level_at(tiles, v.pos, on) >= int(BWEffects.p(e, "min", 1)):
 				_add_status(v, str(BWEffects.p(e, "status", "blinded")), att, 1)
 	var fl := tiles.intensity(v.pos, "fire")
 	if fl > 0 and att.alive() and v.alive() and gap(v, att) <= 1:
@@ -2357,7 +2589,7 @@ func _gust(u: BWUnit, blows: Array) -> void:
 ## A unit's turn start: per-turn perk state, Frost Ward, Frostbite, Glare's
 ## blind, and the turn-start move terms.
 func _perk_turn_start(u: BWUnit) -> void:
-	for k in ["heat_rush_used", "shadowstep_used", "detonated"]:
+	for k in ["heat_rush_used", "shadowstep_used", "detonated", "free_water_used"]:
 		u.fx.erase(k)
 	u.fx["extra_move"] = 0
 	u.fx["start_move"] = 0
@@ -2460,7 +2692,11 @@ func _move_rules(u: BWUnit) -> Dictionary:
 	var r := {}
 	if not u.effects.is_empty():
 		for e in BWEffects.list(u, "move_cost"):
-			r["cost_on"] = [str(BWEffects.p(e, "on", "water")), int(BWEffects.p(e, "cost", 0))]
+			if int(BWEffects.p(e, "once", 0)) == 1:             # D204 Waterwalking: the first one each turn
+				if not u.fx.get("free_water_used", false):
+					r["free_on"] = str(BWEffects.p(e, "on", "water"))
+			else:
+				r["cost_on"] = [str(BWEffects.p(e, "on", "water")), int(BWEffects.p(e, "cost", 0))]
 		for e in BWEffects.list(u, "skate"):
 			r["skate"] = int(BWEffects.p(e, "cost", 1))
 		if not u.fx.get("heat_rush_used", false):
@@ -2531,6 +2767,9 @@ func _reach_fx(u: BWUnit, budget: int, blocked: Dictionary, no_stop: Dictionary,
 			if rules.has("heat") and nm & 1 == 0 and tiles.intensity(n, "fire") > 0:
 				nm |= 1
 				sc = maxi(0, sc - int(rules.heat))
+			if rules.has("free_on") and nm & 4 == 0 and BWEffects.level_at(tiles, n, str(rules.free_on)) > 0:
+				nm |= 4                                   # D204 Waterwalking: this hex costs nothing
+				sc = 0
 			steps.append([n, sc, nm])
 		if rules.has("shadow") and k.z & 2 == 0 and tiles.intensity(h, "dark") > 0:
 			for t in board.area(h, int(rules.shadow[0])):
@@ -2616,7 +2855,12 @@ func _nearest(h: Vector2i, pools: Array) -> int:
 ## Shadowstep (a jump in the path), and say so on the move event.
 func _mark_move_perks(u: BWUnit, path: Array, e: Dictionary) -> void:
 	var heat: bool = BWEffects.has(u, "heat_rush") and not u.fx.get("heat_rush_used", false)
+	var free_water: bool = str(_move_rules(u).get("free_on", "")) != ""
 	for i in range(1, path.size()):
+		if free_water and BWEffects.level_at(tiles, path[i], "water") > 0:
+			free_water = false
+			u.fx["free_water_used"] = true             # D204 Waterwalking: spent
+			e["free_water"] = path[i]
 		if BWHex.distance(path[i - 1], path[i]) > 1:
 			u.fx["shadowstep_used"] = true
 			e["shadowstep"] = [path[i - 1], path[i]]
@@ -2697,11 +2941,13 @@ func _reaction_basic(h: BWUnit, t: BWUnit, cause: String, label: String) -> void
 	_face(h, t.pos)
 	var fc := forecast_basic(h, t)
 	var res := roll(fc)
+	BWEnchant.land(self, h, t, res)            # v2 hook
 	var before := t.hp
 	t.hp = maxi(0, t.hp - res.damage)
 	_emit({ "type": "counter", "unit": h.id, "target": t.id, "result": res, "forecast_hit": fc.hit.value, "odds": odds(fc),
 		"ko": not t.alive(), "target_hp": t.hp, "name": label, "cause": cause, "tags": _tags(fc) })
 	_after_blow(h, t, res, before, cause)
+	BWEnchant.after_blow(self, h, t, res)      # v2 hook
 	_conduct(h, t, int(res.damage))
 	_check_end()
 
@@ -2753,7 +2999,7 @@ func roll(fc: Dictionary) -> Dictionary:
 ## crit, no glance. Flagged `expected` so the preview labels it "~".
 static func expected_result(fc: Dictionary) -> Dictionary:
 	var ex := float(fc.expected.value)
-	var hit := float(fc.hit.value) >= 50.0
+	var hit := float(fc.hit.value) >= 50.0 and not fc.has("immune")   # D209
 	return { "hit": hit, "glance": false, "crit": false, "resisted": false,
 		"damage": maxi(0, roundi(ex)), "secondary": true, "rolls": {}, "expected": true }
 

@@ -4,16 +4,18 @@ Draft for review. Powers stay in the existing bands (skill 8–14, spell 9–13)
 
 ## 1. How picks work
 
+**Two options a pick (D174).** Every element or weapon pick shows only **2 options, drawn at random** from what the unit could take: 2 of that element's perks it doesn't own, or 2 from the class's improve / learn pool (fewer only when fewer remain). The draw is seeded from the run seed, the unit and how many picks of that kind it has made, so it is reproducible and the same pick shows the same 2 cards after a reload. AI units and enemies take the first of their 2. Rank 3 still grants all five perks.
+
 **Element perks**
 - 5 perks per element: mobility, defence, offence, control, support.
-- Affinity rank 1 gives 1 pick, rank 2 a second pick, and rank 3 unlocks all five.
+- Affinity rank 1 gives 1 pick, rank 2 a second pick (each from 2 drawn options), and rank 3 unlocks all five.
 - Units start at rank 1 in their own element, so 1 pick at the start. A newly learned element gives its own first pick.
 - You pick as soon as you earn it, even mid-fight. The perk works from that moment.
 - Passives only; some have a once-per-battle trigger. No new buttons.
 
 **Weapon skills**
 - Each expertise step (E→D, D→C, C→B, B→A) gives 1 pick, so 4 picks per class.
-- A pick either **improves** a skill you know (it gains a "+" rider) or **learns** one of the 5 new skills for that class.
+- A pick either **improves** a skill you know (it gains a "+" rider) or **learns** one of the 5 new skills for that class; 2 of those options are drawn for each pick.
 - You equip up to 3 skills before the fight. An Improve earned mid-fight works at once. A skill learned mid-fight can be equipped from the next fight on.
 
 New status (one): **Pinned**: −2 move, until the end of the holder's next turn.
@@ -25,8 +27,8 @@ New status (one): **Pinned**: −2 move, until the end of the holder's next turn
 ### Water: depth is terrain
 Already chosen; fleshed out here.
 
-**Waterwalking** (mobility). Water's move penalty doesn't apply to you, and you gain move from the water you start your turn on.
-- No added cost on water. +1/+2/+3 move when starting on water 1/2/3.
+**Waterwalking** (mobility). **Current rule (D204): the first water hex you cross each turn costs no move.** (Draft, superseded: water's move penalty doesn't apply to you, and you gain move from the water you start your turn on; then D93: water costs 0 at any level.)
+- The first water hex entered each turn costs 0; later ones cost as usual. Spent by a move; back next turn.
 
 **Flow State** (support). You and your allies standing in water are harder to hit.
 - +3/+6/+9 avoid on water 1/2/3.

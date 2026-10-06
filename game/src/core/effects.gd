@@ -39,7 +39,8 @@ const FLAT_TO_PCT := 4.0 / 3.0
 
 ## Keys that work whatever elements the wearer has learned (EQUIPMENT.md §1).
 ## Every other element-tagged enchantment sleeps until its element is learned.
-const DEFENSIVE := ["damage_taken_mod", "immune"]
+## D201: a curse's cost never sleeps either.
+const DEFENSIVE := ["damage_taken_mod", "immune", "drawback"]
 
 ## The 25 equipment / ability keys (EQUIPMENT.md §1).
 const GEAR_KEYS := ["element_damage_pct", "damage_taken_mod", "tile_duration_plus", "affinity_gain_plus",
@@ -63,7 +64,16 @@ const PERK_KEYS := ["move_cost", "stand_on_mod", "start_move", "undertow", "heat
 	"wildfire", "skate", "rime_armour", "fault_lines", "frostbite", "frost_ward", "bolt_step", "grounded",
 	"overcharge", "static_field", "lightning_rod", "tailwind", "eye_of_storm", "gust", "slipstream",
 	"shadowstep", "nightborn", "hit_status", "cover", "radiant_guard", "judgement", "glare", "sanctuary"]
-const KEYS := GEAR_KEYS + PERK_KEYS
+## D196-D205 (design/ENCHANTMENTS-v2.md): four generic hooks so the v2 rows
+## stay data. Served by BWEnchant (src/core/enchant_v2.gd) through the
+## "v2 hook:" lines in battle.gd.
+##   on_event  on, do, target, radius, pct, pct_of, hexes, status, ...: when `on`
+##             happens, do `do` (see ENCHANTMENTS-v2 §2 for the vocabulary)
+##   pity      kind = miss | glance | crit | resist | graze | reroll: RNG forgiveness
+##   drawback  the cost half of a cursed row (hp_cost, status, no_heal, ...)
+##   swap      trade places with an ally (Bodyguard: mode=move; Lifeline: on=ally_low)
+const V2_KEYS := ["on_event", "pity", "drawback", "swap"]
+const KEYS := GEAR_KEYS + PERK_KEYS + V2_KEYS
 
 ## "AoE skills" for aoe_radius_plus (Cleaving, Channelling) are the skill
 ## defs with `aoe: true` in their row (D89): arcing_shot, surge,
@@ -95,6 +105,12 @@ static func collect(u: BWUnit) -> Array:
 	var out: Array = []
 	for slot in SLOT_ORDER:
 		var it: Dictionary = u.equipment.get(slot, {})
+		# D206: the drawn weapon's imbue carries an element enchantment of its own
+		# (the carried weapon, equipment "second", gives nothing: D180).
+		var imb_row := BWData.row("enchantments", str(it.get("imbue_enchant", "")))
+		if not imb_row.is_empty():
+			var bn := str(BWData.row("equipment", str(it.get("base", ""))).get("name", it.get("base", "")))
+			out.append_array(records(imb_row, "%s (%s imbue)" % [str(imb_row.get("name_pattern", "")).replace("{item}", bn), str(it.get("imbue", ""))]))
 		var ench := str(it.get("enchant", ""))
 		if ench == "":
 			continue
@@ -103,7 +119,7 @@ static func collect(u: BWUnit) -> Array:
 			continue
 		var base_name := str(BWData.row("equipment", str(it.get("base", ""))).get("name", it.get("base", "")))
 		var nm := str(row.get("name_pattern", ench)).replace("{item}", base_name)
-		out.append(make(row, "enchant", 1, nm))
+		out.append_array(records(row, nm))
 	for type in TYPES:
 		var a: Dictionary = u.abilities.get(type, {})
 		if a.is_empty():
@@ -124,6 +140,35 @@ static func collect(u: BWUnit) -> Array:
 		if not row.is_empty():
 			out.append(make(row, "perk", 1, str(row.get("name", id))))
 	return out
+
+
+## D196: an enchantment row's records: its own key, then each `also` record
+## ("key(a=1;b=2) | key(...)"), then its `drawback` (key "drawback"), all
+## under the item's name and the row's element.
+static func records(row: Dictionary, display: String) -> Array:
+	var out: Array = [make(row, "enchant", 1, display)]
+	for part in str(row.get("also", "")).split("|", false):
+		var t := part.strip_edges()
+		var i := t.find("(")
+		if i <= 0 or not t.ends_with(")"):
+			continue
+		var r2 := row.duplicate()
+		r2["effect_key"] = t.substr(0, i)
+		r2["params"] = t.substr(i + 1, t.length() - i - 2)
+		out.append(make(r2, "enchant", 1, display))
+	var dw := str(row.get("drawback", "")).strip_edges()
+	if dw != "":
+		var r3 := row.duplicate()
+		r3["effect_key"] = "drawback"
+		r3["params"] = dw
+		out.append(make(r3, "enchant", 1, display))
+	return out
+
+
+## D201: is this enchantment row (or id) cursed?
+static func cursed(row_or_id: Variant) -> bool:
+	var row: Dictionary = row_or_id if row_or_id is Dictionary else BWData.row("enchantments", str(row_or_id))
+	return int(row.get("cursed", 0)) == 1
 
 
 ## One record from a CSV row (enchantments.csv or abilities.csv).
@@ -206,8 +251,9 @@ static func share(u: BWUnit, key: String) -> int:
 			continue
 		var from := str(e.params.get("from", ""))
 		var raw: int = int(u.stats.get(from, 0))
-		for item in u.equipment.values():
-			raw += int(item.get("stats", {}).get(from, 0))
+		for slot in u.equipment:
+			if slot != BWUnit.SECOND:                  # D180: the carried weapon gives nothing
+				raw += int(u.equipment[slot].get("stats", {}).get(from, 0))
 		v += floori(raw * float(e.params.get("pct", 0)) / 100.0)
 	return v
 
@@ -422,6 +468,7 @@ static func attack_mods(att: BWUnit, dfn: BWUnit, kind: String, element: String,
 	# guard (Guarding): the defender attacked last turn and braced
 	if float(dfn.fx.get("guard", 0)) > 0.0:
 		out.append(_m("dmg", str(dfn.fx.get("guard_name", "Guard")), 1.0 - float(dfn.fx.guard) / 100.0))
+	out.append_array(BWEnchant.mods(att, dfn, kind, element, ctx, auras))   # D196-D205 (v2 rows)
 	return out
 
 

@@ -1,6 +1,6 @@
 extends RefCounted
 ## The run layer: setup, items, enemies, loot, learning, recruits, shop,
-## re-imbue, save/load.
+## save/load. (Re-imbue is gone, D202; the scrolls are in test_enchant_v2.)
 
 
 func _ids() -> Array:
@@ -102,25 +102,18 @@ func test_weapon_rank_gate(t) -> void:
 	var u: BWUnit = r.squad[0]
 	var big := r.make_item("halberd", "C")
 	r.inventory.append(big)
-	t.ok(not r.equip(u, big), "C weapon needs C expertise")
-	u.expertise["lance"] = 20
-	t.ok(r.equip(u, big), "with C lance expertise it fits")
+	t.ok(r.equip(u, big), "D180: a C weapon needs no expertise")
 	t.eq(u.weapon_class, "lance", "switching weapon class follows the item")
 
 
-func test_shop_and_reimbue(t) -> void:
+func test_shop_trade(t) -> void:
 	var r := _run()
 	var mine := r.random_item("E")
 	r.inventory.append(mine)
 	var take: Dictionary = r.shop[0]
 	t.ok(r.trade(mine, take), "1-for-1 trade")
 	t.ok(take in r.inventory and mine in r.shop, "items swapped")
-	var a := r.make_item("chaps", "E")
-	var b := r.make_item("tights", "E", "")
-	var ench: String = a.enchant
-	t.ok(r.reimbue(a, b), "armour → armour re-imbue")
-	t.eq(b.enchant, ench, "enchantment moved")
-	t.eq(a.enchant, "", "source left plain")
+	t.ok(not r.has_method("reimbue"), "D202: no re-imbue")
 
 
 func test_save_round_trip(t) -> void:
@@ -133,7 +126,7 @@ func test_save_round_trip(t) -> void:
 	t.eq(r2.fight, r.fight, "fight survives")
 	t.eq(r2.squad.size(), r.squad.size(), "squad survives")
 	t.eq(r2.inventory.size(), r.inventory.size(), "inventory survives")
-	t.eq(r2.squad[0].xp, r.squad[0].xp, "xp survives")
+	t.eq(r2.squad[0].level, r.squad[0].level, "the level survives")
 	t.eq(r2.squad[0].max_hp(), r.squad[0].max_hp(), "stats + gear survive")
 	t.eq(r2.random_item("E").stats, r.random_item("E").stats, "rng continues identically")
 
