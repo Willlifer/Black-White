@@ -57,7 +57,7 @@ func show_unit(u: BWUnit) -> void:
 	var wname := BWText.weapon(u.weapon_class)
 	lines.append("[font_size=%d][color=#%s]%s (%s)   [/color][color=#%s]◆[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SMALL, lab, wname, u.expertise_letter(u.weapon_class), BWGearText.hex(BWLook.element_color(u.element)), el,
-		u.element.capitalize()])
+		BWKanji.bb(u.element) + u.element.capitalize()])     # D231
 	lines.append_array(BWCombatUI.badge_lines(u, BWStyle.F_SMALL))      # D130: immunity, next battle
 	lines.append("[font_size=%d]HP %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.max_hp(), u.move_range(), u.speed()])
 	var st: PackedStringArray = []
@@ -70,7 +70,7 @@ func show_unit(u: BWUnit) -> void:
 	for e in BWFormulas.ELEMENTS:
 		var r := u.affinity_rank(e)
 		if r > 0:
-			aff.append("[color=#%s]◆ %s %d[/color]" % [BWGearText.hex(BWGearText.readable(BWLook.element_color(e))), e.capitalize(), r])
+			aff.append("[color=#%s]◆ %s%s %d[/color]" % [BWGearText.hex(BWGearText.readable(BWLook.element_color(e))), BWKanji.bb(e), e.capitalize(), r])
 	if not aff.is_empty():
 		lines.append("[font_size=%d][color=#%s]Affinity[/color]  %s[/font_size]" % [BWStyle.F_SMALL, faint, "  ".join(aff)])
 	lines.append("[font_size=%d][color=#%s]GEAR[/color][/font_size]" % [BWStyle.F_MENU_TITLE - 2, faint])

@@ -22,6 +22,7 @@ const DEFAULTS := {
 	"show_numbers": true,         # floating damage numbers
 	"screen_shake": true,         # D170: camera shake on hits (BWHitFeel, every BWCombatScreen._shake)
 	"skip_hints": 0,              # how many times the "hold Space to skip" hint has shown
+	"element_kanji": false,       # D231: element kanji on tiles, markers and element words (BWKanji)
 }
 const BUS_KEYS := { "vol_master": "Master", "vol_music": "Music", "vol_sfx": "SFX", "vol_voice": "Voice", "vol_ui": "UI" }
 const WINDOW_PRESETS := ["", "1280x720", "1600x900", "1920x1080", "2560x1440"]

@@ -117,7 +117,7 @@ func _run() -> void:
 
 func _unit_for(st: String, clip: String) -> BWUnit:
 	var id: String = REPS[st]
-	if clip in ["strike_axe", "walk_heavy", "run_heavy"] and AXE_REPS.has(st):
+	if clip in ["strike_axe", "walk_heavy", "run_heavy", "strike_hook", "strike_axe_jab"] and AXE_REPS.has(st):
 		id = AXE_REPS[st]
 	var u := BWRosterKits.unit(id)
 	if REP_WEAPON.has(st):

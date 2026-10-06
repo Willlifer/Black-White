@@ -89,7 +89,7 @@ new scrolls after every battle" % BWRun.SCROLL_COST
 	_left_title = BWStyle.section_label("")
 	lv.add_child(_left_title)
 	var ls := ScrollContainer.new()
-	ls.custom_minimum_size = Vector2(BWItemCard.W + 20, 176)
+	ls.custom_minimum_size = Vector2(BWItemCard.W + 20, 148)      # D216: two rows of tiles, no spare
 	ls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lv.add_child(ls)
 	_left = _grid()
@@ -99,7 +99,7 @@ new scrolls after every battle" % BWRun.SCROLL_COST
 	_right_title = BWStyle.section_label("")
 	rv.add_child(_right_title)
 	var rsc := ScrollContainer.new()
-	rsc.custom_minimum_size = Vector2(BWItemCard.W + 20, 176)
+	rsc.custom_minimum_size = Vector2(BWItemCard.W + 20, 148)
 	rsc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rv.add_child(rsc)
 	_right = _grid()
@@ -113,7 +113,7 @@ new scrolls after every battle" % BWRun.SCROLL_COST
 	var cmp := HBoxContainer.new()
 	cmp.add_theme_constant_override("separation", 10)
 	cs.add_child(cmp)
-	_card_a = BWItemCard.new()
+	_card_a = BWItemCard.new(BWItemCard.W_WIDE)        # D216: wide, so a full card fits unscrolled
 	cmp.add_child(_card_a)
 	_arrow = Label.new()
 	_arrow.text = "⇄"
@@ -123,7 +123,7 @@ new scrolls after every battle" % BWRun.SCROLL_COST
 	_arrow.custom_minimum_size = Vector2(46, 0)
 	_arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cmp.add_child(_arrow)
-	_card_b = BWItemCard.new()
+	_card_b = BWItemCard.new(BWItemCard.W_WIDE)
 	cmp.add_child(_card_b)
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)

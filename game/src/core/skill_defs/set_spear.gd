@@ -9,7 +9,7 @@ const CD := 3
 
 func _init() -> void:
 	define({
-		"key": "set_spear", "name": "Set Spear", "weapon": "lance", "clip": "block",
+		"key": "set_spear", "name": "Set Spear", "weapon": "lance", "clip": "brace",
 		"desc": "Free: plant the spear. Until your next turn, enemies entering any tile within your reach must stop there and can't get past",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0, "free_action": true,

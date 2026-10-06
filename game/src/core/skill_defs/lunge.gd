@@ -10,7 +10,7 @@ const LEN := 3
 
 func _init() -> void:
 	define({
-		"key": "lunge", "name": "Lunge", "weapon": "sword", "clip": "",
+		"key": "lunge", "name": "Lunge", "weapon": "sword", "clip": "thrust",
 		"desc": "Dash up to 3 tiles in a straight line and strike the first enemy in the way. An ally or rock just stops you",
 		"targeting": "dir", "needs_element": true, "range": LEN, "cd": CD,
 		"power": POWER,

@@ -17,7 +17,7 @@ const NOWHERE := Vector2i(-9999, -9999)
 
 func _init() -> void:
 	define({
-		"key": "grapple_throw", "name": "Grapple Throw", "weapon": "fists", "clip": "uppercut",
+		"key": "grapple_throw", "name": "Grapple Throw", "weapon": "fists", "clip": "grapple",
 		"desc": "Seize an adjacent enemy and throw it down on a free tile next to you; +50% if it lands on charge you laid",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER, "second_pick": "hex",

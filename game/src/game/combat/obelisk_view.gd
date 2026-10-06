@@ -78,40 +78,13 @@ func _build() -> void:
 	_label.outline_modulate = Color.BLACK
 	_label.font_size = 14
 	add_child(_label)
-	_bar_bg = _bar_quad(BAR_W * 1.6 + 0.04, BAR_H + 0.04, Color(0, 0, 0, 0.9), 0)
-	add_child(_bar_bg)
-	_bar_ghost = _bar_quad(BAR_W * 1.6, BAR_H, Color(0.62, 0.62, 0.66), 1)
-	add_child(_bar_ghost)
-	_bar_fill = _bar_quad(BAR_W * 1.6, BAR_H, Color(0.97, 0.97, 0.97) if o.look() == "bright" else Color(0.5, 0.5, 0.53), 2)
-	add_child(_bar_fill)
-	_hp_label = Label3D.new()
-	_hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_hp_label.no_depth_test = true
-	_hp_label.fixed_size = true
-	_hp_label.pixel_size = 0.0011
-	_hp_label.font_size = 17
-	_hp_label.outline_size = 9
-	_hp_label.modulate = Color.BLACK
-	_hp_label.outline_modulate = Color.WHITE
-	_hp_label.render_priority = 14
-	_hp_label.outline_render_priority = 13
-	add_child(_hp_label)
+	_build_bar(BAR_W * 1.6)         # D215: the same bar rule, wider (it has 350 HP)
 	_place_bar()
 
 
 func _place_bar() -> void:
-	var y := _height + 0.35
-	for n in [_bar_bg, _bar_fill, _bar_ghost, _hp_label]:
-		n.position.y = y
-	_label.position.y = y + 0.42
-
-
-## The obelisk's bar is wider (it has 500 HP), so its fill is cut on that width.
-func _set_bar(mi: MeshInstance3D, f: float) -> void:
-	var w := BAR_W * 1.6
-	var q: QuadMesh = mi.mesh
-	q.size = Vector2(maxf(w * f, 0.001), BAR_H)
-	q.center_offset = Vector3(-(w - w * f) * 0.5, 0, 0)
+	_hp_bar.place(_height + 0.35)
+	_label.position.y = 0.42
 
 
 func head_height() -> float:

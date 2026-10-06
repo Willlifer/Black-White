@@ -209,11 +209,27 @@ func set_element(slot: String, element: String) -> void:
 
 # ----------------------------------------------------------------- hair
 
+## D228 (L-4): the equipment data's `hides_hair` flag decides, per item:
+## all = hide_all (full cover: full helm, dragoon helm), top = hide_top (hair
+## that fits under the brim shows), none = show (tiara, crown). A row without
+## the flag falls back to the model manifest's hair_mode.
+const HIDES_HAIR := { "all": "hide_all", "top": "hide_top", "none": "show" }
+
+
+static func piece_hair_mode(base_id: String) -> String:
+	if BWData.has_table("equipment"):
+		var flag := str(BWData.row("equipment", base_id).get("hides_hair", "")).strip_edges()
+		if HIDES_HAIR.has(flag):
+			return HIDES_HAIR[flag]
+	var m := str(info(base_id).get("hair_mode", ""))
+	return m if m in HAIR_MODES else "show"
+
+
 ## The strictest hair_mode among equipped pieces: show < hide_top < hide_all.
 func hair_mode() -> String:
 	var best := 0
 	for s in _pieces:
-		best = maxi(best, HAIR_MODES.find(str(_pieces[s].info.get("hair_mode", "show"))))
+		best = maxi(best, HAIR_MODES.find(piece_hair_mode(str(_pieces[s].base))))
 	return HAIR_MODES[best]
 
 
@@ -222,7 +238,7 @@ func hair_mode() -> String:
 func hair_clearance() -> float:
 	var c := INF
 	for s in _pieces:
-		if str(_pieces[s].info.get("hair_mode", "")) == "hide_top":
+		if piece_hair_mode(str(_pieces[s].base)) == "hide_top":
 			c = minf(c, float(_pieces[s].info.get("hair_clearance", 0.0)))
 	return c
 

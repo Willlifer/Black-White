@@ -9,7 +9,7 @@ extends BWSkillDef
 
 func _init() -> void:
 	define({
-		"key": "reload", "name": "Reload", "weapon": "pistols", "clip": "",
+		"key": "reload", "name": "Reload", "weapon": "pistols", "clip": "reload",
 		"desc": "Seat a round of your element. Readies the quick shot, and the next shot lays a trail. A round of your own element hits +10%",
 		"plus": "Reload+: seats two rounds, so two trailed shots",
 		"targeting": "self", "needs_element": true, "range": 0, "cd": 0,

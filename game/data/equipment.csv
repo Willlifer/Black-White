@@ -1,49 +1,49 @@
-id,name,slot,weight,stat_lines,ability_id,notes
-feathered_cap,Feathered Cap,head,ranger,dex|spd,deadeye|fletchers_eye,Robin Hood cap; the feather takes the element colour
-feathered_full_helm,Feathered Full Helm,head,heavy,def|con,unflinching|visor,The brief's 'full helm'; plume takes the element colour
-wizard_hat,Wizard Hat,head,wizard,wil|res,imbued|attuned,Band takes the element colour
-baseball_cap,Baseball Cap,head,ranger,spd|dex,heads_up,Logo patch takes the element colour
-tilted_beret,Tilted Beret,head,ranger,dex|wil,flair|encore,Pin takes the element colour; leans dex with a little wil
-tiara,Tiara,head,wizard,res|wil,grace|poise,Centre gem takes the element colour
-crown,Crown,head,wizard,wil|con,royal_presence|heavy_is_the_head,Wizard weight: a crown commands rather than protects. Gems take the element colour
-dragoon_helm,Dragoon Helm,head,heavy,str|def,leap_ready|dragoons_descent,Crest fin takes the element colour
-single_shoulder_guard,Single Shoulder Guard,chest,ranger,def|dex,shoulder_check|brace,One pauldron over bare clothing; light enough for a ranger. Strap takes the element colour
-vest,Vest,chest,ranger,dex|spd,nimble_strength|second_wind,Lining takes the element colour
-chain_mail,Chain Mail,chest,heavy,def|con,woven_rings|ring_guard,Collar trim takes the element colour
-platemail,Platemail,chest,heavy,def|str|con,bastion|guardian|unbowed,The heaviest chest; three stat lines. Tabard takes the element colour
-silken_robe,Silken Robe,chest,wizard,wil|res,ward|insight|mana_veil,Sash takes the element colour
-leather_cuirass,Leather Cuirass,chest,ranger,dex|def,supple|scouts_lead,Stitching takes the element colour
-brigandine,Brigandine,chest,heavy,str|def,steel_under_cloth|hardened,Cloth cover takes the element colour
-scarf,Scarf,chest,wizard,res|spd,flutter|keep_warm,The whole scarf takes the element colour (it is the splash)
-bandolier,Bandolier,chest,ranger,dex|spd,quick_draw|ammo_belt,Cartridge caps take the element colour
-gladiator_chestpiece,Gladiator Chestpiece,chest,heavy,str|con,crowd_pleaser|arena_born,Single-shoulder manica and belt; belt takes the element colour
-chaps,Chaps,legs,ranger,dex|spd,light_footed|sure_stride,Fringe takes the element colour
-platelegs,Platelegs,legs,heavy,def|res,iron_wall|rooted,Knee rivets take the element colour
-leather_tassets,Leather Tassets,legs,heavy,str|def,enrage|bloodied,Heavy weight because Enrage is a str/def ability. Lacing takes the element colour
-robe_bottoms,Robe Bottoms,legs,wizard,wil|res,ward|insight|drift,Hem takes the element colour
-tights,Tights,legs,ranger,spd|dex,acrobat|tumble,Stripe takes the element colour
-sword,Sword,main_hand,sword,str|spd,,The plain duelist blade
-scimitar,Scimitar,main_hand,sword,str|dex,,"Curved, quick; leans dex"
-flamberge,Flamberge,main_hand,sword,str|con,,Wavy two-hander; leans con
-axe,Axe,main_hand,axe,str|con,,
-double_axe,Double Axe,main_hand,axe,str|def,,Brief's 'double axe of cleaving' lives here
-hatchet,Hatchet,main_hand,axe,str|spd,,"Light, throwable"
-warhammer,Warhammer,main_hand,axe,str|def,,Axe class (D9); blunt
-anchor,Anchor,main_hand,axe,str|con,,Axe class (D9); chain-swung
-lance,Lance,main_hand,lance,str|def,,
-javelin,Javelin,main_hand,lance,str|dex,,Throwable
-halberd,Halberd,main_hand,lance,str|def,,Hook and blade
-glaive,Glaive,main_hand,lance,str|spd,,Sweeping blade on a pole
-dagger,Dagger,main_hand,daggers,dex|spd,,
-jagged_dagger,Jagged Dagger,main_hand,daggers,dex|str,,Serrated
-shortbow,Shortbow,main_hand,bow,dex|spd,,
-recurve_bow,Recurve Bow,main_hand,bow,dex|str,,Stands in for the brief's 'longbow'
-compound_bow,Compound Bow,main_hand,bow,dex|def,,
-pistol,Pistol,main_hand,pistols,dex|spd,,
-flintlock,Flintlock,main_hand,pistols,dex|str,,
-m1911,M1911,main_hand,pistols,dex|def,,
-staff,Staff,main_hand,staff,wil|res,,
-moon_staff,Moon Staff,main_hand,staff,wil|spd,,
-hand_wraps,Hand Wraps,main_hand,fists,str|spd,,"Cloth wraps over the knuckles; the light, quick pair. Wrap bands take the element colour"
-brass_knuckles,Brass Knuckles,main_hand,fists,str|dex,,"A four-ring duster over a short wrap; leans dex for crits. The knuckle face takes the element colour"
-gauntlets,Gauntlets,main_hand,fists,str|def,,"Plated fists with a flared cuff; the heavy pair. The knuckle plate takes the element colour"
+id,name,slot,weight,stat_lines,ability_id,notes,hides_hair
+feathered_cap,Feathered Cap,head,ranger,dex|spd,deadeye|fletchers_eye,Robin Hood cap; the feather takes the element colour,top
+feathered_full_helm,Feathered Full Helm,head,heavy,def|con,unflinching|visor,The brief's 'full helm'; plume takes the element colour,all
+wizard_hat,Wizard Hat,head,wizard,wil|res,imbued|attuned,Band takes the element colour,top
+baseball_cap,Baseball Cap,head,ranger,spd|dex,heads_up,Logo patch takes the element colour,top
+tilted_beret,Tilted Beret,head,ranger,dex|wil,flair|encore,Pin takes the element colour; leans dex with a little wil,top
+tiara,Tiara,head,wizard,res|wil,grace|poise,Centre gem takes the element colour,none
+crown,Crown,head,wizard,wil|con,royal_presence|heavy_is_the_head,Wizard weight: a crown commands rather than protects. Gems take the element colour,none
+dragoon_helm,Dragoon Helm,head,heavy,str|def,leap_ready|dragoons_descent,Crest fin takes the element colour,all
+single_shoulder_guard,Single Shoulder Guard,chest,ranger,def|dex,shoulder_check|brace,One pauldron over bare clothing; light enough for a ranger. Strap takes the element colour,
+vest,Vest,chest,ranger,dex|spd,nimble_strength|second_wind,Lining takes the element colour,
+chain_mail,Chain Mail,chest,heavy,def|con,woven_rings|ring_guard,Collar trim takes the element colour,
+platemail,Platemail,chest,heavy,def|str|con,bastion|guardian|unbowed,The heaviest chest; three stat lines. Tabard takes the element colour,
+silken_robe,Silken Robe,chest,wizard,wil|res,ward|insight|mana_veil,Sash takes the element colour,
+leather_cuirass,Leather Cuirass,chest,ranger,dex|def,supple|scouts_lead,Stitching takes the element colour,
+brigandine,Brigandine,chest,heavy,str|def,steel_under_cloth|hardened,Cloth cover takes the element colour,
+scarf,Scarf,chest,wizard,res|spd,flutter|keep_warm,The whole scarf takes the element colour (it is the splash),
+bandolier,Bandolier,chest,ranger,dex|spd,quick_draw|ammo_belt,Cartridge caps take the element colour,
+gladiator_chestpiece,Gladiator Chestpiece,chest,heavy,str|con,crowd_pleaser|arena_born,Single-shoulder manica and belt; belt takes the element colour,
+chaps,Chaps,legs,ranger,dex|spd,light_footed|sure_stride,Fringe takes the element colour,
+platelegs,Platelegs,legs,heavy,def|res,iron_wall|rooted,Knee rivets take the element colour,
+leather_tassets,Leather Tassets,legs,heavy,str|def,enrage|bloodied,Heavy weight because Enrage is a str/def ability. Lacing takes the element colour,
+robe_bottoms,Robe Bottoms,legs,wizard,wil|res,ward|insight|drift,Hem takes the element colour,
+tights,Tights,legs,ranger,spd|dex,acrobat|tumble,Stripe takes the element colour,
+sword,Sword,main_hand,sword,str|spd,,The plain duelist blade,
+scimitar,Scimitar,main_hand,sword,str|dex,,"Curved, quick; leans dex",
+flamberge,Flamberge,main_hand,sword,str|con,,Wavy two-hander; leans con,
+axe,Axe,main_hand,axe,str|con,,,
+double_axe,Double Axe,main_hand,axe,str|def,,Brief's 'double axe of cleaving' lives here,
+hatchet,Hatchet,main_hand,axe,str|spd,,"Light, throwable",
+warhammer,Warhammer,main_hand,axe,str|def,,Axe class (D9); blunt,
+anchor,Anchor,main_hand,axe,str|con,,Axe class (D9); chain-swung,
+lance,Lance,main_hand,lance,str|def,,,
+javelin,Javelin,main_hand,lance,str|dex,,Throwable,
+halberd,Halberd,main_hand,lance,str|def,,Hook and blade,
+glaive,Glaive,main_hand,lance,str|spd,,Sweeping blade on a pole,
+dagger,Dagger,main_hand,daggers,dex|spd,,,
+jagged_dagger,Jagged Dagger,main_hand,daggers,dex|str,,Serrated,
+shortbow,Shortbow,main_hand,bow,dex|spd,,,
+recurve_bow,Recurve Bow,main_hand,bow,dex|str,,Stands in for the brief's 'longbow',
+compound_bow,Compound Bow,main_hand,bow,dex|def,,,
+pistol,Pistol,main_hand,pistols,dex|spd,,,
+flintlock,Flintlock,main_hand,pistols,dex|str,,,
+m1911,M1911,main_hand,pistols,dex|def,,,
+staff,Staff,main_hand,staff,wil|res,,,
+moon_staff,Moon Staff,main_hand,staff,wil|spd,,,
+hand_wraps,Hand Wraps,main_hand,fists,str|spd,,"Cloth wraps over the knuckles; the light, quick pair. Wrap bands take the element colour",
+brass_knuckles,Brass Knuckles,main_hand,fists,str|dex,,A four-ring duster over a short wrap; leans dex for crits. The knuckle face takes the element colour,
+gauntlets,Gauntlets,main_hand,fists,str|def,,Plated fists with a flared cuff; the heavy pair. The knuckle plate takes the element colour,

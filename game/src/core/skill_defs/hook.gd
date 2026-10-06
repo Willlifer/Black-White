@@ -11,7 +11,7 @@ const RANGE := 3
 
 func _init() -> void:
 	define({
-		"key": "hook", "name": "Hook", "weapon": "axe", "clip": "",
+		"key": "hook", "name": "Hook", "weapon": "axe", "clip": "hook",
 		"desc": "Hook an enemy up to 3 tiles away and haul it in next to you, onto whatever ground is there",
 		"targeting": "unit", "needs_element": true, "range": RANGE, "cd": CD,
 		"power": POWER,

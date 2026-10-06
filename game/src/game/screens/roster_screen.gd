@@ -330,10 +330,9 @@ func _select(i: int) -> void:
 	_set_face(u)
 	BWPortraits.portrait(u)         # D156: render on hover, so a pick's slot is ready when it lands
 	var el := BWLook.element_color(u.element).to_html(false)
-	var w := BWData.row("equipment", u.weapon_model)
-	var wname := BWText.label(w.get("name", u.weapon_model))
-	# "Flamberge (sword)", but just "Axe" when the model is the class itself.
-	var wtext := wname if wname.to_lower() == u.weapon_class else "%s (%s)" % [wname, BWText.weapon(u.weapon_class)]
+	# "Flamberge (Sword)", but just "Axe" when the model is the class itself (D218: BWText).
+	var wname := BWText.model_name(u.weapon_model, u.weapon_class)
+	var wtext := BWText.weapon(u.weapon_class) if wname == "" else "%s (%s)" % [wname, BWText.weapon(u.weapon_class)]
 	_stats.text = "[font_size=24][b]%s[/b][/font_size]   [color=#999999]%s[/color]\n" % [u.name, BWText.label(u.friendliness)] \
 		+ "[color=#%s]■[/color] %s      %s\n" % [el, u.element.capitalize(), wtext] \
 		+ "\n" + _bars(u)

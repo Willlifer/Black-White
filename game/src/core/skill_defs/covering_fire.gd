@@ -10,7 +10,7 @@ const RADIUS := 3
 
 func _init() -> void:
 	define({
-		"key": "covering_fire", "name": "Covering Fire", "weapon": "pistols", "clip": "",
+		"key": "covering_fire", "name": "Covering Fire", "weapon": "pistols", "clip": "aim",
 		"desc": "Watch your allies: until your next turn, the first enemy to attack an ally within 3 tiles of you gets shot (if it's in range)",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0, "radius": RADIUS,

@@ -12,6 +12,8 @@ extends Node
 ##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
 ##   --screen <title|roster|prep|rooms|prebattle|downtime|results>   open one screen on a sample run
 ##   --ui-probe                  drive combat with synthetic input and check it responds
+##   --tutorial                  open the tutorial (D223); --tutorial-probe steps through all of it
+##                               with synthetic input (SHOTS=<dir>: review frames), exit 0 = completed
 ##   --flow-probe                walk the real game through every screen transition
 ##   --ui-shots [dir]            render roster / codex / loading / results review frames
 ##                               to <dir>/ui_*.png (default design/art), then quit
@@ -29,7 +31,7 @@ extends Node
 const REPORT_PATH := "user://self_test_report.json"
 ## D124: runs that must not see (or change) the player's saved settings.
 const ISOLATED_FLAGS := ["--defaults", "--self-test", "--pace", "--forecast", "--ui-probe", "--flow-probe",
-	"--ui-shots", "--audio-capture", "--shot", "--autoplay"]
+	"--ui-shots", "--audio-capture", "--shot", "--autoplay", "--tutorial-probe"]
 
 
 func _ready() -> void:
@@ -51,6 +53,7 @@ func _ready() -> void:
 	BWMusic.ensure(self)
 	BWEsc.ensure(self)                              # ---- D171: Esc closes the newest open window
 	BWSettings.apply_all()                          # ---- D124: volumes (buses exist now), window, UI size
+	BWShaderWarm.start(self)                        # ---- D232 (L-6): VFX shaders warm offscreen under the first screen
 	for n in [BWMusic._inst, BWSfx._inst]:          # ---- D124: music and UI sounds carry on under the pause menu
 		if n and is_instance_valid(n):
 			n.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -75,6 +78,15 @@ func _ready() -> void:
 		return
 	if "--ui-probe" in args:
 		add_child(BWUIProbe.new())
+		return
+	if "--tutorial-probe" in args:                  # ---- D223: step through the whole tutorial
+		add_child(BWTutorialProbe.new())
+		return
+	if "--tutorial" in args:                        # ---- D223: open the tutorial straight away
+		var tut := BWTutorial.new()
+		tut.finished.connect(func(_c): get_tree().quit())
+		add_child(tut)
+		BWMusic.play("combat")
 		return
 	if "--screen" in args:
 		_one_screen(_arg(args, "--screen", "title"))

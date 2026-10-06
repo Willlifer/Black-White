@@ -126,6 +126,17 @@ var _act_next := 0.0
 var _seq: Array = []              # handling clips still to play (out, then in)
 var _last_act := ""
 var _hand_lead := false           # the next push leads the hands back from a hold
+## D219-D220: the special encounter this body belongs to ("" = none):
+## "colossus", "grunt", "blank", "being" (BWAnimEncounter's header).
+var encounter := ""
+## The figure's world scale (BWCharacter sets it; the Colossus's 2.6): a
+## gait's rate is the root speed over the clip speed times this, so a big
+## stride isn't played at a small one's cadence.
+var body_scale := 1.0
+var _enc_t := 0.0
+var _enc_w := 0.0                 # the blank's / being's layer weight (eased)
+var _enc_pace := 1.0              # grunt: its own walking pace
+var _base := {}                   # the set's guard (the blank holds it)
 
 
 func _init(c: BWCharacter, set_name: String) -> void:
@@ -147,14 +158,27 @@ func _init(c: BWCharacter, set_name: String) -> void:
 	if str(actions.walk.clip) == "walk":
 		actions.walk = { "clip": str(personality.walk) }
 	_rng.seed = absi(hash(uid + "|idle"))
+	_encounter_setup(c.unit)
 	_idle_next = _next_interval()
 	_hold_next = _rng.randf_range(0.25, 0.7) * float(_hiv()[1])
 	_act_next = _rng.randf_range(0.3, 0.8) * float(_aiv()[1])
 
 
 ## True when this set has a clip for the pose (otherwise play() holds the static key).
+## A clip's own name is a pose too (idle_look, cheer_cool, stricken ...: the
+## hall asks for them by name, D222).
 func has_clip(pose_name: String) -> bool:
-	return actions.has(pose_name) and library.has_animation(StringName(str(actions[pose_name].clip)))
+	var act := _act(pose_name)
+	return not act.is_empty() and library.has_animation(StringName(str(act.clip)))
+
+
+## The action for a pose name: actions_for's route, else a clip of that name.
+func _act(pose_name: String) -> Dictionary:
+	if actions.has(pose_name):
+		return actions[pose_name]
+	if pose_name != "" and library != null and library.has_animation(StringName(pose_name)):
+		return { "clip": pose_name }
+	return {}
 
 
 func clip_meta(clip: String) -> Dictionary:
@@ -191,14 +215,14 @@ func _clip_for(pose_name: String) -> String:
 		return "limp"
 	if pose_name == "idle" and hold != "guard" and library.has_animation(StringName(BWAnimHandling.loop_clip(hold))):
 		return BWAnimHandling.loop_clip(hold)
-	return str(actions[pose_name].clip)
+	return str(_act(pose_name).clip)
 
 
 ## Request a pose. blend < 0: the BLENDS table; 0: snap (stills, tests: a
 ## clip snaps to its "pose" marker).
 func play(pose_name: String, blend: float = -1.0) -> void:
 	var top: Dictionary = layers.back() if not layers.is_empty() else {}
-	var act: Dictionary = actions.get(pose_name, {})
+	var act: Dictionary = _act(pose_name)
 	if not pose_name in ["run", "run_stop"]:
 		run_rate = -1.0
 	if act.is_empty() or not library.has_animation(StringName(str(act.clip))):
@@ -220,7 +244,13 @@ func play(pose_name: String, blend: float = -1.0) -> void:
 			top.hold = -1.0                          # windup -> strike: release the coil
 			pending = ""
 			return
-	if pose_name == "idle" and not top.is_empty() and _is_oneshot(top) and not top.ended and blend != 0.0:
+		if top.hold >= 0.0 and is_equal_approx(hold, float(top.hold)):
+			current = pose_name
+			return                                   # D221: already holding this coil (a dash's windup, then the cutscene's)
+	# a one-shot runs out before idle; a held anticipation (aim, a dash's
+	# coil) has no end, so idle takes over from it (D221)
+	var held: bool = not top.is_empty() and top.kind == "clip" and float(top.get("hold", -1.0)) >= 0.0
+	if pose_name == "idle" and not top.is_empty() and _is_oneshot(top) and not top.ended and blend != 0.0 and not held:
 		pending = "idle"                             # let the action finish; it ends on idle
 		if bool(top.get("variant", false)):
 			current = "idle"
@@ -241,6 +271,8 @@ func play(pose_name: String, blend: float = -1.0) -> void:
 			return
 	var l := _clip_layer(clip)
 	l.hold = hold
+	if act.has("from"):
+		l.t = float(clip_meta(clip).get("markers", {}).get(str(act.from), 0.0))   # D221: war_cry, land
 	var after: Dictionary = act.get("after", {})
 	if not top.is_empty() and after.has(str(top.get("clip", ""))):
 		l.t = float(clip_meta(clip).get("markers", {}).get(str(after[top.clip]), 0.0))
@@ -554,7 +586,16 @@ func handle(what: String) -> bool:
 ## fits the cruise, so the stop starts on a contact.
 func plan_move(distance: float, hexes: int) -> Dictionary:
 	var ramp := 0.22
-	if not wounded and hexes >= 2 and has_clip("run") and library.has_animation(&"run_start") and library.has_animation(&"run_stop"):
+	if encounter == "being":
+		# D220: a Being glides (no steps): a trapezoid at the glide speed
+		var gd := distance / GLIDE_SPEED + 0.3
+		var gs := func(t: float) -> float:
+			return BWCombatScreen._trapezoid(t, gd, 0.3) * distance
+		return { "gait": "glide", "pose": "walk", "dur": gd, "stop_at": -1.0, "s": gs, "rate": -1.0 }
+	if encounter == "colossus" and character and character.is_inside_tree():
+		body_scale = character.global_basis.get_scale().y
+	var walks_only := encounter in ["colossus", "blank", "grunt"]   # D219/D220: no runs (the Horde shuffles)
+	if not wounded and not walks_only and hexes >= 2 and has_clip("run") and library.has_animation(&"run_start") and library.has_animation(&"run_stop"):
 		var st: Dictionary = clip_meta("run_start")
 		var sp: Dictionary = clip_meta("run_stop")
 		var rm: Dictionary = clip_meta(str(actions.run.clip))
@@ -567,7 +608,7 @@ func plan_move(distance: float, hexes: int) -> Dictionary:
 			var t_s := (rs.size() - 1) / hz
 			var t_e := float(sp.get("root_end", (re.size() - 1) / hz))
 			var d_e := _curve(re, t_e * hz)
-			var V := float(rm.speed)
+			var V := float(rm.speed) * _enc_pace
 			var half := float(rm.stride) * 0.5
 			var cruise := distance - d_s - d_e
 			if cruise >= half * 0.6:
@@ -583,7 +624,10 @@ func plan_move(distance: float, hexes: int) -> Dictionary:
 				return { "gait": "run", "pose": "run", "dur": t_s + tc + t_e, "stop_at": t_s + tc, "s": s, "rate": rate }
 	# a careful walk (one hex) or the limp: the style bar's trapezoid at the clip speed
 	var clip := "limp" if wounded and library.has_animation(&"limp") else str(actions.get("walk", {}).get("clip", "walk"))
-	var sp2 := float(clip_meta(clip).get("speed", 0.0))
+	var sp2 := float(clip_meta(clip).get("speed", 0.0)) * _enc_pace
+	if encounter == "colossus":
+		sp2 *= body_scale              # D219: its stride is 2.6x; the clip's speed is in model units
+		ramp = 0.45                    # and it gets going slowly
 	if sp2 <= 0.0:
 		return {}
 	var dur2 := distance / sp2 + ramp
@@ -670,6 +714,9 @@ func update(delta: float) -> void:
 	for i in range(1, layers.size()):
 		var l: Dictionary = layers[i]
 		pose = _blend(pose, _sample(l), l)
+	if encounter != "":
+		pose = pose.duplicate(true)          # (a key layer's pose is shared: never write into it)
+		_encounter_layer(pose, delta)
 	if secondary_enabled:
 		_motion_layer(pose, delta)
 	if lock_enabled:
@@ -714,7 +761,8 @@ func _advance(delta: float) -> void:
 			elif run_rate > 0.0 and str(l.clip).begins_with("run"):
 				rate = run_rate
 			elif sp > 0.0:
-				rate = clampf(Vector2(velocity.x, velocity.z).length() / sp, 0.0, 1.6)
+				var sc := body_scale if encounter == "colossus" else 1.0
+				rate = clampf(Vector2(velocity.x, velocity.z).length() / (sp * sc), 0.0, 1.6)
 		elif l.loop and str(l.clip) in ["idle", "idle_bouncy", "wounded"]:
 			rate = float(personality.get("rate", 1.0))
 		l.rate = rate
@@ -873,6 +921,140 @@ func _reframe(p: Dictionary, frame: String, target: Dictionary) -> Dictionary:
 		d.frame = frame
 		q[h] = d
 	return q
+
+
+# ------------------------------------------------------------ encounters
+
+const GLIDE_SPEED := 2.4          ## a Being's glide (u/s)
+const BEING_HOVER := 0.17         ## a Being floats this high (m), +- BEING_BOB
+const BEING_BOB := 0.025
+const BLANK_LOOK := 2.6           ## the Blanks' shared head-turn beat (s)
+const BLANK_SNAP := 0.11          ## ... each turn takes this long: a snap, then dead still
+## The Blanks' head yaw / tilt per beat (radians); one shared sequence.
+const BLANK_LOOKS := [[0.0, 0.0], [0.75, 0.0], [0.75, 0.0], [0.0, 0.0], [-0.65, 0.0], [-0.65, 0.26], [0.0, 0.0], [0.0, -0.22]]
+
+
+## D219-D220: the encounter's own routes and pace (see BWAnimEncounter).
+func _encounter_setup(u: BWUnit) -> void:
+	encounter = str(u.encounter) if u != null else ""
+	if encounter == "":
+		return
+	var uid := u.id
+	_base = BWAnimClips.base_channels(set_id)
+	match encounter:
+		"colossus":
+			rotate_idles = false                  # a giant doesn't twirl its spear
+			personality.rate = 0.8
+			if library.has_animation(&"walk_colossus"):
+				actions.walk = { "clip": "walk_colossus" }
+				actions.run = { "clip": "walk_colossus" }
+				actions.run_stop = { "clip": "stomp_colossus" }
+				actions.stomp = { "clip": "stomp_colossus" }
+			if library.has_animation(&"strike_colossus"):
+				actions.windup = { "clip": "strike_colossus", "hold": "coil" }
+				actions.strike = { "clip": "strike_colossus" }
+		"grunt":
+			# out of step: each grunt its own pace and breathing rate
+			var h := float(absi(hash(uid + "|pace")) % 1000) / 1000.0
+			_enc_pace = lerpf(0.82, 1.12, h)
+			personality.rate = float(personality.get("rate", 1.0)) * lerpf(0.9, 1.15, 1.0 - h)
+			var jab := "strike_axe_jab" if weapon_class == "axe" else "strike_jab"
+			if library.has_animation(StringName(jab)):
+				actions.windup = { "clip": jab, "hold": "coil" }
+				actions.strike = { "clip": jab }
+		"blank":
+			rotate_idles = false                  # economy: no weapon play, no fidgets
+			actions.walk = { "clip": "walk_calm" if library.has_animation(&"walk_calm") else "walk" }
+			actions.idle = { "clip": "idle" }
+		"being":
+			rotate_idles = false
+			actions.idle = { "clip": "idle" }
+			actions.walk = { "clip": "idle" }     # it glides: no steps
+			actions.run = { "clip": "idle" }
+
+
+## The encounter's runtime layer, on the blended clip pose (any set).
+func _encounter_layer(p: Dictionary, delta: float) -> void:
+	_enc_t += delta
+	var top: Dictionary = layers.back()
+	var clip := str(top.get("clip", ""))
+	var gait: bool = top.kind == "clip" and clip_meta(clip).has("gait")
+	var standing: bool = current == "idle" and top.kind == "clip" and bool(top.loop) and not gait
+	match encounter:
+		"grunt":
+			# hunched: over at the spine and chest, chin up to see, knees bent
+			p.spine = (p.spine as Vector3) + Vector3(0.12, 0, 0)
+			p.chest = (p.chest as Vector3) + Vector3(0.07, 0, 0)
+			p.head = (p.head as Vector3) + Vector3(-0.15, 0, 0)
+			p.root = (p.root as Vector3) + Vector3(0, -0.035, 0)
+			if gait:
+				# the shuffle: the swing foot barely leaves the floor
+				for sd in ["l", "r"]:
+					var f: Dictionary = p["foot_" + sd]
+					var r: Vector3 = f.rot
+					var yf := BWAnimClips.ankle(Vector2.ZERO, r.x, r.y).y
+					var pos: Vector3 = f.pos
+					pos.y = yf + maxf(pos.y - yf, 0.0) * 0.5
+					f.pos = pos
+		"blank":
+			# economy of motion: standing dead still at the guard with exact
+			# head turns on a clock shared by every Blank; walking, only the legs
+			var want := 1.0 if standing or (gait and current == "walk") else 0.0
+			_enc_w = move_toward(_enc_w, want, delta * 7.0)
+			if _enc_w <= 0.0:
+				return
+			var w := smoothstep(0.0, 1.0, _enc_w)
+			var look := _blank_look() if standing else Vector2.ZERO
+			var still := {
+				"hips": _base.hips, "spine": (_base.spine as Vector3) + (Vector3(0.03, 0, 0) if gait else Vector3.ZERO),
+				"chest": (_base.chest as Vector3) + Vector3(0, look.x * 0.35, 0), "neck": _base.neck,
+				"head": (_base.head as Vector3) + Vector3(0, look.x * 0.65, look.y),
+			}
+			for k in still:
+				p[k] = (p[k] as Vector3).lerp(still[k], w)
+			var root: Vector3 = p.root
+			var br: Vector3 = _base.root
+			p.root = Vector3(lerpf(root.x, br.x, w), lerpf(root.y, br.y - (0.02 if gait else 0.0), w), root.z)
+			p.squash = lerpf(float(p.get("squash", 0.0)), 0.0, w)
+			p.head_sq = lerpf(float(p.get("head_sq", 0.0)), 0.0, w)
+			for h in ["hand_r", "hand_l"]:
+				var d: Dictionary = p[h]
+				if str(d.get("frame", "chest")) != "chest":
+					continue
+				d.pos = (d.pos as Vector3).lerp(_base[h + "_pos"], w)
+				d.aim = (d.aim as Vector3).lerp(_base[h + "_aim"], w).normalized()
+		"being":
+			# hovering: no contacts (the lock lets the feet hang), toes down,
+			# a slow bob; leaning into a glide. A knocked-out Being drops.
+			var want := 0.0 if clip == "fall" else 1.0
+			_enc_w = move_toward(_enc_w, want, delta * (4.0 if want > 0.0 else 6.0))
+			var w := smoothstep(0.0, 1.0, _enc_w)
+			var ph := float(absi(hash(character.unit.id if character and character.unit else "b")) % 628) / 100.0
+			var h := (BEING_HOVER + BEING_BOB * sin(_enc_t * 1.6 + ph)) * w
+			var v := clampf(Vector2(velocity.x, velocity.z).length() / GLIDE_SPEED, 0.0, 1.0)
+			p.root = (p.root as Vector3) + Vector3(0, h, 0)
+			p.spine = (p.spine as Vector3) + Vector3(0.16 * v * w, 0, 0)
+			p.head = (p.head as Vector3) + Vector3(-0.1 * v * w, 0, 0)
+			for sd in ["l", "r"]:
+				var f: Dictionary = p["foot_" + sd]
+				var pos: Vector3 = f.pos
+				var r: Vector3 = f.rot
+				var hang := 0.55 + 0.06 * sin(_enc_t * 1.6 + ph - 0.5 + (0.4 if sd == "r" else 0.0))
+				pos.y += h * 0.92 + 0.03 * w
+				pos.z -= 0.12 * v * w
+				f.pos = pos
+				f.rot = Vector3(lerpf(r.x, hang, w), r.y, r.z)
+				p["contact_" + sd] = lerpf(float(p.get("contact_" + sd, 1.0)), 0.0, w)
+
+
+## The Blanks' shared head turn now: (yaw, tilt), snapped between held beats.
+func _blank_look() -> Vector2:
+	var t := Time.get_ticks_msec() / 1000.0
+	var k := int(floor(t / BLANK_LOOK))
+	var a: Array = BLANK_LOOKS[posmod(k, BLANK_LOOKS.size())]
+	var b: Array = BLANK_LOOKS[posmod(k - 1, BLANK_LOOKS.size())]
+	var u := smoothstep(0.0, BLANK_SNAP, t - k * BLANK_LOOK)
+	return Vector2(lerpf(float(b[0]), float(a[0]), u), lerpf(float(b[1]), float(a[1]), u))
 
 
 # ------------------------------------------------------------ motion layer

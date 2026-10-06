@@ -10,7 +10,7 @@ const TURNS := 2
 
 func _init() -> void:
 	define({
-		"key": "war_cry", "name": "War Cry", "weapon": "axe", "clip": "cheer",
+		"key": "war_cry", "name": "War Cry", "weapon": "axe", "clip": "war_cry",
 		"desc": "Roar (uses your action): +20% STR for your next 2 turns",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0,

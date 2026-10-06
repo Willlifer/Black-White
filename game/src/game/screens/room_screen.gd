@@ -235,7 +235,8 @@ func _enemy(e: BWUnit, i: int, det: Array, count: int = 1) -> Control:
 	var n := _small(e.name if count <= 1 else "%s  ×%d" % [e.name.rstrip("0123456789 "), count], BWStyle.F_BODY, BWStyle.TEXT)
 	col.add_child(n)
 	var ec := BWGearText.readable(BWLook.element_color(e.element))
-	var el := _small("◆ " + BWText.label(e.element) if e.element != "" else "No element", BWStyle.F_SMALL, ec)
+	var el := _small("◆ " + BWKanji.prefix(e.element) + BWText.label(e.element) if e.element != "" else "No element", BWStyle.F_SMALL, ec)
+	BWKanji.fallback(el)                                   # D231: the kanji, when on
 	col.add_child(el)
 	col.add_child(_small(("Melee weapons" if count > 1 else "%s (%s)" % [BWText.weapon(e.weapon_class), e.expertise_letter(e.weapon_class)]) + "  ·  Lv %d" % e.level,
 		BWStyle.F_SMALL, BWStyle.LABEL))

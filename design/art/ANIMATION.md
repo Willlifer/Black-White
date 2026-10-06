@@ -16,6 +16,9 @@ remain only as a safety fallback.
 | `.../anim_react.gd` | `BWAnimReact`: stricken, block, fumble, dodge, kneel, fall | **yes, source** |
 | `.../anim_stricken.gd` | `BWAnimStricken`: the five hit variants (flinch, shrug, stumble, knockback, rage) per style | **yes, source** |
 | `.../anim_handling.gd` | `BWAnimHandling`: weapon handling (D80): holds, their transitions, the handling actions, per style | **yes, source** |
+| `.../anim_skill.gd` | `BWAnimSkill` (D221): brace, leap, strike_thrust / _sweep / _throw(_l) / _hook / _grapple / _hundred, and the skill pose routes (war_cry, aim, reload, tumble, land) | **yes, source** |
+| `.../anim_encounter.gd` | `BWAnimEncounter` (D219-D220): walk_colossus, stomp_colossus, strike_colossus, the Horde's jab; the runtime layer is `BWAnimator._encounter_layer` | **yes, source** |
+| `game/src/game/combat/clip_route.gd` | `BWClipRoute` (D221): which clip an action plays (cast vs strike, setup poses, multi-blow clips, status poses); `tools/anim_audit.gd` prints the table | yes |
 | `game/src/game/combat/reaction_pick.gd` | `BWReactionPick`: which reaction a blow gets (the table below) | yes |
 | `game/src/game/combat/projectile_flight.gd` | `BWProjectileFlight`: arrow / bullet / bolt in flight, stick, muzzle flash | yes |
 | `game/tools/build_anims.gd` | bakes every set to `art/animations/<style>.res` (9 sets incl. fists, about 400 ms each) | yes |
@@ -733,3 +736,36 @@ reach directly.
 - **Flights:** `game/src/game/combat/vfx_ranged.gd` (`BWRangedVFX`), one node, one `_process`, a POOL of 96 arrows prewarmed when a bow is on the field. Flat shots (34 u/s, faint trail) stick in the chest and ride the bone; misses fly past and skitter behind; Split fans three; Energized pierces through and on into the ground; Pinning sticks at the feet while the target is Pinned; Dualthrow spins the dagger end over end. Stuck arrows fade after 1.5 s.
 - **Arcing Shot / Rain of Arrows** are played whole by `play_area` (camera by tier, callout, clip, arrows, impacts, numbers). Arcing: one arrow on a tall arc to the centre; the blast hexes light from the centre out, a white star, ink debris, a shake. Rain: the volley leaves the bow skyward (one per release marker), a shadow (`shaders/volley_shadow.gdshader`) sweeps over the 19 hexes, 2-4 arrows per hex land over ~1 s (0.3 s while hold-to-skip), each target's number pops on its hex's first strike.
 - **Review:** `godot --path . --resolution 1600x900 -s res://tools/ranged_preview.gd` (→ `design/art/ranged_bow_sheet.png`); `SHOTS=<dir> MODE=flat|miss|aimed|arcing|rain|split|pierce|pin|throw godot --path . --script res://tools/ranged_shots.gd` then `python tools/ranged_strip.py <dir>/<mode>_frames design/art/ranged_<mode> 12` (→ `ranged_flat|arcing|rain.png/.gif`); `MODE=perf` prints Rain's frame times.
+
+
+## Encounters and the fit sweep (D219-D222)
+
+The full table and its reasons: `design/art/ANIMATION-AUDIT.md`.
+
+- **Colossus** (polearm set, D219): `walk_colossus` (32 f, stance 0.62, lift
+  0.16, a step every 0.67 s; the body drops onto each plant; `step` /
+  `step_r` markers shake the camera through `BWCombatScreen._footfalls`),
+  `stomp_colossus` on arrival (`stomp` shakes harder), `strike_colossus`
+  (64 f: coil 22 held by the windup, launch 26, land 30, hit 31, a held
+  follow-through to 46, engage 99 so no dash, no bolt). It never runs; its
+  gait rate divides by `BWAnimator.body_scale` (2.6). The line thrust's later
+  strikes join the first cutscene (`_take_line`).
+- **Runtime layer** (`BWAnimator._encounter_layer`, any set, D220): grunts
+  hunch and shuffle at their own pace and jab (`strike_jab`,
+  `strike_axe_jab`: `BWAnimEncounter.jab` retimes the class strike to 22 f,
+  the wind-up at 60%); Blanks hold the guard still with head snaps on a
+  shared clock and walk with only their legs; Beings hover (contacts off),
+  glide (`plan_move` gait "glide"), flicker (`BWCharacter._update_flicker`)
+  and cast every attack.
+- **Skills** (D221): the defs' `clip` names the pose; `BWAnimSkill.actions`
+  maps it per style. Setup beats play their pose (`brace`, `war_cry` = the
+  rage from `catch`, `aim` = the strike held at its coil, `reload` =
+  `act_check`, `tumble` = the dodge); a staff channels and casts at the tile.
+  A weapon skill at range strikes (the bolt leaves on the hit). Flurry's and
+  Hundred Fists' later strikes land on `hit2..` (`_take_strikes`). A charge
+  rides in on its held coil; `idle` takes over from a held coil.
+- **Poses** (D222): any clip name is a pose (`BWAnimator._act`); Staggered
+  plays the stumble, Blinded the flinch.
+- Review: `godot --path . --resolution 1600x900 --script
+  res://tools/anim2_shots.gd [-- --only colossus_walk|colossus_thrust|being|horde|blank|jab]`
+  (-> `design/art/anim2_*.png`); skill strips through `anim_preview.gd --only strip`.

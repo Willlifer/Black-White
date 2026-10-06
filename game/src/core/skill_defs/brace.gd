@@ -11,7 +11,7 @@ const GUARD_PCT := 25
 
 func _init() -> void:
 	define({
-		"key": "brace", "name": "Brace", "weapon": "fists", "clip": "block",
+		"key": "brace", "name": "Brace", "weapon": "fists", "clip": "brace",
 		"desc": "Free: brace yourself. You take 25% less damage until your next turn, and your next Flurry throws one more strike",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0, "free_action": true,

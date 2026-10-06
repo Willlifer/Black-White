@@ -391,39 +391,94 @@ static func draw_stone(ci: CanvasItem, s: Vector2, bright: bool) -> void:
 		ci.draw_line(Vector2(cx - s.x * 0.06, y), Vector2(cx + s.x * 0.06, y), line, 1.5)
 
 
-## V8 hp_bar.gd, in black and white: outline, dark well, a white fill (grey
-## for enemies), a sheen, and a tick every 10 HP (heavier every 100).
+## D215: the HP bar. At or above 50% HP the fill is BLACK with WHITE pips,
+## below 50% it is WHITE with BLACK pips; pips mark every 10% of max HP (9
+## ticks). A two-ring outline (the fill's opposite inside, its own colour
+## outside) reads on dark panels and light ones. A drop leaves a mid-grey
+## ghost that drains; the forecast cut (`preview`) is the same grey. Crossing
+## 50% pulses once. No numbers unless the bar or its card (the nearest
+## PanelContainer, or a row that takes the mouse) is hovered: then "hp / max"
+## sits on the bar (bars under 9 px tall stay silent; their icons carry a tooltip).
 class HPBar:
 	extends Control
 	var hp := 100
 	var max_hp := 100
-	var preview := -1        # forecast: HP after the hit, drawn as a lighter cut
-	var enemy := false
+	var preview := -1        # forecast: HP after the hit, drawn as a grey cut
+	var enemy := false       # kept for callers; the colour follows HP now (D215)
+	var track := false       # one unit for life (a stone's row): animate the ghost and the flip
+	var _ghost := -1.0       # fraction the grey chunk drains from (-1 = none)
+	var _ghost_tw: Tween
+	var _pulse := 0.0
+	var _hover := false
+	var _host: Control
 
 	func _init(px: Vector2 = Vector2(112, 11)) -> void:
 		custom_minimum_size = px
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func set_hp(v: int, m: int, after: int = -1) -> void:
+		var old_f := clampf(float(hp) / max_hp, 0.0, 1.0)
+		var same_unit := track and m == max_hp
 		hp = v
 		max_hp = maxi(m, 1)
 		preview = after
+		var f := clampf(float(hp) / max_hp, 0.0, 1.0)
+		if same_unit and is_inside_tree() and f < old_f - 0.001:
+			if _ghost_tw and _ghost_tw.is_valid():
+				_ghost_tw.kill()
+			_ghost = maxf(_ghost, old_f)
+			_ghost_tw = create_tween()
+			_ghost_tw.tween_interval(0.35)
+			_ghost_tw.tween_method(func(x: float): _ghost = x; queue_redraw(), _ghost, f, 0.45)
+			_ghost_tw.tween_callback(func(): _ghost = -1.0; queue_redraw())
+		if same_unit and is_inside_tree() and (f >= 0.5) != (old_f >= 0.5):
+			var tw := create_tween()
+			tw.tween_method(func(x: float): _pulse = x; queue_redraw(), 1.0, 0.0, 0.3)
 		queue_redraw()
+
+	func _ready() -> void:
+		var n := get_parent()
+		while n is Control:
+			if n is PanelContainer or (n as Control).mouse_filter == Control.MOUSE_FILTER_STOP:
+				_host = n
+				break
+			n = n.get_parent()
+
+	func _process(_d: float) -> void:
+		if size.y < 9.0 or not is_visible_in_tree():
+			return
+		var r := (_host if is_instance_valid(_host) else self).get_global_rect()
+		var h := r.has_point(get_global_mouse_position()) or get_global_rect().grow(4).has_point(get_global_mouse_position())
+		if h != _hover:
+			_hover = h
+			queue_redraw()
 
 	func _draw() -> void:
 		var s := size
-		draw_rect(Rect2(Vector2(-1, -1), s + Vector2(2, 2)), Color(0, 0, 0, 0.85))
-		draw_rect(Rect2(Vector2.ZERO, s), Color(0.06, 0.06, 0.07))
 		var f := clampf(float(hp) / max_hp, 0.0, 1.0)
-		var fill := BWStyle.ENEMY_FILL if enemy else BWStyle.PLAYER_FILL
-		draw_rect(Rect2(Vector2.ZERO, Vector2(s.x * f, s.y)), fill)
+		var bright := f >= 0.5
+		var fc := Color.BLACK if bright else Color.WHITE
+		var oc := Color.WHITE if bright else Color.BLACK
+		var grow := 1.5 * _pulse                     # the 50% flip: a quick swell
+		var r := Rect2(Vector2(-grow, -grow), s + Vector2(grow, grow) * 2.0)
+		draw_rect(r.grow(2), fc)                     # outer ring: the fill's own colour
+		draw_rect(r.grow(1), oc)                     # inner ring: its opposite
+		draw_rect(r, Color(0.8, 0.8, 0.8) if bright else Color(0.16, 0.16, 0.16))
+		var grey := Color(0.5, 0.5, 0.5)
+		if _ghost > f:
+			draw_rect(Rect2(r.position, Vector2(r.size.x * _ghost, r.size.y)), grey)
+		draw_rect(Rect2(r.position, Vector2(r.size.x * f, r.size.y)), fc)
 		if preview >= 0 and preview < hp:
 			var pf := clampf(float(preview) / max_hp, 0.0, 1.0)
-			draw_rect(Rect2(Vector2(s.x * pf, 0), Vector2(s.x * (f - pf), s.y)), Color(0.25, 0.25, 0.27))
-		draw_rect(Rect2(Vector2.ZERO, Vector2(s.x * f, s.y * 0.35)), Color(1, 1, 1, 0.28))
-		var t := 10
-		while t < max_hp:
-			var x := s.x * float(t) / max_hp
-			var heavy := t % 100 == 0
-			draw_line(Vector2(x, 0), Vector2(x, s.y * (1.0 if heavy else 0.55)), Color(0, 0, 0, 0.75 if heavy else 0.45), 1.0)
-			t += 10
+			draw_rect(Rect2(r.position + Vector2(r.size.x * pf, 0), Vector2(r.size.x * (f - pf), r.size.y)), grey)
+		for k in range(1, 10):
+			var x := r.position.x + roundf(r.size.x * k / 10.0)
+			draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), oc, 1.0)
+		if _hover and s.y >= 9.0:
+			var font := get_theme_default_font()
+			var fs := int(clampf(s.y + 2.0, 10.0, 14.0))
+			var txt := "%d / %d" % [hp, max_hp]
+			var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var pos := Vector2((s.x - tw) * 0.5, s.y * 0.5 + fs * 0.36)
+			draw_string_outline(font, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color.WHITE)
+			draw_string(font, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.BLACK)

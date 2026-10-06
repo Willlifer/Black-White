@@ -57,11 +57,12 @@ var _leg_l: Node3D
 var _leg_r: Node3D
 var _head: Node3D
 var _label: Label3D
-var _bar_bg: MeshInstance3D
-var _bar_fill: MeshInstance3D
-var _bar_ghost: MeshInstance3D     # the chunk just lost, lingering grey before it drains
-var _hp_label: Label3D             # current HP, printed on the bar (author 10/4: "hard to see what the current HP is")
-var _shown_f := 1.0
+## D215: the floating bar (BWHPBar3D): black with white pips at/above 50%,
+## white with black pips below; the "hp / max" label shows only on hover.
+var _hp_bar: BWHPBar3D
+var _bar_bg: MeshInstance3D        # the bar's quad (_hp_bar.quad)
+var _hp_label: Label3D             # "hp / max" (_hp_bar.label), visible while hovered
+var _bar_w := BAR_W
 ## Bigger than v1 (0.9 × 0.075): the HP has to read at combat distance.
 const BAR_W := 1.25
 const BAR_H := 0.13
@@ -100,25 +101,7 @@ func _build() -> void:
 	_label.outline_modulate = Color.BLACK
 	_label.font_size = 13
 	add_child(_label)
-	# V8-style floating HP bar: ink well, white fill (grey for enemies)
-	_bar_bg = _bar_quad(BAR_W + 0.04, BAR_H + 0.04, Color(0, 0, 0, 0.9), 0)
-	add_child(_bar_bg)
-	_bar_ghost = _bar_quad(BAR_W, BAR_H, Color(0.62, 0.62, 0.66), 1)
-	add_child(_bar_ghost)
-	_bar_fill = _bar_quad(BAR_W, BAR_H, Color(0.45, 0.45, 0.47) if unit.team == "enemy" else Color(0.97, 0.97, 0.97), 2)
-	add_child(_bar_fill)
-	_hp_label = Label3D.new()
-	_hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_hp_label.no_depth_test = true
-	_hp_label.fixed_size = true
-	_hp_label.pixel_size = 0.0011
-	_hp_label.font_size = 17
-	_hp_label.outline_size = 9
-	_hp_label.modulate = Color.BLACK
-	_hp_label.outline_modulate = Color.WHITE
-	_hp_label.render_priority = 14
-	_hp_label.outline_render_priority = 13
-	add_child(_hp_label)
+	_build_bar(BAR_W)
 	_place_bar()
 	idle()
 
@@ -128,11 +111,20 @@ func _place_bar() -> void:
 	var bar := 2.2                     # primitive stand-in: unchanged
 	if character:
 		bar = 2.62 if character.part("head") == null else 2.80
-	_bar_bg.position.y = bar
-	_bar_fill.position.y = bar
-	_bar_ghost.position.y = bar
-	_hp_label.position.y = bar
-	_label.position.y = bar + 0.18
+	_hp_bar.place(bar)
+
+
+## D215: the bar node carries the HP quad, the hover label and the name
+## label (so the D217 clamp moves them together).
+func _build_bar(w: float) -> void:
+	_bar_w = w
+	_hp_bar = BWHPBar3D.new(unit, w, BAR_H)
+	add_child(_hp_bar)
+	_bar_bg = _hp_bar.quad
+	_hp_label = _hp_bar.label
+	remove_child(_label)
+	_hp_bar.add_child(_label)
+	_label.position.y = BWHPBar3D.LABEL_RISE
 
 
 ## D156: which view shows a unit right now (BWWidgets.LivePortrait follows it).
@@ -241,11 +233,8 @@ func _build_primitive() -> void:
 
 func show_label(v: bool) -> void:
 	_label.visible = v
-	if _bar_bg:
-		_bar_bg.visible = v
-		_bar_fill.visible = v
-		_bar_ghost.visible = v
-		_hp_label.visible = v
+	if _hp_bar:
+		_hp_bar.set_shown(v)
 
 
 ## A billboarded quad that always faces the camera and draws over the scene.
@@ -275,20 +264,9 @@ func refresh() -> void:
 	if character:
 		character.set_wounded(unit.alive() and float(unit.hp) < BWAnimator.WOUNDED_HP * maxf(unit.max_hp(), 1))
 	_label.text = unit.name
-	if _bar_fill:
-		# billboards rotate around the node, so the fill is cut in the mesh
-		# itself: width f·W, shifted to stay flush with the left of the well
-		var f := clampf(float(unit.hp) / maxf(unit.max_hp(), 1), 0.0, 1.0)
-		_set_bar(_bar_fill, f)
-		if f < _shown_f - 0.001:
-			# the lost chunk lingers grey, then drains: you see how much it was
-			var tw := create_tween()
-			tw.tween_interval(0.35)
-			tw.tween_method(func(x: float): _set_bar(_bar_ghost, x), _shown_f, f, 0.45).set_trans(Tween.TRANS_SINE)
-		else:
-			_set_bar(_bar_ghost, f)
-		_shown_f = f
-		_hp_label.text = "%d / %d" % [unit.hp, unit.max_hp()]
+	if _hp_bar:
+		# D215: the lost chunk lingers grey, then drains; crossing 50% flips and pulses
+		_hp_bar.set_hp(unit.hp, unit.max_hp())
 	visible = unit.alive() or visible
 	if has_ward(unit) != (_ward != null):        # ---- D102: the Frost Ward follows the data
 		if has_ward(unit):
@@ -297,14 +275,6 @@ func refresh() -> void:
 			ward_break()
 		else:
 			set_ward(false)
-
-
-func _set_bar(mi: MeshInstance3D, f: float) -> void:
-	# billboards rotate around the node, so a fill is cut in the mesh itself:
-	# width f·W, shifted to stay flush with the left of the well
-	var q: QuadMesh = mi.mesh
-	q.size = Vector2(maxf(BAR_W * f, 0.001), BAR_H)
-	q.center_offset = Vector3(-(BAR_W - BAR_W * f) * 0.5, 0, 0)
 
 
 func _bar() -> String:

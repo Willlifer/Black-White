@@ -51,6 +51,10 @@ func _ready() -> void:
 	_order_panel.offset_top = 10
 	_order_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_root.add_child(_order_panel)
+	# D217: the over-unit bars and labels keep below the turn-order bar
+	_order_panel.item_rect_changed.connect(func(): BWHPBar3D.hud_rect = _order_panel.get_global_rect())
+	tree_exiting.connect(func(): BWHPBar3D.hud_rect = Rect2(); BWHPBar3D.hover_unit = null; BWHPBar3D.covers = Callable())
+	BWHPBar3D.covers = cover_rects                # D230 (L-21): bars hide behind HUD panels
 	_order = HBoxContainer.new()
 	_order.add_theme_constant_override("separation", 6)
 	_order.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -229,10 +233,11 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 	var lines: PackedStringArray = []
 	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s[/color]" % [BWStyle.F_NAME, u.name,
 		BWStyle.TEXT_DIM.to_html(false), "enemy" if u.team == "enemy" else "Lv %d" % u.level])
-	lines.append("[font_size=%d][color=#%s]%s · %s ([hint=%s]%s[/hint])  [/color][color=#%s]■[/color] [color=#%s]%s[/color][/font_size]" % [
-		BWStyle.F_SUB, BWStyle.LABEL.to_html(false), u.weapon_model.replace("_", " ").capitalize(),
+	var model := BWText.model_name(u.weapon_model, u.weapon_class)      # D218: no "Sword · Sword"
+	lines.append("[font_size=%d][color=#%s]%s%s ([hint=%s]%s[/hint])  [/color][color=#%s]■[/color] [color=#%s]%s[/color][/font_size]" % [
+		BWStyle.F_SUB, BWStyle.LABEL.to_html(false), (model + " · ") if model != "" else "",
 		BWText.weapon(u.weapon_class), BWGlossary.hint_text("expertise"), u.expertise_letter(u.weapon_class), el, BWStyle.LABEL.to_html(false),
-		BWGlossary.markup(u.element.capitalize())])
+		BWKanji.bb(u.element) + BWGlossary.markup(u.element.capitalize())])     # D231: the kanji, when on
 	lines.append_array(badge_lines(u, BWStyle.F_SMALL))      # D129/D130
 	lines.append("[font_size=%d]HP %d / %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.hp, u.max_hp(), u.move_range(), u.speed()])
 	lines.append("[font_size=%d][color=#%s]CON %d   STR %d   DEX %d   WIL %d
@@ -483,6 +488,22 @@ func blocking_rects() -> Array:
 	for c in [_menu, _forecast, _acting.panel, _hovered.panel]:
 		if c.visible:
 			out.append(c.get_global_rect())
+	return out
+
+
+## D230 (L-21): every visible HUD plate (the log, the cards, the menu, the
+## forecast, toasts): an over-unit bar or label touching one is culled.
+func cover_rects() -> Array:
+	var out: Array = []
+	var screen := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2.ZERO
+	for c in _root.get_children():
+		if c is PanelContainer and c != _order_panel and (c as Control).is_visible_in_tree():   # D217 clamps under the turn order
+			var r: Rect2 = (c as Control).get_global_rect()
+			if r.has_area() and r.size.x < screen.x * 0.9:
+				out.append(r)
+	for d in [_acting, _hovered]:
+		if not d.is_empty() and d.panel.is_visible_in_tree() and not d.panel.get_parent() == _root:
+			out.append(d.panel.get_global_rect())
 	return out
 
 
@@ -1264,6 +1285,7 @@ func set_objectives(stones: Array) -> void:
 			col.add_child(nm)
 			var bar := BWWidgets.HPBar.new(Vector2(220, 10))
 			bar.enemy = (o as BWObelisk).look() != "bright"
+			bar.track = true
 			col.add_child(bar)
 			row.add_child(col)
 			v.add_child(row)
@@ -1273,7 +1295,7 @@ func set_objectives(stones: Array) -> void:
 		if r.is_empty():
 			continue
 		r.bar.set_hp(o.hp, o.max_hp())
-		r.label.text = "%s   %s" % [o.name, "BROKEN" if not o.alive() else "%d / %d" % [o.hp, o.max_hp()]]
+		r.label.text = o.name if o.alive() else "%s   BROKEN" % o.name     # D215: numbers on hover (the bar)
 		r.row.modulate = Color(1, 1, 1, 0.45) if not o.alive() else Color.WHITE
 
 

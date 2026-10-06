@@ -25,3 +25,19 @@ static func weapon(wc: Variant) -> String:
 		if n != "":
 			return label(n)
 	return label(k)
+
+
+## D218: a weapon model's display name, or "" when the model is the class
+## itself (a plain "Sword", a "Dagger" of the daggers), so a card says "Sword (E)", never "Sword · Sword (E)".
+static func model_name(model: Variant, wc: Variant) -> String:
+	var m := str(model)
+	if m == "":
+		return ""
+	var n := m
+	if BWData.has_table("equipment"):
+		n = str(BWData.row("equipment", m).get("name", m))
+	var shown := label(n)
+	var a := shown.to_lower().trim_suffix("s")          # "Dagger" is the "Daggers" class too
+	if a == str(wc).to_lower().trim_suffix("s") or a == weapon(wc).to_lower().trim_suffix("s") or m == str(wc):
+		return ""
+	return shown

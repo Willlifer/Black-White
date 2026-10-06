@@ -12,7 +12,7 @@ extends Node3D
 ## pulsing, and "C  continue your run" when a save exists. The UI is drawn in
 ## the 1600×900 design space and scales with the window (4K included).
 
-signal done(choice: String)     # "new" | "continue"
+signal done(choice: String)     # "new" | "continue" | "tutorial" (D223)
 
 const ORBIT := 0.085            # rad/s
 const FADE_IN := 2.2
@@ -30,6 +30,7 @@ var _mark: TitleMark
 var _prompt: Label
 var _cont: Label
 var _set_line: Button               # D124: "S  settings"
+var _tut_line: Button               # D223: "T  tutorial"
 var settings: BWSettingsPanel
 var _black: ColorRect
 var _ready_for_input := false
@@ -147,7 +148,23 @@ func _ready() -> void:
 	_set_line.add_theme_constant_override("outline_size", 8)
 	_set_line.modulate.a = 0.0
 	_set_line.pressed.connect(open_settings)
-	lines.add_child(_set_line)
+	# ---- D223: the tutorial entry, next to settings (T, or click it)
+	var opts := HBoxContainer.new()
+	opts.alignment = BoxContainer.ALIGNMENT_CENTER
+	opts.add_theme_constant_override("separation", 28)
+	lines.add_child(opts)
+	opts.add_child(_set_line)
+	_tut_line = Button.new()
+	_tut_line.name = "tutorial_entry"
+	_tut_line.text = "T    tutorial"
+	for k in ["flat", "focus_mode", "modulate"]:
+		_tut_line.set(k, _set_line.get(k))
+	for c in ["font_color", "font_hover_color", "font_outline_color"]:
+		_tut_line.add_theme_color_override(c, _set_line.get_theme_color(c))
+	_tut_line.add_theme_font_size_override("font_size", 19)
+	_tut_line.add_theme_constant_override("outline_size", 8)
+	_tut_line.pressed.connect(open_tutorial)
+	opts.add_child(_tut_line)
 	_black = ColorRect.new()
 	_black.color = Color.BLACK
 	_black.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -166,6 +183,7 @@ func _ready() -> void:
 	mk.tween_property(get_meta("plate"), "modulate:a", 1.0, 0.4)
 	mk.tween_property(_cont, "modulate:a", 1.0, 0.6)
 	mk.parallel().tween_property(_set_line, "modulate:a", 1.0, 0.6)
+	mk.parallel().tween_property(_tut_line, "modulate:a", 1.0, 0.6)
 
 
 ## A shell of nearer stars around the arena, in front of the sky's: as the
@@ -233,11 +251,23 @@ func open_settings() -> void:
 	settings = BWSettingsPanel.summon(self)
 
 
+## D223: the guided practice fight; the title waits for nothing else.
+func open_tutorial() -> void:
+	if not _ready_for_input or (settings and is_instance_valid(settings)):
+		return
+	_ready_for_input = false
+	done.emit("tutorial")
+
+
 func _unhandled_input(ev: InputEvent) -> void:
 	if not _ready_for_input or (settings and is_instance_valid(settings)):
 		return
 	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_S:
 		open_settings()
+		get_viewport().set_input_as_handled()
+		return
+	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_T:   # ---- D223
+		open_tutorial()
 		get_viewport().set_input_as_handled()
 		return
 	var pressed: bool = (ev is InputEventKey and ev.pressed and not ev.echo) \

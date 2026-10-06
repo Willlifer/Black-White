@@ -13,7 +13,7 @@ const MOVE := 2
 
 func _init() -> void:
 	define({
-		"key": "tumble", "name": "Tumble", "weapon": "daggers", "clip": "",
+		"key": "tumble", "name": "Tumble", "weapon": "daggers", "clip": "tumble",
 		"desc": "Free: after you attack this turn, move 2 more tiles",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0, "free_action": true,

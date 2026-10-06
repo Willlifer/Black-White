@@ -257,6 +257,9 @@ class Card:
 		var font := get_theme_default_font()
 		draw_string(font, Vector2(12, 30), str(index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, BWStyle.F_SMALL,
 			Color(1, 1, 1, 0.35 * fade))
+		if el != "" and BWKanji.enabled():           # D231: the element kanji, top right
+			draw_string(BWKanji.font(2), Vector2(12, 40), BWKanji.glyph(el), HORIZONTAL_ALIGNMENT_RIGHT, s.x - 24, BWStyle.F_BODY + 8,
+				Color(glyph_col.lightened(0.15), fade))
 		# glyph in a ring
 		var c := Vector2(s.x / 2.0, 82)
 		draw_circle(c, 46, Color(1, 1, 1, 0.06 * fade))

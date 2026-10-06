@@ -99,6 +99,11 @@ plus one other. Weapon damage, range and speed come from the class row in
 Weight counts: head 2 heavy / 3 ranger / 3 wizard; chest 4 heavy / 4 ranger /
 2 wizard; legs 2 heavy / 2 ranger / 1 wizard.
 
+**Hair under headgear (D228):** head rows carry `hides_hair`: `all` hides the
+hair (Feathered Full Helm, Dragoon Helm), `top` keeps only hair that fits under
+the brim (Feathered Cap, Baseball Cap, Tilted Beret, Wizard Hat), `none` shows it
+(Tiara, Crown). It wins over the model manifest's `hair_mode`.
+
 ### Head
 
 | Item | Weight | Stats | Abilities (learned after 2 battles) | Enchantments it can roll |

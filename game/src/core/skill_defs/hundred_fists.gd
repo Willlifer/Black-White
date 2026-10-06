@@ -12,7 +12,7 @@ const ONCE_CD := 999
 
 func _init() -> void:
 	define({
-		"key": "hundred_fists", "name": "Hundred Fists", "weapon": "fists", "clip": "flurry",
+		"key": "hundred_fists", "name": "Hundred Fists", "weapon": "fists", "clip": "hundred",
 		"desc": "Once per battle: six blows at an adjacent enemy, 30% each and rolled one by one; the last pours two steps of your element into its tile",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": 0, "once_per_battle": true,
 		"power": POWER, "hits": HITS, "hit_pct": PCT, "steps": STEPS,

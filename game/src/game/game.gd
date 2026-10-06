@@ -35,10 +35,23 @@ func go_title() -> void:
 	await _swap(s)
 	BWMusic.play("title")
 	var choice: String = await s.done
+	if choice == "tutorial":                     # ---- D223: the practice fight, never the run or the save
+		go_tutorial()
+		return
 	if choice == "continue" and not s.old_save and _load():
 		_next_after_load()
 	else:
 		go_roster()
+
+
+## D223: the guided practice fight. It brings its own squad and run and
+## never touches `run` or the save; back to the title when it ends or exits.
+func go_tutorial() -> void:
+	var s := BWTutorial.new()
+	await _swap(s)
+	BWMusic.play("combat")
+	await s.finished
+	go_title()
 
 
 func go_roster() -> void:

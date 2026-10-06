@@ -11,7 +11,7 @@ const PLUS_BLOWS := 2
 
 func _init() -> void:
 	define({
-		"key": "riposte", "name": "Riposte", "weapon": "sword", "clip": "",
+		"key": "riposte", "name": "Riposte", "weapon": "sword", "clip": "brace",
 		"desc": "Free: set your guard and still act. The first blow to land is halved, and answered; a landed answer takes 1 off the cooldown",
 		"plus": "Riposte+: answers the first two blows, both halved",
 		"targeting": "self", "needs_element": true, "range": 0, "cd": BWSkills.RIPOSTE_CD,

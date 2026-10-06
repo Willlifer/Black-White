@@ -33,7 +33,7 @@ extends RefCounted
 ## Bump ANIM_VERSION when the source changes; test_animation checks that the
 ## saved library matches a fresh bake of this file.
 
-const ANIM_VERSION := 7
+const ANIM_VERSION := 8
 const FPS := 24.0
 const BAKE_HZ := 60.0
 const DIR := "res://art/animations/"
@@ -104,6 +104,9 @@ static func actions_for(set_id: String, weapon_class: String = "") -> Dictionary
 	if set_id == "pistol":
 		out.merge({ "pistol_whip": { "clip": "strike_pistol_whip" },
 			"windup_pistol_whip": { "clip": "strike_pistol_whip", "hold": "coil" } })
+	# D221: the fit sweep's routes (brace, leap, land, war_cry, aim, tumble,
+	# reload, and the skill strikes: thrust, hook, cut, sweep, throw, grapple, hundred)
+	out.merge(BWAnimSkill.actions(set_id, strike))
 	return out
 
 ## Channel id -> [pose key, sub key]. Order is the track order.
@@ -399,6 +402,8 @@ static func clips(set_id: String) -> Array:
 	out.append_array(BWAnimAction.clips(set_id))
 	out.append_array(BWAnimReact.clips(set_id))
 	out.append_array(BWAnimHandling.clips(set_id))
+	out.append_array(BWAnimSkill.clips(set_id))           # D221: brace, leap, the sweep's skill clips
+	out.append_array(BWAnimEncounter.clips(set_id))       # D219-D220: the Colossus, the Horde's jab
 	return out
 
 

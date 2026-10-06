@@ -1,0 +1,21 @@
+bw_kanji.ttf
+============
+
+A subset of Noto Sans JP (variable, wght 100-900) holding only the seven
+element kanji the "Element kanji" accessibility setting draws (D231):
+
+  火 fire   水 water   氷 ice   雷 thunder   風 wind   闇 dark   光 light
+
+Source:  https://github.com/google/fonts/tree/main/ofl/notosansjp
+         (NotoSansJP[wght].ttf)
+Authors: Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved
+         Font Name 'Source'. Noto is a trademark of Google LLC.
+Licence: SIL Open Font License 1.1, see OFL.txt beside this file.
+
+Built with fontTools (2026-10-06):
+
+  python -m fontTools.subset "NotoSansJP[wght].ttf" --text="火水氷雷風闇光" \
+      --output-file=bw_kanji.ttf --layout-features='' --no-hinting --desubroutinize
+
+The subset is a modified version under the OFL; it keeps the variable
+weight axis (BWKanji picks 250 / 500 / 900 for tile levels 1 / 2 / 3).

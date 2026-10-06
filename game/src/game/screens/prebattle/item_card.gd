@@ -9,15 +9,20 @@ extends PanelContainer
 ##   the ability it teaches after BWRun.LEARN_BATTLES battles worn
 ##   for a weapon, its expertise line (anyone can wield it, D180)
 ## Frame weight (BWStyle.frame_style), the same as the combat unit cards.
+## D216: compact, so a C+ weapon (three enchantment lines) or a cursed card
+## with its cost fits without scrolling at 1600×900 and 1920×1080: a 52 px
+## icon, the imbue on the kind line, the stat deltas on one line, no section
+## titles, and the "teaches" block only when the item teaches something.
 
 const W := 420.0
+const W_WIDE := 470.0           # the shop's two cards side by side (D216)
 
 var _icon: BWItemTile
 var _name: RichTextLabel
 var _kind: Label
 var _infusion: HBoxContainer
 var _vs: Label
-var _stats: GridContainer
+var _stats: RichTextLabel       # D216: one line, "STR +5 (+5)   DEX — (−2)"
 var _passive: RichTextLabel
 var _teach: RichTextLabel
 var _teach_title: Label
@@ -28,12 +33,15 @@ var _empty: Label
 var _body: VBoxContainer
 
 
-func _init() -> void:
-	add_theme_stylebox_override("panel", BWStyle.frame_style())
-	custom_minimum_size = Vector2(W, 0)
+func _init(w: float = W) -> void:
+	var sb := BWStyle.frame_style()
+	sb.content_margin_top = mini(int(sb.content_margin_top), 8)
+	sb.content_margin_bottom = mini(int(sb.content_margin_bottom), 8)
+	add_theme_stylebox_override("panel", sb)
+	custom_minimum_size = Vector2(w, 0)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", 2)
 	add_child(v)
 	_empty = Label.new()
 	_empty.text = EMPTY_TEXT
@@ -42,17 +50,18 @@ func _init() -> void:
 	_empty.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 	v.add_child(_empty)
 	_body = VBoxContainer.new()
-	_body.add_theme_constant_override("separation", 4)
+	_body.add_theme_constant_override("separation", 3)
 	v.add_child(_body)
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
+	head.add_theme_constant_override("separation", 10)
 	_body.add_child(head)
-	_icon = BWItemTile.new({}, 68.0)
+	_icon = BWItemTile.new({}, 52.0)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_icon.draggable = false
 	head.add_child(_icon)
 	var hv := VBoxContainer.new()
-	hv.add_theme_constant_override("separation", 2)
+	hv.add_theme_constant_override("separation", 0)
+	hv.alignment = BoxContainer.ALIGNMENT_CENTER
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hv)
 	_name = _rich(BWStyle.F_SUB)
@@ -60,20 +69,19 @@ func _init() -> void:
 	_kind = Label.new()
 	_kind.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
 	_kind.add_theme_color_override("font_color", BWStyle.LABEL)
-	hv.add_child(_kind)
+	var kr := HBoxContainer.new()                # D216: kind and imbue share a line
+	kr.add_theme_constant_override("separation", 14)
+	hv.add_child(kr)
+	kr.add_child(_kind)
 	_infusion = HBoxContainer.new()
-	_infusion.add_theme_constant_override("separation", 6)
-	hv.add_child(_infusion)
-	_body.add_child(HSeparator.new())
+	_infusion.add_theme_constant_override("separation", 5)
+	kr.add_child(_infusion)
 	_vs = Label.new()
 	_vs.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
 	_vs.add_theme_color_override("font_color", BWStyle.FAINT)
 	_vs.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(_vs)
-	_stats = GridContainer.new()
-	_stats.columns = 3
-	_stats.add_theme_constant_override("h_separation", 18)
-	_stats.add_theme_constant_override("v_separation", 2)
+	_stats = _rich(BWStyle.F_SMALL - 1)
 	_body.add_child(_stats)
 	_passive_title = BWStyle.section_label("Passive")
 	_body.add_child(_passive_title)
@@ -83,7 +91,6 @@ func _init() -> void:
 	_body.add_child(_teach_title)
 	_teach = _rich(BWStyle.F_SMALL - 2)
 	_body.add_child(_teach)
-	_body.add_child(HSeparator.new())
 	_check = _rich(BWStyle.F_SMALL - 2)
 	_body.add_child(_check)
 	_hint = Label.new()
@@ -133,7 +140,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	_body.visible = true
 	_empty.visible = false
 	_stats.visible = true
-	_passive_title.visible = true
+	_passive_title.visible = false               # D216: no section titles; the ■ lines speak
 	_teach_title.visible = true
 	_icon.set_item(item)
 	var col := BWGearText.readable(BWGearText.item_color(item))
@@ -146,7 +153,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	var el := BWGearText.item_element(item)
 	_infusion.add_child(BWGearText.Swatch.new(el, 14.0))
 	var il := Label.new()
-	il.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	il.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
 	var weapon := str(item.slot) == "main_hand"
 	if weapon:                                   # D182: a weapon's element is its imbue
 		il.text = ("Imbued with %s" % el.capitalize()) if el != "" else "No imbue (tiers C and up carry one)"
@@ -165,41 +172,27 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	else:
 		_vs.text = "Compared with %s's %s" % [u.name if u else "the", BWGearText.plain_name(compare)]
 	_vs.visible = _vs.text != ""
-	for c in _stats.get_children():
-		c.queue_free()
 	var keys: Array = []
 	for s in BWUnit.STATS:
 		if item.stats.has(s) or (not worn and compare.get("stats", {}).has(s)):
 			keys.append(s)
+	var segs: PackedStringArray = []                # D216: the deltas on one line
 	for s in keys:
 		var v := int(item.stats.get(s, 0))
-		var name_l := Label.new()
-		name_l.text = BWGearText.STAT_NAMES[s]
-		name_l.add_theme_color_override("font_color", BWStyle.LABEL if item.stats.has(s) else BWStyle.FAINT)
-		name_l.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-		_stats.add_child(name_l)
-		var val := Label.new()
-		val.text = "+%d" % v if item.stats.has(s) else "—"
-		val.add_theme_font_size_override("font_size", BWStyle.F_SMALL + 1)
-		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		val.custom_minimum_size = Vector2(44, 0)
-		_stats.add_child(val)
-		var dl := Label.new()
-		dl.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
-		if worn:
-			dl.text = ""
-		else:
+		var has: bool = item.stats.has(s)
+		var seg := "[color=#%s]%s[/color] [b]%s[/b]" % [BWGearText.hex(BWStyle.LABEL if has else BWStyle.FAINT), s.to_upper(),
+			("+%d" % v) if has else "—"]
+		if not worn:
 			var d := v - int(compare.get("stats", {}).get(s, 0))
 			if d > 0:
-				dl.text = "+%d %s" % [d, s.to_upper()]
-				dl.add_theme_color_override("font_color", Color.WHITE)
+				seg += " [color=#ffffff](+%d)[/color]" % d
 			elif d < 0:
-				dl.text = "%s%d %s" % [BWGearText.MINUS, -d, s.to_upper()]
-				dl.add_theme_color_override("font_color", BWStyle.FAINT)
+				seg += " [color=#%s](%s%d)[/color]" % [BWGearText.hex(BWStyle.FAINT), BWGearText.MINUS, -d]
 			else:
-				dl.text = "±0"
-				dl.add_theme_color_override("font_color", Color(1, 1, 1, 0.3))
-		_stats.add_child(dl)
+				seg += " [color=#ffffff4d](±0)[/color]"
+		segs.append(seg)
+	_stats.text = "   ".join(segs)
+	_stats.visible = not segs.is_empty()
 	# passive
 	var p := BWGearText.passive_text(item)
 	if p == "":
@@ -209,24 +202,21 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	_passive.text += curse_line(BWGearText.enchant(item))       # D201
 	if weapon and el != "":                      # D182: the imbue is the weapon's second enchantment
 		var ec := BWGearText.hex(BWGearText.readable(BWLook.element_color(el)))
-		_passive.text += "
-[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]
+		_passive.text += "\n[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]
 		var ie := BWData.row("enchantments", str(item.get("imbue_enchant", "")))
 		if not ie.is_empty():                    # D206: the imbue's own element enchantment (while drawn)
 			_passive.text += "\n[color=#%s]■ %s imbue · %s:[/color] %s%s" % [ec, el.capitalize(), BWGearText.row_name(ie),
 				BWGlossary.markup(str(ie.get("effect_text", ""))), curse_line(ie)]
-	# teaches
+	# teaches (D216: collapsed when there's nothing to teach)
 	var t := BWGearText.teaches(item)
-	if t.is_empty():
-		_teach.text = "[color=#%s]Nothing — weapons teach skills by expertise, not by wearing.[/color]" % BWGearText.hex(BWStyle.FAINT) \
-			if str(item.slot) == "main_hand" else "[color=#%s]Nothing[/color]" % BWGearText.hex(BWStyle.FAINT)
-	else:
+	_teach_title.visible = not t.is_empty()
+	_teach.visible = not t.is_empty()
+	if not t.is_empty():
 		var lines: PackedStringArray = []
 		for a in t:
 			var known: bool = u != null and run != null and str(a.id) in run.learned.get(u.id, [])
 			var worn_n := int(item.get("worn", {}).get(u.id if u else "", 0))
-			var state := " [color=#%s](known)[/color]" % BWGearText.hex(BWStyle.FAINT) if known else \
-				(" [color=#%s](%d/%d worn)[/color]" % [BWGearText.hex(BWStyle.FAINT), worn_n, BWRun.LEARN_BATTLES] if worn_n > 0 else "")
+			var state := " [color=#%s](known)[/color]" % BWGearText.hex(BWStyle.FAINT) if known else (" [color=#%s](%d/%d worn)[/color]" % [BWGearText.hex(BWStyle.FAINT), worn_n, BWRun.LEARN_BATTLES] if worn_n > 0 else "")
 			lines.append("[b]%s[/b] [color=#%s]%s[/color]%s — %s" % [a.name, BWGearText.hex(BWStyle.LABEL), str(a.type), state, a.effect_text])
 		_teach.text = BWGlossary.markup("\n".join(lines))
 	# can equip
@@ -279,6 +269,7 @@ func show_scroll(s: Dictionary, opts: Dictionary = {}) -> void:
 	_passive.text = "[color=#%s]■[/color] [b]%s[/b]: %s%s" % [BWGearText.hex(col), BWGearText.row_name(row),
 		BWGlossary.markup(str(row.get("effect_text", ""))), curse_line(row)]
 	_teach_title.visible = false
+	_teach.visible = true
 	_teach.text = BWGlossary.markup("[b]Armour:[/b] replaces its enchantment.  [b]Weapon:[/b] imbues it with %s and this enchantment (its own enchantment stays)." % el.capitalize())
 	_check.visible = false
 	_hint.text = str(opts.get("hint", ""))

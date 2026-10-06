@@ -11,7 +11,7 @@ const GUARD_PCT := 15
 
 func _init() -> void:
 	define({
-		"key": "phalanx", "name": "Phalanx", "weapon": "lance", "clip": "block",
+		"key": "phalanx", "name": "Phalanx", "weapon": "lance", "clip": "brace",
 		"desc": "Brace: you and adjacent allies take 15% less damage until your next turn, and you can't be displaced",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0,

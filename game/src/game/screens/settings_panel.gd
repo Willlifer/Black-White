@@ -72,7 +72,7 @@ func _build() -> void:
 	panel.custom_minimum_size = Vector2(W, 0)
 	center.add_child(panel)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 4)       # D231: 8 -> 4, room for Accessibility at 16:9
 	panel.add_child(v)
 
 	var title := Label.new()
@@ -113,6 +113,10 @@ func _build() -> void:
 	_segmented(v, "show_odds", "Odds strip", [[false, "Off"], [true, "On"]])
 	_segmented(v, "show_numbers", "Damage numbers", [[false, "Off"], [true, "On"]])
 	_segmented(v, "screen_shake", "Screen shake", [[false, "Off"], [true, "On"]])   # ---- D170
+
+	v.add_child(BWStyle.section_label("Accessibility"))                              # ---- D231
+	_segmented(v, "element_kanji", "Element kanji  火 水 氷", [[false, "Off"], [true, "On"]])
+	BWKanji.fallback(v.get_child(v.get_child_count() - 1).get_child(0))   # the row label shows the glyphs
 
 	v.add_child(HSeparator.new())
 	var foot := HBoxContainer.new()
@@ -218,7 +222,7 @@ func _segmented(parent: Control, key: String, label: String, options: Array) -> 
 		b.toggle_mode = true
 		b.button_group = group
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 34)
+		b.custom_minimum_size = Vector2(0, 30)
 		b.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 		b.add_theme_stylebox_override("pressed", on)
 		b.add_theme_color_override("font_pressed_color", Color.BLACK)

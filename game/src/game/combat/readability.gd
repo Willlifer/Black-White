@@ -80,13 +80,10 @@ func _unit_rects() -> Array:
 		var v: BWUnitView = screen._views[id]
 		if not is_instance_valid(v) or not v.is_visible_in_tree() or v._hp_label == null:
 			continue
-		var hp := BWBlastPreview.label_rect(cam, v._hp_label)
+		var hp := BWBlastPreview.label_rect(cam, v._hp_label) if v._hp_label.visible else Rect2()
 		var c := v._hp_label.global_position
-		if not cam.is_position_behind(c):
-			var half := cam.global_basis.x * (BWUnitView.BAR_W * v.scale.x * 0.5 + 0.02)
-			var a := cam.unproject_position(c - half)
-			var b := cam.unproject_position(c + half)
-			var bar := Rect2(minf(a.x, b.x), minf(a.y, b.y), absf(b.x - a.x), absf(b.y - a.y)).grow_individual(0, 6, 0, 6)
+		if not cam.is_position_behind(c) and v._hp_bar:
+			var bar := v._hp_bar.screen_rect(cam).grow_individual(0, 6, 0, 6)     # D215
 			hp = bar.merge(hp) if hp.has_area() else bar
 		out.append(hp)
 		var nm := BWBlastPreview.label_rect(cam, v._label)

@@ -38,6 +38,7 @@ const STATIC_SORT := 0.45  # over faces (0.30-0.35) and marks (0.40), under high
 ## untouched (BWTiles.is_seeded). Once play changes the hex it is ordinary
 ## charge, so the ring goes and never comes back.
 var _seed := {}           # Vector2i -> MeshInstance3D
+var kanji: BWKanjiLayer   # D231
 
 
 func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
@@ -72,6 +73,8 @@ func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
 			_static[h] = _static_rim(h, top)
 		elif board.seeds.has(h):
 			_seed[h] = _seed_rim(h, top)
+	kanji = BWKanjiLayer.new()                  # D231: element kanji on the tile tops (accessibility)
+	add_child(kanji)
 	refresh_tiles(true)
 
 
@@ -414,6 +417,8 @@ func _fx_card_node(at: Vector3) -> MeshInstance3D:
 ## Retarget hex h's layers to `want` (BWTileFX.layers()).
 func _fx_apply(h: Vector2i, want: Dictionary, snap: bool, formed: bool) -> void:
 	_fx_state[h] = want
+	if kanji:
+		kanji.apply(h, top_center(h), want)
 	var an: Dictionary = _fx_anim[h]
 	for axis in ["h", "v"]:
 		var w: Dictionary = want[axis]

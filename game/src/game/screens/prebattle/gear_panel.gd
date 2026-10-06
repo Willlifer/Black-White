@@ -85,7 +85,7 @@ func _init(p_run: BWRun) -> void:
 	dollrow.add_theme_constant_override("separation", 10)
 	dc.add_child(dollrow)
 	var ls := VBoxContainer.new()
-	ls.add_theme_constant_override("separation", 34)
+	ls.add_theme_constant_override("separation", 16)   # D229 (L-22): was 34; the doll is shorter
 	ls.alignment = BoxContainer.ALIGNMENT_CENTER
 	dollrow.add_child(ls)
 	var frame := PanelContainer.new()
@@ -95,7 +95,7 @@ func _init(p_run: BWRun) -> void:
 	frame.add_theme_stylebox_override("panel", fs)
 	dollrow.add_child(frame)
 	doll = BWPaperdoll.new()
-	doll.custom_minimum_size = Vector2(330, 440)
+	doll.custom_minimum_size = Vector2(330, 372)       # D229 (L-22): 440 ran the skill rows off a 16:9 screen
 	frame.add_child(doll)
 	var rs := VBoxContainer.new()
 	rs.add_theme_constant_override("separation", 34)
@@ -132,7 +132,7 @@ func _init(p_run: BWRun) -> void:
 	_msg.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
 	_msg.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_msg.custom_minimum_size = Vector2(500, 48)
+	_msg.custom_minimum_size = Vector2(500, 0)
 	dc.add_child(_msg)
 	_give_box = HBoxContainer.new()
 	_give_box.add_theme_constant_override("separation", 8)

@@ -9,7 +9,7 @@ const PLUS_SECOND_PCT := 50
 
 func _init() -> void:
 	define({
-		"key": "dualthrow_second", "name": "Second Dagger", "weapon": "daggers", "clip": "",
+		"key": "dualthrow_second", "name": "Second Dagger", "weapon": "daggers", "clip": "throw_l",
 		"desc": "The other blade, same reach. It bounces on to the nearest foe within 2 hexes for 75%",
 		"targeting": "unit", "needs_element": true, "range": BWSkills.DUALTHROW_RANGE, "cd": 0,
 		"power": BWSkills.DUALTHROW_DMG, "follow_up_only": true,

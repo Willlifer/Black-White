@@ -100,7 +100,7 @@ static func equip_check(run: BWRun, u: BWUnit, item: Dictionary) -> Array:
 		return [true, "Armour — anyone can wear it."]
 	var wc := str(item.weight)
 	var wname := BWText.weapon(wc)
-	return [run.can_equip(u, item), "Anyone can wield it. %s's %s expertise %s sets hit chance and skills." % [u.name, wname, u.expertise_letter(wc)]]
+	return [run.can_equip(u, item), "Anyone can wield it · %s's %s expertise %s" % [u.name, wname, u.expertise_letter(wc)]]
 
 
 ## Weapon classes in data order.
@@ -170,20 +170,29 @@ static func draw_glyph(ci: CanvasItem, stat: String, r: Rect2, col: Color) -> vo
 
 
 ## An element swatch: a filled diamond in the element colour with an ink rim
-## (a hollow one for "no element").
+## (a hollow one for "no element"). D231: with Element kanji on, the kanji
+## follows the diamond in the element's readable colour.
 class Swatch:
 	extends Control
 	var element := ""
+	var _px := 16.0
+	var _kanji := ""
 
 	func _init(el: String = "", px: float = 16.0) -> void:
 		element = el
-		custom_minimum_size = Vector2(px, px)
+		_px = px
+		_kanji = BWKanji.glyph(el) if BWKanji.enabled() else ""
+		custom_minimum_size = Vector2(px + (px * 1.45 if _kanji != "" else 0.0), px)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	func _draw() -> void:
-		var c := size / 2.0
-		var r := minf(size.x, size.y) * 0.48
+		if _kanji != "":
+			var fs := int(_px * 1.15)
+			draw_string(BWKanji.font(0), Vector2(_px + 5.0, size.y * 0.5 + fs * 0.38), _kanji, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
+				BWGearText.readable(BWLook.element_color(element)))
+		var c := Vector2(_px, size.y) / 2.0
+		var r := minf(_px, size.y) * 0.48
 		var pts := PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)])
 		if element == "":
 			pts.append(pts[0])

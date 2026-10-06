@@ -101,6 +101,9 @@ var _stowed_key := ""
 var _hip: BoneAttachment3D
 var _sparkle := -1.0             # staves: the aura strength a handling sparkle set (< 0: none)
 var _sparkle_prev := ["", 0.0]   # the aura before the sparkle
+var _flicker: Array = []         # D220: a Being's tinted parts, flickered in its element each frame
+var _flicker_tint := Color.WHITE
+var _flicker_t := 0.0
 
 static var _sleeves := {}        # garment id -> ArrayMesh (torso trimmed away)
 static var _depth := {}          # mesh id -> {bin: z} back-depth profiles
@@ -255,6 +258,36 @@ func _encounter_look() -> void:
 	_tint_all(self, tint)
 	if kind == "being" and weapon:
 		weapon.set_aura(unit.element, 1.0)
+	if kind == "being":
+		# D220: the body flickers in its element (BWCharacter._update_flicker)
+		_flicker_tint = tint
+		_flicker.clear()
+		_collect_tinted(self, _flicker)
+
+
+static func _collect_tinted(n: Node, out: Array) -> void:
+	if n is GeometryInstance3D and not n is Label3D:
+		out.append(n)
+	for c in n.get_children():
+		_collect_tinted(c, out)
+
+
+## D220: an Elemental Being shimmers: its element tint breathes a few
+## percent on two slow, out-of-step waves, with a rare quick dip and
+## recover (a flame guttering, a current skipping). Tasteful: never more
+## than about 12% from the base glow, no strobing.
+func _update_flicker(delta: float) -> void:
+	_flicker_t += delta
+	var ph := float(absi(hash(unit.id if unit else "")) % 628) / 100.0
+	var t := _flicker_t + ph
+	var k := 1.0 + 0.045 * sin(t * 2.3) + 0.03 * sin(t * 5.7 + 1.3)
+	var dip := fposmod(t, 3.7)
+	if dip < 0.16:
+		k -= 0.1 * sin(PI * dip / 0.16)
+	var c := Color(_flicker_tint.r * k, _flicker_tint.g * k, _flicker_tint.b * k, _flicker_tint.a)
+	for g in _flicker:
+		if is_instance_valid(g):
+			(g as GeometryInstance3D).set_instance_shader_parameter("tint", c)
 
 
 static func _tint_all(n: Node, tint: Color) -> void:
@@ -666,6 +699,8 @@ func _process(delta: float) -> void:
 		_update_sparkle()
 	else:
 		poser.update(delta)
+	if not _flicker.is_empty():
+		_update_flicker(delta)
 
 
 ## Bows: inside a shot clip's arrow windows (meta.arrows, D164: [[nock s,
@@ -848,6 +883,7 @@ func _track_motion(delta: float) -> void:
 	animator.velocity = inv * vel
 	animator.accel = animator.accel.lerp(inv * acc, 1.0 - exp(-delta * 30.0))
 	var dyaw := wrapf(yaw - _last_yaw, -PI, PI)
+	animator.body_scale = global_basis.get_scale().y      # D219: the Colossus's gait rate
 	var vis0 := _yaw_vis
 	_last_pos = gp
 	_last_vel = vel

@@ -12,6 +12,12 @@ extends RefCounted
 ## Matching: whole words, case-insensitive, the longest surface wins ("gale 2"
 ## over "gale"), text inside tags, [hint] and [url] is left alone, so running
 ## it twice changes nothing. One precompiled regex for the whole lexicon.
+##
+## D227 (L-9) stops: phrases that are matched (so the longest still wins) but
+## never linked. STOP_PHRASES are case-insensitive ("light grey" is a colour,
+## not the element); a skill whose name is also a term ("Charge", "Covering
+## Fire") is a case-sensitive stop: the capitalised name is the skill, while
+## "charged tile" or "covering fire" in lower case still link.
 
 const TABLE := "glossary"
 const CATEGORY_ORDER := ["element", "tile", "operator", "rider", "status", "roll", "facing", "rule", "progression"]
@@ -28,23 +34,43 @@ static var _by_term := {}          # term -> id (for hint lookups)
 static var _re: RegEx
 static var _tag_re: RegEx
 static var _loaded := false
+static var _stops := {}            # lower-case stop surface -> true (never linked)
+static var _exact_stops := {}      # exact-case surface -> true (skill names that collide with a term)
+
+## D227: colour and weight words that share a surface with a term.
+const STOP_PHRASES := ["light grey", "light gray", "dark grey", "dark gray", "light greys", "dark greys",
+	"light enough", "light, quick", "light, throwable", "light armour", "light armor"]
 
 
 static func _ensure() -> void:
 	if _loaded:
 		return
 	_loaded = true
-	build(BWData.table(TABLE) if BWData.has_table(TABLE) else [])
+	var skills: Array = []
+	for k in BWSkillRegistry.keys():
+		var n := str(BWSkillRegistry.row(k).get("name", ""))
+		if n != "":
+			skills.append(n)
+	build(BWData.table(TABLE) if BWData.has_table(TABLE) else [], STOP_PHRASES, skills)
 
 
 ## (Re)build the lexicon from rows (the CSV, or a test's own rows).
-static func build(rows: Array) -> void:
+## `stops`: phrases never linked (any case); `skill_names`: exact-case names
+## never linked where they collide with a term (D227).
+static func build(rows: Array, stops: Array = [], skill_names: Array = []) -> void:
 	_loaded = true
 	_entries.clear()
 	_order.clear()
 	_by_word.clear()
 	_by_term.clear()
+	_stops.clear()
+	_exact_stops.clear()
 	var words: Array = []
+	for w in stops:
+		var k := _norm(str(w))
+		if k != "" and not _stops.has(k):
+			_stops[k] = true
+			words.append(k)
 	for r in rows:
 		var id := str(r.get("id", ""))
 		if id == "" or _entries.has(id):
@@ -62,6 +88,10 @@ static func build(rows: Array) -> void:
 			if k != "" and not _by_word.has(k):
 				_by_word[k] = id
 				words.append(k)
+	for n in skill_names:
+		var k := _norm(str(n))
+		if _by_word.has(k):          # only names that collide with a term
+			_exact_stops[" ".join(str(n).split(" ", false))] = true
 	words.sort_custom(func(a, b): return a.length() > b.length() if a.length() != b.length() else a < b)
 	_re = null
 	if not words.is_empty():
@@ -128,7 +158,7 @@ static func terms_in(text: String) -> Array:
 		return ids
 	var plain := _tag_re.sub(text, "", true) if _tag_re else text
 	for m in _re.search_all(plain):
-		var id := str(_by_word.get(_norm(m.get_string(1)), ""))
+		var id := _id_for(m.get_string(1))
 		if id != "" and not id in ids:
 			ids.append(id)
 	return ids
@@ -141,7 +171,7 @@ static func _link(seg: String) -> String:
 	var pos := 0
 	for m in _re.search_all(seg):
 		var surface := m.get_string(1)
-		var id := str(_by_word.get(_norm(surface), ""))
+		var id := _id_for(surface)
 		out += seg.substr(pos, m.get_start(1) - pos)
 		if id == "":
 			out += surface
@@ -149,6 +179,16 @@ static func _link(seg: String) -> String:
 			out += "[hint=%s]%s[/hint]" % [hint_text(id), surface]
 		pos = m.get_end(1)
 	return out + seg.substr(pos)
+
+
+## The id a matched surface links to: "" for a stop (D227).
+static func _id_for(surface: String) -> String:
+	var k := _norm(surface)
+	if _stops.has(k):
+		return ""
+	if _exact_stops.has(" ".join(surface.split(" ", false))):
+		return ""
+	return str(_by_word.get(k, ""))
 
 
 ## The hint string RichTextLabel shows (and Rich parses back): "Term: definition".

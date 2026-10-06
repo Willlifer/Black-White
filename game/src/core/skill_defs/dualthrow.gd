@@ -5,7 +5,7 @@ extends BWSkillDef
 
 func _init() -> void:
 	define({
-		"key": "dualthrow", "name": "Dualthrow", "weapon": "daggers", "clip": "",
+		"key": "dualthrow", "name": "Dualthrow", "weapon": "daggers", "clip": "throw",
 		"desc": "Throw, leaving the element behind the blade, then throw again",
 		"plus": "Dualthrow+: the bounce goes twice (75%, then 50%)",
 		"targeting": "unit", "needs_element": true, "range": BWSkills.DUALTHROW_RANGE, "cd": BWSkills.DEFAULT_CD,

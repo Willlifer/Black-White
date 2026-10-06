@@ -8,7 +8,7 @@ const PLUS_PER_FOE_PCT := 15
 
 func _init() -> void:
 	define({
-		"key": "cleave", "name": "Cleave", "weapon": "axe", "clip": "",
+		"key": "cleave", "name": "Cleave", "weapon": "axe", "clip": "cut",
 		"desc": "Sweep 3 tiles beside you. If the element is already on the ground there, the swing carries further. +10% to everyone per foe caught beyond the first",
 		"plus": "Cleave+: +15% per extra foe (from +10%)",
 		"targeting": "dir", "needs_element": true, "range": 1, "cd": BWSkills.DEFAULT_CD,

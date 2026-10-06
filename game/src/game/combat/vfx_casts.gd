@@ -671,7 +671,7 @@ func dive(v: Node3D, path: Array) -> void:
 	_burst_parts(to + Vector3(0, 0.15, 0), "", 12, 0.02, { "up": 0.8, "spread": 3.5, "g": 1.0, "shape": 3, "life": 0.8, "s0": 0.38 })
 	if screen.feel:
 		screen.feel.shake(0.14)
-	v.pose_named("kneel")
+	v.pose_named("land" if v.has_clip("land") else "kneel")   # D221: the leap's landing, not the KO kneel
 	await get_tree().create_timer(0.3).timeout
 	if screen.rig:
 		var back := create_tween()

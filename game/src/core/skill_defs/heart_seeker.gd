@@ -8,7 +8,7 @@ const CRIT := 25
 
 func _init() -> void:
 	define({
-		"key": "heart_seeker", "name": "Heart Seeker", "weapon": "sword", "clip": "",
+		"key": "heart_seeker", "name": "Heart Seeker", "weapon": "sword", "clip": "thrust",
 		"desc": "A precise thrust at an adjacent enemy: +25 crit chance",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER,

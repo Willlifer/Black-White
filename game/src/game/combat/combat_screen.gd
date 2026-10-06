@@ -62,6 +62,9 @@ var pause_menu: BWPauseMenu
 var readability: BWReadability   # ---- D160-D163 (marked edit)
 var vfx: BWVfxCasts              # ---- D167-D169 cast / spectacle VFX (marked edit)
 var feel: BWHitFeel              # ---- D170 hit feel (marked edit)
+# ---- D223 tutorial hooks (marked edit): BWTutorial steers the real screen
+var gate: Callable               # (kind: click|confirm|cancel|attack|swap|wait|skill, arg) -> may it go through?
+var turn_hook: Callable          # (u: BWUnit) -> true when it played (passed) that turn itself
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -121,6 +124,7 @@ func _ready() -> void:
 		v.setup(u)
 		v.position = _unit_pos(u.pos)
 		_views[u.id] = v
+		_footfalls(v)                     # ---- D219: the Colossus shakes the board as it walks
 	_face_all()
 	var focus := BWLook.world(board.camera_focus, board.elevation(board.camera_focus))
 	rig.follow(focus, true)
@@ -230,6 +234,7 @@ func _on_hover(h: Vector2i) -> void:
 		return
 	_hover = h
 	var under := battle.unit_at(h)
+	BWHPBar3D.hover_unit = under            # D215: the hovered unit's bar shows its numbers
 	if under:
 		ui.set_card(under, battle.tiles, battle.current())
 	elif battle.current():
@@ -274,6 +279,8 @@ func _on_hover(h: Vector2i) -> void:
 func _on_click(h: Vector2i) -> void:
 	if not _player_turn() or h == Vector2i(-1, -1):
 		return
+	if gate.is_valid() and not gate.call("click", h):          # ---- D223
+		return
 	var u := battle.current()
 	var target := battle.unit_at(h)
 	if ui.forecast_open():
@@ -296,6 +303,8 @@ func _on_click(h: Vector2i) -> void:
 
 
 func _on_action(id: String) -> void:
+	if gate.is_valid() and not gate.call(id, null):            # ---- D223
+		return
 	match id:
 		"wait":
 			if _player_turn() and not ui.forecast_open():
@@ -348,6 +357,8 @@ func _on_action(id: String) -> void:
 
 func _on_skill_chosen(key: String, element: String) -> void:
 	if not _player_turn() or ui.forecast_open():
+		return
+	if gate.is_valid() and not gate.call("skill", "%s|%s" % [key, element]):   # ---- D223
 		return
 	var u := battle.current()
 	var row := BWSkills.get_skill(key)
@@ -525,6 +536,8 @@ func _after_events() -> void:
 		if battle.over:
 			break
 		var u := battle.current()
+		if u and turn_hook.is_valid() and turn_hook.call(u):   # ---- D223: the tutorial passes this turn
+			continue
 		if u and BWAI.controls(u, autoplay):          # enemies and autoplay
 			await get_tree().create_timer(0.35).timeout
 			BWAI.take_turn(battle)
@@ -569,6 +582,7 @@ func _play(e: Dictionary) -> void:
 					else:
 						await _animate_leap(_views[e.unit], e.path)
 				"charge", "shove", "knockback", "pull", "push": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
+				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
 		"swap":                                             # ---- D181: put away, draw
 			await _animate_swap(_views[e.unit], e)
@@ -582,6 +596,7 @@ func _play(e: Dictionary) -> void:
 			ui.feed("%s steps back" % _name(e.unit))
 		"attack":
 			var rs := [{ "target": e.target, "result": e.result, "ko": e.ko, "target_hp": e.get("target_hp", -1), "tags": e.get("tags", []), "odds": e.get("odds", {}) }]
+			rs.append_array(_take_line(e))                          # ---- D219: the Colossus's thrust runs through them all at once
 			var tc := _tier(e)                                      # ---- D122
 			var what := "strike %d/%d" % [int(e.strike) + 1, int(e.strikes)] if int(e.get("strike", 0)) > 0 				else (str(e.get("pattern", "")).capitalize() if e.has("strikes") else "")
 			if int(tc.tier) == BWCutsceneTier.MINIMAL:
@@ -631,12 +646,14 @@ func _play(e: Dictionary) -> void:
 			if ranged and ranged.owns(e):                           # ---- D165: Arcing Shot / Rain of Arrows, whole
 				await ranged.play_area(e, stc, call if bool(stc.callout) else {})
 			elif (e.results as Array).is_empty():
-				await _setup_beat(e.unit, sname)
+				await _setup_beat(e.unit, sname, BWSkillRegistry.clip(e.skill), e)    # ---- D221: brace, war cry, aim ...
 			elif int(stc.tier) == BWCutsceneTier.MINIMAL:
-				await _quick_hit(e.unit, e.results, sname, str(e.get("element", "")), BWSkillRegistry.clip(e.skill), stc)
+				var qx := _take_strikes(e, BWSkillRegistry.clip(e.skill))           # ---- D221: Flurry / Hundred Fists blows on the clip's hits
+				await _quick_hit(e.unit, e.results, sname, str(e.get("element", "")), BWSkillRegistry.clip(e.skill), stc, qx)
 			else:
+				var cx := _take_strikes(e, BWSkillRegistry.clip(e.skill))           # ---- D221
 				await _cutscene(e.unit, e.results, sname, e.get("hexes", []), str(e.get("element", "")), BWSkillRegistry.clip(e.skill),
-					call if bool(stc.callout) else {}, stc)
+					call if bool(stc.callout) else {}, stc, cx)
 			if ranged:
 				ranged.context = {}                                 # ---- D165
 			barks.after_action(battle._unit(e.unit), e.results)
@@ -665,6 +682,8 @@ func _play(e: Dictionary) -> void:
 			if sv:
 				_float_status(sv, skey, str(sinfo[0]), str(sinfo[1]))
 				sv.refresh()
+				if BWClipRoute.STATUS_POSE.has(skey) and sv.unit.alive() and sv.has_clip(str(BWClipRoute.STATUS_POSE[skey])):
+					sv.pose_named(str(BWClipRoute.STATUS_POSE[skey]))   # ---- D222: Staggered stumbles, Blinded flinches
 			ui.feed("%s is %s (%s)" % [_name(str(e.get("unit", ""))), sinfo[0], sinfo[1]])
 		"status_end":                                # ---- D102: a ward or status fades with its data
 			var ev: BWUnitView = _views.get(str(e.get("unit", "")))
@@ -811,8 +830,25 @@ func _animate_leap(v: BWUnitView, path: Array) -> void:
 	var from := _unit_pos(path[0])
 	var to := _unit_pos(path[path.size() - 1])
 	v.face(to)
-	v.pose_named("windup")
 	var h := 1.2 + from.distance_to(to) * 0.15
+	if v.has_clip("leap"):
+		# ---- D221: the leap clip: crouch, spring on "launch", the arc flies
+		# the root, a three-point landing on "land" (was: the strike's coil,
+		# then the KO kneel as the landing)
+		v.pose_named("leap")
+		var launch := maxf(v.time_to_marker("launch"), 0.0)
+		var air := maxf(v.time_to_marker("land") - launch, 0.3)
+		await get_tree().create_timer(launch).timeout
+		var lt := create_tween()
+		lt.tween_method(func(t: float): v.position = from.lerp(to, t) + Vector3(0, sin(t * PI) * h, 0),
+			0.0, 1.0, air).set_trans(Tween.TRANS_SINE)
+		await lt.finished
+		v.position = to
+		_shake(0.04)
+		await get_tree().create_timer(0.18).timeout
+		v.idle()
+		return
+	v.pose_named("windup")
 	var tw := create_tween()
 	tw.tween_method(func(t: float): v.position = from.lerp(to, t) + Vector3(0, sin(t * PI) * h, 0),
 		0.0, 1.0, 0.45).set_trans(Tween.TRANS_SINE)
@@ -823,14 +859,44 @@ func _animate_leap(v: BWUnitView, path: Array) -> void:
 
 
 ## Charge (fast) and shove (pushed): a straight slide hex to hex, no hop.
+## D221: a charge (Charge, Lunge) rides in on its strike's held coil, the
+## weapon cocked, and the cutscene's strike releases that same coil (it
+## played the whole strike during the slide, then the strike again).
 func _animate_slide(v: BWUnitView, path: Array, step: float) -> void:
 	var tw := create_tween()
 	for i in range(1, path.size()):
 		tw.tween_property(v, "position", _unit_pos(path[i]), step)
 	if path.size() > 1:
 		v.face(_unit_pos(path[path.size() - 1]))
-	v.pose_named("strike" if step < 0.1 else "hit")
+	var dash := step < 0.1
+	var next := _next_skill(str(v.unit.id)) if dash else {}
+	if dash and not next.is_empty():
+		v.skill = BWSkillRegistry.clip(str(next.skill))
+		v.pose_named("windup")
+	else:
+		v.pose_named("strike" if dash else "hit")
 	await tw.finished
+	if next.is_empty():
+		v.idle()
+
+
+## D221: a thrown unit (Grapple Throw's "place") flies on a low arc and
+## lands on a knee, instead of walking to the hex.
+func _animate_toss(v: BWUnitView, path: Array) -> void:
+	if path.size() < 2:
+		return
+	var from := _unit_pos(path[0])
+	var to := _unit_pos(path[path.size() - 1])
+	v.face(from)
+	v.pose_named("hit")
+	var tw := create_tween()
+	tw.tween_method(func(t: float): v.position = from.lerp(to, t) + Vector3(0, sin(t * PI) * 1.1, 0),
+		0.0, 1.0, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	v.position = to
+	v.pose_named("kneel")
+	_shake(0.08)
+	await get_tree().create_timer(0.2).timeout
 	v.idle()
 
 
@@ -900,7 +966,10 @@ func _animate_walk(v: BWUnitView, path: Array) -> void:
 	tw.tween_method(step, 0.0, dur, dur)
 	await tw.finished
 	v.position = pts[pts.size() - 1]
-	v.idle()
+	if v.has_clip("stomp"):
+		v.pose_named("stomp")              # ---- D219: the Colossus arrives with a stomp (idle follows)
+	else:
+		v.idle()
 	_face_all()
 
 
@@ -928,7 +997,7 @@ static func _trapezoid(t: float, dur: float, ramp: float) -> float:
 ## result; then everything returns.
 ## D122 `tc` (BWCutsceneTier.tier_for): FULL plays the whole thing; SHORT
 ## the zoom and dim on quicker tweens, a ~0.3 s callout and no long holds.
-func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: Array = [], element: String = "", skill_clip: String = "", call: Dictionary = {}, tc: Dictionary = {}) -> void:
+func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: Array = [], element: String = "", skill_clip: String = "", call: Dictionary = {}, tc: Dictionary = {}, extra: Array = []) -> void:
 	var a: BWUnitView = _views[attacker_id]
 	var targets: Array = []
 	for r in results:
@@ -1004,7 +1073,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	var home := a.position
 	# casting: staff spells, and elemental skills used at range (a skill
 	# channels first); striking: every weapon style has a strike clip
-	var use_cast := spell or (not melee and element != "" and skill_name != "" and not (ranged and ranged.handles(a)))   # D165: bows and thrown blades shoot
+	var use_cast := BWClipRoute.casts(a.unit, spell, skill_clip)   # D221: a weapon skill at range strikes (bolt on the hit); D220: a Being casts
 	var clip := a.has_clip("cast") if use_cast else a.has_clip("strike")
 	var to_impact := 0.0
 	if use_cast and clip:
@@ -1043,7 +1112,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 			to_impact = _projectile(a, d, element != "", element if element != "" else a.unit.attuned, bool(results[0].result.hit))
 			if vfx:
 				vfx.at_release(a, targets)                      # ---- D169: Empty the Chamber's fan
-		elif not melee:
+		elif not melee and str(a.unit.encounter) != "colossus":
 			# a reach weapon or a skill at range: the bolt leaves on the hit frame
 			await get_tree().create_timer(maxf(a.time_to_marker("hit"), 0.0)).timeout
 			to_impact = _projectile(a, d, element != "", element if element != "" else a.unit.attuned, bool(results[0].result.hit))
@@ -1091,6 +1160,9 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		lines.append("%s %s" % [t.unit.name, label.strip_edges()])
 	if biggest > 0:
 		feel.shake_blows(targets, results)             # ---- D170: scaled to the hit's share of max HP
+	lines.append_array(await _play_extras(a, extra, melee, str(tc.get("flash", "full"))))   # ---- D221: the clip's later blows
+	if skill_clip == "grapple":
+		await _toss_in_cutscene(a, d)                  # ---- D221: the foe leaves her hands on "throw"
 	ui.feed("%s%s → %s" % [a.unit.name, (" (%s)" % skill_name) if skill_name != "" else "", ", ".join(lines)])
 	# the clip hops back to its stance: return home while it is airborne
 	var back := 0.25
@@ -1169,7 +1241,7 @@ func _dim_all(x: float, nodes: Array) -> void:
 ## numbers float and the odds strip shows briefly. Basic attacks, extra
 ## strikes, counters, overwatch shots and riposte answers play here, and
 ## shorter skills in the Fast mode. A crit gets the tiny flash (`tc.flash`).
-func _quick_hit(attacker_id: String, results: Array, label_text: String, element: String = "", skill_clip: String = "", tc: Dictionary = {}) -> void:
+func _quick_hit(attacker_id: String, results: Array, label_text: String, element: String = "", skill_clip: String = "", tc: Dictionary = {}, extra: Array = []) -> void:
 	var a: BWUnitView = _views[attacker_id]
 	var targets: Array = []
 	for r in results:
@@ -1180,7 +1252,7 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	for t in targets:
 		t.face(a.global_position)
 	var res: Dictionary = r0.result
-	var spell := str(a.unit.weapon().get("damage_type", "")) == "spell"
+	var spell := BWClipRoute.casts(a.unit, str(a.unit.weapon().get("damage_type", "")) == "spell", skill_clip)   # ---- D220: a Being casts
 	var melee := BWHex.distance(a.unit.pos, d.unit.pos) <= 1
 	var reacts: Array = []
 	for k in results.size():
@@ -1213,6 +1285,9 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 		t.refresh()
 		lines.append("%s %s" % [t.unit.name, ("immune" if rk.get("immune", false) else "miss") if not rk.hit else str(rk.damage)])
 	feel.shake_blows(targets, results)               # ---- D170: gentle, scaled to the hit
+	lines.append_array(await _play_extras(a, extra, melee, str(tc.get("flash", "tiny"))))   # ---- D221
+	if skill_clip == "grapple":
+		await _toss_in_cutscene(a, d)                  # ---- D221
 	ui.feed("%s%s → %s" % [a.unit.name, (" " + label_text) if label_text != "" else "", ", ".join(lines)])
 	await _hold(0.45)
 	ui.odds_hide()                                   # ---- D113
@@ -1226,18 +1301,141 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 ## D122: a setup skill (no blows: a guard, a paint, Transfer's lift, War
 ## Cry) plays in place: a short channel if the unit has one, and the feed.
 ## The guard / status / paint events that follow show the rest.
-func _setup_beat(attacker_id: String, skill_name: String) -> void:
+func _setup_beat(attacker_id: String, skill_name: String, skill_clip: String = "", e: Dictionary = {}) -> void:
 	var a: BWUnitView = _views.get(attacker_id)
 	ui.feed("%s: %s" % [_name(attacker_id), skill_name])
 	if a == null:
 		return
+	# ---- D221: the def's pose (brace, war_cry, aim, reload, tumble), else the
+	# channel; a channel aimed at a tile (Transfer, Inversion, Aegis) faces
+	# it and ends in a cast at it
+	var pose := BWClipRoute.setup_pose(skill_clip, a.has_clip, str(a.unit.weapon_class) == "staff")
+	var at: Variant = e.get("target", null)
+	var aimed: bool = at is Vector2i and at != a.unit.pos and battle.board.exists(at)
+	if aimed:
+		a.face(_unit_pos(at))
 	var show: float = vfx.setup(a) if vfx else 0.0       # ---- D169: Ley Line, War Cry, Siphon in place
-	if a.has_clip("channel"):
-		a.pose_named("channel")
-		await _hold(maxf(0.35, show))
-		a.idle()
+	if pose != "":
+		a.pose_named(pose)
+		await _hold(maxf(BWClipRoute.setup_hold(pose), show))
+		if pose == "channel" and aimed and a.has_clip("cast"):
+			a.pose_named("cast")
+			await _hold(maxf(a.time_to_marker("release"), 0.0) + 0.3)
 	elif show > 0.0:
 		await _hold(show)
+	a.idle()                              # (also ends a dash's held coil)
+
+
+# ---- D219-D221 clip routing helpers (the animation fit sweep) ----
+
+## D219: the Colossus's footfalls and stomp shake the camera.
+func _footfalls(v: BWUnitView) -> void:
+	if v.unit == null or str(v.unit.encounter) != "colossus" or v.character == null or v.character.animator == null:
+		return
+	v.character.animator.marker.connect(func(_clip: String, m: String) -> void:
+		if m.begins_with("step"):
+			_shake(0.035)
+		elif m == "stomp":
+			_shake(0.09))
+
+
+## D219: the Colossus's line thrust: the later strikes on the line (queued
+## "attack" events, strike k > 0) join the first one's cutscene, so every
+## foe on the line reacts to the one thrust.
+func _take_line(e: Dictionary) -> Array:
+	var out: Array = []
+	if str(e.get("pattern", "")) != "line" or int(e.get("strike", 0)) != 0 or not _views.has(str(e.unit)):
+		return out
+	if str((_views[str(e.unit)] as BWUnitView).unit.encounter) != "colossus":
+		return out
+	var keep: Array = []
+	for q in _queue:
+		if str(q.get("type", "")) == "attack" and str(q.get("unit", "")) == str(e.unit) and str(q.get("pattern", "")) == "line" \
+				and int(q.get("strike", 0)) > 0 and _views.has(str(q.target)):
+			out.append({ "target": q.target, "result": q.result, "ko": q.ko, "target_hp": q.get("target_hp", -1), "tags": q.get("tags", []),
+				"odds": q.get("odds", {}) })
+			if readability:
+				readability.played(q)
+		else:
+			keep.append(q)
+	_queue = keep
+	return out
+
+
+## D221: a multi-blow clip's later strikes (Flurry 2-3, Hundred Fists 2-6),
+## taken out of the queue to land on the clip's hit2.. markers. Strikes past
+## what the clip shows (a braced Flurry's fourth) stay queued as their own.
+func _take_strikes(e: Dictionary, skill_clip: String) -> Array:
+	var n := BWClipRoute.multi_hits(skill_clip)
+	var out: Array = []
+	if n <= 1:
+		return out
+	var keep: Array = []
+	for q in _queue:
+		if str(q.get("type", "")) == "attack" and str(q.get("unit", "")) == str(e.unit) and str(q.get("skill", "")) == str(e.skill) \
+				and int(q.get("strike", 0)) > 0 and int(q.strike) < n and _views.has(str(q.target)):
+			out.append(q)
+			if readability:
+				readability.played(q)
+		else:
+			keep.append(q)
+	_queue = keep
+	return out
+
+
+## The next queued skill event of a unit ({} = none before its next turn).
+func _next_skill(uid: String) -> Dictionary:
+	for q in _queue:
+		match str(q.get("type", "")):
+			"skill":
+				return q if str(q.get("unit", "")) == uid else {}
+			"turn":
+				return {}
+	return {}
+
+
+## D221: play the taken strikes on the attacker's clip: each blow's
+## reaction meets its own hitN marker; numbers and tags as usual.
+func _play_extras(a: BWUnitView, extra: Array, melee: bool, flash: String) -> PackedStringArray:
+	var lines: PackedStringArray = []
+	for q in extra:
+		var tv: BWUnitView = _views.get(str(q.target))
+		if tv == null or not is_instance_valid(tv):
+			continue
+		var rx := { "target": q.target, "result": q.result, "ko": q.ko, "target_hp": q.get("target_hp", -1), "tags": q.get("tags", []),
+			"odds": q.get("odds", {}) }
+		var at := a.time_to_marker("hit%d" % (int(q.strike) + 1))
+		if at < 0.0:
+			at = 0.12
+		var react := _pick_reaction(tv, rx, melee, "%s|x%d" % [a.unit.id, int(q.strike)])
+		await _react_at(a, [tv], [react], at, [rx], "tiny" if flash != "none" else "none")
+		var rk: Dictionary = rx.result
+		var num := ("IMMUNE" if rk.get("immune", false) else "MISS") if not rk.hit else str(rk.damage)
+		if rk.get("crit", false) and rk.hit:
+			num += "  CRIT"
+		if BWSettings.value("show_numbers"):
+			feel.float_number(tv, num, rk, 0.7)
+		_float_tags(tv, rx)
+		tv.refresh()
+		lines.append("%s %s" % [tv.unit.name, ("immune" if rk.get("immune", false) else "miss") if not rk.hit else str(rk.damage)])
+	return lines
+
+
+## D221: Grapple Throw: the queued "place" of the seized foe flies on the
+## clip's "throw" marker, inside the cutscene.
+func _toss_in_cutscene(a: BWUnitView, d: BWUnitView) -> void:
+	var mv := {}
+	for q in _queue:
+		if str(q.get("type", "")) == "move" and str(q.get("kind", "")) == "place" and str(q.get("unit", "")) == str(d.unit.id):
+			mv = q
+			break
+	if mv.is_empty():
+		return
+	_queue.erase(mv)
+	await get_tree().create_timer(maxf(a.time_to_marker("throw"), 0.0)).timeout
+	await _animate_toss(d, mv.path)
+
+# ---- end D219-D221 ----
 
 
 ## The reaction for one blow on one target: BWReactionPick by context
