@@ -1,0 +1,591 @@
+# Black | White battle maps
+
+The ten 3v3 maps are in `game/maps/*.json`. They use the format that
+`BWBoard.from_dict()` loads (`game/src/core/board.gd`), plus three extra
+fields: `deploy`, `notes` and `camera.focus`. The board loader ignores the
+extra fields today. On every map the enemy starts at the top (row 0) and the
+player at the bottom.
+
+## Reading the pictures
+
+Each hex is a terrain letter followed by its elevation as a hex digit (0–f).
+Odd rows are indented half a hex (pointy-top odd-r, as in `hex.gd`).
+
+| Mark | Meaning |
+|---|---|
+| `n` | neutral |
+| `g` | grassy: fire spreads across it |
+| `m` | muddy: each step costs 2 |
+| `j` | jagged: impassable and blocks sight. Its elevation only sets how tall it looks. |
+| `.` | void (no cell) |
+| `E` / `P` | default enemy / player spawn, on neutral ground |
+| suffix `w`/`f`/`l`/`d` + 1–3 | static charge (D115): water / fire / light / dark at that level, e.g. `n0w3` |
+
+In the four static maps (6–9) both halves are drawn and spawns show as `E`
+on both sides; the bottom three are the player's.
+
+These rules shaped the maps (D17, D20):
+- Every unit moves 4 hexes (daggers 5).
+- A step can rise at most 2 levels, and each level climbed costs 1 extra move.
+  Drops are free.
+- Line of sight is blocked by jagged hexes, and by any hex that stands 2 or
+  more levels above both ends.
+
+## Shared conventions
+
+- **Spawns:** each side has 3 spawns, all inside its own deploy zone. No two
+  spawns overlap.
+- **Deploy:** this is the brief's "3 rows opposite the enemy". Each zone takes
+  the 3 rows at that team's own edge, keeps the hexes closest to the centre
+  line, and holds at most 12 hexes. The player zone is an exact mirror of the
+  enemy zone (an exact 180° rotation on Tinderbox). The one exception is
+  Ravine, which is asymmetric.
+- **Symmetry:** in odd-r layout, an exact left-right mirror needs odd rows to
+  be one hex shorter than even rows. That is why the symmetric maps have a
+  ragged right edge on odd rows. With an odd number of rows, every row keeps
+  its parity when the map is flipped top to bottom, so that mirror is exact.
+- **First contact:** on most maps the spawns are 8–12 hexes apart. Bridge is
+  the exception at 16, but most of that distance is a free downhill walk.
+  After one turn of moving, ranged units are in range on turn 2.
+- **Script checks:** a script checked these things:
+  - every spawn and deploy hex exists and is not jagged;
+  - every spawn can walk to an enemy spawn, using the `step_cost` rule from
+    `board.gd`;
+  - no two spawns overlap.
+
+  It also flags standable hexes that no unit can walk to. Only Tinderbox's
+  berm has these, and that is on purpose.
+
+---
+
+## 1. Arena (`arena.json`, 11×11, 91 cells)
+
+```
+     0  1  2  3  4  5  6  7  8  9  10 
+  0   .  .  . n0 E0 n0 n0 E0 n0  .  .
+  1    .  . n0 j3 n0 E0 n0 j3 n0  .  .
+  2   .  . n0 n0 n0 n0 n0 n0 n0 n0  .
+  3    . n0 n0 n0 n1 n1 n1 n0 n0 n0  .
+  4   . n0 g0 n0 n1 n2 n2 n1 n0 g0 n0
+  5   n0 j3 g0 n1 n2 n2 n2 n1 g0 j3 n0
+  6   . n0 g0 n0 n1 n2 n2 n1 n0 g0 n0
+  7    . n0 n0 n0 n1 n1 n1 n0 n0 n0  .
+  8   .  . n0 n0 n0 n0 n0 n0 n0 n0  .
+  9    .  . n0 j3 n0 P0 n0 j3 n0  .  .
+ 10   .  .  . n0 P0 n0 n0 P0 n0  .  .
+```
+
+**Intent.** This is a symmetric hexagonal arena (radius 5 around (5,5)) and
+the title-screen backdrop.
+- A raised dais at elevation 2 sits in the middle, ringed by steps at
+  elevation 1.
+- Six jagged pillars stand one hex in from each corner.
+- Two small grass wedges on the east and west flanks give fire users something
+  to light.
+
+From the dais a unit can see 79 of the 85 hexes within range 6, so the dais is
+the obvious prize. Getting onto it from the floor costs 2 extra moves.
+
+**Decisions I made**
+- I made the arena a true hexagon, not a rectangle. It looks the same from
+  either side, flipped top to bottom or left to right. That means it looks
+  good from any point on the title-screen orbit. The orbit should circle
+  `camera.focus` (5,5).
+- I built the "ramps" as a full ring of elevation-1 hexes around the dais.
+  Every approach is a 1-level step, so no face of the dais is a dead side.
+- I used six pillars instead of four, one for each corner of the hexagon. They
+  are jagged at elevation 3, so they read as columns.
+- The spawns form a triangle: two on the back edge and one a row forward. On
+  an odd-r edge row, this is the only way to place 3 spawns symmetrically.
+- I kept the grass small (6 hexes), because this is the "fair" map.
+
+## 2. Paintball (`paintball.json`, 11×11, 116 cells)
+
+```
+     0  1  2  3  4  5  6  7  8  9  10 
+  0  n0 n0 n0 E0 n0 E0 n0 E0 n0 n0 n0
+  1   n0 n0 n0 n0 n0 n0 n0 n0 n0 n0  .
+  2  n0 j1 n0 n0 n0 n0 n0 n0 n0 j1 n0
+  3   n0 n0 n2 n2 n0 n0 n2 n2 n0 n0  .
+  4  n0 n0 n0 n0 j1 m0 j1 n0 n0 n0 n0
+  5   n0 j1 m0 m0 m0 m0 m0 m0 j1 n0  .
+  6  n0 n0 n0 n0 j1 m0 j1 n0 n0 n0 n0
+  7   n0 n0 n2 n2 n0 n0 n2 n2 n0 n0  .
+  8  n0 j1 n0 n0 n0 n0 n0 n0 n0 j1 n0
+  9   n0 n0 n0 n0 n0 n0 n0 n0 n0 n0  .
+ 10  n0 n0 n0 P0 n0 P0 n0 P0 n0 n0 n0
+```
+
+**Intent.** This is a mirrored speedball field. Each half has:
+- two 1-hex jagged "can" bunkers near the back corners;
+- two 2-hex walls at elevation 2, which hide ground units from each other;
+- a jagged pair on either side of a muddy centre alley.
+
+A muddy band across row 5 makes rushing the middle cost double. The edge
+columns stay open from end to end. They are long lanes for bows (range 6) and
+pistols (range 5).
+
+**Decisions I made**
+- The "2-high walls" are neutral hexes at elevation 2, not jagged. They still
+  block sight between ground units under D20, because they stand 2 levels
+  above both ends. A unit can climb onto one for 2 extra moves. From there it
+  sees 13 of the 25 far-half hexes within range 6, but it is fully exposed, so
+  the wall works as a risky perch. The bunkers are jagged, as the brief asked.
+- The field is mirrored both left-right and top-bottom, so it looks the same
+  from any corner.
+- The mud is 3 rows deep at the centre and 1 row deep on the flanks. Going
+  through the middle is the shortest route but the slowest. Going round the
+  edge is longer but stays out of the mud.
+
+## 3. Bridge (`bridge.json`, 9×17, 85 cells)
+
+```
+     0  1  2  3  4  5  6  7  8  
+  0   . n5 n5 E5 E5 E5 n5 n5  .
+  1    . j6 n5 n5 n5 n5 j6  .  .
+  2   . n5 n5 n5 n5 n5 n5 n5  .
+  3    .  . n5 n5 n5 n5  .  .  .
+  4   .  .  . n4 n4 n4  .  .  .
+  5    .  . n3 n3 n3 n3  .  .  .
+  6   .  .  . n2 n2 n2  .  .  .
+  7   n0 n0 g2 g2 g2 g2  .  .  .
+  8   . n0 n0 g2 g2 g2  .  .  .
+  9   n0 n0 g2 g2 g2 g2  .  .  .
+ 10   .  .  . n2 n2 n2  .  .  .
+ 11    .  . n3 n3 n3 n3  .  .  .
+ 12   .  .  . n4 n4 n4  .  .  .
+ 13    .  . n5 n5 n5 n5  .  .  .
+ 14   . n5 n5 n5 n5 n5 n5 n5  .
+ 15    . j6 n5 n5 n5 n5 j6  .  .
+ 16   . n5 n5 P5 P5 P5 n5 n5  .
+```
+
+**Intent.** This map follows Hyrule Temple's bridge.
+- Each end is a raised platform at elevation 5, with two jagged pillars for
+  cover.
+- Stairs lead down (5→4→3→2) to a span over void. The span is 3–4 hexes wide
+  and sits at elevation 2.
+- The middle of the span (rows 7–9) is grass, like wooden planks, so fire can
+  cut the bridge in half.
+- An under-ledge at elevation 0 sits on the west side. Stepping down onto it
+  is free, and climbing back up costs 2 extra moves. From the ledge, units can
+  flank or shoot upward: it sees 31 hexes within range 6.
+
+**Decisions I made**
+- The bridge runs vertically (17 rows). That way "deploy in 3 rows" means the
+  same thing here as on every other map.
+- The span alternates between 3 and 4 hexes wide. In odd-r, a vertical strip
+  of constant width zigzags, and alternating the width keeps it centred on
+  x=4.
+- The map is mirrored top to bottom, so there is one ledge, in the middle,
+  and both teams can reach it equally.
+- The spawns are 16 hexes apart. The stairs down are free drops, so each side
+  reaches the top of the span on turn 1, and ranged units engage on turn 2.
+
+## 4. Ravine (`ravine.json`, 12×13, 156 cells), asymmetric
+
+```
+     0  1  2  3  4  5  6  7  8  9  10 11 
+  0  n3 n3 n3 n3 n3 n3 E3 n3 n3 n3 n3 n3
+  1   n3 n3 n3 E3 n3 n3 n3 n3 E3 n3 n3 n3
+  2  n3 n3 j4 n3 n3 n3 n3 n3 n3 j4 n3 n3
+  3   n3 n3 n3 n3 n3 n3 j4 n3 n3 n3 n3 n3
+  4  n3 n2 n3 n3 n3 n3 n3 n3 n3 n3 n3 n3
+  5   m0 n1 m0 m0 m0 m0 m0 m0 m0 m0 m0 m0
+  6  m0 m0 m0 m0 m0 j1 m0 m0 m0 n2 n2 m0
+  7   g4 g4 g4 g4 g4 g4 g4 g4 g4 g4 g4 g4
+  8  g3 g3 g4 g4 g3 g3 g3 g3 g3 g3 g3 g3
+  9   g2 g2 g3 g3 g2 g2 j3 g2 g2 g2 g2 g2
+ 10  n1 g1 g2 g2 g1 g1 g1 g1 g1 g1 g1 n1
+ 11   n0 n0 n1 n1 P0 n0 n0 n0 P0 n0 n0 n0
+ 12  n0 n0 n0 n0 n0 n0 P0 n0 n0 n0 n0 n0
+```
+
+**Intent.** The player starts at the foot of a grassy hill. The hill climbs
+0→1→2→3→4 in 1-level rows to a crest at elevation 4. Below the crest is a
+muddy ravine floor at elevation 0, 2 rows deep. The enemy holds a flat neutral
+plateau at elevation 3 on the far lip.
+
+Both ravine walls are too steep to climb straight up: the enemy side rises 3
+levels and the player side rises 4. Each side has one climbable path, and they
+are at opposite ends:
+- **West, enemy side:** floor 0 → 1 → 2 → plateau 3.
+- **East, player side:** floor 0 → 2 → crest 4.
+
+Anyone can drop into the ravine for free. Getting out means wading through mud
+to the right ramp, so a melee crossing always runs on a diagonal.
+
+**Which side gets the hill, and why that is fair.** The player gets it. The
+crest is the highest ground on the map (4 against 3), but it has three
+costs:
+1. Climbing to it takes about 8 moves. The enemy reaches its lip in one
+   turn.
+2. The whole slope is grass, so one enemy fire spell can spread across the
+   player's approach. The enemy's plateau cannot burn.
+3. The crest has no cover.
+
+The enemy keeps the cheap, safe ground, and the player pays for the view. From
+the crest, a unit sees 25 of the 32 plateau hexes within range 6. From the lip,
+an enemy sees 22 of the 33 hill hexes.
+
+**Decisions I made**
+- The ravine floor is made of low cells, not void. Dropping in is a real
+  tactical option, not a death pit.
+- There are two exits, one in each wall, at opposite corners. This forces a
+  diagonal crossing, so no single choke can be held from both sides.
+- A spur in columns 2–3 rises a level ahead of the rest of the slope. It is a
+  cheaper partial climb on the west.
+- Ranged units meet on turn 2. Melee units meet on turn 3. This map is a
+  shooting gallery first.
+
+## 5. Tinderbox (`tinderbox.json`, 13×13, 163 cells), my own map
+
+```
+     0  1  2  3  4  5  6  7  8  9  10 11 12 
+  0  n0 n0 n0 E0 n0 n0 E0 n0 E0 n0 n0 n0 n0
+  1   n0 n0 n0 n0 n0 n0 n0 n0 n0 n1 n2 n0  .
+  2  g0 g0 n0 n0 g0 g0 n0 n0 n0 j3 n4 n4 n0
+  3   g0 g0 g0 g0 g0 j1 g0 g0 g0 g0 n4 g0  .
+  4  g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0
+  5   g0 g0 j1 g0 g0 g0 g0 g0 g0 g0 g0 g0  .
+  6  m0 m0 n3 n3 n3 n3 g0 n3 n3 n3 n3 m0 m0
+  7   g0 g0 g0 g0 g0 g0 g0 g0 g0 j1 g0 g0  .
+  8  g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0 g0
+  9   g0 n4 g0 g0 g0 g0 j1 g0 g0 g0 g0 g0  .
+ 10  n0 n4 n4 j3 n0 n0 n0 g0 g0 n0 n0 g0 g0
+ 11   n0 n2 n1 n0 n0 n0 n0 n0 n0 n0 n0 n0  .
+ 12  n0 n0 n0 n0 P0 n0 P0 n0 n0 P0 n0 n0 n0
+```
+
+**Intent.** An earth berm at elevation 3 cuts a grass meadow in half. Units on
+the ground cannot climb it, and it hides each side's ground units from the
+other. The berm has three gaps:
+- **Two muddy fords at the edges.** These are slow chokepoints, and fire
+  cannot cross them.
+- **One grassy gap in the centre.** It works as a fuse: fire lit on one side
+  can burn through to the other.
+
+Each side has a stone sniper perch at elevation 4, on that side's left flank,
+so the two perches face each other across the diagonal. A unit reaches its
+perch by a back staircase (0→1→2→4), which takes two turns. From the perch it
+can see over the berm into the near half of the enemy meadow: 13 of 16 hexes
+within range 6. A ground unit standing beside the berm sees none of the far
+side.
+
+**What should emerge**
+- Burning the meadow forces units out to the fords. Mud is slow, so the fords
+  become killing lanes for the enemy perch.
+- The centre gap is the fastest route, and it is also the fire's route.
+  Holding it means standing on the fuse.
+- A side can deny the enemy perch by burning the grass at the foot of its
+  tower. The stairs are neutral, so the perch is never cut off, only dangerous
+  to reach.
+
+**Decisions I made**
+- The map uses 180° rotational symmetry instead of a mirror. That puts each
+  side's perch opposite the other side's weak flank, so the sniper duel runs
+  on a diagonal.
+- The berm is neutral at elevation 3, not jagged. Under D20, jagged hexes
+  always block sight, so a jagged berm would block the perches too. At
+  elevation 3 the berm blocks ground sight, but perches at elevation 4 see
+  over it.
+- No unit can walk onto the berm's 8 hexes, even though they are standable.
+  The checker flags them as scenery, and that is on purpose. If a staircase
+  reached the berm, the berm would become a free bridge, because dropping off
+  either side costs nothing.
+- I named it Tinderbox because the meadow is almost all grass.
+
+---
+
+## Static tiles (D115–D117)
+
+A **static** hex has a permanent floor charge: the map's, nobody's. The
+rules are ELEMENTS.md §5.5. In short:
+
+- It is laid at the start, never decays, and **re-forms at every cycle
+  tick**. Painting on it works for the rest of that cycle: fire steps static
+  water 3 to water 2, a gale copies it, ice glazes it (a frozen lake is
+  walkable), and a second axis painted on top decays normally while the
+  static axis holds.
+- **A detonation spends it.** Thunder on a static hex blows it as usual
+  (static water 3 = a 23% blast), and the hex then stays empty through the
+  *next* cycle too, re-forming at the tick after. Consume spends it the same
+  way. So static water is a bomb every other cycle at best, not every turn.
+- Static fire burns standing and crossing units like any fire. It never
+  ignites grass (restored entries count as spread, not cast).
+- Perks read it as normal ground: Undertow pulls toward static water 3,
+  Shadowstep jumps between static dark hexes, Coal Engine and Heat Rush run
+  on static fire, Waterwalking crosses static water free.
+- **The look** (BWBoardView, D116): an inlaid rim cut into the tile, an ink
+  ring, a band in the element's colour, an inner ink ring, and six ink
+  wedges notched in from the corners with a small colour lozenge at each
+  tip. It sits above the element FX, so it reads under blazing fire, while
+  the charge is stepped down, and while the static is spent. The element
+  FX draw on top of the face as for any charge.
+
+## Static vs seeded: guidance for future maps (D134–D136)
+
+Two kinds of map charge. Both use the same `h` / `v` values; they differ in
+what happens once play touches them.
+
+| | **Static** (`"static"`, D115) | **Seeded** (`"seed"`, D134) |
+|---|---|---|
+| Start | charged | charged |
+| On its own | never decays, re-forms every tick | never decays (holds) |
+| Painted / operated on | works for the cycle, then snaps back | becomes ordinary charge for good |
+| Thunder / Consume | blows it, back two ticks later | blows it, gone for the fight |
+| Look | inlaid rim with corner wedges (always) | thin element-colour ring with a white hairline, **only while untouched** |
+
+Rules of thumb:
+
+- **Seed the ground, make the landmarks static.** A floor that starts dark
+  and gets overwritten is a fight about the floor; a floor that stays dark
+  all game removes options (author, 2026-10-05). Default to seeded.
+- Keep statics **few and small**: one hex or one line that defines the map
+  (the tomb heart, the deep lake, the forge channel, the altar). A static
+  area larger than ~10 hexes needs a reason.
+- Every seeded area should be answerable by at least one common element: an
+  opposite that steps it down (light vs dark, water vs fire), thunder that
+  consumes it, or a second axis that adds to it.
+- Format: the same two forms as statics, with the key `seed` per cell or a
+  top-level `seeds` list (`{ "q", "r", "h", "v" }`). A hex is one or the
+  other; both on one hex is a load error and the static wins.
+
+### Map format (hand-edit)
+
+The HexMapEditor only writes `q, r, terrain, elevation` per cell, so it
+can't carry a static. It does keep unknown top-level keys when it re-saves.
+Two forms load (`BWBoard.from_dict`); seeds use the same forms with `seed` /
+`seeds`:
+
+```json
+{ "q": 6, "r": 5, "terrain": "neutral", "elevation": 0, "static": { "h": -3 } }
+```
+per cell (what the shipped maps use; a re-save in the editor drops it), or
+
+```json
+"statics": [ { "q": 6, "r": 5, "h": -3 }, { "q": 6, "r": 6, "v": 2 } ]
+```
+at the top level, which survives an editor round-trip. `h`: water −3 … +3
+fire, `v`: dark −3 … +3 light; one or both. A static on a jagged hex, a
+missing cell or (0, 0) is a load error. (The editor would also rename the
+B|W terrain kinds on re-save, so these maps are edited by hand anyway.)
+
+The four maps below are mirrored top to bottom (13 rows, so the mirror is
+exact): both sides get the same ground. A script checked spawns, deploy
+zones and walk costs, with static water's move cost included. Every spawn
+reaches the nearest foe spawn in 12–14 move (3–3.5 turns), and no standable
+hex is out of reach. `test_maps` plays an AI fight on each one, and
+`test_static_tiles` plays another with the static-reading perks (rounds at
+seed 11: lake 13, catacombs 12, forge 9, chapel 10).
+
+Renders from the gameplay camera, battle start: `design/art/maps_lake.png`,
+`maps_catacombs.png`, `maps_forge.png`, `maps_chapel.png`.
+
+## 6. Lake (`lake.json`, 13×13, 159 cells, 10 static, 42 seeded)
+
+```
+     0    1    2    3    4    5    6    7    8    9    10   11   12
+  0   .   g2   n2   n2   n2   E2   n2   E2   n2   n2   n2   g2    .
+  1    g2   n2   j4   n2   n2   n2   E2   n2   n2   j4   n2   g2    .
+  2  g2   g2   n2   n1   n1   n1   n1   n1   n1   n1   n2   g2   g2
+  3    g1   g1   n1   n1   g1   j2   n1   j2   g1   n1   n1   g1    .
+  4  n0w1 n0w1 n0w1 n1   n0w1 n0w1 n0w2 n0w1 n0w1 n1   n0w1 n0w1 n0w1
+  5    n0w1 n0w2 n0w2 n1   n0w2 n0w3 n0w3 n0w3 n0w2 n1   n0w2 n0w2  .
+  6  n0w2 n0w2 n0w2 n1   n0w3 n0w3 n1   n0w3 n0w3 n1   n0w2 n0w2 n0w2
+  7    n0w1 n0w2 n0w2 n1   n0w2 n0w3 n0w3 n0w3 n0w2 n1   n0w2 n0w2  .
+  8  n0w1 n0w1 n0w1 n1   n0w1 n0w1 n0w2 n0w1 n0w1 n1   n0w1 n0w1 n0w1
+  9    g1   g1   n1   n1   g1   j2   n1   j2   g1   n1   n1   g1    .
+ 10  g2   g2   n2   n1   n1   n1   n1   n1   n1   n1   n2   g2   g2
+ 11    g2   n2   j4   n2   n2   n2   E2   n2   n2   j4   n2   g2    .
+ 12   .   g2   n2   n2   n2   E2   n2   E2   n2   n2   n2   g2    .
+```
+
+**Intent.** A basin around a deep lake. The deploy shelves (elev 2) step
+down to a shore (elev 1), then to a lake at elev 0:
+- the middle is **static water 3** (10 hexes, +2 move to enter) around a
+  dry island at elev 1;
+- water 2 (+1 move) and water 1 (free, still wet) shallows fill the rest.
+  D136: the shallows are **seeded**: wet from the start, but fire dries
+  them for good; only the deep water 3 is static;
+- two **dry causeways** (elev 1) run straight across on columns 3 and 9.
+
+Walking the causeways is fast but leaves a unit standing in a line. Wading
+is slow. The island is the high point in the middle, but anyone reaching it
+stands in a ring of deep water: one thunder detonation there is a 23% blast
+with half splash. **Undertow** turns the whole lake into a magnet, because
+static water 3 always exists. **Waterwalking** makes the lake a road.
+**Flow State**, **Tidal Guard** and **Current Push** have water everywhere.
+
+## 7. Catacombs (`catacombs.json`, 13×13, 159 cells, 1 static, 58 seeded)
+
+```
+     0    1    2    3    4    5    6    7    8    9    10   11   12
+  0   .   n2   n2   n2   n2   E2   n2   E2   n2   n2   n2   n2    .
+  1    n2   n2   n2   n2   n2   n2   E2   n2   n2   n2   n2   n2    .
+  2  j3   n2   n1   n1   j3   n1   n1   n1   j3   n1   n1   n2   j3
+  3    j3   n0d2 j3   n0d2 j3   n0d2 n0d2 j3   n0d2 j3   n0d2 j3    .
+  4  n0d2 n0d2 j3   n0d2 n0d2 n0d2 j3   n0d2 n0d2 n0d2 j3   n0d2 n0d2
+  5    n0d2 j3   n0d2 n0d2 j3   n1d2 n1d2 j3   n0d2 n0d2 j3   n0d2  .
+  6  n0d2 n0d2 n0d2 j3   n0d2 n1d2 n2d3 n1d2 n0d2 j3   n0d2 n0d2 n0d2
+  7    n0d2 j3   n0d2 n0d2 j3   n1d2 n1d2 j3   n0d2 n0d2 j3   n0d2  .
+  8  n0d2 n0d2 j3   n0d2 n0d2 n0d2 j3   n0d2 n0d2 n0d2 j3   n0d2 n0d2
+  9    j3   n0d2 j3   n0d2 j3   n0d2 n0d2 j3   n0d2 j3   n0d2 j3    .
+ 10  j3   n2   n1   n1   j3   n1   n1   n1   j3   n1   n1   n2   j3
+ 11    n2   n2   n2   n2   n2   n2   E2   n2   n2   n2   n2   n2    .
+ 12   .   n2   n2   n2   n2   E2   n2   E2   n2   n2   n2   n2    .
+```
+
+**Intent.** Two lit galleries (elev 2, plain neutral) above a crypt. The
+crypt floor (elev 0) is a maze of one-hex lanes of **seeded dark 2** (D136)
+between jagged pillars. Anyone in a lane is −14 to hit. In the middle is a raised
+tomb (elev 1–2) with a **dark 3** heart (−21 to hit, and it drains 3% a turn).
+- Pillars break sight lines everywhere, so ranged units fight from the
+  gallery lip and melee wins in the lanes.
+- **Shadowstep** jumps from dark hex to dark hex within 3, ignoring the
+  path, so the walls are porous for dark users only.
+- **Ambush** (+10 crit from dark 2) and **Cover of Night** suit the narrow
+  lanes. **Pall** blinds anyone hit on dark 2+, and that is the whole floor.
+- D136: the lanes and the tomb ring are **seeded**. Light painted into a lane
+  opens it for good, thunder blows it (13%) and leaves it bare, fire adds a
+  fire axis that decays with it. The lanes start as the dark's map and
+  become whoever fights over them. Only the **dark 3 heart** (6, 6) is
+  static: it re-forms every cycle, a landmark that always hides and drains.
+- The high pillars stay (author likes them).
+- Render, mid-fight with lanes overwritten: `design/art/maps_catacombs_seeded.png`.
+
+## 8. Forge (`forge.json`, 13×13, 159 cells, 11 static, 16 seeded)
+
+```
+     0    1    2    3    4    5    6    7    8    9    10   11   12
+  0   .   n3   n3   n3   n3   E3   n3   E3   n3   n3   n3   n3    .
+  1    n3   n3   j5   n3   n3   n3   E3   n3   n3   n3   j5   n3    .
+  2  n3   n3   n3   n2   n2   n3   n3   n3   n2   n2   n3   n3   n3
+  3    n2   n2f1 n2f1 n2f1 n2   n2   n2   n2   n2f1 n2f1 n2f1 n2    .
+  4  m1   m1   n1   n1   n1   j3   n1   j3   n1   n1   n1   m1   m1
+  5    m0   n0   n0   n0f2 n0   n0   n0   n0   n0f2 n0   n0   m0    .
+  6  n0f2 n0f2 n0f2 n0f2 n0   n0f2 n0f2 n0f2 n0   n0f2 n0f2 n0f2 n0f2
+  7    m0   n0   n0   n0f2 n0   n0   n0   n0   n0f2 n0   n0   m0    .
+  8  m1   m1   n1   n1   n1   j3   n1   j3   n1   n1   n1   m1   m1
+  9    n2   n2f1 n2f1 n2f1 n2   n2   n2   n2   n2f1 n2f1 n2f1 n2    .
+ 10  n3   n3   n3   n2   n2   n3   n3   n3   n2   n2   n3   n3   n3
+ 11    n3   n3   j5   n3   n3   n3   E3   n3   n3   n3   j5   n3    .
+ 12   .   n3   n3   n3   n3   E3   n3   E3   n3   n3   n3   n3    .
+```
+
+**Intent.** A stepped foundry. The terraces drop 3 → 2 → 1 → 0 toward a
+central pit, so going in is free and coming back out costs climbs.
+- A **static fire 2** channel runs the length of the pit (8% standing, 4%
+  per hex crossed), with two dry bridges at columns 4 and 8. A fire 2 spur
+  sits on each side of the channel.
+- **Fire 1 runnels** (4% standing, 2% to cross) cut each elev-2 terrace on
+  both flanks, so the edge routes cost a little fire too.
+- Slag **mud** fills the pit's corners and the elev-1 flanks.
+- Two jagged anvils per side guard the middle approach.
+
+Crossing the channel is the risk: a bridge, a burn, or a long climb round.
+**Coal Engine** (+2 move starting on fire 2) and **Heat Rush** (no crossing
+damage, +1 move) turn the channel into a road. **Ember Skin** and
+**Kindling** want to stand in it. Water painted on the channel quenches it
+for one cycle. D136: only the channel row is static; the fire 2 spurs and
+the fire 1 runnels are **seeded**, so water quenches them for good.
+
+## 9. Chapel (`chapel.json`, 13×13, 159 cells, 1 static, 52 seeded)
+
+```
+     0    1    2    3    4    5    6    7    8    9    10   11   12
+  0   .   n1   n1   n1   n1   E1   n1   E1   n1   n1   n1   n1    .
+  1    n1   j4   n1   n1   n1   n1   E1   n1   n1   n1   n1   j4    .
+  2  n1   n1d2 j4   n1   n1   n0l2 n0l2 n0l2 n1   n1   j4   n1d2 n1
+  3    n1d2 n1d2 j4   n1   n1   n0l2 n0l2 n1   n1   j4   n1d2 n1d2  .
+  4  j4   n1d2 j4   n2   n2   n0l2 n0l2 n0l2 n2   n2   j4   n1d2 j4
+  5    n1d2 n1d2 n0   n0   n0   n0l2 n0l2 n0   n0   n0   n1d2 n1d2  .
+  6  n1d1 n1d1 j4   n0   n1l2 n1l2 n2l3 n1l2 n1l2 n0   j4   n1d1 n1d1
+  7    n1d2 n1d2 n0   n0   n0   n0l2 n0l2 n0   n0   n0   n1d2 n1d2  .
+  8  j4   n1d2 j4   n2   n2   n0l2 n0l2 n0l2 n2   n2   j4   n1d2 j4
+  9    n1d2 n1d2 j4   n1   n1   n0l2 n0l2 n1   n1   j4   n1d2 n1d2  .
+ 10  n1   n1d2 j4   n1   n1   n0l2 n0l2 n0l2 n1   n1   j4   n1d2 n1
+ 11    n1   j4   n1   n1   n1   n1   E1   n1   n1   n1   n1   j4    .
+ 12   .   n1   n1   n1   n1   E1   n1   E1   n1   n1   n1   n1    .
+```
+
+**Intent.** A nave. A **static light 2** aisle runs end to end down the
+centre (elev 0). It heals 6% a turn but gives +14 to hit against anyone
+standing in it. At the crossing it widens into a transept with a raised
+**light 3** altar (elev 2: heals 9%, +21 to be hit). Low pews (elev 2) flank
+the aisle. Behind the column rows (jagged, elev 4) on each side are **dark
+2 alcoves** (elev 1, −14 to be hit), with dark 1 at the crossing.
+
+The trade is positional: stand in the light and heal while exposed, or
+hide in the dark alcoves and be far from the fight. Light and dark meet at
+the transept, so painting either one walks the other back for a cycle.
+D136: the aisle and the alcoves are **seeded** and only the light 3 altar
+is static, so a dark user can take the aisle (and light can open an
+alcove) for the rest of the fight.
+**Sunpath**, **Judgement** (no glances on targets in light) and **Glare**
+reward the aisle. **Radiant Guard** cancels its exposure.
+
+## Rotation (D118)
+
+*Superseded by D145 (below).* `BWRun.MAPS`, simplest first: arena, paintball, **lake**, bridge,
+**chapel**, ravine, **catacombs**, tinderbox, **forge**. Fights 1–9 play
+each map once. Fight 10 replays paintball (`map_for` skips the arena on the
+second lap), and the boss fights on the arena, unchanged.
+
+## Rotation (D145, author addendum 2026-10-05)
+
+Fight 4 is always the **Obelisks** and the Giant stays on the arena. The
+other nine slots (fights 1–3 and 5–10) take `BWRun.MAP_POOL` (arena,
+paintball, bridge, lake, chapel, ravine, catacombs, tinderbox, forge) in a
+seeded shuffle of the run's seed (`BWRun.shuffled_maps`, its own rng, so loot
+rolls don't move): nine maps for nine slots, no repeats. The order is saved
+(`map_order`); an older save re-derives it from its seed. The Bridge is back
+in the pool.
+
+## 10. Obelisks (`obelisks.json`, 17×13, 173 cells, 31 seeded), objective map (D140–D145)
+
+```
+     0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16
+  0 .    .    n2   n2   n2   n2   n2   E2   n2   E2   n2   n2   n2   n2   n2   .    .
+  1   .    n2   n2   n2   n2   n2   n2   n2   E2   n2   n2   n2   n2   n2   n2   .    .
+  2 .    .    .    .    n1   n2   n2   n2   n2   n2   n2   n2   j4   n2   n1   .    .
+  3   .    .    .    n1   .    g1   g1   n1   n1   n1   n1   n2   m0d1 m0d1 m0d1 m0d1 .
+  4 .    n1   n1   n1   .    .    j3   n2   n2   n2   n1   n2   m0d1 m0d1 m0d1 m0d1 m0d1
+  5   n1   n1l1 n1l1 n1   .    .    n2   n3   n3   n2   n2   m0d1 m0d1 n4   n4   m0d1 .
+  6 n1   n1l1 L2   n1l1 n1   n1   n2   n3   j5   n3   n2   n2   n3   n4   W4   n4   m0d1
+  7   n1   n1l1 n1l1 n1   .    .    n2   n3   n3   n2   n2   m0d1 m0d1 n4   n4   m0d1 .
+  8 .    n1   n1   n1   .    .    j3   n2   n2   n2   n1   n2   m0d1 m0d1 m0d1 m0d1 m0d1
+  9   .    .    .    n1   .    g1   g1   n1   n1   n1   n1   n2   m0d1 m0d1 m0d1 m0d1 .
+ 10 .    .    .    .    n1   n2   n2   n2   n2   n2   n2   n2   j4   n2   n1   .    .
+ 11   .    n2   n2   n2   n2   n2   n2   n2   P2   n2   n2   n2   n2   n2   n2   .    .
+ 12 .    .    n2   n2   n2   n2   n2   P2   n2   P2   n2   n2   n2   n2   n2   .    .
+```
+`L` = the White Lantern, `W` = the Black Well; `l1` / `d1` = seeded light 1 / dark 1.
+
+**Intent.** Two stones on the centre row, at the west and east ends, so both
+teams (top and bottom, exact mirror) are equally far from each. Break either
+to win (D140).
+- **West, the White Lantern** (dodges ranged): a raised island (elev 1, the
+  stone on a dais at 2) cut off by a two-hex **void** moat, reached by exactly
+  **three bridges**: east (shared), north-east (the enemy's), south-east (the
+  player's). Its ring is **seeded light 1** (heals 3%, +7 to be hit): holding
+  the stone heals you and exposes you. Void blocks sight (D20), so shooters
+  must stand on a bridge to see it: it is the melee stone.
+- **East, the Black Well** (dodges melee): a sheer plateau (elev 4) in a
+  sunken tar moat (mud, elev 0, **seeded dark 1**: −7 to be hit). One way up,
+  the **causeway** from the west (elev 2 then 3). The moat is open ground, so
+  bows and pistols see the Well over it from the lip (elev 2): it is the
+  ranged stone. The Well's pull drags anyone in the moat against its cliff
+  (a slam a turn).
+- **Middle**: a mound (elev 3) round a standing stone (j5), two broken
+  pillars (j3) by the Lantern's bridgeheads, grass at the bridgeheads (fire
+  can cut a bridge off), jagged teeth (j4) on the moat's rim.
+- The map is built by a script (checks: spawn-to-stone walks, sight lines,
+  mirror, reachability); walks from either side: 7–9 move to the Lantern's
+  ring, 10–12 to the Well's plateau; a bow sees the Well within 2–4 move.
+  `test_obelisks.test_obelisks_map` checks the three bridges, the one way up,
+  the mirror distances and reachability.
+
+Renders: `design/art/obelisks_map.png`, `obelisks_lantern.png`,
+`obelisks_well.png`, `obelisks_push.png`, `obelisks_pull.png`,
+`obelisks_ui.png`, `obelisks_forecast.png` (`tools/obelisk_shots.gd`).

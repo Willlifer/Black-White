@@ -1,0 +1,273 @@
+extends RefCounted
+## Phase 6 audio (design/audio/AUDIO.md): every sound the code asks for
+## exists, the music layers are equal-length sample-aligned loops, the bus
+## layout, the cue tables, and no WAV we ship clips. Reads the WAV files
+## themselves (RIFF), not just Godot's imports.
+
+const SRC_DIRS := ["res://src/game/", "res://src/game/audio/", "res://src/game/combat/", "res://src/game/screens/"]
+const SFX_PREFIXES := ["swing_", "hit_", "bow_", "arrow_", "pistol_", "flintlock_", "cast_", "bolt_", "channel_",
+	"elem_", "heal", "tile_", "step_", "ko_", "ui_", "sting_", "progress_"]
+const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "dark", "light"]
+const CEIL := 0.8913          # -1 dBFS
+
+
+## Minimal RIFF reader: { rate, channels, bits, frames, data_offset, ok }.
+static func wav_info(path: String) -> Dictionary:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null or f.get_length() < 44:
+		return { "ok": false }
+	if f.get_buffer(4).get_string_from_ascii() != "RIFF":
+		return { "ok": false }
+	f.get_32()
+	if f.get_buffer(4).get_string_from_ascii() != "WAVE":
+		return { "ok": false }
+	var out := { "ok": false }
+	while f.get_position() + 8 <= f.get_length():
+		var id := f.get_buffer(4).get_string_from_ascii()
+		var size := f.get_32()
+		var at := f.get_position()
+		if id == "fmt ":
+			f.get_16()
+			out.channels = f.get_16()
+			out.rate = f.get_32()
+			f.get_32()
+			f.get_16()
+			out.bits = f.get_16()
+		elif id == "data":
+			out.data_offset = at
+			out.data_size = size
+			out.frames = size / maxi(1, int(out.get("channels", 1)) * int(out.get("bits", 16)) / 8)
+			out.ok = out.has("rate")
+		f.seek(at + size + (size & 1))
+	return out
+
+
+## Peak |sample| (0..1) of a 16-bit PCM WAV, every sample.
+static func wav_peak(path: String) -> float:
+	var info := wav_info(path)
+	if not info.ok or int(info.bits) != 16:
+		return 99.0
+	var f := FileAccess.open(path, FileAccess.READ)
+	f.seek(int(info.data_offset))
+	var ints := f.get_buffer(int(info.data_size)).to_int32_array()     # two 16-bit samples per int
+	var m := 0
+	for v in ints:
+		var lo := v & 0xFFFF
+		if lo >= 32768:
+			lo -= 65536
+		var hi := v >> 16
+		m = maxi(m, maxi(absi(lo), absi(hi)))
+	return m / 32768.0
+
+
+static func _first_last(path: String) -> Array:
+	var info := wav_info(path)
+	var f := FileAccess.open(path, FileAccess.READ)
+	var fb := int(info.channels) * 2
+	f.seek(int(info.data_offset))
+	var a := f.get_buffer(fb)
+	f.seek(int(info.data_offset) + int(info.data_size) - fb)
+	var b := f.get_buffer(fb)
+	return [a.decode_s16(0) / 32768.0, b.decode_s16(0) / 32768.0]
+
+
+static func _sources() -> Array:
+	var out: Array = []
+	for d in SRC_DIRS:
+		for fn in DirAccess.get_files_at(d):
+			if fn.ends_with(".gd"):
+				out.append(d + fn)
+	return out
+
+
+## Every SFX name written as a string literal in the game's scripts.
+static func referenced_sfx() -> Dictionary:
+	var names := {}
+	var re := RegEx.new()
+	re.compile("\"([a-z_]+)\"")
+	for path in _sources():
+		var src := FileAccess.get_file_as_string(path)
+		for m in re.search_all(src):
+			var s := m.get_string(1)
+			for p in SFX_PREFIXES:
+				if s.begins_with(p) and not s.ends_with("_"):
+					names[s] = path.get_file()
+	for e in ELEMENTS:
+		names["elem_" + e] = "unit_audio.gd (\"elem_\" + element)"
+	return names
+
+
+func test_every_referenced_sfx_exists(c) -> void:
+	var refs := referenced_sfx()
+	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
+	c.ok(manifest.size() >= 39, "manifest lists the sound set (%d)" % manifest.size())
+	var checked := 0
+	for n in refs:
+		if not manifest.has(n):
+			if n.begins_with("hit_") or n.begins_with("ui_") or n.begins_with("elem_") or BWSfx.MIX.has(n):
+				c.ok(false, "%s (used in %s) is in sfx.json" % [n, refs[n]])
+			continue
+		var count := int(manifest[n].variants)
+		c.ok(count >= 2, "%s has 2+ variations (%d)" % [n, count])
+		for v in range(1, count + 1):
+			var p := BWSfx.path_of(n, v)
+			c.ok(FileAccess.file_exists(p), "file %s" % p)
+			c.ok(ResourceLoader.exists(p), "imported %s" % p)
+			checked += 1
+	for n in BWSfx.MIX:
+		c.ok(manifest.has(n), "mixed sound %s exists" % n)
+	for n in manifest:
+		c.ok(BWSfx.MIX.has(n), "sound %s has a mix level" % n)
+	c.ok(checked >= 80, "checked %d variation files" % checked)
+
+
+func test_sfx_files_are_clean(c) -> void:
+	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
+	for n in manifest:
+		for v in range(1, int(manifest[n].variants) + 1):
+			var p := ProjectSettings.globalize_path(BWSfx.path_of(n, v))
+			var info := wav_info(p)
+			c.ok(info.ok and int(info.rate) == 44100 and int(info.bits) == 16, "%s_%d is 44.1 kHz 16-bit" % [n, v])
+			var pk := wav_peak(p)
+			c.ok(pk <= CEIL, "%s_%d peak %.3f <= -1 dBFS" % [n, v, pk])
+			var lv: Dictionary = (manifest[n].levels as Array)[v - 1]
+			c.ok(absf(float(lv.loudness) - float((JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).target_loudness)) <= 1.5,
+				"%s_%d loudness %.1f near target" % [n, v, float(lv.loudness)])
+	var loop := ProjectSettings.globalize_path(BWSfx.path_of("channel_loop", 1))
+	var fl := _first_last(loop)
+	c.ok(absf(fl[0] - fl[1]) < 0.02, "channel loop meets itself (%.4f)" % absf(fl[0] - fl[1]))
+
+
+func test_music_layers_are_aligned_loops(c) -> void:
+	var info: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(BWMusic.MANIFEST))
+	c.ok(info is Dictionary and info.has("sets"), "layers.json")
+	for set_name in BWMusic.SETS:
+		var want := int(BWMusic.SET_SAMPLES[set_name])
+		c.eq(int(info.sets[set_name].samples), want, "%s: layers.json length = BWMusic.SET_SAMPLES" % set_name)
+		var bpm := 120.0 * 705600.0 / want
+		c.near(float(info.sets[set_name].bpm), bpm, 0.01, "%s bpm" % set_name)
+		var lengths := {}
+		for layer in BWMusic.SETS[set_name]:
+			var res_path := BWMusic.layer_path(set_name, layer)
+			var p := ProjectSettings.globalize_path(res_path)
+			var w := wav_info(p)
+			c.ok(w.ok, "%s/%s is a WAV" % [set_name, layer])
+			if not w.ok:
+				continue
+			c.eq(int(w.rate), 44100, "%s/%s rate" % [set_name, layer])
+			c.eq(int(w.channels), 2, "%s/%s stereo" % [set_name, layer])
+			c.eq(int(w.frames), want, "%s/%s is exactly 8 bars (%d samples)" % [set_name, layer, want])
+			lengths[layer] = int(w.frames)
+			var st: AudioStream = load(res_path)
+			c.near(st.get_length(), want / 44100.0, 0.001, "%s/%s imports at the same length" % [set_name, layer])
+			var fl := _first_last(p)
+			c.ok(absf(fl[0] - fl[1]) < 0.06, "%s/%s seam step %.4f" % [set_name, layer, absf(fl[0] - fl[1])])
+			var pk := wav_peak(p)
+			c.ok(pk <= CEIL, "%s/%s peak %.3f <= -1 dBFS" % [set_name, layer, pk])
+		var vals := lengths.values()
+		c.ok(not vals.is_empty() and vals.all(func(x): return x == vals[0]), "%s: all layers the same length (sample-aligned)" % set_name)
+	# the tempo sets keep the 8-bar grid: boss is a +8..12% lift, slow is slower
+	var boss_up := float(BWMusic.SET_SAMPLES.main) / float(BWMusic.SET_SAMPLES.boss) - 1.0
+	c.ok(boss_up >= 0.08 and boss_up <= 0.12, "boss tempo +%.1f%%" % (boss_up * 100))
+	c.ok(BWMusic.SET_SAMPLES.slow > BWMusic.SET_SAMPLES.main, "roster/rest set is slower")
+
+
+func test_bus_layout(c) -> void:
+	BWAudio.ensure_buses()
+	BWAudio.ensure_buses()                 # idempotent
+	for b in BWAudio.BUSES:
+		c.ok(AudioServer.get_bus_index(b) >= 0, "bus %s" % b)
+	c.eq(AudioServer.get_bus_index("Master"), 0, "Master is bus 0")
+	for b in BWAudio.SEND:
+		var i := AudioServer.get_bus_index(b)
+		c.eq(str(AudioServer.get_bus_send(i)), str(BWAudio.SEND[b]), "%s sends to %s" % [b, BWAudio.SEND[b]])
+		c.ok(AudioServer.get_bus_index(BWAudio.SEND[b]) < i, "%s sends left" % b)
+	var lim := BWAudio.effect("Master", "AudioEffectHardLimiter") as AudioEffectHardLimiter
+	c.ok(lim != null and lim.ceiling_db <= -0.99, "Master limiter at -1 dB")
+	var comp := BWAudio.effect("Music", "AudioEffectCompressor") as AudioEffectCompressor
+	c.ok(comp != null and str(comp.sidechain) == "Voice", "Music ducks under Voice (sidechain)")
+	c.ok(BWAudio.effect("Music", "AudioEffectAmplify") != null, "Music has the sting duck")
+	c.ok(BWAudio.effect("MusicStretch", "AudioEffectPitchShift") != null, "MusicStretch has the tempo compensation")
+	var n := 0
+	for k in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, k) is AudioEffectHardLimiter:
+			n += 1
+	c.eq(n, 1, "one limiter after two ensures")
+	# per-bus volume setting
+	var before := BWAudio.get_volume("SFX")
+	BWAudio.set_volume("SFX", 0.5)
+	c.near(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX")), float(BWAudio.BASE_DB.SFX) + linear_to_db(0.5), 0.01, "SFX at 0.5")
+	BWAudio.set_volume("SFX", 0.0)
+	c.ok(AudioServer.is_bus_mute(AudioServer.get_bus_index("SFX")), "volume 0 mutes")
+	BWAudio.set_volume("SFX", before)
+	c.near(BWAudio.get_volume("SFX"), before, 0.0001, "restored")
+
+
+func test_cue_tables(c) -> void:
+	for cue in ["title", "roster", "prebattle", "rest", "combat", "boss"]:
+		c.ok(BWMusic.CUES.has(cue), "cue %s" % cue)
+	for cue in BWMusic.CUES:
+		var set_name := str(BWMusic.CUES[cue].set)
+		c.ok(BWMusic.SETS.has(set_name), "%s uses a real set" % cue)
+		for l in BWMusic.CUES[cue].mix:
+			c.ok(l in BWMusic.SETS[set_name], "%s: layer %s is in set %s" % [cue, l, set_name])
+		var mix := BWMusic.cue_mix(cue)
+		c.eq(mix.size(), (BWMusic.SETS[set_name] as Array).size(), "%s: a level for every layer" % cue)
+		var on := 0
+		for l in mix:
+			c.ok(float(mix[l]) <= 0.0 and float(mix[l]) >= BWMusic.OFF_DB, "%s/%s in range" % [cue, l])
+			if float(mix[l]) > BWMusic.OFF_DB:
+				on += 1
+		c.ok(on >= 1, "%s plays something" % cue)
+	c.ok(float(BWMusic.cue_mix("title").full) > BWMusic.OFF_DB and float(BWMusic.cue_mix("title").bright) > BWMusic.OFF_DB, "title: the loop, brightened by its octave-up voicing")
+	c.eq(str(BWMusic.CUES.roster.set), "slow", "roster: slowed")
+	c.ok(float(BWMusic.cue_mix("prebattle").drums) <= BWMusic.OFF_DB, "no drumline before the fight")
+	c.eq(float(BWMusic.cue_mix("combat").drums), 0.0, "combat: the drums come in")
+	c.ok(float(BWMusic.cue_mix("prebattle").bright) > float(BWMusic.cue_mix("prebattle").full), "prebattle: led by the bright voicing (author 10/4)")
+	c.eq(str(BWMusic.CUES.combat.set), "battle", "combat: the slower 108 BPM set (author 10/4)")
+	c.eq(str(BWMusic.CUES.boss.set), "boss", "boss: the +10% set")
+	var boss_on := BWMusic.cue_mix("boss").values().filter(func(v): return v > BWMusic.OFF_DB).size()
+	c.ok(boss_on >= 5, "boss: nearly every layer (%d)" % boss_on)
+	# combat intensity only ever adds energy
+	var steps: Array = BWMusic.CUES.combat.intensity
+	c.eq(steps.size(), 3, "three combat intensities")
+	for k in range(1, 3):
+		var a := BWMusic.cue_mix("combat", k - 1)
+		var b := BWMusic.cue_mix("combat", k)
+		for l in a:
+			c.ok(float(b[l]) >= float(a[l]), "intensity %d -> %d: %s does not drop" % [k - 1, k, l])
+	c.ok(BWMusic.runtime_rate("boss") > 1.08 and BWMusic.runtime_rate("slow") < 0.9, "runtime tempo rates")
+	for k in BWMusic.STINGS:
+		c.ok(BWSfx.variants(BWMusic.STINGS[k]) >= 1, "sting %s exists" % k)
+
+
+func test_barks_and_hooks(c) -> void:
+	# every bark clip the data uses has an onset/gain row, and the file
+	var clips := {}
+	for row in BWData.table("barks"):
+		clips[BWVoice.key(str(row.voice_clip))] = true
+	for k in BWUnitAudio.HIT_GRUNTS:
+		clips[k] = true
+	for k in BWUnitAudio.STRIKE_SHOUTS:
+		clips[k] = true
+	for v in BWUnitAudio.VARIANT_BARKS:
+		for k in BWUnitAudio.VARIANT_BARKS[v].clips:
+			clips[k] = true
+	for k in clips:
+		c.ok(BWVoice.CLIPS.has(k), "bark %s has a start/gain row" % k)
+		c.ok(ResourceLoader.exists(BWBarks.clip_path(k)), "bark file %s" % k)
+		if BWVoice.CLIPS.has(k):
+			var st: AudioStream = load(BWBarks.clip_path(k))
+			c.ok(float(BWVoice.CLIPS[k][0]) < st.get_length() - 0.2, "%s starts inside the clip" % k)
+	# the reactions lane's variants all have a voice
+	var rp: Variant = load("res://src/game/combat/reaction_pick.gd") if ResourceLoader.exists("res://src/game/combat/reaction_pick.gd") else null
+	if rp != null and "VARIANTS" in (rp as GDScript).get_script_constant_map():
+		for v in (rp as GDScript).get_script_constant_map().VARIANTS:
+			c.ok(BWUnitAudio.VARIANT_BARKS.has(v), "reaction %s has a bark" % v)
+	else:
+		c.ok(BWUnitAudio.VARIANT_BARKS.size() == 5, "variant table ready for the reactions lane")
+	# button labels
+	c.eq(BWAudioDirector.press_sound("Begin battle"), "ui_confirm", "Begin -> confirm")
+	c.eq(BWAudioDirector.press_sound("Back"), "ui_cancel", "Back -> cancel")
+	c.eq(BWAudioDirector.press_sound("Shield"), "ui_click", "other -> click")
+	c.eq(BWAudioDirector.press_sound(null), "ui_click", "no label -> click")

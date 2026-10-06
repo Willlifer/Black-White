@@ -1,0 +1,9 @@
+id,name,damage_type,base_dmg,range,speed_mod,move_mod,levels,skills,notes
+sword,Sword,martial,12,1,1,0,str,striketwice|riposte,"V8 sword: the duelist"
+axe,Axe,martial,16,1,-1,0,str,cleave|charge,"V8 axe: hits hardest, moves last"
+lance,Lance,martial,11,2,0,0,str,tridentpierce|vault,"V8 lance: reach 2"
+daggers,Daggers,dexterous,9,1,3,1,dex,consume|daggerleap|dualthrow,"V8 dagger: fastest hands; +1 move (D17 carve-out)"
+bow,Bow,dexterous,11,6,0,0,dex,arcing_shot|energized_shot,"V8 bow"
+pistols,Pistols,dexterous,13,5,-1,0,dex,reload|quick_shot,"V8 flintlock's kit (D9); range 5 not 7 — no falloff any more"
+staff,Staff,spell,11,3,0,0,wil,surge|saturate|ley_line|siphon,"New mage weapon (D5); spells come from the elements doc"
+fists,Fists,martial,8,1,2,1,str,flurry|uppercut|palm_burst,"New class (D76): blunt and elemental; fast hands, +1 move. The daggers' counterpart, up close"

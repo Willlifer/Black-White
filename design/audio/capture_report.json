@@ -1,0 +1,423 @@
+{
+ "sample_rate": 48000,
+ "seconds": 61.035,
+ "fps": 60.0,
+ "sfx_stem": true,
+ "stem_vs_master_lag_samples": 98,
+ "calibration": {
+  "sync_clicks": 3,
+  "found": 3,
+  "lags_ms": [
+   3.6,
+   10.5,
+   0.1
+  ],
+  "output_path_latency_ms": 3.6,
+  "master_limiter_lookahead_ms": 2.04,
+  "note": "time from the frame a sound is started to its first sample in the recording (mix block + latency); every later offset is measured against this. Godot starts a sound at a mix-block boundary, so single sounds scatter by about one block (10.7 ms at 48 kHz)"
+ },
+ "sections": {
+  "title": {
+   "from_s": 1.56,
+   "to_s": 12.56,
+   "rms_dbfs": -22.66,
+   "loudness_lufs": -20.32,
+   "momentary_max_lufs": -15.89,
+   "peak_dbfs": -8.57,
+   "samples_over_-1dBFS": 0,
+   "clipped_samples": 0
+  },
+  "roster": {
+   "from_s": 12.56,
+   "to_s": 24.1,
+   "rms_dbfs": -22.62,
+   "loudness_lufs": -20.27,
+   "momentary_max_lufs": -15.08,
+   "peak_dbfs": -7.32,
+   "samples_over_-1dBFS": 0,
+   "clipped_samples": 0
+  },
+  "combat": {
+   "from_s": 24.1,
+   "to_s": 50.01,
+   "rms_dbfs": -22.07,
+   "loudness_lufs": -19.54,
+   "momentary_max_lufs": -13.61,
+   "peak_dbfs": -5.78,
+   "samples_over_-1dBFS": 0,
+   "clipped_samples": 0
+  },
+  "boss": {
+   "from_s": 50.01,
+   "to_s": 61.0,
+   "rms_dbfs": -20.57,
+   "loudness_lufs": -17.89,
+   "momentary_max_lufs": -14.16,
+   "peak_dbfs": -3.75,
+   "samples_over_-1dBFS": 0,
+   "clipped_samples": 0
+  }
+ },
+ "whole": {
+  "peak_dbfs": -3.75,
+  "clipped_samples": 0,
+  "samples_over_-1dBFS": 0
+ },
+ "music_changes": [
+  {
+   "what": "cue",
+   "quant": "bar",
+   "cue": "roster",
+   "deck": "main",
+   "t_s": 13.568,
+   "grid_s": 2.0,
+   "error_ms": 1.83
+  },
+  {
+   "what": "cue",
+   "quant": "bar",
+   "cue": "combat",
+   "deck": "slow",
+   "t_s": 25.318,
+   "grid_s": 2.3526,
+   "error_ms": -6.82
+  },
+  {
+   "what": "intensity",
+   "quant": "beat",
+   "cue": "combat",
+   "deck": "main",
+   "t_s": 40.803,
+   "grid_s": 0.5,
+   "error_ms": -4.55
+  },
+  {
+   "what": "cue",
+   "quant": "bar",
+   "cue": "boss",
+   "deck": "main",
+   "t_s": 51.304,
+   "grid_s": 2.0,
+   "error_ms": -0.75
+  }
+ ],
+ "music_change_error_ms": {
+  "count": 4,
+  "max_abs": 6.82,
+  "mean_abs": 3.49,
+  "frame_ms": 16.67
+ },
+ "onsets_vs_grid": [
+  {
+   "deck": "main",
+   "cue": "title",
+   "from_s": 1.56,
+   "to_s": 13.57,
+   "onsets": 61,
+   "offset_ms_median": 16.0,
+   "spread_ms_iqr": 73.33,
+   "within_15ms_of_grid": 0.197
+  },
+  {
+   "deck": "main",
+   "cue": "combat",
+   "from_s": 25.32,
+   "to_s": 51.31,
+   "onsets": 149,
+   "offset_ms_median": -4.67,
+   "spread_ms_iqr": 13.0,
+   "within_15ms_of_grid": 0.832
+  },
+  {
+   "deck": "boss",
+   "cue": "boss",
+   "from_s": 51.31,
+   "to_s": 61.03,
+   "onsets": 52,
+   "offset_ms_median": 4.79,
+   "spread_ms_iqr": 13.03,
+   "within_15ms_of_grid": 0.827
+  }
+ ],
+ "sfx_vs_markers": [
+  {
+   "sfx": "bow_release_2.wav",
+   "tag": "release",
+   "unit": "will",
+   "marker": "strike:release",
+   "marker_frame": 1971,
+   "sfx_frame": 1971,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.94,
+   "t_s": 33.486,
+   "led": true,
+   "sound_vs_marker_ms": 2.4
+  },
+  {
+   "sfx": "hit_miss_1.wav",
+   "tag": "impact",
+   "unit": "pip",
+   "marker": "dodge:impact",
+   "marker_frame": 2014,
+   "sfx_frame": 2014,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.93,
+   "t_s": 34.205,
+   "led": true,
+   "sound_vs_marker_ms": -3.5
+  },
+  {
+   "sfx": "bolt_fizz_3.wav",
+   "tag": "release",
+   "unit": "henrietta",
+   "marker": "cast:release",
+   "marker_frame": 2466,
+   "sfx_frame": 2466,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.51,
+   "t_s": 41.739,
+   "led": true,
+   "sound_vs_marker_ms": 3.4
+  },
+  {
+   "sfx": "hit_block_3.wav",
+   "tag": "impact",
+   "unit": "pip",
+   "marker": "kneel:impact",
+   "marker_frame": 2490,
+   "sfx_frame": 2490,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.81,
+   "t_s": 42.138,
+   "led": false,
+   "sound_vs_marker_ms": 17.5
+  },
+  {
+   "sfx": "elem_dark_1.wav",
+   "tag": "impact",
+   "unit": "pip",
+   "marker": "kneel:impact",
+   "marker_frame": 2490,
+   "sfx_frame": 2490,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": false,
+   "score": 0.39,
+   "t_s": 42.139,
+   "led": false
+  },
+  {
+   "sfx": "hit_flesh_4.wav",
+   "tag": "impact",
+   "unit": "jet",
+   "marker": "stricken_shrug:impact",
+   "marker_frame": 2490,
+   "sfx_frame": 2490,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": false,
+   "score": 0.4,
+   "t_s": 42.14,
+   "led": false
+  },
+  {
+   "sfx": "ko_thud_2.wav",
+   "tag": "grounded",
+   "unit": "pip",
+   "marker": "fall:grounded",
+   "marker_frame": 2589,
+   "sfx_frame": 2589,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.95,
+   "t_s": 43.787,
+   "led": true,
+   "sound_vs_marker_ms": 5.2
+  },
+  {
+   "sfx": "swing_light_1.wav",
+   "tag": "launch",
+   "unit": "rory",
+   "marker": "strike:launch",
+   "marker_frame": 2990,
+   "sfx_frame": 2993,
+   "frame_gap": 3,
+   "scheduled_delay_s": 0.05,
+   "found_in_capture": true,
+   "score": 1.0,
+   "t_s": 50.522,
+   "led": true,
+   "aligned_to": "strike:hit",
+   "sound_vs_marker_ms": -0.7
+  },
+  {
+   "sfx": "hit_flesh_1.wav",
+   "tag": "impact",
+   "unit": "will",
+   "marker": "stricken_flinch:impact",
+   "marker_frame": 3013,
+   "sfx_frame": 3013,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.86,
+   "t_s": 50.855,
+   "led": false,
+   "sound_vs_marker_ms": 15.9
+  },
+  {
+   "sfx": "bolt_fizz_1.wav",
+   "tag": "release",
+   "unit": "will",
+   "marker": "cast:release",
+   "marker_frame": 3182,
+   "sfx_frame": 3182,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.53,
+   "t_s": 53.673,
+   "led": true,
+   "sound_vs_marker_ms": 4.4
+  },
+  {
+   "sfx": "hit_miss_3.wav",
+   "tag": "impact",
+   "unit": "rory",
+   "marker": "dodge:impact",
+   "marker_frame": 3208,
+   "sfx_frame": 3208,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.92,
+   "t_s": 54.106,
+   "led": true,
+   "sound_vs_marker_ms": 9.0
+  },
+  {
+   "sfx": "swing_axe_3.wav",
+   "tag": "launch",
+   "unit": "jet",
+   "marker": "strike_axe:launch",
+   "marker_frame": 3420,
+   "sfx_frame": 3420,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.85,
+   "t_s": 57.638,
+   "led": true,
+   "aligned_to": "strike_axe:hit",
+   "sound_vs_marker_ms": 9.1
+  },
+  {
+   "sfx": "hit_flesh_2.wav",
+   "tag": "impact",
+   "unit": "henrietta",
+   "marker": "stricken_shrug:impact",
+   "marker_frame": 3430,
+   "sfx_frame": 3430,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.63,
+   "t_s": 57.806,
+   "led": false,
+   "sound_vs_marker_ms": 8.7
+  },
+  {
+   "sfx": "swing_heavy_1.wav",
+   "tag": "launch",
+   "unit": "henrietta",
+   "marker": "strike:launch",
+   "marker_frame": 3587,
+   "sfx_frame": 3588,
+   "frame_gap": 1,
+   "scheduled_delay_s": 0.026,
+   "found_in_capture": true,
+   "score": 0.86,
+   "t_s": 60.44,
+   "led": true,
+   "aligned_to": "strike:hit",
+   "sound_vs_marker_ms": -8.2
+  },
+  {
+   "sfx": "hit_flesh_3.wav",
+   "tag": "impact",
+   "unit": "jet",
+   "marker": "stricken_stumble:impact",
+   "marker_frame": 3600,
+   "sfx_frame": 3600,
+   "frame_gap": 0,
+   "scheduled_delay_s": 0.0,
+   "found_in_capture": true,
+   "score": 0.63,
+   "t_s": 60.64,
+   "led": false,
+   "sound_vs_marker_ms": 12.1
+  }
+ ],
+ "sfx_sync_summary": {
+  "marker_linked_sounds": 15,
+  "same_frame_as_marker": 13,
+  "led_by_a_frame": 9,
+  "led_max_abs_ms": 9.0,
+  "aligned_peak_vs_marker_ms": [
+   -0.7,
+   9.1,
+   -8.2
+  ],
+  "frame0_impacts_ms": [
+   17.5,
+   15.9,
+   8.7,
+   12.1
+  ],
+  "immediate_sounds": 13,
+  "found_in_capture": 13,
+  "sound_vs_marker_ms_max_abs": 17.5,
+  "within_one_frame": 12
+ },
+ "whoosh_peak_vs_marker": [
+  {
+   "sfx": "cast_whoom_3.wav",
+   "marker": "release",
+   "peak_minus_marker_ms": -0.4,
+   "note": "from the logged start time; the recording-based check is in sfx_vs_markers"
+  },
+  {
+   "sfx": "swing_light_1.wav",
+   "marker": "hit",
+   "peak_minus_marker_ms": -6.7,
+   "note": "from the logged start time; the recording-based check is in sfx_vs_markers"
+  },
+  {
+   "sfx": "cast_whoom_1.wav",
+   "marker": "release",
+   "peak_minus_marker_ms": -1.1,
+   "note": "from the logged start time; the recording-based check is in sfx_vs_markers"
+  },
+  {
+   "sfx": "swing_axe_3.wav",
+   "marker": "hit",
+   "peak_minus_marker_ms": -6.5,
+   "note": "from the logged start time; the recording-based check is in sfx_vs_markers"
+  },
+  {
+   "sfx": "swing_heavy_1.wav",
+   "marker": "hit",
+   "peak_minus_marker_ms": -15.5,
+   "note": "from the logged start time; the recording-based check is in sfx_vs_markers"
+  }
+ ]
+}

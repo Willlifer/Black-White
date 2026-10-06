@@ -1,0 +1,488 @@
+{
+ "version": 1,
+ "rig_version": 1,
+ "neutral_accent": "#8C8C8C",
+ "pieces": {
+  "bandolier": {
+   "slot": "chest",
+   "weight": "ranger",
+   "attach": "socket",
+   "socket": "socket_chest",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "chest"
+   ],
+   "tris": 284,
+   "accent_share": 0.198,
+   "accent_part": "cartridge caps",
+   "covers": [],
+   "notes": "Diagonal leather belt, left shoulder to right hip, with a row of cartridges (coloured caps) and a buckle. Rigid on socket_chest."
+  },
+  "baseball_cap": {
+   "slot": "head",
+   "weight": "ranger",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_top",
+   "hair_clearance": 0.1,
+   "bones": [
+    "head"
+   ],
+   "tris": 114,
+   "accent_share": 0.075,
+   "accent_part": "logo patch and button",
+   "covers": [],
+   "notes": "Six-panel dome, long forward bill (dark underside), logo patch, top button."
+  },
+  "brigandine": {
+   "slot": "chest",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "shoulder_l",
+    "thigh_l",
+    "shoulder_r",
+    "thigh_r"
+   ],
+   "tris": 792,
+   "accent_share": 0.119,
+   "accent_part": "cloth cover bands",
+   "covers": [
+    "torso"
+   ],
+   "notes": "Riveted plate coat: white plate rows with dark rivets between coloured cloth bands; high collar."
+  },
+  "chain_mail": {
+   "slot": "chest",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "shoulder_l",
+    "upper_arm_l",
+    "thigh_l",
+    "shoulder_r",
+    "upper_arm_r",
+    "thigh_r"
+   ],
+   "tris": 792,
+   "accent_share": 0.081,
+   "accent_part": "collar trim",
+   "covers": [
+    "torso",
+    "upper_legs"
+   ],
+   "notes": "Hauberk to mid-thigh with short sleeves; checker of greys reads as rings; padded collar."
+  },
+  "chaps": {
+   "slot": "legs",
+   "weight": "ranger",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "thigh_l",
+    "shin_l",
+    "thigh_r",
+    "shin_r"
+   ],
+   "tris": 700,
+   "accent_share": 0.091,
+   "accent_part": "fringe",
+   "covers": [
+    "legs"
+   ],
+   "notes": "Leather leggings (light grey) with a fringe of teeth down each outer seam and a belt with a front V."
+  },
+  "crown": {
+   "slot": "head",
+   "weight": "wizard",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "show",
+   "hair_clearance": 0.0,
+   "bones": [
+    "head"
+   ],
+   "tris": 288,
+   "accent_share": 0.11,
+   "accent_part": "gems on the band and the point tips",
+   "covers": [],
+   "notes": "Six-point crown sitting on the crown of the head, gems on the band and tips."
+  },
+  "dragoon_helm": {
+   "slot": "head",
+   "weight": "heavy",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_all",
+   "hair_clearance": 0.0,
+   "bones": [
+    "head"
+   ],
+   "tris": 190,
+   "accent_share": 0.172,
+   "accent_part": "crest fin",
+   "covers": [],
+   "notes": "Beaked helm with swept-back horns and a jagged dragon-spine crest."
+  },
+  "feathered_cap": {
+   "slot": "head",
+   "weight": "ranger",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_top",
+   "hair_clearance": 0.13,
+   "bones": [
+    "head"
+   ],
+   "tris": 112,
+   "accent_share": 0.115,
+   "accent_part": "feather",
+   "covers": [],
+   "notes": "Robin Hood cap: long front peak, crown rising to a back point, turned-up brim, tall feather on the left."
+  },
+  "feathered_full_helm": {
+   "slot": "head",
+   "weight": "heavy",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_all",
+   "hair_clearance": 0.0,
+   "bones": [
+    "head"
+   ],
+   "tris": 226,
+   "accent_share": 0.157,
+   "accent_part": "plume",
+   "covers": [],
+   "notes": "Great helm: octagonal bucket, eye slit, rim band, arched plume crest on top."
+  },
+  "gladiator_chestpiece": {
+   "slot": "chest",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "thigh_l",
+    "upper_arm_r",
+    "forearm_r",
+    "thigh_r"
+   ],
+   "tris": 760,
+   "accent_share": 0.234,
+   "accent_part": "belt",
+   "covers": [
+    "right_arm"
+   ],
+   "notes": "Segmented manica on the right arm (rigid upper_arm_r / forearm_r), harness strap, round chest disc, wide coloured belt."
+  },
+  "leather_cuirass": {
+   "slot": "chest",
+   "weight": "ranger",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "upper_arm_l",
+    "thigh_l",
+    "upper_arm_r",
+    "thigh_r"
+   ],
+   "tris": 608,
+   "accent_share": 0.115,
+   "accent_part": "stitching",
+   "covers": [
+    "torso"
+   ],
+   "notes": "Moulded leather barrel (light grey) with shoulder pads; coloured stitching down the front and round the hem."
+  },
+  "leather_tassets": {
+   "slot": "legs",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "thigh_l",
+    "thigh_r"
+   ],
+   "tris": 376,
+   "accent_share": 0.103,
+   "accent_part": "lacing",
+   "covers": [
+    "upper_legs"
+   ],
+   "notes": "Wide belt with five hanging leather plates over the thighs, tied on with coloured lacing."
+  },
+  "platelegs": {
+   "slot": "legs",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "thigh_l",
+    "shin_l",
+    "foot_l",
+    "thigh_r",
+    "shin_r",
+    "foot_r"
+   ],
+   "tris": 816,
+   "accent_share": 0.057,
+   "accent_part": "knee rivets",
+   "covers": [
+    "legs"
+   ],
+   "notes": "Rigid plates per bone: fauld hoop + front tassets (hips), ridged cuisses (thighs), knee cops with big rivets, greaves (shins), sabatons (feet)."
+  },
+  "platemail": {
+   "slot": "chest",
+   "weight": "heavy",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "upper_arm_l",
+    "thigh_l",
+    "upper_arm_r",
+    "thigh_r"
+   ],
+   "tris": 800,
+   "accent_share": 0.057,
+   "accent_part": "tabard",
+   "covers": [
+    "torso",
+    "upper_legs"
+   ],
+   "notes": "Rigid plates per bone: ridged breastplate (chest), two fauld hoops (spine, hips), big pauldrons (upper arms), gorget; cloth tabard hangs in front."
+  },
+  "robe_bottoms": {
+   "slot": "legs",
+   "weight": "wizard",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "thigh_l",
+    "thigh_r"
+   ],
+   "tris": 384,
+   "accent_share": 0.129,
+   "accent_part": "hem band",
+   "covers": [
+    "legs"
+   ],
+   "notes": "Floor-length flared skirt with a dark waist sash and a coloured hem band."
+  },
+  "scarf": {
+   "slot": "chest",
+   "weight": "wizard",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "shoulder_l",
+    "shoulder_r"
+   ],
+   "tris": 240,
+   "accent_share": 0.532,
+   "accent_part": "stripes and fringe (the scarf is the splash)",
+   "covers": [],
+   "notes": "Chunky wrap round the neck with two striped tails down the front; the coloured stripes are the splash."
+  },
+  "silken_robe": {
+   "slot": "chest",
+   "weight": "wizard",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "shoulder_l",
+    "upper_arm_l",
+    "forearm_l",
+    "hand_l",
+    "thigh_l",
+    "shoulder_r",
+    "upper_arm_r",
+    "forearm_r",
+    "hand_r",
+    "thigh_r"
+   ],
+   "tris": 868,
+   "accent_share": 0.058,
+   "accent_part": "sash",
+   "covers": [
+    "torso",
+    "upper_legs",
+    "arms"
+   ],
+   "notes": "Robe to below the knee with wide bell sleeves, crossed collar and a coloured sash with a hanging tail."
+  },
+  "single_shoulder_guard": {
+   "slot": "chest",
+   "weight": "ranger",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "chest",
+    "upper_arm_l"
+   ],
+   "tris": 306,
+   "accent_share": 0.166,
+   "accent_part": "strap",
+   "covers": [],
+   "notes": "Layered pauldron on the left shoulder (rigid upper_arm_l), strap across the chest to the right armpit."
+  },
+  "tiara": {
+   "slot": "head",
+   "weight": "wizard",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "show",
+   "hair_clearance": 0.0,
+   "bones": [
+    "head"
+   ],
+   "tris": 196,
+   "accent_share": 0.097,
+   "accent_part": "centre gem and side gems",
+   "covers": [],
+   "notes": "Band over the hair, rising to three peaks at the front; big centre gem."
+  },
+  "tights": {
+   "slot": "legs",
+   "weight": "ranger",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "thigh_l",
+    "shin_l",
+    "foot_l",
+    "thigh_r",
+    "shin_r",
+    "foot_r"
+   ],
+   "tris": 688,
+   "accent_share": 0.118,
+   "accent_part": "outer-seam stripe",
+   "covers": [
+    "legs"
+   ],
+   "notes": "Skin-tight white leggings with a coloured stripe down each outer seam and a dark waistband."
+  },
+  "tilted_beret": {
+   "slot": "head",
+   "weight": "ranger",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_top",
+   "hair_clearance": 0.15,
+   "bones": [
+    "head"
+   ],
+   "tris": 196,
+   "accent_share": 0.066,
+   "accent_part": "pin",
+   "covers": [],
+   "notes": "Puffy disc tipped to the character's right, dark band, stalk, big pin and two ribbon tails."
+  },
+  "vest": {
+   "slot": "chest",
+   "weight": "ranger",
+   "attach": "skinned",
+   "socket": "",
+   "hair_mode": "",
+   "hair_clearance": 0.0,
+   "bones": [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "shoulder_l",
+    "thigh_l",
+    "shoulder_r",
+    "thigh_r"
+   ],
+   "tris": 304,
+   "accent_share": 0.184,
+   "accent_part": "lining (lapels)",
+   "covers": [
+    "torso"
+   ],
+   "notes": "Open-front sleeveless vest with deep armholes, lapels show the lining, two pocket flaps."
+  },
+  "wizard_hat": {
+   "slot": "head",
+   "weight": "wizard",
+   "attach": "socket",
+   "socket": "socket_hat",
+   "hair_mode": "hide_top",
+   "hair_clearance": 0.22,
+   "bones": [
+    "head"
+   ],
+   "tris": 194,
+   "accent_share": 0.109,
+   "accent_part": "band and star",
+   "covers": [],
+   "notes": "Wide floppy brim, tall crooked cone, coloured band and star badge."
+  }
+ }
+}

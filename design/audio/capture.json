@@ -1,0 +1,2077 @@
+{
+ "fps": 60.0,
+ "markers": [
+  {
+   "clip": "strike",
+   "frame": 1947,
+   "led": false,
+   "marker": "nock",
+   "report_after_lead": false,
+   "true_usec": 34903865,
+   "unit": "will",
+   "usec": 34920538
+  },
+  {
+   "clip": "strike",
+   "frame": 1962,
+   "led": false,
+   "marker": "coil",
+   "report_after_lead": false,
+   "true_usec": 35155768,
+   "unit": "will",
+   "usec": 35172441
+  },
+  {
+   "clip": "strike",
+   "frame": 1962,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 35155783,
+   "unit": "will",
+   "usec": 35172452
+  },
+  {
+   "clip": "strike",
+   "frame": 1971,
+   "led": true,
+   "marker": "release",
+   "report_after_lead": false,
+   "true_usec": 35337379,
+   "unit": "will",
+   "usec": 35320717
+  },
+  {
+   "clip": "strike",
+   "frame": 1972,
+   "led": false,
+   "marker": "release",
+   "report_after_lead": true,
+   "true_usec": 35339279,
+   "unit": "will",
+   "usec": 35339286
+  },
+  {
+   "clip": "strike",
+   "frame": 1975,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 35379947,
+   "unit": "will",
+   "usec": 35388306
+  },
+  {
+   "clip": "dodge",
+   "frame": 2006,
+   "led": true,
+   "marker": "launch",
+   "report_after_lead": false,
+   "true_usec": 35923634,
+   "unit": "pip",
+   "usec": 35906972
+  },
+  {
+   "clip": "dodge",
+   "frame": 2007,
+   "led": false,
+   "marker": "launch",
+   "report_after_lead": true,
+   "true_usec": 35921805,
+   "unit": "pip",
+   "usec": 35921813
+  },
+  {
+   "clip": "strike",
+   "frame": 2012,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 36003948,
+   "unit": "will",
+   "usec": 36003957
+  },
+  {
+   "clip": "dodge",
+   "frame": 2014,
+   "led": true,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 36047287,
+   "unit": "pip",
+   "usec": 36038959
+  },
+  {
+   "clip": "dodge",
+   "frame": 2015,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": true,
+   "true_usec": 36047341,
+   "unit": "pip",
+   "usec": 36055683
+  },
+  {
+   "clip": "dodge",
+   "frame": 2018,
+   "led": false,
+   "marker": "land",
+   "report_after_lead": false,
+   "true_usec": 36087315,
+   "unit": "pip",
+   "usec": 36103988
+  },
+  {
+   "clip": "dodge",
+   "frame": 2020,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 36128928,
+   "unit": "pip",
+   "usec": 36137268
+  },
+  {
+   "clip": "dodge",
+   "frame": 2042,
+   "led": false,
+   "marker": "hop_start",
+   "report_after_lead": false,
+   "true_usec": 36505214,
+   "unit": "pip",
+   "usec": 36505222
+  },
+  {
+   "clip": "dodge",
+   "frame": 2050,
+   "led": false,
+   "marker": "hop_end",
+   "report_after_lead": false,
+   "true_usec": 36629601,
+   "unit": "pip",
+   "usec": 36637942
+  },
+  {
+   "clip": "dodge",
+   "frame": 2065,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 36879811,
+   "unit": "pip",
+   "usec": 36888151
+  },
+  {
+   "clip": "cast",
+   "frame": 2466,
+   "led": true,
+   "marker": "release",
+   "report_after_lead": false,
+   "true_usec": 43581745,
+   "unit": "henrietta",
+   "usec": 43573417
+  },
+  {
+   "clip": "cast",
+   "frame": 2467,
+   "led": false,
+   "marker": "release",
+   "report_after_lead": true,
+   "true_usec": 43580326,
+   "unit": "henrietta",
+   "usec": 43588668
+  },
+  {
+   "clip": "cast",
+   "frame": 2467,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 43580344,
+   "unit": "henrietta",
+   "usec": 43588682
+  },
+  {
+   "clip": "cast",
+   "frame": 2469,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 43621598,
+   "unit": "henrietta",
+   "usec": 43621606
+  },
+  {
+   "clip": "kneel",
+   "frame": 2490,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 43973000,
+   "unit": "pip",
+   "usec": 43973018
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 2490,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 43975528,
+   "unit": "jet",
+   "usec": 43975534
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 2501,
+   "led": true,
+   "marker": "catch",
+   "report_after_lead": false,
+   "true_usec": 44163931,
+   "unit": "jet",
+   "usec": 44155602
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 2502,
+   "led": false,
+   "marker": "catch",
+   "report_after_lead": true,
+   "true_usec": 44163098,
+   "unit": "jet",
+   "usec": 44171439
+  },
+  {
+   "clip": "kneel",
+   "frame": 2509,
+   "led": false,
+   "marker": "down",
+   "report_after_lead": false,
+   "true_usec": 44287902,
+   "unit": "pip",
+   "usec": 44287909
+  },
+  {
+   "clip": "cast",
+   "frame": 2512,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 44329421,
+   "unit": "henrietta",
+   "usec": 44337765
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 2520,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 44454605,
+   "unit": "jet",
+   "usec": 44471278
+  },
+  {
+   "clip": "kneel",
+   "frame": 2524,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 44539374,
+   "unit": "pip",
+   "usec": 44539383
+  },
+  {
+   "clip": "fall",
+   "frame": 2551,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 44989832,
+   "unit": "pip",
+   "usec": 44989837
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 2552,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 44996908,
+   "unit": "jet",
+   "usec": 45005248
+  },
+  {
+   "clip": "fall",
+   "frame": 2589,
+   "led": true,
+   "marker": "grounded",
+   "report_after_lead": false,
+   "true_usec": 45638665,
+   "unit": "pip",
+   "usec": 45622004
+  },
+  {
+   "clip": "fall",
+   "frame": 2590,
+   "led": false,
+   "marker": "grounded",
+   "report_after_lead": true,
+   "true_usec": 45638567,
+   "unit": "pip",
+   "usec": 45638575
+  },
+  {
+   "clip": "fall",
+   "frame": 2615,
+   "led": false,
+   "marker": "still",
+   "report_after_lead": false,
+   "true_usec": 46054928,
+   "unit": "pip",
+   "usec": 46054935
+  },
+  {
+   "clip": "fall",
+   "frame": 2625,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 46224178,
+   "unit": "pip",
+   "usec": 46224187
+  },
+  {
+   "clip": "strike",
+   "frame": 2980,
+   "led": false,
+   "marker": "coil",
+   "report_after_lead": false,
+   "true_usec": 52133620,
+   "unit": "rory",
+   "usec": 52141960
+  },
+  {
+   "clip": "strike",
+   "frame": 2990,
+   "led": true,
+   "marker": "launch",
+   "report_after_lead": false,
+   "true_usec": 52323330,
+   "unit": "rory",
+   "usec": 52306667
+  },
+  {
+   "clip": "strike",
+   "frame": 2991,
+   "led": false,
+   "marker": "launch",
+   "report_after_lead": true,
+   "true_usec": 52322244,
+   "unit": "rory",
+   "usec": 52322251
+  },
+  {
+   "clip": "strike",
+   "frame": 2996,
+   "led": false,
+   "marker": "land",
+   "report_after_lead": false,
+   "true_usec": 52406767,
+   "unit": "rory",
+   "usec": 52406776
+  },
+  {
+   "clip": "strike",
+   "frame": 2999,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 52447489,
+   "unit": "rory",
+   "usec": 52455834
+  },
+  {
+   "clip": "strike",
+   "frame": 2999,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 52447514,
+   "unit": "rory",
+   "usec": 52455853
+  },
+  {
+   "clip": "stricken_flinch",
+   "frame": 3013,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 52689214,
+   "unit": "will",
+   "usec": 52689230
+  },
+  {
+   "clip": "stricken_flinch",
+   "frame": 3020,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 52798082,
+   "unit": "will",
+   "usec": 52806424
+  },
+  {
+   "clip": "stricken_flinch",
+   "frame": 3024,
+   "led": true,
+   "marker": "catch",
+   "report_after_lead": false,
+   "true_usec": 52879719,
+   "unit": "will",
+   "usec": 52871390
+  },
+  {
+   "clip": "stricken_flinch",
+   "frame": 3025,
+   "led": false,
+   "marker": "catch",
+   "report_after_lead": true,
+   "true_usec": 52882485,
+   "unit": "will",
+   "usec": 52890824
+  },
+  {
+   "clip": "strike",
+   "frame": 3026,
+   "led": false,
+   "marker": "hop_start",
+   "report_after_lead": false,
+   "true_usec": 52906832,
+   "unit": "rory",
+   "usec": 52906842
+  },
+  {
+   "clip": "strike",
+   "frame": 3034,
+   "led": false,
+   "marker": "hop_end",
+   "report_after_lead": false,
+   "true_usec": 53031526,
+   "unit": "rory",
+   "usec": 53039868
+  },
+  {
+   "clip": "stricken_flinch",
+   "frame": 3043,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 53172480,
+   "unit": "will",
+   "usec": 53189154
+  },
+  {
+   "clip": "strike",
+   "frame": 3046,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 53239535,
+   "unit": "rory",
+   "usec": 53239543
+  },
+  {
+   "clip": "cast",
+   "frame": 3182,
+   "led": true,
+   "marker": "release",
+   "report_after_lead": false,
+   "true_usec": 55516790,
+   "unit": "will",
+   "usec": 55508460
+  },
+  {
+   "clip": "cast",
+   "frame": 3183,
+   "led": false,
+   "marker": "release",
+   "report_after_lead": true,
+   "true_usec": 55513960,
+   "unit": "will",
+   "usec": 55522301
+  },
+  {
+   "clip": "cast",
+   "frame": 3183,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 55513976,
+   "unit": "will",
+   "usec": 55522313
+  },
+  {
+   "clip": "cast",
+   "frame": 3185,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 55556864,
+   "unit": "will",
+   "usec": 55556871
+  },
+  {
+   "clip": "dodge",
+   "frame": 3200,
+   "led": true,
+   "marker": "launch",
+   "report_after_lead": false,
+   "true_usec": 55827941,
+   "unit": "rory",
+   "usec": 55811280
+  },
+  {
+   "clip": "dodge",
+   "frame": 3201,
+   "led": false,
+   "marker": "launch",
+   "report_after_lead": true,
+   "true_usec": 55826955,
+   "unit": "rory",
+   "usec": 55826964
+  },
+  {
+   "clip": "dodge",
+   "frame": 3208,
+   "led": true,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 55949528,
+   "unit": "rory",
+   "usec": 55941198
+  },
+  {
+   "clip": "dodge",
+   "frame": 3209,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": true,
+   "true_usec": 55949022,
+   "unit": "rory",
+   "usec": 55957363
+  },
+  {
+   "clip": "dodge",
+   "frame": 3212,
+   "led": false,
+   "marker": "land",
+   "report_after_lead": false,
+   "true_usec": 55991676,
+   "unit": "rory",
+   "usec": 56008351
+  },
+  {
+   "clip": "dodge",
+   "frame": 3214,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 56032116,
+   "unit": "rory",
+   "usec": 56040461
+  },
+  {
+   "clip": "cast",
+   "frame": 3228,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 56264753,
+   "unit": "will",
+   "usec": 56273093
+  },
+  {
+   "clip": "dodge",
+   "frame": 3236,
+   "led": false,
+   "marker": "hop_start",
+   "report_after_lead": false,
+   "true_usec": 56407637,
+   "unit": "rory",
+   "usec": 56407649
+  },
+  {
+   "clip": "dodge",
+   "frame": 3244,
+   "led": false,
+   "marker": "hop_end",
+   "report_after_lead": false,
+   "true_usec": 56531659,
+   "unit": "rory",
+   "usec": 56540001
+  },
+  {
+   "clip": "dodge",
+   "frame": 3259,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 56783478,
+   "unit": "rory",
+   "usec": 56791819
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3410,
+   "led": false,
+   "marker": "coil",
+   "report_after_lead": false,
+   "true_usec": 59299425,
+   "unit": "jet",
+   "usec": 59307767
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3420,
+   "led": true,
+   "marker": "launch",
+   "report_after_lead": false,
+   "true_usec": 59489269,
+   "unit": "jet",
+   "usec": 59472607
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3421,
+   "led": false,
+   "marker": "launch",
+   "report_after_lead": true,
+   "true_usec": 59490418,
+   "unit": "jet",
+   "usec": 59490426
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3426,
+   "led": false,
+   "marker": "land",
+   "report_after_lead": false,
+   "true_usec": 59573406,
+   "unit": "jet",
+   "usec": 59573412
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3429,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 59616047,
+   "unit": "jet",
+   "usec": 59624388
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3429,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 59616064,
+   "unit": "jet",
+   "usec": 59624399
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 3430,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 59640472,
+   "unit": "henrietta",
+   "usec": 59640478
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 3441,
+   "led": true,
+   "marker": "catch",
+   "report_after_lead": false,
+   "true_usec": 59831054,
+   "unit": "henrietta",
+   "usec": 59822725
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 3442,
+   "led": false,
+   "marker": "catch",
+   "report_after_lead": true,
+   "true_usec": 59830718,
+   "unit": "henrietta",
+   "usec": 59839059
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3459,
+   "led": false,
+   "marker": "hop_start",
+   "report_after_lead": false,
+   "true_usec": 60115059,
+   "unit": "jet",
+   "usec": 60123402
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 3460,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 60122812,
+   "unit": "henrietta",
+   "usec": 60139488
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3466,
+   "led": false,
+   "marker": "hop_end",
+   "report_after_lead": false,
+   "true_usec": 60242534,
+   "unit": "jet",
+   "usec": 60242543
+  },
+  {
+   "clip": "strike_axe",
+   "frame": 3479,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 60448136,
+   "unit": "jet",
+   "usec": 60456477
+  },
+  {
+   "clip": "stricken_shrug",
+   "frame": 3492,
+   "led": false,
+   "marker": "recovered",
+   "report_after_lead": false,
+   "true_usec": 60664867,
+   "unit": "henrietta",
+   "usec": 60673208
+  },
+  {
+   "clip": "strike",
+   "frame": 3577,
+   "led": false,
+   "marker": "coil",
+   "report_after_lead": false,
+   "true_usec": 62082404,
+   "unit": "henrietta",
+   "usec": 62090752
+  },
+  {
+   "clip": "strike",
+   "frame": 3587,
+   "led": true,
+   "marker": "launch",
+   "report_after_lead": false,
+   "true_usec": 62275282,
+   "unit": "henrietta",
+   "usec": 62258622
+  },
+  {
+   "clip": "strike",
+   "frame": 3588,
+   "led": false,
+   "marker": "launch",
+   "report_after_lead": true,
+   "true_usec": 62274865,
+   "unit": "henrietta",
+   "usec": 62274879
+  },
+  {
+   "clip": "strike",
+   "frame": 3596,
+   "led": false,
+   "marker": "land",
+   "report_after_lead": false,
+   "true_usec": 62398020,
+   "unit": "henrietta",
+   "usec": 62406363
+  },
+  {
+   "clip": "strike",
+   "frame": 3598,
+   "led": false,
+   "marker": "hit",
+   "report_after_lead": false,
+   "true_usec": 62441009,
+   "unit": "henrietta",
+   "usec": 62441019
+  },
+  {
+   "clip": "strike",
+   "frame": 3598,
+   "led": false,
+   "marker": "pose",
+   "report_after_lead": false,
+   "true_usec": 62441029,
+   "unit": "henrietta",
+   "usec": 62441033
+  },
+  {
+   "clip": "stricken_stumble",
+   "frame": 3600,
+   "led": false,
+   "marker": "impact",
+   "report_after_lead": false,
+   "true_usec": 62474358,
+   "unit": "jet",
+   "usec": 62474367
+  }
+ ],
+ "marks": [
+  {
+   "frame": 9,
+   "usec": 1836062,
+   "what": "record_start"
+  },
+  {
+   "frame": 100,
+   "usec": 3396474,
+   "what": "title"
+  },
+  {
+   "frame": 724,
+   "usec": 14394321,
+   "what": "roster"
+  },
+  {
+   "frame": 1409,
+   "usec": 25940239,
+   "what": "combat"
+  },
+  {
+   "frame": 2962,
+   "usec": 51845635,
+   "what": "boss"
+  },
+  {
+   "frame": 3622,
+   "usec": 62839534,
+   "what": "record_stop"
+  }
+ ],
+ "mix_rate": 48000.0,
+ "music": [
+  {
+   "cue": "title",
+   "frame": 100,
+   "type": "cue",
+   "usec": 3388691
+  },
+  {
+   "active": "main",
+   "cue": "title",
+   "deck": "main",
+   "deck_pos_s": 0.00524349427780509,
+   "frame": 100,
+   "from": 0.0,
+   "type": "start",
+   "usec": 3396463
+  },
+  {
+   "active": "main",
+   "cue": "roster",
+   "deck_pos_s": 10.9939429178467,
+   "frame": 724,
+   "type": "cue",
+   "usec": 14389822
+  },
+  {
+   "active": "slow",
+   "bar": 6,
+   "cue": "roster",
+   "deck": "slow",
+   "deck_pos_s": 14.1188403932495,
+   "frame": 782,
+   "from": 14.1156462585034,
+   "type": "start",
+   "usec": 15404411
+  },
+  {
+   "active": "slow",
+   "cue": "roster",
+   "deck": "main",
+   "deck_pos_s": 14.1188483932495,
+   "err_ms": 1.83188854980543,
+   "frame": 782,
+   "grid_s": 2.0,
+   "pos_s": 12.0018318885498,
+   "quant": "bar",
+   "target_s": 12.0,
+   "type": "applied",
+   "usec": 15404421,
+   "what": "cue"
+  },
+  {
+   "active": "slow",
+   "cue": "combat",
+   "deck_pos_s": 5.83818566488647,
+   "frame": 1409,
+   "type": "cue",
+   "usec": 25940221
+  },
+  {
+   "active": "main",
+   "bar": 3,
+   "cue": "combat",
+   "deck": "main",
+   "deck_pos_s": 6.01316250778198,
+   "frame": 1481,
+   "from": 6.0,
+   "type": "start",
+   "usec": 27154371
+  },
+  {
+   "active": "main",
+   "cue": "combat",
+   "deck": "slow",
+   "deck_pos_s": 6.01317050778198,
+   "err_ms": -6.82094910643816,
+   "frame": 1481,
+   "grid_s": 2.35260770975057,
+   "pos_s": 7.05100218014526,
+   "quant": "bar",
+   "target_s": 7.0578231292517,
+   "type": "applied",
+   "usec": 27154383,
+   "what": "cue"
+  },
+  {
+   "active": "main",
+   "cue": "combat",
+   "deck_pos_s": 5.30005796231079,
+   "frame": 2398,
+   "level": 1,
+   "type": "intensity",
+   "usec": 42439814
+  },
+  {
+   "active": "main",
+   "cue": "combat",
+   "deck": "main",
+   "deck_pos_s": 5.4954900300293,
+   "err_ms": -4.54996997070278,
+   "frame": 2410,
+   "grid_s": 0.5,
+   "pos_s": 5.4954500300293,
+   "quant": "beat",
+   "target_s": 5.5,
+   "type": "applied",
+   "usec": 42638940,
+   "what": "intensity"
+  },
+  {
+   "active": "main",
+   "cue": "boss",
+   "deck_pos_s": 14.6969677681885,
+   "frame": 2962,
+   "type": "cue",
+   "usec": 51838484
+  },
+  {
+   "active": "boss",
+   "bar": 0,
+   "cue": "boss",
+   "deck": "boss",
+   "deck_pos_s": 0.00782449427780509,
+   "frame": 3040,
+   "from": 0.0,
+   "type": "start",
+   "usec": 53140226
+  },
+  {
+   "active": "boss",
+   "cue": "boss",
+   "deck": "main",
+   "deck_pos_s": 0.00783149427780509,
+   "err_ms": -0.746467529296524,
+   "frame": 3040,
+   "grid_s": 2.0,
+   "pos_s": 15.9992535324707,
+   "quant": "bar",
+   "target_s": 16.0,
+   "type": "applied",
+   "usec": 53140235,
+   "what": "cue"
+  }
+ ],
+ "output_latency": 0.00999999977648258,
+ "record_start_usec": 1836059,
+ "sections": [
+  [
+   "sync",
+   0.0
+  ],
+  [
+   "title",
+   1.5
+  ],
+  [
+   "roster",
+   12.0
+  ],
+  [
+   "combat",
+   24.0
+  ],
+  [
+   "boss",
+   50.0
+  ],
+  [
+   "end",
+   61.0
+  ]
+ ],
+ "sfx": [
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 39,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 2337160
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 54,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 2586351
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 70,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 2852677
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_hover_3.wav",
+   "frame": 868,
+   "name": "ui_hover",
+   "offset": 0.0,
+   "tag": "roster_browse",
+   "unit": "",
+   "usec": 16848676
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_pick_1.wav",
+   "frame": 896,
+   "name": "ui_pick",
+   "offset": 0.0,
+   "tag": "roster_pick",
+   "unit": "",
+   "usec": 17307659
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_hover_1.wav",
+   "frame": 950,
+   "name": "ui_hover",
+   "offset": 0.0,
+   "tag": "roster_browse",
+   "unit": "",
+   "usec": 18208063
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_pick_2.wav",
+   "frame": 978,
+   "name": "ui_pick",
+   "offset": 0.0,
+   "tag": "roster_pick",
+   "unit": "",
+   "usec": 18675270
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_hover_2.wav",
+   "frame": 1032,
+   "name": "ui_hover",
+   "offset": 0.0,
+   "tag": "roster_browse",
+   "unit": "",
+   "usec": 19575438
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_pick_1.wav",
+   "frame": 1060,
+   "name": "ui_pick",
+   "offset": 0.0,
+   "tag": "roster_pick",
+   "unit": "",
+   "usec": 20041673
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_hover_3.wav",
+   "frame": 1114,
+   "name": "ui_hover",
+   "offset": 0.0,
+   "tag": "roster_browse",
+   "unit": "",
+   "usec": 20942418
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_pick_2.wav",
+   "frame": 1142,
+   "name": "ui_pick",
+   "offset": 0.0,
+   "tag": "roster_pick",
+   "unit": "",
+   "usec": 21408906
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 1431,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 26323694
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1456,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 26739562
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 1479,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 27122257
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1493,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 27353402
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 1506,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 27572303
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 1529,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 27956118
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1556,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 28406188
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 1579,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 28787866
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 1606,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 29237113
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 1630,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 29637817
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 1698,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 30771740
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1712,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 31007384
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 1724,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 31204164
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1737,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 31420574
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 1749,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 31623257
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 1762,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 31840452
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1774,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 32038621
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 1787,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 32256667
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1796,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 32405073
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 1856,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "will",
+   "usec": 33404756
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 1876,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "will",
+   "usec": 33738838
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 1898,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "will",
+   "usec": 34105075
+  },
+  {
+   "delay": 0.0,
+   "file": "bow_draw_1.wav",
+   "frame": 1932,
+   "name": "bow_draw",
+   "offset": 0.0,
+   "tag": "bow_draw",
+   "unit": "will",
+   "usec": 34675926
+  },
+  {
+   "delay": 0.0,
+   "file": "bow_release_2.wav",
+   "frame": 1971,
+   "name": "bow_release",
+   "offset": 0.0,
+   "tag": "release",
+   "unit": "will",
+   "usec": 35321656
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_miss_1.wav",
+   "frame": 2014,
+   "name": "hit_miss",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "pip",
+   "usec": 36041342
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2016,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 36071496
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 2017,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 36088503
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2049,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "pip",
+   "usec": 36621394
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 2138,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 38106955
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2152,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 38340528
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 2164,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 38537714
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2177,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 38754762
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2189,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 38954893
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2202,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 39171194
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2211,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 39321440
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2286,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 40571530
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 2300,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 40804744
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2312,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 41004464
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 2325,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 41221536
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 2337,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 41422256
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2350,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 41637783
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2362,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 41839604
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 2375,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 42056969
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2384,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 42205105
+  },
+  {
+   "delay": 0.0,
+   "file": "channel_loop_2.wav",
+   "frame": 2426,
+   "name": "channel_loop",
+   "offset": 0.0,
+   "tag": "channel",
+   "unit": "",
+   "usec": 42906831
+  },
+  {
+   "delay": 0.0,
+   "file": "cast_whoom_3.wav",
+   "frame": 2460,
+   "name": "cast_whoom",
+   "offset": 0.0186666666666667,
+   "tag": "cast_whoom",
+   "unit": "henrietta",
+   "usec": 43473028
+  },
+  {
+   "delay": 0.0,
+   "file": "bolt_fizz_3.wav",
+   "frame": 2466,
+   "name": "bolt_fizz",
+   "offset": 0.0,
+   "tag": "release",
+   "unit": "henrietta",
+   "usec": 43574690
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_block_3.wav",
+   "frame": 2490,
+   "name": "hit_block",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "pip",
+   "usec": 43974221
+  },
+  {
+   "delay": 0.0,
+   "file": "elem_dark_1.wav",
+   "frame": 2490,
+   "name": "elem_dark",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "pip",
+   "usec": 43974967
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_flesh_4.wav",
+   "frame": 2490,
+   "name": "hit_flesh",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "jet",
+   "usec": 43976300
+  },
+  {
+   "delay": 0.0,
+   "file": "ko_thud_2.wav",
+   "frame": 2589,
+   "name": "ko_thud",
+   "offset": 0.0,
+   "tag": "grounded",
+   "unit": "pip",
+   "usec": 45622939
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2700,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 47472032
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2714,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 47707577
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2726,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 47905986
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2739,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 48124189
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 2751,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 48324723
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 2764,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 48538658
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 2776,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "bartholomew",
+   "usec": 48739259
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 2848,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 49940683
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 2862,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 50172873
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2874,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 50371670
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 2887,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 50591149
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2899,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 50788596
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 2912,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 51005957
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 2921,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 51155615
+  },
+  {
+   "delay": 0.0503333333333333,
+   "file": "swing_light_1.wav",
+   "frame": 2993,
+   "name": "swing_light",
+   "offset": 0.0,
+   "tag": "launch",
+   "unit": "rory",
+   "usec": 52357744
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_flesh_1.wav",
+   "frame": 3013,
+   "name": "hit_flesh",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "will",
+   "usec": 52691197
+  },
+  {
+   "delay": 0.0,
+   "file": "channel_loop_1.wav",
+   "frame": 3142,
+   "name": "channel_loop",
+   "offset": 0.0,
+   "tag": "channel",
+   "unit": "",
+   "usec": 54840515
+  },
+  {
+   "delay": 0.0,
+   "file": "cast_whoom_1.wav",
+   "frame": 3176,
+   "name": "cast_whoom",
+   "offset": 0.0456666666666667,
+   "tag": "cast_whoom",
+   "unit": "will",
+   "usec": 55407367
+  },
+  {
+   "delay": 0.0,
+   "file": "bolt_fizz_1.wav",
+   "frame": 3182,
+   "name": "bolt_fizz",
+   "offset": 0.0,
+   "tag": "release",
+   "unit": "will",
+   "usec": 55509467
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_miss_3.wav",
+   "frame": 3208,
+   "name": "hit_miss",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "rory",
+   "usec": 55942242
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 3210,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 55974021
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 3211,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 55989782
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 3243,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "rory",
+   "usec": 56526065
+  },
+  {
+   "delay": 0.0,
+   "file": "tile_gale_2.wav",
+   "frame": 3271,
+   "name": "tile_gale",
+   "offset": 0.0,
+   "tag": "gale",
+   "unit": "",
+   "usec": 56993509
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 3317,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 57757861
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 3337,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 58092027
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_3.wav",
+   "frame": 3359,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 58457157
+  },
+  {
+   "delay": 0.0,
+   "file": "swing_axe_3.wav",
+   "frame": 3420,
+   "name": "swing_axe",
+   "offset": 0.0,
+   "tag": "launch",
+   "unit": "jet",
+   "usec": 59473590
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_5.wav",
+   "frame": 3426,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 59573696
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_2.wav",
+   "frame": 3426,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 59573724
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_flesh_2.wav",
+   "frame": 3430,
+   "name": "hit_flesh",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "henrietta",
+   "usec": 59641682
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 3465,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 60223031
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_6.wav",
+   "frame": 3466,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "jet",
+   "usec": 60243050
+  },
+  {
+   "delay": 0.026,
+   "file": "swing_heavy_1.wav",
+   "frame": 3588,
+   "name": "swing_heavy",
+   "offset": 0.0,
+   "tag": "launch",
+   "unit": "henrietta",
+   "usec": 62276497
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_1.wav",
+   "frame": 3595,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 62391006
+  },
+  {
+   "delay": 0.0,
+   "file": "step_stone_4.wav",
+   "frame": 3595,
+   "name": "step_stone",
+   "offset": 0.0,
+   "tag": "step",
+   "unit": "henrietta",
+   "usec": 62391044
+  },
+  {
+   "delay": 0.0,
+   "file": "hit_flesh_3.wav",
+   "frame": 3600,
+   "name": "hit_flesh",
+   "offset": 0.0,
+   "tag": "impact",
+   "unit": "jet",
+   "usec": 62475892
+  }
+ ],
+ "voice": [
+  {
+   "clip": "hmm",
+   "frame": 1498,
+   "pitch": 0.939999997615814,
+   "usec": 27444313
+  },
+  {
+   "clip": "hmm",
+   "frame": 2501,
+   "pitch": 1.12000000476837,
+   "usec": 44156739
+  },
+  {
+   "clip": "hmm",
+   "frame": 2550,
+   "pitch": 0.939999997615814,
+   "usec": 44974247
+  },
+  {
+   "clip": "ouch_grunt",
+   "frame": 3013,
+   "pitch": 1.01999998092651,
+   "usec": 52692219
+  },
+  {
+   "clip": "hmm",
+   "frame": 3270,
+   "pitch": 0.939999997615814,
+   "usec": 56973883
+  },
+  {
+   "clip": "hmm",
+   "frame": 3441,
+   "pitch": 0.939999997615814,
+   "usec": 59823942
+  },
+  {
+   "clip": "oogh",
+   "frame": 3600,
+   "pitch": 1.12000000476837,
+   "usec": 62478093
+  }
+ ],
+ "wav_seconds": 61.0346666666667
+}

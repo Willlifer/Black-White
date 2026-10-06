@@ -1,0 +1,34 @@
+
+BASIC ATTACK FORECAST — hit% / crit% / glance% / dmg per clean hit / hits to KO
+defender HP: avg L1 (all 4)=108, tank L1 (con6 def6)=112, grown (all 30)=160, boss (all 50, 500hp)=500
+
+attacker     weapon   element  | avg L1 (all 4)             | tank L1 (con6 def6)        | grown (all 30)             | boss (all 50, 500hp)      
+--------------------------------------------------------------------------------------------------------------------------------------------------
+Bartholomew  axe      water    |  77/ 0.2/ 14  19dmg   6hits |  77/ 0.2/ 16  18dmg   7hits |  74/ 0.2/ 40   1dmg 160hits |  72/ 0.2/ 60   1dmg 500hits
+Alexandra    sword    fire     |  79/ 0.4/ 14  14dmg   8hits |  79/ 0.4/ 16  13dmg   9hits |  76/ 0.4/ 40   1dmg 160hits |  74/ 0.4/ 60   1dmg 500hits
+Aureli       staff    light    |  83/ 0.3/ 14  15dmg   8hits |  83/ 0.3/ 16  16dmg   7hits |  80/ 0.3/ 40   1dmg 160hits |  78/ 0.3/ 60   1dmg 500hits
+Kyla         daggers  thunder  |  81/ 0.6/ 14  12dmg   9hits |  81/ 0.6/ 16  11dmg  11hits |  78/ 0.6/ 40   1dmg 160hits |  76/ 0.6/ 60   1dmg 500hits
+Will         bow      wind     |  80/ 0.5/ 14  13dmg   9hits |  80/ 0.5/ 16  12dmg  10hits |  77/ 0.5/ 40   1dmg 160hits |  75/ 0.5/ 60   1dmg 500hits
+Picassa      staff    dark     |  84/ 0.4/ 14  15dmg   8hits |  84/ 0.4/ 16  16dmg   7hits |  81/ 0.4/ 40   1dmg 160hits |  79/ 0.4/ 60   1dmg 500hits
+Thaddeus     axe      ice      |  76/ 0.1/ 14  19dmg   6hits |  76/ 0.1/ 16  18dmg   7hits |  73/ 0.1/ 40   1dmg 160hits |  71/ 0.1/ 60   1dmg 500hits
+Leopold      sword    light    |  79/ 0.4/ 14  13dmg   9hits |  79/ 0.4/ 16  12dmg  10hits |  76/ 0.4/ 40   1dmg 160hits |  74/ 0.4/ 60   1dmg 500hits
+Gus          axe      fire     |  78/ 0.3/ 14  19dmg   6hits |  78/ 0.3/ 16  18dmg   7hits |  75/ 0.3/ 40   1dmg 160hits |  73/ 0.3/ 60   1dmg 500hits
+Henrietta    lance    dark     |  77/ 0.2/ 14  13dmg   9hits |  77/ 0.2/ 16  12dmg  10hits |  74/ 0.2/ 40   1dmg 160hits |  72/ 0.2/ 60   1dmg 500hits
+Marguerite   lance    water    |  78/ 0.3/ 14  11dmg  10hits |  78/ 0.3/ 16  10dmg  12hits |  75/ 0.3/ 40   1dmg 160hits |  73/ 0.3/ 60   1dmg 500hits
+Zoe          pistols  thunder  |  81/ 0.6/ 14  16dmg   7hits |  81/ 0.6/ 16  15dmg   8hits |  78/ 0.6/ 40   1dmg 160hits |  76/ 0.6/ 60   1dmg 500hits
+Pip          daggers  wind     |  80/ 0.5/ 14  11dmg  10hits |  80/ 0.5/ 16  10dmg  12hits |  77/ 0.5/ 40   1dmg 160hits |  75/ 0.5/ 60   1dmg 500hits
+Ottilie      bow      ice      |  81/ 0.6/ 14  14dmg   8hits |  81/ 0.6/ 16  13dmg   9hits |  78/ 0.6/ 40   1dmg 160hits |  76/ 0.6/ 60   1dmg 500hits
+Nova         pistols  fire     |  79/ 0.4/ 14  14dmg   8hits |  79/ 0.4/ 16  13dmg   9hits |  76/ 0.4/ 40   1dmg 160hits |  74/ 0.4/ 60   1dmg 500hits
+Rory         lance    wind     |  79/ 0.4/ 14  13dmg   9hits |  79/ 0.4/ 16  12dmg  10hits |  76/ 0.4/ 40   1dmg 160hits |  74/ 0.4/ 60   1dmg 500hits
+Montgomery   sword    dark     |  80/ 0.5/ 14  14dmg   8hits |  80/ 0.5/ 16  13dmg   9hits |  77/ 0.5/ 40   1dmg 160hits |  75/ 0.5/ 60   1dmg 500hits
+Jet          axe      thunder  |  80/ 0.5/ 14  16dmg   7hits |  80/ 0.5/ 16  15dmg   8hits |  77/ 0.5/ 40   1dmg 160hits |  75/ 0.5/ 60   1dmg 500hits
+Hugo         lance    ice      |  78/ 0.3/ 14  12dmg   9hits |  78/ 0.3/ 16  11dmg  11hits |  75/ 0.3/ 40   1dmg 160hits |  73/ 0.3/ 60   1dmg 500hits
+Ambrose      bow      light    |  78/ 0.3/ 14  11dmg  10hits |  78/ 0.3/ 16  10dmg  12hits |  75/ 0.3/ 40   1dmg 160hits |  73/ 0.3/ 60   1dmg 500hits
+
+One worked example (first roster row vs avg L1), every number explained:
+  Hit                76.60   = hit basis − avoid  (5–100)   [82.0 − 5.4]
+  Avoid               5.40   = 5 + 0.1 × target DEX   [5 + 0.1 × 4]
+  Glance             14.00   = 10 + target DEF   [10 + 4]
+  Crit                0.20   = 0.1 × DEX + modifiers   [0.1 × 2 +0.0]
+  Damage             19.00   = base − 0.75 × DEF  (min 1)   [22.0 − 0.75 × 4]
+  Expected damage    13.55   = hit × (glance/crit/clean mix) × resist mix   [77% hit, 17.7 per hit]

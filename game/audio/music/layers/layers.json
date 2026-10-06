@@ -1,0 +1,401 @@
+{
+ "bars": 8,
+ "sample_rate": 44100,
+ "sets": {
+  "main": {
+   "samples": 705600,
+   "seconds": 16.0,
+   "bpm": 120.0,
+   "folder": "",
+   "layers": {
+    "full": {
+     "file": "full.wav",
+     "what": "BlackWhite loop, cut on the 8-bar line, reverb tail wrapped into the head",
+     "k_rms_db": -20.0,
+     "peak_db": -1.65,
+     "seam_jump": 0.00151,
+     "step_p99": 0.0136
+    },
+    "bright": {
+     "file": "bright.wav",
+     "what": "the whole loop an octave up (WSOLA x2 + decimate), low-cut at 160 Hz: the lighter voicing",
+     "k_rms_db": -20.0,
+     "peak_db": -1.44,
+     "seam_jump": 0.00174,
+     "step_p99": 0.02678
+    },
+    "calm": {
+     "file": "calm.wav",
+     "what": "harmonic part of full (HPSS), low-passed at 420 Hz: no attacks, softer",
+     "k_rms_db": -20.0,
+     "peak_db": -1.62,
+     "seam_jump": 0.00054,
+     "step_p99": 0.01262
+    },
+    "air": {
+     "file": "air.wav",
+     "what": "harmonic part an octave up (WSOLA x2 + decimate), high-passed at 500 Hz: a shimmer",
+     "k_rms_db": -20.31,
+     "peak_db": -1.05,
+     "seam_jump": 0.01167,
+     "step_p99": 0.03828
+    },
+    "drums": {
+     "file": "drums.wav",
+     "what": "drum_beat 90->120 BPM, pitch kept: WSOLA anchored on every 16th",
+     "k_rms_db": -20.31,
+     "peak_db": -1.05,
+     "seam_jump": 0.0,
+     "step_p99": 0.08085
+    },
+    "drums_top": {
+     "file": "drums_top.wav",
+     "what": "drums high-passed at 5 kHz: hats and shakers only",
+     "k_rms_db": -26.11,
+     "peak_db": -1.05,
+     "seam_jump": 0.00016,
+     "step_p99": 0.24701
+    },
+    "drums_half": {
+     "file": "drums_half.wav",
+     "what": "drum_beat bars 1-4 at half-time (each 16th stretched to an 8th, WSOLA anchored)",
+     "k_rms_db": -20.93,
+     "peak_db": -1.05,
+     "seam_jump": 0.0,
+     "step_p99": 0.07628
+    },
+    "voice_pad": {
+     "file": "voice_pad.wav",
+     "what": "granular pad from the Low fish voice takes, root + fifth on the loop's bass",
+     "k_rms_db": -20.0,
+     "peak_db": -4.09,
+     "seam_jump": 0.01506,
+     "step_p99": 0.02944
+    }
+   }
+  },
+  "slow": {
+   "samples": 830000,
+   "seconds": 18.820862,
+   "bpm": 102.014,
+   "folder": "slow",
+   "layers": {
+    "full": {
+     "file": "slow/full.wav",
+     "what": "full re-timed to 102.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.55,
+     "seam_jump": 0.00233,
+     "step_p99": 0.01355,
+     "chroma_centroid": [
+      "E",
+      178.0
+     ]
+    },
+    "bright": {
+     "file": "slow/bright.wav",
+     "what": "bright re-timed to 102.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.42,
+     "seam_jump": 0.00673,
+     "step_p99": 0.02662,
+     "chroma_centroid": [
+      "E",
+      364.0
+     ]
+    },
+    "calm": {
+     "file": "slow/calm.wav",
+     "what": "calm re-timed to 102.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.53,
+     "seam_jump": 0.00324,
+     "step_p99": 0.01255,
+     "chroma_centroid": [
+      "E",
+      170.0
+     ]
+    },
+    "voice_pad": {
+     "file": "slow/voice_pad.wav",
+     "what": "voice_pad re-timed to 102.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -4.04,
+     "seam_jump": 0.00978,
+     "step_p99": 0.02893,
+     "chroma_centroid": [
+      "E",
+      478.0
+     ]
+    }
+   }
+  },
+  "battle": {
+   "samples": 784000,
+   "seconds": 17.777778,
+   "bpm": 108.0,
+   "folder": "battle",
+   "layers": {
+    "full": {
+     "file": "battle/full.wav",
+     "what": "full re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.59,
+     "seam_jump": 0.00374,
+     "step_p99": 0.01356,
+     "chroma_centroid": [
+      "E",
+      178.0
+     ]
+    },
+    "bright": {
+     "file": "battle/bright.wav",
+     "what": "bright re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.43,
+     "seam_jump": 0.00566,
+     "step_p99": 0.02669,
+     "chroma_centroid": [
+      "E",
+      365.0
+     ]
+    },
+    "air": {
+     "file": "battle/air.wav",
+     "what": "air re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -20.35,
+     "peak_db": -1.05,
+     "seam_jump": 0.0024,
+     "step_p99": 0.03799,
+     "chroma_centroid": [
+      "A",
+      526.0
+     ]
+    },
+    "drums": {
+     "file": "battle/drums.wav",
+     "what": "drums re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -20.32,
+     "peak_db": -1.05,
+     "seam_jump": 0.01993,
+     "step_p99": 0.07967,
+     "chroma_centroid": [
+      "B",
+      397.0
+     ]
+    },
+    "drums_top": {
+     "file": "battle/drums_top.wav",
+     "what": "drums_top re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -26.29,
+     "peak_db": -1.05,
+     "seam_jump": 0.01035,
+     "step_p99": 0.24183,
+     "chroma_centroid": [
+      "A#",
+      8553.0
+     ]
+    },
+    "voice_pad": {
+     "file": "battle/voice_pad.wav",
+     "what": "voice_pad re-timed to 108.0 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -4.02,
+     "seam_jump": 0.0201,
+     "step_p99": 0.02907,
+     "chroma_centroid": [
+      "E",
+      480.0
+     ]
+    }
+   }
+  },
+  "boss": {
+   "samples": 640000,
+   "seconds": 14.512472,
+   "bpm": 132.3,
+   "folder": "boss",
+   "layers": {
+    "full": {
+     "file": "boss/full.wav",
+     "what": "full re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.8,
+     "seam_jump": 0.00453,
+     "step_p99": 0.01355,
+     "chroma_centroid": [
+      "E",
+      178.0
+     ]
+    },
+    "bright": {
+     "file": "boss/bright.wav",
+     "what": "bright re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.4,
+     "seam_jump": 0.00419,
+     "step_p99": 0.02671,
+     "chroma_centroid": [
+      "E",
+      365.0
+     ]
+    },
+    "calm": {
+     "file": "boss/calm.wav",
+     "what": "calm re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -1.61,
+     "seam_jump": 0.00282,
+     "step_p99": 0.01261,
+     "chroma_centroid": [
+      "E",
+      170.0
+     ]
+    },
+    "air": {
+     "file": "boss/air.wav",
+     "what": "air re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.14,
+     "peak_db": -1.05,
+     "seam_jump": 0.00785,
+     "step_p99": 0.03897,
+     "chroma_centroid": [
+      "A",
+      527.0
+     ]
+    },
+    "drums": {
+     "file": "boss/drums.wav",
+     "what": "drums re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.09,
+     "peak_db": -1.05,
+     "seam_jump": 0.00526,
+     "step_p99": 0.08303,
+     "chroma_centroid": [
+      "B",
+      382.0
+     ]
+    },
+    "drums_top": {
+     "file": "boss/drums_top.wav",
+     "what": "drums_top re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -25.68,
+     "peak_db": -1.05,
+     "seam_jump": 0.00385,
+     "step_p99": 0.2569,
+     "chroma_centroid": [
+      "A#",
+      8571.0
+     ]
+    },
+    "voice_pad": {
+     "file": "boss/voice_pad.wav",
+     "what": "voice_pad re-timed to 132.3 BPM (WSOLA)",
+     "k_rms_db": -20.0,
+     "peak_db": -4.3,
+     "seam_jump": 0.02698,
+     "step_p99": 0.02916,
+     "chroma_centroid": [
+      "E",
+      482.0
+     ]
+    }
+   }
+  }
+ },
+ "analysis": {
+  "blackwhite_seam": {
+   "hard_cut_jump": 0.0632,
+   "wrapped_jump": 0.00092
+  },
+  "blackwhite_bands_db": {
+   "20-150": -5.8,
+   "150-300": -1.4,
+   "300-600": -20.3,
+   "600-1200": -24.5,
+   "1200-2400": -45.4,
+   "2400-22050": -70.4
+  },
+  "hpss": {
+   "perc_vs_harm_db": -19.3,
+   "perc_onsets": 50,
+   "perc_grid_dev_ms_mean": 28.9,
+   "shipped": false
+  },
+  "air_plain_highpass_rms_db": -82.3,
+  "drum_stretch": {
+   "source_90": {
+    "onsets": 124,
+    "grid_dev_ms_mean_abs": 9.52,
+    "chroma_centroid": [
+     "B",
+     412.0
+    ]
+   },
+   "wsola_anchored": {
+    "onsets": 124,
+    "grid_dev_ms_mean_abs": 7.63,
+    "chroma_centroid": [
+     "B",
+     387.0
+    ]
+   },
+   "wsola_global": {
+    "onsets": 124,
+    "grid_dev_ms_mean_abs": 8.77,
+    "chroma_centroid": [
+     "B",
+     395.0
+    ]
+   }
+  },
+  "voice_pad": {
+   "grains_pool": 150,
+   "pool_seconds": 3.0
+  }
+ },
+ "bar_roots": [
+  "F#",
+  "F#",
+  "E",
+  "E",
+  "E",
+  "E",
+  "F#",
+  "F#"
+ ],
+ "main_chroma_centroid": {
+  "full": [
+   "E",
+   178.0
+  ],
+  "bright": [
+   "E",
+   365.0
+  ],
+  "calm": [
+   "E",
+   170.0
+  ],
+  "air": [
+   "A",
+   527.0
+  ],
+  "drums": [
+   "B",
+   387.0
+  ],
+  "drums_top": [
+   "A#",
+   8564.0
+  ],
+  "drums_half": [
+   "B",
+   398.0
+  ],
+  "voice_pad": [
+   "E",
+   487.0
+  ]
+ }
+}

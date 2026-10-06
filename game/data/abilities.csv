@@ -1,0 +1,47 @@
+id,name,type,source_item,effect_text,effect_key,params
+ward,Ward,reactive,silken_robe|robe_bottoms,"When you take damage, +1 willpower and +1 resistance for the rest of the battle (up to +5 each).",trigger_stat,trigger=damaged;stats=wil+res;amount=1;cap=5
+iron_wall,Iron Wall,reactive,platelegs,"When you take damage, +1 defense and +1 resistance for the rest of the battle (up to +5 each).",trigger_stat,trigger=damaged;stats=def+res;amount=1;cap=5
+enrage,Enrage,reactive,leather_tassets,"When you take damage, +1 strength and +1 defense for the rest of the battle (up to +5 each).",trigger_stat,trigger=damaged;stats=str+def;amount=1;cap=5
+light_footed,Light Footed,reactive,chaps,"When you take damage, +1 dexterity and +1 speed for the rest of the battle (up to +5 each).",trigger_stat,trigger=damaged;stats=dex+spd;amount=1;cap=5
+encore,Encore,reactive,tilted_beret,"When you knock out an enemy, +1 speed for the rest of the battle (up to +3).",trigger_stat,trigger=knockout;stats=spd;amount=1;cap=3
+poise,Poise,reactive,tiara,"When you avoid an attack, +1 willpower for the rest of the battle (up to +3).",trigger_stat,trigger=avoided;stats=wil;amount=1;cap=3
+heavy_is_the_head,Heavy Is the Head,reactive,crown,"When an ally is knocked out, +2 willpower and +2 resistance for the rest of the battle (up to +6 each).",trigger_stat,trigger=ally_ko;stats=wil+res;amount=2;cap=6
+brace,Brace,reactive,single_shoulder_guard,"When you take damage, +1 defense for the rest of the battle (up to +3).",trigger_stat,trigger=damaged;stats=def;amount=1;cap=3
+second_wind,Second Wind,reactive,vest,"The first time you fall below half HP, +2 speed for the rest of the battle.",trigger_stat,trigger=low_hp;threshold=50;stats=spd;amount=2;once=1
+crowd_pleaser,Crowd Pleaser,reactive,gladiator_chestpiece,"When you knock out an enemy, +2 strength and +2 defense for the rest of the battle (up to +6 each).",trigger_stat,trigger=knockout;stats=str+def;amount=2;cap=6
+bloodied,Bloodied,reactive,leather_tassets,"The first time you fall below half HP, +3 strength for the rest of the battle.",trigger_stat,trigger=low_hp;threshold=50;stats=str;amount=3;once=1
+tumble,Tumble,reactive,tights,"When you avoid an attack, +1 speed for the rest of the battle (up to +3).",trigger_stat,trigger=avoided;stats=spd;amount=1;cap=3
+unflinching,Unflinching,supportive,feathered_full_helm,"You and allies next to you cannot be knocked back, pulled or shoved.",immune,what=displace;radius=1
+deadeye,Deadeye,supportive,feathered_cap,+5% hit chance for every hex between you and your target.,attack_mod,hit_per_hex=5
+imbued,Imbued,supportive,wizard_hat,"When you use an element, your next attack with that same element deals 25% more damage.",element_damage_pct,pct=25;next_same=1
+heads_up,Heads Up,supportive,baseball_cap,Allies within 2 hexes get +5% avoid.,aura_mod,radius=2;allies=1;avoid=5
+grace,Grace,supportive,tiara,Allies within 2 hexes get +2 resistance.,aura_mod,radius=2;allies=1;res=2
+royal_presence,Royal Presence,supportive,crown,Allies within 2 hexes deal 10% more damage.,aura_mod,radius=2;allies=1;dmg_pct=10
+ring_guard,Ring Guard,supportive,chain_mail,Allies next to you get +5% glance chance.,glance_mod,chance_plus=5;radius=1;allies=1
+guardian,Guardian,supportive,platemail,Allies next to you get +2 defense.,aura_mod,radius=1;allies=1;def=2
+mana_veil,Mana Veil,supportive,silken_robe,Allies next to you get +5% resist chance.,aura_mod,radius=1;allies=1;resist=5
+scouts_lead,Scout's Lead,supportive,leather_cuirass,Allies within 2 hexes get +1 speed.,aura_mod,radius=2;allies=1;spd=1
+keep_warm,Keep Warm,supportive,scarf,Allies next to you get +2 resistance.,aura_mod,radius=1;allies=1;res=2
+woven_rings,Woven Rings,passive,chain_mail,Double your glancing damage reduction: glances against you deal 25% instead of 50%.,glance_mod,reduction_mult=2;cap=75
+bastion,Bastion,passive,platemail,Double your glance chance.,glance_mod,chance_mult=2
+steel_under_cloth,Steel Under Cloth,passive,brigandine,Add 25% of your dexterity to your strength.,stat_share,from=dex;to=str;pct=25
+nimble_strength,Nimble Strength,passive,vest,Add 25% of your strength to your dexterity.,stat_share,from=str;to=dex;pct=25
+insight,Insight,passive,silken_robe|robe_bottoms,Add 25% of your willpower to your resistance.,stat_share,from=wil;to=res;pct=25
+fletchers_eye,Fletcher's Eye,passive,feathered_cap,+5% critical chance against targets 3 or more hexes away.,attack_mod,crit=5;min_range=3
+visor,Visor,passive,feathered_full_helm,Critical hits against you deal x1.25 instead of x1.5.,damage_taken_mod,source=crit;crit_mult_minus=0.25
+attuned,Attuned,passive,wizard_hat,+1 extra affinity point in any element you attack with.,affinity_gain_plus,amount=1
+flair,Flair,passive,tilted_beret,+5% critical chance.,aura_mod,radius=0;crit=5
+leap_ready,Leap Ready,passive,dragoon_helm,+1 move.,aura_mod,radius=0;move=1
+dragoons_descent,Dragoon's Descent,passive,dragoon_helm,+10% damage for each level of elevation you stand above your target.,attack_mod,dmg_per_height_pct=10
+shoulder_check,Shoulder Check,passive,single_shoulder_guard,+5% glance chance against melee attacks.,glance_mod,chance_plus=5;vs=melee
+unbowed,Unbowed,passive,platemail,"You cannot be knocked back, pulled or shoved.",immune,what=displace;radius=0
+hardened,Hardened,passive,brigandine,Take 10% less damage from weapon skills.,damage_taken_mod,source=skill;pct=-10
+supple,Supple,passive,leather_cuirass,+5% avoid.,aura_mod,radius=0;avoid=5
+quick_draw,Quick Draw,passive,bandolier,"Once per battle, a weapon skill comes back 1 turn early.",skill_cd_minus,amount=1;once_per_battle=1
+ammo_belt,Ammo Belt,passive,bandolier,+1 range with bows and pistols.,range_mod,mult=1;plus=1;dmg_pct=100;ranged_only=1
+arena_born,Arena Born,passive,gladiator_chestpiece,+5% critical chance.,aura_mod,radius=0;crit=5
+flutter,Flutter,passive,scarf,+1 move.,aura_mod,radius=0;move=1
+sure_stride,Sure Stride,passive,chaps,Muddy ground costs normal movement.,immune,what=muddy;radius=0
+rooted,Rooted,passive,platelegs,"You cannot be knocked back, pulled or shoved.",immune,what=displace;radius=0
+drift,Drift,passive,robe_bottoms,Water tiles never slow you.,immune,what=water_wading;radius=0
+acrobat,Acrobat,passive,tights,+5% avoid.,aura_mod,radius=0;avoid=5

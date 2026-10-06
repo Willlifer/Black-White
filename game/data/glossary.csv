@@ -1,0 +1,77 @@
+id,term,aliases,category,definition,see
+fire,Fire,burning|burns|burn,element,Axis element. A fire tile deals 4/8/12% max HP at the occupant's turn start and 2/4/6% per fire hex entered; fire 2+ on grass spreads.,water
+water,Water,wet,element,"Axis element, opposite of fire. Entering costs +0/+1/+2 move at levels 1/2/3; thunder hits on the occupant gain +10% per level.",conduction
+light,Light,,element,"Axis element, opposite of dark. Heals the occupant 3/6/9% max HP at its turn start, but attacks on it gain +7 hit per level.",dark
+dark,Dark,,element,"Axis element, opposite of light. Attacks on the occupant get -7 hit per level; dark 3 also drains 3% max HP at its turn start.",light
+ice,Ice,,element,Operator element. On a charged tile it glazes it for 2 cycles; on empty ground it arms a stasis marker. Ice ranks resist every other element.,glaze
+thunder,Thunder,lightning,element,Operator element. On a charged tile it detonates the charge; on empty ground it arms a fuse. Thunder hits on uncharged tiles gain Spark.,detonate
+wind,Wind,,element,Operator element. On a charged tile it copies the charge onto the six neighbours (a gale); on empty ground it arms a gale marker.,gale
+charge,Charge,charged|tile charge|axis|axes,tile,"A tile's two axes, water to fire and dark to light, each -3 to +3. Both apply at once; an opposite element steps its axis back toward 0.",tile_level
+tile_level,Tile Level,intensity|intensities|tile levels|charge level,tile,"How strong one axis is on a tile, 1 to 3. Each step of an element adds 1, capped at 3; tile effects such as fire damage scale with it.",charge
+decay,Decay,decays|decaying|decayed,tile,Every 2 cycles a tile's strongest axis steps 1 toward 0. A fresh cast refreshes the timer; glaze pauses it; static tiles never decay.,cycle
+cycle,Cycle,cycles,rule,"One full pass of the speed queue: every living unit has had a turn. Tiles tick (decay, then grass spread) once per cycle.",decay
+marker,Marker,markers,tile,"An operator waiting on empty ground: fuse, stasis or gale. It does nothing until a fresh axis element lands on it, then fires. Lasts 3 cycles.",fuse
+static_tile,Static Tile,static tiles|static|statics,tile,A map tile with a permanent charge. It never decays and snaps back each tick; a detonation spends it for one full cycle before it returns.,charge
+grassy,Grassy,grass,tile,"Terrain that spreads fire. Cast fire 2+ on grass seeds fire 1 onto grassy neighbours at the next tick, once per cast; wet grass dries instead.",fire
+muddy,Muddy,mud,tile,"Terrain that costs 2 move to enter instead of 1. Water's move penalty is added on top, so muddy water 3 costs 4.",water
+jagged,Jagged,jagged rock,tile,"Impassable rock. It never holds an element; areas, gale copies and grass seeds skip it, and a unit shoved into it slams.",slam
+fuse,Fuse,fused|fuses|fusing,operator,"Thunder's marker. When a fresh fire, water, light or dark lands on it, it detonates that charge. A unit standing on a fuse is Conductive.",detonate
+detonate,Detonate,detonation|detonations|detonates|detonated|splash,operator,"Thunder erases a charged tile in a blast: 5% + 4% per charge point (+2% per water level) max HP to the occupant, half to each neighbour.",shatter
+stasis,Stasis,,operator,"Ice's marker. When a fresh fire, water, light or dark lands on it, the new charge is stored and glazed for 2 cycles.",glaze
+glaze,Glaze,glazed|glazes|glazing,operator,"Ice locks a charged tile for 2 cycles: decay pauses, effects still apply, glazed water costs no extra move. Fire melts it; thunder shatters it.",shatter
+gale,Gale,gales|gale copy|gale copies,operator,"Wind's marker or effect: the tile's charge is copied onto its six neighbours, overwriting them. Copies last 1 cycle at that level, then decay.",gale_2
+gale_2,Gale 2,gale two,operator,"Wind on a gale marker upgrades it to gale 2. When it fires, its copies reach both rings around it, the 18 nearest hexes.",gale
+shatter,Shatter,shatters|shattered,rider,Any attack on a unit standing on a glazed tile deals +15% and leaves the glaze. Detonating a glazed tile deals x1.5.,glaze
+spark,Spark,,rider,"A thunder hit on a target whose tile holds no charge (empty, or only a marker) deals +10%.",thunder
+conductive,Conductive,chain lightning|chain arc|chain arcs,rider,"A unit standing on a fuse. Any damage it takes also arcs 50% to its nearest living teammate, as unrolled thunder damage. The arc never arcs again.",fuse
+conduction,Conduction,conducted|conducts,rider,"Thunder hits on a unit standing in water deal +10% per water level, after mitigation. Water also adds 2% per level to a detonation.",water
+striketwice_reaction,Reaction,reactions,rider,"When Striketwice's second cut carries the opposite element of the first, the hex reacts: steam, eclipse or storm.",steam
+steam,Steam,,rider,"Striketwice reaction, fire meeting water: deals 8% max HP fire damage to every unit on the ring around the hex.",striketwice_reaction
+eclipse,Eclipse,eclipses,rider,"Striketwice reaction, light meeting dark: the foe on the hex and the cutter's foes on the ring around it are Blinded.",blinded
+storm,Storm,,rider,"Striketwice reaction, thunder meeting wind: every unit on the ring around the hex is pushed back 1.",push
+eruption,Eruption,erupt|erupts|erupted|eruptions,rider,"Some enchantments make tiles you lay erupt 1 turn later: damage, a push or healing on and around the tile, often clearing it.",detonate
+status,Status,statuses,status,A short effect on a unit. Each lasts until the end of its holder's next turn; one applied at the holder's own turn start ends with that turn.,staggered
+staggered,Staggered,stagger|staggers,status,"Can't use skills on its next turn, basic attack only. When it ends the unit is Steadied.",steadied
+steadied,Steadied,,status,Immune to Staggered for its next 2 turns. A unit gains it when a stagger ends.,staggered
+blinded,Blinded,blind|blinds,status,"Can't crit, and can only target units within 2 hexes, with basic attacks and skills alike.",crit
+pinned,Pinned,,status,-2 move until the end of its next turn. Laid by Pinning Shot and Hamstring.,status
+drenched,Drenched,drench,status,"-1 move, and thunder hits on it deal +20%, until the end of its next turn.",conduction
+scorched,Scorched,scorch,status,Attacks on it deal +10% until the end of its next turn. Saturate fire 3 and Reckless Swing lay it.,status
+shrouded,Shrouded,shroud,status,Takes a 4% max HP dark drain at the start of its turn. Saturate pushing dark to 3 lays it.,dark
+swift,Swift,,status,+1 move until the end of its next turn. Ley Line grants it to allies on the line.,status
+frost_ward,Frost Ward,frost wards,status,"Negates the next elemental effect on its holder (tile damage, an elemental status, a chain arc or an elemental push), then breaks. One per unit.",elemental_effect
+elemental_effect,Elemental Effect,elemental effects,rule,"Element tile damage, a detonation, steam, an eruption, a chain arc, an elemental status or an element's push. Frost Ward and Nightborn negate these.",frost_ward
+guard,Guard,guards|guarded,rule,"A damage-taken cut from a skill such as Riposte, Phalanx, Aegis or Brace. The strongest guard holds; guards don't stack.",riposte
+hit,Hit,hit chance|hit basis,roll,"80 + DEX + 5 per weapon expertise rank (affinity rank for spells), minus the target's avoid. Held between 5 and 100.",avoid
+avoid,Avoid,avoided|avoids|avoid chance,roll,"5 + 0.1 x target DEX, subtracted from hit. An avoided attack deals no damage, but secondary effects and painting still land.",secondary_effect
+glance,Glance,glances|glancing|glanced|glance chance,roll,10 + target DEF. Rolled first on a hit; a glance deals 50% damage and can't crit.,crit
+crit,Crit,crits|critical|critical hit|critical hits|crit chance,roll,"0.1 x DEX plus modifiers. Only a clean, non-glancing hit can crit; a crit deals x1.5 damage.",glance
+resist,Resist,resisted|resists|resist chance,roll,"Magic only (spells, elemental skills): 10 + target RES + elemental resistance. A resist takes 80% damage and blocks secondary effects.",elemental_resistance
+elemental_resistance,Elemental Resistance,affinity resistance|elemental resist,roll,"5 per own affinity rank in that element, 2.5 per rank of its opposite, 2.5 per ice rank against all others. Cuts tile damage, capped at 75.",affinity_rank
+secondary_effect,Secondary Effect,secondary effects,rule,"A status, push, pull or throw riding on an attack. It still lands on an avoid; a resist stops it. Tiles change on every outcome.",resist
+facing,Facing,flank|flanks|flanking|flank attack,facing,"A unit faces its last step or strike. Attacks gain a line by angle: rear +15 hit, rear flank +5 hit, front flank +5 glance, front +10 glance.",rear
+rear,Rear,rear attack|rear attacks,facing,Striking from directly behind the target's facing: +15 hit to the attack.,facing
+rear_flank,Rear Flank,rear flanks,facing,Striking from one of the two back corners of the target's facing: +5 hit.,facing
+front_flank,Front Flank,front flanks,facing,Striking from one of the two front corners of the target's facing: +5 glance for the target.,facing
+front,Front,front attack|facing the blow|head-on,facing,Striking straight into the target's facing: +10 glance for the target.,facing
+backstab,Backstab,backstabs|backstabbing,rule,Daggerleap landing behind a foe (its back three sides) deals +50% to it; Assassinate backstabs too.,rear
+affinity_rank,Affinity Rank,affinity|affinities|affinity ranks,progression,Every 10 affinity points is a rank: +5% damage and +5% resistance in that element. Rank 1 in an element lets you use it.,perk
+expertise,Expertise,expertise rank|weapon expertise,progression,"Weapon skill, ranked E, D, C, B, A every 10 points. Each letter adds +5 hit with that weapon and owes one skill pick.",improve
+xp,XP,experience,progression,"Each attack earns 10 XP, +1 affinity and +1 expertise; a knockout earns 30 XP and +3 of each. 100 XP is a level.",affinity_rank
+attuned_element,Attuned Element,attuned|attunement,progression,"The element a unit last used this battle, its own element at the start. Basic attacks carry it for damage, resist and growth.",affinity_rank
+perk,Perk,perks,progression,A passive element bonus. Affinity ranks 1 and 2 each give one pick of the element's five perks; rank 3 grants all five.,affinity_rank
+improve,Improve,improved|improve rider,progression,An expertise pick that gives a known skill its upgrade rider. Only skills with a listed rider can be improved.,expertise
+loadout,Loadout,loadouts,progression,"The skills a unit brings into battle: up to 3 per weapon class, 4 for the staff.",overcap
+overcap,Overcap,over-cap,progression,"A skill learned mid-fight while the loadout is full. It is usable at once, for that battle only.",loadout
+once_per_battle,Once Per Battle,once a battle,rule,A skill that leaves the menu after one use and returns at the next battle.,cooldown
+cooldown,Cooldown,cooldowns|cd,rule,"Turns of your own before a skill is ready again, usually 2. Kept per skill and element: Cleave in fire doesn't lock Cleave in water.",once_per_battle
+momentum,Momentum,,rule,Vault's strike lands with +25% damage (+35% once Vault is improved). The strike spends it.,follow_up
+push,Push,pushed|pushes|shove|shoved|shoves|knockback|knocked back,rule,"Moves a unit straight away without walking it, so no crossing damage. Stopped by rock or a unit, it slams instead.",slam
+displacement,Displacement,displace|displaced|pull|pulled|pulls,rule,"Any push, pull, throw or knockback. A secondary effect: it lands on an avoid, a resist stops it, and some units can't be displaced.",push
+slam,Slam,slams|slammed,rule,"A shoved unit stopped by rock or another unit takes extra damage, usually 8% max HP to it and to what it hits.",push
+zone,Zone,zones,rule,"Hexes a unit holds, such as Set Spear's reach. An enemy entering one stops there; the zone ends at the holder's next turn.",overwatch
+overwatch,Overwatch,covering fire,rule,The first enemy to attack an ally in the radius draws one basic attack from the watcher after its attack resolves.,counter
+follow_up,Follow-Up,follow-ups|follow up,rule,"A second action some skills grant at once, usually a basic attack: Ley Line, Siphon, Charge, Transfer and Inversion.",momentum
+riposte,Riposte,ripostes|riposted,rule,"Sword skill, free to set. The first blow to land on you is halved and answered at 10 power on your ring; a landed answer refunds 1 cooldown.",counter
+counter,Counter,counters|countered|counterattack|counter attack,rule,"A basic strike back at an attacker, from an enchantment like Riposting (50%, once per enemy turn) or overwatch. Counters are never countered.",riposte
+seeded_tile,Seeded Tile,seeded|seeded tiles,tile,"A map tile that starts charged and holds without decay until play changes it; after any change it is ordinary charge and never returns.",static_tile

@@ -1,0 +1,1022 @@
+{
+ "sounds": {
+  "swing_light": {
+   "variants": 4,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.19,
+     "rms_db": -19.06,
+     "seconds": 0.299,
+     "peak_s": 0.083
+    },
+    {
+     "peak_db": -1.06,
+     "loudness": -16.0,
+     "rms_db": -18.86,
+     "seconds": 0.31,
+     "peak_s": 0.091
+    },
+    {
+     "peak_db": -1.46,
+     "loudness": -16.0,
+     "rms_db": -18.99,
+     "seconds": 0.267,
+     "peak_s": 0.092
+    },
+    {
+     "peak_db": -2.4,
+     "loudness": -16.0,
+     "rms_db": -19.1,
+     "seconds": 0.324,
+     "peak_s": 0.099
+    }
+   ]
+  },
+  "swing_heavy": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.13,
+     "rms_db": -17.79,
+     "seconds": 0.502,
+     "peak_s": 0.149
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.28,
+     "rms_db": -18.19,
+     "seconds": 0.497,
+     "peak_s": 0.163
+    },
+    {
+     "peak_db": -2.11,
+     "loudness": -16.0,
+     "rms_db": -17.74,
+     "seconds": 0.471,
+     "peak_s": 0.151
+    }
+   ]
+  },
+  "swing_axe": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.0,
+     "rms_db": -18.22,
+     "seconds": 0.436,
+     "peak_s": 0.149
+    },
+    {
+     "peak_db": -1.07,
+     "loudness": -16.0,
+     "rms_db": -17.96,
+     "seconds": 0.386,
+     "peak_s": 0.131
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.16,
+     "rms_db": -17.73,
+     "seconds": 0.368,
+     "peak_s": 0.136
+    }
+   ]
+  },
+  "hit_flesh": {
+   "variants": 4,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.11,
+     "loudness": -16.0,
+     "rms_db": -15.32,
+     "seconds": 0.35,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.51,
+     "loudness": -16.0,
+     "rms_db": -15.0,
+     "seconds": 0.35,
+     "peak_s": 0.007
+    },
+    {
+     "peak_db": -2.03,
+     "loudness": -16.0,
+     "rms_db": -15.31,
+     "seconds": 0.35,
+     "peak_s": 0.007
+    },
+    {
+     "peak_db": -1.44,
+     "loudness": -16.0,
+     "rms_db": -15.12,
+     "seconds": 0.35,
+     "peak_s": 0.009
+    }
+   ]
+  },
+  "hit_crit": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.3,
+     "loudness": -16.0,
+     "rms_db": -19.38,
+     "seconds": 1.1,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -3.65,
+     "loudness": -16.0,
+     "rms_db": -19.29,
+     "seconds": 1.1,
+     "peak_s": 0.009
+    },
+    {
+     "peak_db": -2.73,
+     "loudness": -16.0,
+     "rms_db": -19.38,
+     "seconds": 1.1,
+     "peak_s": 0.008
+    }
+   ]
+  },
+  "hit_glance": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.25,
+     "rms_db": -19.56,
+     "seconds": 0.38,
+     "peak_s": 0.018
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.23,
+     "rms_db": -19.58,
+     "seconds": 0.38,
+     "peak_s": 0.04
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.27,
+     "rms_db": -19.65,
+     "seconds": 0.38,
+     "peak_s": 0.011
+    }
+   ]
+  },
+  "hit_block": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.03,
+     "loudness": -16.0,
+     "rms_db": -20.06,
+     "seconds": 0.85,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -2.87,
+     "loudness": -16.0,
+     "rms_db": -20.06,
+     "seconds": 0.85,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -2.16,
+     "loudness": -16.0,
+     "rms_db": -20.08,
+     "seconds": 0.85,
+     "peak_s": 0.005
+    }
+   ]
+  },
+  "hit_miss": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.94,
+     "loudness": -16.0,
+     "rms_db": -19.59,
+     "seconds": 0.221,
+     "peak_s": 0.08
+    },
+    {
+     "peak_db": -2.01,
+     "loudness": -16.0,
+     "rms_db": -19.51,
+     "seconds": 0.222,
+     "peak_s": 0.086
+    },
+    {
+     "peak_db": -3.26,
+     "loudness": -16.0,
+     "rms_db": -19.62,
+     "seconds": 0.203,
+     "peak_s": 0.067
+    }
+   ]
+  },
+  "bow_draw": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.25,
+     "loudness": -16.0,
+     "rms_db": -18.42,
+     "seconds": 0.62,
+     "peak_s": 0.312
+    },
+    {
+     "peak_db": -3.18,
+     "loudness": -16.0,
+     "rms_db": -18.47,
+     "seconds": 0.62,
+     "peak_s": 0.308
+    }
+   ]
+  },
+  "bow_release": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.78,
+     "rms_db": -20.84,
+     "seconds": 0.55,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.85,
+     "rms_db": -20.61,
+     "seconds": 0.55,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.91,
+     "rms_db": -20.75,
+     "seconds": 0.55,
+     "peak_s": 0.006
+    }
+   ]
+  },
+  "arrow_thunk": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.53,
+     "rms_db": -18.03,
+     "seconds": 0.5,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.41,
+     "rms_db": -17.92,
+     "seconds": 0.5,
+     "peak_s": 0.02
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.45,
+     "rms_db": -17.95,
+     "seconds": 0.5,
+     "peak_s": 0.008
+    }
+   ]
+  },
+  "pistol_shot": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.15,
+     "loudness": -16.0,
+     "rms_db": -21.17,
+     "seconds": 1.3,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -2.61,
+     "loudness": -16.0,
+     "rms_db": -21.78,
+     "seconds": 1.3,
+     "peak_s": 0.007
+    },
+    {
+     "peak_db": -3.09,
+     "loudness": -16.0,
+     "rms_db": -22.0,
+     "seconds": 1.3,
+     "peak_s": 0.006
+    }
+   ]
+  },
+  "flintlock_shot": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.18,
+     "loudness": -16.0,
+     "rms_db": -23.67,
+     "seconds": 1.8,
+     "peak_s": 0.081
+    },
+    {
+     "peak_db": -3.92,
+     "loudness": -16.0,
+     "rms_db": -23.67,
+     "seconds": 1.8,
+     "peak_s": 0.101
+    }
+   ]
+  },
+  "cast_whoom": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.96,
+     "loudness": -16.0,
+     "rms_db": -19.07,
+     "seconds": 0.75,
+     "peak_s": 0.154
+    },
+    {
+     "peak_db": -2.17,
+     "loudness": -16.0,
+     "rms_db": -19.11,
+     "seconds": 0.75,
+     "peak_s": 0.129
+    },
+    {
+     "peak_db": -2.8,
+     "loudness": -16.0,
+     "rms_db": -18.99,
+     "seconds": 0.75,
+     "peak_s": 0.127
+    }
+   ]
+  },
+  "bolt_fizz": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.26,
+     "rms_db": -21.01,
+     "seconds": 0.55,
+     "peak_s": 0.047
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.11,
+     "rms_db": -20.81,
+     "seconds": 0.55,
+     "peak_s": 0.066
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.18,
+     "rms_db": -20.93,
+     "seconds": 0.55,
+     "peak_s": 0.041
+    }
+   ]
+  },
+  "channel_loop": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": true,
+   "levels": [
+    {
+     "peak_db": -6.67,
+     "loudness": -16.0,
+     "rms_db": -17.91,
+     "seconds": 2.0,
+     "peak_s": 0.057
+    },
+    {
+     "peak_db": -6.71,
+     "loudness": -16.0,
+     "rms_db": -17.81,
+     "seconds": 2.0,
+     "peak_s": 0.063
+    }
+   ]
+  },
+  "elem_fire": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.81,
+     "loudness": -16.0,
+     "rms_db": -20.19,
+     "seconds": 0.75,
+     "peak_s": 0.092
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.16,
+     "rms_db": -20.59,
+     "seconds": 0.75,
+     "peak_s": 0.049
+    },
+    {
+     "peak_db": -2.24,
+     "loudness": -16.0,
+     "rms_db": -20.35,
+     "seconds": 0.75,
+     "peak_s": 0.096
+    }
+   ]
+  },
+  "elem_water": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.39,
+     "rms_db": -20.85,
+     "seconds": 0.65,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.21,
+     "rms_db": -20.9,
+     "seconds": 0.65,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.38,
+     "rms_db": -21.07,
+     "seconds": 0.65,
+     "peak_s": 0.006
+    }
+   ]
+  },
+  "elem_ice": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.56,
+     "loudness": -16.0,
+     "rms_db": -22.84,
+     "seconds": 0.85,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.2,
+     "rms_db": -22.87,
+     "seconds": 0.85,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.78,
+     "loudness": -16.0,
+     "rms_db": -22.8,
+     "seconds": 0.85,
+     "peak_s": 0.005
+    }
+   ]
+  },
+  "elem_thunder": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.29,
+     "rms_db": -20.93,
+     "seconds": 0.6,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.16,
+     "rms_db": -20.74,
+     "seconds": 0.6,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.85,
+     "rms_db": -21.41,
+     "seconds": 0.6,
+     "peak_s": 0.005
+    }
+   ]
+  },
+  "elem_wind": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.81,
+     "loudness": -16.0,
+     "rms_db": -20.6,
+     "seconds": 0.841,
+     "peak_s": 0.205
+    },
+    {
+     "peak_db": -3.62,
+     "loudness": -16.0,
+     "rms_db": -21.05,
+     "seconds": 0.886,
+     "peak_s": 0.167
+    },
+    {
+     "peak_db": -4.61,
+     "loudness": -16.0,
+     "rms_db": -20.99,
+     "seconds": 0.882,
+     "peak_s": 0.201
+    }
+   ]
+  },
+  "elem_dark": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.11,
+     "loudness": -16.0,
+     "rms_db": -18.52,
+     "seconds": 0.95,
+     "peak_s": 0.103
+    },
+    {
+     "peak_db": -4.5,
+     "loudness": -16.0,
+     "rms_db": -18.49,
+     "seconds": 0.95,
+     "peak_s": 0.107
+    },
+    {
+     "peak_db": -1.23,
+     "loudness": -16.0,
+     "rms_db": -18.52,
+     "seconds": 0.95,
+     "peak_s": 0.17
+    }
+   ]
+  },
+  "elem_light": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.67,
+     "loudness": -16.0,
+     "rms_db": -21.34,
+     "seconds": 1.4,
+     "peak_s": 0.089
+    },
+    {
+     "peak_db": -6.85,
+     "loudness": -16.0,
+     "rms_db": -21.5,
+     "seconds": 1.4,
+     "peak_s": 0.09
+    },
+    {
+     "peak_db": -8.22,
+     "loudness": -16.0,
+     "rms_db": -21.31,
+     "seconds": 1.4,
+     "peak_s": 0.098
+    }
+   ]
+  },
+  "heal": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.26,
+     "loudness": -16.0,
+     "rms_db": -21.88,
+     "seconds": 1.3,
+     "peak_s": 0.49
+    },
+    {
+     "peak_db": -4.67,
+     "loudness": -16.0,
+     "rms_db": -20.99,
+     "seconds": 1.3,
+     "peak_s": 0.447
+    }
+   ]
+  },
+  "tile_detonate": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.82,
+     "loudness": -16.0,
+     "rms_db": -23.69,
+     "seconds": 2.0,
+     "peak_s": 0.009
+    },
+    {
+     "peak_db": -6.52,
+     "loudness": -16.0,
+     "rms_db": -23.43,
+     "seconds": 2.0,
+     "peak_s": 0.007
+    },
+    {
+     "peak_db": -5.82,
+     "loudness": -16.0,
+     "rms_db": -24.03,
+     "seconds": 2.0,
+     "peak_s": 0.01
+    }
+   ]
+  },
+  "tile_glaze": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.53,
+     "loudness": -16.0,
+     "rms_db": -22.66,
+     "seconds": 1.0,
+     "peak_s": 0.606
+    },
+    {
+     "peak_db": -4.66,
+     "loudness": -16.0,
+     "rms_db": -22.76,
+     "seconds": 1.0,
+     "peak_s": 0.606
+    }
+   ]
+  },
+  "tile_gale": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.56,
+     "loudness": -16.0,
+     "rms_db": -20.74,
+     "seconds": 1.5,
+     "peak_s": 0.553
+    },
+    {
+     "peak_db": -5.9,
+     "loudness": -16.0,
+     "rms_db": -20.95,
+     "seconds": 1.5,
+     "peak_s": 0.543
+    }
+   ]
+  },
+  "step_stone": {
+   "variants": 6,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.41,
+     "rms_db": -18.52,
+     "seconds": 0.2,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.94,
+     "rms_db": -18.66,
+     "seconds": 0.2,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.48,
+     "rms_db": -18.32,
+     "seconds": 0.2,
+     "peak_s": 0.006
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.37,
+     "rms_db": -18.41,
+     "seconds": 0.2,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.63,
+     "rms_db": -18.79,
+     "seconds": 0.2,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.41,
+     "rms_db": -18.41,
+     "seconds": 0.2,
+     "peak_s": 0.006
+    }
+   ]
+  },
+  "ko_thud": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.76,
+     "loudness": -16.0,
+     "rms_db": -17.88,
+     "seconds": 1.0,
+     "peak_s": 0.01
+    },
+    {
+     "peak_db": -5.18,
+     "loudness": -16.0,
+     "rms_db": -18.09,
+     "seconds": 1.0,
+     "peak_s": 0.033
+    }
+   ]
+  },
+  "ui_hover": {
+   "variants": 3,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.9,
+     "loudness": -16.0,
+     "rms_db": -19.04,
+     "seconds": 0.045,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -4.15,
+     "loudness": -16.0,
+     "rms_db": -19.2,
+     "seconds": 0.045,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -4.32,
+     "loudness": -16.0,
+     "rms_db": -19.33,
+     "seconds": 0.045,
+     "peak_s": 0.005
+    }
+   ]
+  },
+  "ui_click": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.22,
+     "rms_db": -17.26,
+     "seconds": 0.09,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.29,
+     "rms_db": -17.38,
+     "seconds": 0.09,
+     "peak_s": 0.005
+    }
+   ]
+  },
+  "ui_confirm": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.84,
+     "loudness": -16.0,
+     "rms_db": -17.37,
+     "seconds": 0.42,
+     "peak_s": 0.079
+    },
+    {
+     "peak_db": -6.57,
+     "loudness": -16.0,
+     "rms_db": -17.99,
+     "seconds": 0.42,
+     "peak_s": 0.078
+    }
+   ]
+  },
+  "ui_cancel": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.07,
+     "loudness": -16.0,
+     "rms_db": -16.67,
+     "seconds": 0.38,
+     "peak_s": 0.082
+    },
+    {
+     "peak_db": -4.53,
+     "loudness": -16.0,
+     "rms_db": -16.47,
+     "seconds": 0.38,
+     "peak_s": 0.082
+    }
+   ]
+  },
+  "ui_pick": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.08,
+     "loudness": -16.0,
+     "rms_db": -17.25,
+     "seconds": 0.35,
+     "peak_s": 0.012
+    },
+    {
+     "peak_db": -3.24,
+     "loudness": -16.0,
+     "rms_db": -17.62,
+     "seconds": 0.35,
+     "peak_s": 0.012
+    }
+   ]
+  },
+  "ui_turn": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.87,
+     "loudness": -16.0,
+     "rms_db": -20.23,
+     "seconds": 0.8,
+     "peak_s": 0.096
+    },
+    {
+     "peak_db": -5.56,
+     "loudness": -16.0,
+     "rms_db": -19.69,
+     "seconds": 0.8,
+     "peak_s": 0.096
+    }
+   ]
+  },
+  "ui_levelup": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.32,
+     "loudness": -16.0,
+     "rms_db": -22.48,
+     "seconds": 1.4,
+     "peak_s": 0.203
+    },
+    {
+     "peak_db": -6.3,
+     "loudness": -16.0,
+     "rms_db": -21.73,
+     "seconds": 1.4,
+     "peak_s": 0.203
+    }
+   ]
+  },
+  "sting_victory": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.28,
+     "loudness": -16.0,
+     "rms_db": -23.61,
+     "seconds": 3.2,
+     "peak_s": 0.337
+    },
+    {
+     "peak_db": -5.71,
+     "loudness": -16.0,
+     "rms_db": -22.93,
+     "seconds": 3.2,
+     "peak_s": 0.227
+    }
+   ]
+  },
+  "sting_defeat": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.09,
+     "loudness": -16.0,
+     "rms_db": -19.55,
+     "seconds": 3.4,
+     "peak_s": 0.273
+    },
+    {
+     "peak_db": -5.88,
+     "loudness": -16.0,
+     "rms_db": -19.12,
+     "seconds": 3.4,
+     "peak_s": 0.513
+    }
+   ]
+  },
+  "progress_day": {
+   "variants": 2,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.12,
+     "loudness": -16.0,
+     "rms_db": -20.69,
+     "seconds": 5.0,
+     "peak_s": 4.259
+    },
+    {
+     "peak_db": -1.95,
+     "loudness": -16.0,
+     "rms_db": -20.72,
+     "seconds": 5.0,
+     "peak_s": 4.255
+    }
+   ]
+  }
+ },
+ "format": "44.1 kHz 16-bit PCM; <name>_<n>.wav, n from 1",
+ "target_loudness": -16.0,
+ "peak_ceiling_db": -1.0
+}

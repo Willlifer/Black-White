@@ -1,0 +1,179 @@
+extends Node
+## Entry point. User args (after `--`):
+##   --self-test                 run the deterministic self-test and exit (0 = green)
+##   --forecast                  print the balance sheet and exit
+##   --pace [--support]          AI-vs-AI fight pace (--support: support skills in every kit, D112)
+##   --combat <map>              jump straight into a fight on maps/<map>.json
+##   --autoplay                  let the AI play the player side too
+##   --boss                      fight the Giant instead
+##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
+##   --screen <title|roster|prep|prebattle|downtime|results>   open one screen on a sample run
+##   --ui-probe                  drive combat with synthetic input and check it responds
+##   --flow-probe                walk the real game through every screen transition
+##   --ui-shots [dir]            render roster / codex / loading / results review frames
+##                               to <dir>/ui_*.png (default design/art), then quit
+##   --audio-capture [dir]       record a scripted 61 s run (title, roster, combat, boss)
+##                               from the Master bus to <dir>/capture.wav + capture.json
+##                               (default design/audio); analyse with tools/audio/analyse_capture.py
+##   --seed N                    D154: the roster roll's seed (BWRosterGen): the roster screen
+##                               opens on it, a new run and every tool use it; also the
+##                               --combat fight seed. Probes, shots and the self-test
+##                               default to BWRosterGen.DEFAULT_SEED; play is random.
+##   --defaults                  ignore user://settings.cfg this run (and never write it);
+##                               every probe, the self-test and the shot tools imply it (D124)
+## With no args the game starts normally.
+
+const REPORT_PATH := "user://self_test_report.json"
+## D124: runs that must not see (or change) the player's saved settings.
+const ISOLATED_FLAGS := ["--defaults", "--self-test", "--pace", "--forecast", "--ui-probe", "--flow-probe",
+	"--ui-shots", "--audio-capture", "--shot", "--autoplay"]
+
+
+func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	BWSettings.init(Array(args).any(func(a): return a in ISOLATED_FLAGS))     # ---- D124
+	_seed_roster(args)                                                         # ---- D154
+	if "--self-test" in args:
+		_self_test.call_deferred()
+		return
+	if "--pace" in args:
+		print(BWPaceReport.render(40, "--support" in args))
+		get_tree().quit(0)
+		return
+	if "--forecast" in args:
+		print(BWForecastSheet.render())
+		get_tree().quit(0)
+		return
+	# Sound for every windowed path: buses, SFX, the listeners, the music (Phase 6).
+	BWMusic.ensure(self)
+	BWEsc.ensure(self)                              # ---- D171: Esc closes the newest open window
+	BWSettings.apply_all()                          # ---- D124: volumes (buses exist now), window, UI size
+	for n in [BWMusic._inst, BWSfx._inst]:          # ---- D124: music and UI sounds carry on under the pause menu
+		if n and is_instance_valid(n):
+			n.process_mode = Node.PROCESS_MODE_ALWAYS
+	if "--audio-capture" in args:
+		var ac := BWAudioCapture.new()
+		ac.out_dir = _arg(args, "--audio-capture", ProjectSettings.globalize_path("res://").path_join("../design/audio").simplify_path())
+		add_child(ac)
+		return
+	if "--shot" in args:
+		var cap := BWCapture.new()
+		cap.out_dir = _arg(args, "--shot", "user://shots")
+		cap.every = float(_arg(args, "--every", "1.0"))
+		cap.count = int(_arg(args, "--count", "6"))
+		add_child(cap)
+	if "--flow-probe" in args:
+		add_child(BWFlowProbe.new())
+		return
+	if "--ui-shots" in args:
+		var us := BWUIShots.new()
+		us.out_dir = _arg(args, "--ui-shots", "")
+		add_child(us)
+		return
+	if "--ui-probe" in args:
+		add_child(BWUIProbe.new())
+		return
+	if "--screen" in args:
+		_one_screen(_arg(args, "--screen", "title"))
+		return
+	if "--combat" in args:
+		_quick_combat(_arg(args, "--combat", "arena"), "--autoplay" in args, int(_arg(args, "--seed", "1")), "--boss" in args)
+		return
+	_start_game()
+
+
+## Display: the game opens maximized (project.godot) and scales from its
+## 1600×900 design size to any window, 4K included — UI by canvas_items
+## stretch, 3D at native resolution. F11 or Alt+Enter toggles fullscreen.
+func _input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.keycode == KEY_F11 or (ev.keycode == KEY_ENTER and ev.alt_pressed):
+			BWSettings.toggle_fullscreen()            # D124: remembered in settings.cfg
+			get_viewport().set_input_as_handled()
+
+
+## D154: `--seed N` fixes the roster roll; every isolated run (probes, shots,
+## the self-test) is fixed to the default seed when no --seed is given.
+func _seed_roster(args: PackedStringArray) -> void:
+	var s := -1
+	if "--seed" in args:
+		s = int(_arg(args, "--seed", str(BWRosterGen.DEFAULT_SEED)))
+	elif Array(args).any(func(a): return a in ISOLATED_FLAGS and a != "--defaults"):
+		s = BWRosterGen.DEFAULT_SEED
+	if s < 0:
+		return
+	BWRosterGen.fixed_seed = s
+	BWData.use_roster(BWRosterGen.roll(BWData.identities(), s), s)
+
+
+func _arg(args: PackedStringArray, key: String, fallback: String) -> String:
+	var i := args.find(key)
+	if i >= 0 and i + 1 < args.size() and not args[i + 1].begins_with("--"):
+		return args[i + 1]
+	return fallback
+
+
+func _self_test() -> void:
+	var report := BWSelfTest.run()
+	var data_ok: bool = report.data_errors.is_empty()
+	var f := FileAccess.open(REPORT_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(report, "  "))
+		f.close()
+	print(BWSelfTest.summary(report))
+	print("report: " + ProjectSettings.globalize_path(REPORT_PATH))
+	get_tree().quit(0 if report.passed and data_ok else 1)
+
+
+## A fight with the first three roster entries against three from the
+## middle of the roster. Development shortcut until the run flow exists.
+func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool = false) -> void:
+	var roster := BWData.table("roster")
+	var players: Array = []
+	var enemies: Array = []
+	for i in 3:
+		players.append(BWUnit.from_roster(roster[i]))
+		enemies.append(BWUnit.from_roster(roster[i + 10]))
+	if boss:
+		enemies = [BWRun.new().make_boss()]
+	var s := BWCombatScreen.new()
+	s.configure("res://maps/%s.json" % map_name, players, enemies, [], seed_value)
+	s.autoplay = autoplay
+	s.finished.connect(func(w, _b): print("battle over: ", w))
+	add_child(s)
+	BWMusic.play("boss" if boss else "combat")
+
+
+## Development shortcut: one screen on a sample run (first six of the roster,
+## one fight played on paper), for screenshots and quick iteration.
+func _one_screen(which: String) -> void:
+	BWMusic.ensure(self)
+	var ids := BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+	var run := BWRun.start(ids, 99)
+	var e := run.enemies_for(1)
+	for x in e:
+		x.hp = 0
+	var report := run.after_fight(true, run.squad.slice(0, 3), e, e, [])
+	var s: Node
+	match which:
+		"title": s = BWTitleScreen.new()
+		"roster": s = BWRosterScreen.new()
+		"prebattle":
+			s = BWPrebattleScreen.new()
+			s.set("run", run)
+		"downtime":
+			s = BWDowntimeScreen.new()
+			s.set("run", run)
+		"prep":
+			s = BWPrepScreen.new()
+			s.set("run", run)
+		"results":
+			s = BWResultsScreen.new()
+			s.set("run", run)
+			s.set("report", report)
+	if s:
+		add_child(s)
+
+
+func _start_game() -> void:
+	add_child(BWGame.new())

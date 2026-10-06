@@ -1,0 +1,65 @@
+id,name_pattern,applies_to,element,effect_text,effect_key,params,notes
+explosive,Explosive {item},chaps|platelegs|gladiator_chestpiece|dragoon_helm|bandolier,fire,"Fire tiles you lay erupt 1 turn later: 3 damage per fire point to everyone on the tile and its neighbours, then the tile goes neutral.",tile_erupt,delay=1;dmg_per_point=3;radius=1;consume=1,Brief example (explosive chaps)
+smouldering,Smouldering {item},leather_cuirass|tights|crown|platemail,fire,Fire tiles you lay last 1 turn longer before they start to cool.,tile_duration_plus,turns=1,
+kindled,Kindled {item},wizard_hat|silken_robe|robe_bottoms|scarf|gladiator_chestpiece,fire,Your fire casts push the tile 1 extra step hotter (still capped at +3).,cast_step_plus,steps=1,
+fireproof,Fireproof {item},platemail|platelegs|chain_mail|feathered_full_helm|leather_tassets,fire,Take 15% less fire damage and half damage from burning tiles.,damage_taken_mod,source=fire;pct=-15;tile_pct=-50,Works whatever the wearer's own elements are
+emberstep,Emberstep {item},chaps|tights|baseball_cap|vest,fire,Every tile you leave while moving gains 1 fire step.,lay_on,trigger=move;where=path;step=1;chance=100,
+blazing,Blazing {item},gladiator_chestpiece|leather_tassets|brigandine|dragoon_helm,fire,+1 strength per fire point on the tile you stand on.,stand_on_bonus,stat=str;per_point=1,
+tidal,Tidal {item},silken_robe|robe_bottoms|tiara|scarf,water,Your water casts also lay 1 water step on the ring of tiles around the target.,element_area_plus,radius=1;step=1,
+soaking,Soaking {item},chain_mail|brigandine|leather_cuirass|platelegs,water,"When you are struck, the attacker's tile gains 1 water step (primed for thunder).",lay_on,trigger=struck;where=attacker;step=1;chance=100,
+wading,Wading {item},chaps|tights|robe_bottoms|baseball_cap|vest,water,Water tiles never slow you.,immune,what=water_wading;radius=0,
+deepwater,Deepwater {item},tilted_beret|leather_tassets|bandolier,water,Water tiles you lay last 1 turn longer.,tile_duration_plus,turns=1,
+riptide,Riptide {item},feathered_cap|vest|tights,water,+1 dexterity per water point on the tile you stand on.,stand_on_bonus,stat=dex;per_point=1,
+brimming,Brimming {item},wizard_hat|silken_robe|crown,water,Your water tiles are 50% stronger: wading costs more and thunder gets +50% of the water bonus when it detonates them.,tile_potency_pct,pct=50,
+geyser,Geyser {item},bandolier|vest|single_shoulder_guard,water,"Water tiles you lay erupt 1 turn later: 1 damage per water point, everyone on the tile is pushed 1 hex out, and the tile keeps its water.",tile_erupt,delay=1;dmg_per_point=1;radius=0;push=1;consume=0,
+frozen,Frozen {item},brigandine|platemail|feathered_full_helm|crown|tiara|scarf,ice,Your ice locks (glazes) last 1 turn longer.,tile_duration_plus,turns=1,Brief example (frozen brigandine)
+glacial,Glacial {item},wizard_hat|silken_robe|chain_mail|platelegs,ice,Your ice also locks the 6 tiles around the one you target.,element_area_plus,radius=1;step=0,
+rimed,Rimed {item},platemail|chain_mail|leather_tassets|feathered_full_helm,ice,+2 defense while you stand on a locked (glazed) tile.,stand_on_bonus,stat=def;flat=2,
+shattering,Shattering {item},crown|dragoon_helm|gladiator_chestpiece,ice,"When thunder shatters a lock you made, the shatter multiplier is x2 instead of x1.5.",tile_potency_pct,pct=33,1.5 x 1.33 = 2.0. Depends on ELEMENTS.md keeping a glaze multiplier
+frostbitten,Frostbitten {item},scarf|tights|single_shoulder_guard,ice,Your basic attacks have a 50% chance to lock the target's tile.,lay_on,trigger=hit;where=target;step=0;chance=50,On an empty tile this arms ice's marker instead (V8 Stasis)
+thundering,Thundering {item},feathered_full_helm|dragoon_helm|crown|gladiator_chestpiece,thunder,Your thunder effects trigger twice; the second resolves at 50%.,effect_repeat,extra=1;scale_pct=50,Brief example (thundering full helm). 50% on the echo is my number; the brief says 'twice'
+arcing,Arcing {item},platemail|bandolier|tilted_beret|single_shoulder_guard,thunder,Your detonations splash 2 rings out instead of 1.,element_area_plus,radius=1;step=0,
+stormcallers,Stormcaller's {item},wizard_hat|tiara|robe_bottoms|silken_robe,thunder,Your thunder deals 20% more damage.,element_damage_pct,pct=20;next_same=0,
+grounded,Grounded {item},chain_mail|leather_cuirass|leather_tassets|chaps,thunder,Take 25% less thunder damage and half damage from detonations you stand in.,damage_taken_mod,source=thunder;pct=-25;tile_pct=-50,
+jolting,Jolting {item},brigandine|gladiator_chestpiece|vest|baseball_cap,thunder,Your detonations knock whoever stands on the tile 1 hex away from you.,knockback,hexes=1;on=trigger;chance=100,
+static,Static {item},single_shoulder_guard|platelegs|feathered_cap,thunder,"When an adjacent enemy strikes you, thunder lands on its tile (detonating any charge there).",lay_on,trigger=struck;where=attacker;step=0;chance=100;melee_only=1,
+gusting,Gusting {item},chaps|tights|scarf|feathered_cap,wind,Your gales copy the tile 2 rings out instead of 1.,element_area_plus,radius=1;step=0,
+howling,Howling {item},baseball_cap|bandolier|robe_bottoms|crown,wind,Your gales push everyone on the spread tiles 1 hex outward.,knockback,hexes=1;on=trigger;chance=100,
+lingering,Lingering {item},tilted_beret|vest|tiara,wind,Tiles copied by your gales last 1 turn longer.,tile_duration_plus,turns=1,
+whistling,Whistling {item},feathered_cap|leather_cuirass|tights|wizard_hat,wind,+1 extra wind affinity point every time you use wind.,affinity_gain_plus,amount=1,
+windbreak,Windbreak {item},single_shoulder_guard|leather_cuirass|scarf|platelegs,wind,Take 25% less wind damage.,damage_taken_mod,source=wind;pct=-25;tile_pct=0,
+umbral,Umbral {item},robe_bottoms|silken_robe|tilted_beret|leather_cuirass,dark,Dark tiles you lay last 1 turn longer.,tile_duration_plus,turns=1,
+shrouded,Shrouded {item},vest|feathered_cap|tights|bandolier,dark,+1 speed per dark point on the tile you stand on.,stand_on_bonus,stat=spd;per_point=1,
+abyssal,Abyssal {item},wizard_hat|tiara|crown|scarf,dark,Your dark casts push the tile 1 extra step darker (still capped at -3).,cast_step_plus,steps=1,
+shadowtrail,Shadowtrail {item},chaps|baseball_cap|leather_cuirass,dark,Every tile you leave while moving gains 1 dark step.,lay_on,trigger=move;where=path;step=1;chance=100,
+gloaming,Gloaming {item},feathered_cap|tilted_beret|dragoon_helm,dark,Your dark tiles hide their occupant 50% better.,tile_potency_pct,pct=50,
+nightforged,Nightforged {item},platemail|platelegs|brigandine|single_shoulder_guard,dark,Take 15% less dark damage.,damage_taken_mod,source=dark;pct=-15;tile_pct=0,
+collapsing,Collapsing {item},crown|leather_tassets|robe_bottoms,dark,"Dark tiles you lay collapse 1 turn later: 2 damage per dark point to the occupant, and neighbours are pulled 1 hex in.",tile_erupt,delay=1;dmg_per_point=2;radius=1;push=-1;consume=1,
+radiant,Radiant {item},tiara|silken_robe|crown|robe_bottoms,light,Your light tiles are 50% stronger: more healing and more exposure.,tile_potency_pct,pct=50,
+hallowed,Hallowed {item},platemail|chain_mail|feathered_full_helm|tiara,light,Light tiles you lay last 1 turn longer.,tile_duration_plus,turns=1,
+dawning,Dawning {item},wizard_hat|gladiator_chestpiece|dragoon_helm,light,Your light casts push the tile 1 extra step brighter (still capped at +3).,cast_step_plus,steps=1,
+gleaming,Gleaming {item},platemail|platelegs|gladiator_chestpiece|brigandine|single_shoulder_guard,light,"When you are struck, the attacker's tile gains 1 light step (exposing it).",lay_on,trigger=struck;where=attacker;step=1;chance=100,
+sunlit,Sunlit {item},silken_robe|wizard_hat|leather_tassets|baseball_cap,light,+1 willpower per light point on the tile you stand on.,stand_on_bonus,stat=wil;per_point=1,
+flaring,Flaring {item},robe_bottoms|scarf|tilted_beret,light,"Light tiles you lay flare 1 turn later: allies on the tile and its neighbours heal 2 per light point, then the tile goes neutral.",tile_erupt,delay=1;heal_per_point=2;radius=1;consume=1,
+cleaving,{item} of Cleaving,double_axe|axe|halberd|glaive|flamberge|warhammer,,Basic attacks and AoE skills reach 1 ring further. Allies in the added ring are spared.,aoe_radius_plus,radius=1;ring_pct=100;basic=1;skills=1;friendly=0,Brief example (double axe of cleaving)
+piercing_strikes,{item} of Piercing Strikes,sword|lance|javelin,,Basic attack range is doubled.,range_mod,mult=2;plus=0;dmg_pct=100,Brief example (sword of piercing strikes)
+spreadshot,Spreadshot {item},shortbow|flintlock,,"Fires 3 shots along 3 different lines, 50% damage each.",multi_hit,count=3;dmg_pct=50;pattern=fan,Brief example (spreadshot shortbow)
+doubleshot,Doubleshot {item},recurve_bow|compound_bow|pistol|m1911|dagger|jagged_dagger|scimitar|brass_knuckles,,Every basic attack hits twice at 75% damage each.,multi_hit,count=2;dmg_pct=75;pattern=same,"Brief example (doubleshot longbow; there is no longbow, so recurve/compound). Each hit rolls separately"
+flowing,Flowing {item},lance|glaive|javelin|scimitar|dagger|staff|hatchet|shortbow|hand_wraps,,"After attacking you may move up to 2 more hexes, even if you moved before attacking.",move_after_attack,hexes=2,"Brief example (flowing lance). Base rules already allow act-then-move, so this is a second move"
+impact,{item} of Impact,warhammer|anchor|axe|staff|halberd|double_axe|gauntlets,,Basic attacks knock the target 1 hex straight back.,knockback,hexes=1;on=hit;chance=100,
+hooking,Hooking {item},anchor|halberd|glaive,,Basic attacks drag the target 1 hex toward you.,knockback,hexes=-1;on=hit;chance=100,
+riposting,Riposting {item},sword|flamberge|scimitar|halberd|jagged_dagger,,"Once per enemy turn, when an adjacent enemy attacks you, strike back for 50%.",counter_attack,dmg_pct=50;per_turn=1;range=1,
+keen,Keen {item},dagger|jagged_dagger|scimitar|m1911|compound_bow|hand_wraps|brass_knuckles,,+10% critical chance.,attack_mod,crit=10,
+serrated,Serrated {item},jagged_dagger|flamberge|brass_knuckles,,Critical hits deal x2 instead of x1.5.,attack_mod,crit_mult=0.5,
+sundering,Sundering {item},warhammer|axe|flamberge|m1911|brass_knuckles|gauntlets,,Attacks ignore 25% of the target's defense.,attack_mod,def_ignore_pct=25,
+jousting,Jousting {item},lance|javelin|anchor|double_axe,,"+10% damage for each hex moved this turn before attacking, up to +40%.",attack_mod,dmg_per_hex_moved_pct=10;max_pct=40,
+longshot,Longshot {item},recurve_bow|compound_bow|flintlock|moon_staff,,+2 range.,range_mod,mult=1;plus=2;dmg_pct=100,
+quickdraw,Quickdraw {item},pistol|flintlock|m1911|hatchet|shortbow|dagger|hand_wraps,,Weapon skills recover 1 turn faster.,skill_cd_minus,amount=1;once_per_battle=0,Takes the default cooldown from 2 to 1. Reload is already 0
+throwing,Throwing {item},hatchet|javelin|dagger|anchor,,Basic attack can be thrown up to 2 extra hexes away for 75% damage.,range_mod,mult=1;plus=2;dmg_pct=75,dmg_pct applies only beyond the weapon's normal range
+guarding,Guarding {item},sword|warhammer|staff|halberd|moon_staff|anchor|gauntlets,,"After you attack, take 25% less damage until your next turn.",guard,pct=25;when=after_attack;until=next_turn,
+conducting,Conducting {item},staff|moon_staff|recurve_bow|glaive|pistol,,+25% damage against targets standing on charged tiles.,attack_mod,vs_charged_pct=25,
+lancing,Lancing {item},lance|javelin|compound_bow|m1911,,Attacks pass through: the first unit behind the target in the same line takes 75%.,multi_hit,count=2;dmg_pct=75;pattern=line,First hit is full damage; dmg_pct applies to the unit behind
+channelling,Channelling {item},staff|moon_staff,,Spell AoEs reach 1 ring further (basic attack unchanged).,aoe_radius_plus,radius=1;ring_pct=100;basic=0;skills=1;friendly=0,Staff skills are not written yet; this rides on whatever AoE they have
+pummeling,Pummeling {item},hand_wraps|brass_knuckles,,"Flurry lands 4 strikes instead of 3.",multi_hit,count=4;skill=flurry,"Rides multi_hit with skill=flurry: the basic attack ignores the row. Each strike stays at Flurry's 45%"
+rebound,{item} of the Rebound,gauntlets|brass_knuckles,,"Uppercut knocks the target 2 hexes back instead of 1 (and slams if anything stops it on the way).",knockback,hexes=1;on=skill;skill=uppercut,"on=skill keeps it off basic attacks; hexes add to Uppercut's own 1"
+welling,Welling {item},gauntlets|hand_wraps,,"Palm Burst pours 3 steps of your element instead of 2 (still capped at +/-3).",cast_step_plus,steps=1;skill=palm_burst,"A weapon row (no element column), so cast_step_plus for casts in general ignores it"

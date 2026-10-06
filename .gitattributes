@@ -1,0 +1,8 @@
+# Godot text resources stay plain with LF endings
+*.gd text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.gdshader text eol=lf
+*.csv text eol=lf
+*.json text eol=lf
+*.md text eol=lf

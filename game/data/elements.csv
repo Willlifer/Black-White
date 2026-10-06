@@ -1,0 +1,8 @@
+id,name,hair_hex,tile_glow_hex,opposite,role,notes
+fire,Fire,#E8432E,#FF5A1F,water,axis_pos,"h axis +1..+3. Smouldering / Burning / Blazing: 4/8/12% HP at turn start, 2/4/6% per hex crossed; at 2+ on grassy ignites grassy neighbours once per cast. Melts glaze. See design/ELEMENTS.md"
+water,Water,#2E6FE8,#2E8CFF,fire,axis_neg,"h axis -1..-3. Damp / Flooded / Deep: +0/+1/+2 move cost (0 when glazed); thunder hits on occupant +10% per intensity; adds 2% HP per intensity to a detonation"
+ice,Ice,#5FD8F0,#BFF4FF,all,operator,"Glaze: charged tile locked 2 cycles (decay paused; glazed water walkable). Empty tile: arms a stasis marker (3 cycles). Tile glow is proposed (brief gives none): pale cyan frost. Opposite 'all' = 2.5% resistance per rank to every other element"
+thunder,Thunder,#8B3DF0,#9B4DFF,wind,operator,"Detonate: 5% + 4% per charge point (+2% per water intensity) HP to occupant, half to the six neighbours, x1.5 if glazed; tile erased. Empty tile: arms a fuse marker (3 cycles). Crackling purple"
+wind,Wind,#3CCB5A,#3CDB6A,thunder,operator,"Gale: copies the tile's charge onto the six neighbours at 1 cycle (copies never fire markers or ignite grass; glazed and marked hexes refuse them). Empty tile: arms a gale marker (3 cycles). Swirling green"
+dark,Dark,#3A2A5C,#2A1745,light,axis_neg,"v axis -1..-3. Gloaming / Deep shadow / Abyss: attacks targeting occupant -7/-14/-21 hit; Abyss also drains 3% HP at turn start. Sinking and swirling"
+light,Light,#F5D23A,#FFC81A,dark,axis_pos,"v axis +1..+3. First light / Lightfall / Pillar: heals occupant 3/6/9% HP at turn start; attacks targeting occupant +7/+14/+21 hit. Glowing yellow; needs saturation to read on white tiles"

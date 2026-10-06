@@ -1,0 +1,65 @@
+{
+ "version": 1,
+ "generator": "game/tools/blender/build_obelisks.py",
+ "space": "Godot object-local: origin on the hex top centre, +Y up. `heart` is the pulse's origin, `halo` the light.",
+ "obelisks": {
+  "lantern": {
+   "height": 3.38,
+   "heart": [
+    0,
+    1.7,
+    0
+   ],
+   "halo": [
+    0,
+    3.3,
+    0
+   ],
+   "aabb": {
+    "min": [
+     -0.86,
+     0.0,
+     -0.7448
+    ],
+    "max": [
+     0.86,
+     3.3247,
+     0.7448
+    ]
+   },
+   "tris": 902,
+   "accent_tris": 816,
+   "glb": "res://art/obelisks/lantern.glb",
+   "notes": "The White Lantern: white shaft, glyphs on every face, a halo of light over the cap."
+  },
+  "well": {
+   "height": 3.13,
+   "heart": [
+    0,
+    1.73,
+    0
+   ],
+   "halo": [
+    0,
+    1.73,
+    0
+   ],
+   "aabb": {
+    "min": [
+     -0.9,
+     0.0,
+     -0.7794
+    ],
+    "max": [
+     0.9,
+     3.03,
+     0.7794
+    ]
+   },
+   "tris": 608,
+   "accent_tris": 376,
+   "glb": "res://art/obelisks/well.glb",
+   "notes": "The Black Well: two black shards leaning in, a standing ring between them (the hole for a heart)."
+  }
+ }
+}

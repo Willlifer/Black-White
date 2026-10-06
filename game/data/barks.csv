@@ -1,0 +1,369 @@
+id,event,action,speaker_friendliness,toward_friendliness,trust,line,voice_clip
+ally_attacking_unf_str_01,ally_attacking,,unfriendly,any,strangers,Don't miss.,No
+ally_attacking_unf_str_02,ally_attacking,,unfriendly,any,strangers,Hit it or move.,Hmm
+ally_attacking_unf_str_03,ally_attacking,,unfriendly,any,strangers,Swing already.,Hey
+ally_attacking_unf_str_04,ally_attacking,,unfriendly,any,strangers,Try not to embarrass us.,No
+ally_attacking_unf_str_05,ally_attacking,,unfriendly,any,strangers,I could do that. Better.,Hmm
+ally_attacking_unf_str_06,ally_attacking,,unfriendly,any,strangers,I'm making a face. You can't tell.,Hmm
+ally_attacking_unf_acq_01,ally_attacking,,unfriendly,any,acquainted,Huh. You aimed.,Hmm
+ally_attacking_unf_acq_02,ally_attacking,,unfriendly,any,acquainted,Adequate.,Mmhmm
+ally_attacking_unf_acq_03,ally_attacking,,unfriendly,any,acquainted,Fine. Keep doing that.,Mmhmm
+ally_attacking_unf_acq_04,ally_attacking,,unfriendly,any,acquainted,That one I'll allow.,Mmhmm
+ally_attacking_unf_acq_05,ally_attacking,,unfriendly,any,acquainted,Less bad than last time.,Hmm
+ally_attacking_unf_tru_01,ally_attacking,,unfriendly,any,trusted,Good. Again.,Yeah
+ally_attacking_unf_tru_02,ally_attacking,,unfriendly,any,trusted,Hit 'em for me.,Yah
+ally_attacking_unf_tru_03,ally_attacking,,unfriendly,any,trusted,"Go on, {ally}. Show off.",Hey
+ally_attacking_unf_tru_04,ally_attacking,,unfriendly,any,trusted,I taught you that. I didn't. Still.,Hmm
+ally_attacking_unf_tru_05,ally_attacking,,unfriendly,any,trusted,Not bad. Don't make it weird.,Mmhmm
+ally_attacking_neu_str_01,ally_attacking,,neutral,any,strangers,Attack initiated.,Mmhmm
+ally_attacking_neu_str_02,ally_attacking,,neutral,any,strangers,That's one way to do it.,Hmm
+ally_attacking_neu_str_03,ally_attacking,,neutral,any,strangers,Noted.,Mmhmm
+ally_attacking_neu_str_04,ally_attacking,,neutral,any,strangers,Ah. The pointy end. Good.,Hmm
+ally_attacking_neu_str_05,ally_attacking,,neutral,any,strangers,"Proceeding, I see.",Hmm
+ally_attacking_neu_acq_01,ally_attacking,,neutral,any,acquainted,Same as last time. Works.,Mmhmm
+ally_attacking_neu_acq_02,ally_attacking,,neutral,any,acquainted,"Textbook. Old textbook, but.",Hmm
+ally_attacking_neu_acq_03,ally_attacking,,neutral,any,acquainted,I'd give that a seven.,Mmhmm
+ally_attacking_neu_acq_04,ally_attacking,,neutral,any,acquainted,Reliable. Like a bus.,Mmhmm
+ally_attacking_neu_acq_05,ally_attacking,,neutral,any,acquainted,"Go on, then.",Hey
+ally_attacking_neu_tru_01,ally_attacking,,neutral,any,trusted,There it is.,Mmhmm
+ally_attacking_neu_tru_02,ally_attacking,,neutral,any,trusted,"{ally}, doing {ally} things.",Laugh
+ally_attacking_neu_tru_03,ally_attacking,,neutral,any,trusted,I've seen this one. Still good.,Laugh
+ally_attacking_neu_tru_04,ally_attacking,,neutral,any,trusted,Imagine I'm nodding.,Mmhmm
+ally_attacking_neu_tru_05,ally_attacking,,neutral,any,trusted,Predictable. That's a compliment.,Mmhmm
+ally_attacking_fri_str_01,ally_attacking,,friendly,any,strangers,"Go, uh... you! Go you!",Yeah
+ally_attacking_fri_str_02,ally_attacking,,friendly,any,strangers,Wow! Teamwork! Is this teamwork?,Yeah
+ally_attacking_fri_str_03,ally_attacking,,friendly,any,strangers,Hi! Hit him! Then hi again!,Hey
+ally_attacking_fri_str_04,ally_attacking,,friendly,any,strangers,"You've got this, new friend!",Yeah
+ally_attacking_fri_str_05,ally_attacking,,friendly,any,strangers,I'm cheering. Is cheering okay?,Hmm
+ally_attacking_fri_acq_01,ally_attacking,,friendly,any,acquainted,Go {ally}! I know your name now!,Yeah
+ally_attacking_fri_acq_02,ally_attacking,,friendly,any,acquainted,That's the stuff!,Yeah
+ally_attacking_fri_acq_03,ally_attacking,,friendly,any,acquainted,Hiyah! I said it for you.,Hiyah
+ally_attacking_fri_acq_04,ally_attacking,,friendly,any,acquainted,Big swing energy!,Yah
+ally_attacking_fri_acq_05,ally_attacking,,friendly,any,acquainted,Do the thing you did last time!,Hey
+ally_attacking_fri_tru_01,ally_attacking,,friendly,any,trusted,Thing! Do the thing!,Hey
+ally_attacking_fri_tru_02,ally_attacking,,friendly,any,trusted,Classic {ally}!,Laugh
+ally_attacking_fri_tru_03,ally_attacking,,friendly,any,trusted,"The usual, {ally}!",Yeah
+ally_attacking_fri_tru_04,ally_attacking,,friendly,any,trusted,"Ooh, my favorite move of yours.",Yeah
+ally_attacking_fri_tru_05,ally_attacking,,friendly,any,trusted,Go. I've got snacks after.,Mmhmm
+ally_attacking_unf_str_to_fri_01,ally_attacking,,unfriendly,friendly,strangers,Stop narrating your attacks.,No
+ally_attacking_unf_str_to_fri_02,ally_attacking,,unfriendly,friendly,strangers,You don't have to wave first.,No
+ally_attacking_unf_str_to_fri_03,ally_attacking,,unfriendly,friendly,strangers,Why are you smiling at it?,Hmm
+ally_attacking_unf_tru_to_fri_01,ally_attacking,,unfriendly,friendly,trusted,"Go on, sunshine.",Hey
+ally_attacking_unf_tru_to_fri_02,ally_attacking,,unfriendly,friendly,trusted,"Ugh. Go get 'em, I guess.",Mmhmm
+ally_attacking_unf_tru_to_unf_01,ally_attacking,,unfriendly,unfriendly,trusted,"Only one of us gets to be scary. Fine, two.",Mmhmm
+ally_attacking_unf_acq_to_neu_01,ally_attacking,,unfriendly,neutral,acquainted,At least you don't talk while you do it.,Mmhmm
+ally_attacking_neu_str_to_unf_01,ally_attacking,,neutral,unfriendly,strangers,Aggressive. Efficient. Unpleasant. Fine.,Mmhmm
+ally_attacking_neu_str_to_fri_01,ally_attacking,,neutral,friendly,strangers,You don't have to say 'excuse me' to it.,Hmm
+ally_attacking_fri_str_to_unf_01,ally_attacking,,friendly,unfriendly,strangers,Scary! Love it! Keep going!,Yeah
+ally_attacking_fri_str_to_unf_02,ally_attacking,,friendly,unfriendly,strangers,You're very good at being mean!,Yeah
+ally_attacking_fri_str_to_unf_03,ally_attacking,,friendly,unfriendly,strangers,I made you a cheer. It's mostly 'hey you'.,Hey
+ally_attacking_fri_tru_to_unf_01,ally_attacking,,friendly,unfriendly,trusted,Grumpy smash!,Laugh
+ally_attacking_fri_tru_to_unf_02,ally_attacking,,friendly,unfriendly,trusted,Go be mean! I believe in you!,Yeah
+ally_attacking_fri_tru_to_fri_01,ally_attacking,,friendly,friendly,trusted,High five after! The big one!,Yeah
+ally_attacking_neu_tru_to_neu_01,ally_attacking,,neutral,neutral,trusted,"Calm, competent, quiet. My kind of colleague.",Mmhmm
+ally_ko_unf_str_01,ally_ko,,unfriendly,any,strangers,One less in my way.,No
+ally_ko_unf_str_02,ally_ko,,unfriendly,any,strangers,Should've ducked.,Hmm
+ally_ko_unf_str_03,ally_ko,,unfriendly,any,strangers,Typical.,No
+ally_ko_unf_str_04,ally_ko,,unfriendly,any,strangers,Great. Now I do your job too.,Oof
+ally_ko_unf_str_05,ally_ko,,unfriendly,any,strangers,Get up later. I'm busy.,No
+ally_ko_unf_acq_01,ally_ko,,unfriendly,any,acquainted,Hey. Hey! Get up.,Hey
+ally_ko_unf_acq_02,ally_ko,,unfriendly,any,acquainted,...That one bothered me.,Hmm
+ally_ko_unf_acq_03,ally_ko,,unfriendly,any,acquainted,Who hit them? Point.,No
+ally_ko_unf_acq_04,ally_ko,,unfriendly,any,acquainted,You were annoying. Come back and be annoying.,No
+ally_ko_unf_acq_05,ally_ko,,unfriendly,any,acquainted,Not like this. Ugh.,Oogh
+ally_ko_unf_tru_01,ally_ko,,unfriendly,any,trusted,No. Absolutely not.,No
+ally_ko_unf_tru_02,ally_ko,,unfriendly,any,trusted,Somebody is getting hit very hard.,Hiyah
+ally_ko_unf_tru_03,ally_ko,,unfriendly,any,trusted,{ally}! ...Fine. I'll finish it for you.,No
+ally_ko_unf_tru_04,ally_ko,,unfriendly,any,trusted,Nobody drops {ally} but me.,No
+ally_ko_unf_tru_05,ally_ko,,unfriendly,any,trusted,Stay down. I've got it.,Hmm
+ally_ko_neu_str_01,ally_ko,,neutral,any,strangers,Ah. That's bad.,Hmm
+ally_ko_neu_str_02,ally_ko,,neutral,any,strangers,"One down. Ours, unfortunately.",Hmm
+ally_ko_neu_str_03,ally_ko,,neutral,any,strangers,Recalculating.,Hmm
+ally_ko_neu_str_04,ally_ko,,neutral,any,strangers,They'll be fine. Probably. I don't know them.,Hmm
+ally_ko_neu_str_05,ally_ko,,neutral,any,strangers,Well. Fewer of us.,Oof
+ally_ko_neu_acq_01,ally_ko,,neutral,any,acquainted,Hm. I liked that one.,Hmm
+ally_ko_neu_acq_02,ally_ko,,neutral,any,acquainted,{ally} is down. Adjusting.,Hmm
+ally_ko_neu_acq_03,ally_ko,,neutral,any,acquainted,That was avoidable. Mostly.,No
+ally_ko_neu_acq_04,ally_ko,,neutral,any,acquainted,Okay. Less joking now.,Hmm
+ally_ko_neu_acq_05,ally_ko,,neutral,any,acquainted,I'll tell you how it ends.,Mmhmm
+ally_ko_neu_tru_01,ally_ko,,neutral,any,trusted,{ally}. No.,No
+ally_ko_neu_tru_02,ally_ko,,neutral,any,trusted,Right. I'm annoyed now.,Hmm
+ally_ko_neu_tru_03,ally_ko,,neutral,any,trusted,Rest. I've got the boring part.,Mmhmm
+ally_ko_neu_tru_04,ally_ko,,neutral,any,trusted,That's enough of that.,Hiyah
+ally_ko_neu_tru_05,ally_ko,,neutral,any,trusted,"Out of character for me, but: hey!",Hey
+ally_ko_fri_str_01,ally_ko,,friendly,any,strangers,No! I was going to learn your name!,No
+ally_ko_fri_str_02,ally_ko,,friendly,any,strangers,Are you okay? That's a no.,Oof
+ally_ko_fri_str_03,ally_ko,,friendly,any,strangers,Oh no oh no oh no.,No
+ally_ko_fri_str_04,ally_ko,,friendly,any,strangers,I'll avenge you! Who are you?,Hey
+ally_ko_fri_str_05,ally_ko,,friendly,any,strangers,Nap! It's a nap! Right?,Hmm
+ally_ko_fri_acq_01,ally_ko,,friendly,any,acquainted,{ally}! No no no.,No
+ally_ko_fri_acq_02,ally_ko,,friendly,any,acquainted,I'll get them for you!,Hiyah
+ally_ko_fri_acq_03,ally_ko,,friendly,any,acquainted,You were doing so well!,Oof
+ally_ko_fri_acq_04,ally_ko,,friendly,any,acquainted,Okay. Okay. Angry mode.,Hmm
+ally_ko_fri_acq_05,ally_ko,,friendly,any,acquainted,"Hold on, {ally}! Lie there! Bravely!",Hey
+ally_ko_fri_tru_01,ally_ko,,friendly,any,trusted,Nobody touches {ally}!,No
+ally_ko_fri_tru_02,ally_ko,,friendly,any,trusted,That's it. I'm not friendly anymore.,No
+ally_ko_fri_tru_03,ally_ko,,friendly,any,trusted,I'll finish. Then we're getting soup.,Mmhmm
+ally_ko_fri_tru_04,ally_ko,,friendly,any,trusted,Not my {ally}!,No
+ally_ko_fri_tru_05,ally_ko,,friendly,any,trusted,Okay. Quiet now. Serious now.,Hmm
+ally_ko_unf_str_to_fri_01,ally_ko,,unfriendly,friendly,strangers,"Finally, quiet. ...Too quiet.",Hmm
+ally_ko_unf_str_to_fri_02,ally_ko,,unfriendly,friendly,strangers,Who's going to cheer at me now? Not that I care.,No
+ally_ko_unf_tru_to_fri_01,ally_ko,,unfriendly,friendly,trusted,Hey. Sunshine. Get up.,Hey
+ally_ko_unf_tru_to_fri_02,ally_ko,,unfriendly,friendly,trusted,Okay. Now I'm mad.,No
+ally_ko_unf_tru_to_unf_01,ally_ko,,unfriendly,unfriendly,trusted,Get up. Nobody beats you but me.,Hey
+ally_ko_fri_str_to_unf_01,ally_ko,,friendly,unfriendly,strangers,Mean friend down!,No
+ally_ko_fri_str_to_unf_02,ally_ko,,friendly,unfriendly,strangers,Even grumpy people deserve to win!,No
+ally_ko_fri_tru_to_unf_01,ally_ko,,friendly,unfriendly,trusted,You can't go! You haven't smiled yet!,No
+ally_ko_neu_acq_to_fri_01,ally_ko,,neutral,friendly,acquainted,It's very quiet without the cheering.,Hmm
+ally_ko_neu_tru_to_unf_01,ally_ko,,neutral,unfriendly,trusted,Grumpy's down. I'll be grumpy for both of us.,Hmm
+healing_received_unf_str_01,healing_received,,unfriendly,any,strangers,Didn't ask.,No
+healing_received_unf_str_02,healing_received,,unfriendly,any,strangers,I was fine.,No
+healing_received_unf_str_03,healing_received,,unfriendly,any,strangers,Don't make it a thing.,Hmm
+healing_received_unf_str_04,healing_received,,unfriendly,any,strangers,Fine. Noted. Leave.,Mmhmm
+healing_received_unf_str_05,healing_received,,unfriendly,any,strangers,I'm not saying thank you.,No
+healing_received_unf_acq_01,healing_received,,unfriendly,any,acquainted,...Thanks. Don't.,Mmhmm
+healing_received_unf_acq_02,healing_received,,unfriendly,any,acquainted,That helped. Annoyingly.,Hmm
+healing_received_unf_acq_03,healing_received,,unfriendly,any,acquainted,Okay. I owe you a small amount.,Mmhmm
+healing_received_unf_acq_04,healing_received,,unfriendly,any,acquainted,Acceptable healing.,Mmhmm
+healing_received_unf_acq_05,healing_received,,unfriendly,any,acquainted,"Next time, earlier.",Hmm
+healing_received_unf_tru_01,healing_received,,unfriendly,any,trusted,Thanks. I mean it. Moving on.,Mmhmm
+healing_received_unf_tru_02,healing_received,,unfriendly,any,trusted,You always show up. Annoying. Thanks.,Hmm
+healing_received_unf_tru_03,healing_received,,unfriendly,any,trusted,Good timing. As usual.,Mmhmm
+healing_received_unf_tru_04,healing_received,,unfriendly,any,trusted,I'd heal you too. Probably.,Hmm
+healing_received_unf_tru_05,healing_received,,unfriendly,any,trusted,Keep that up and I'll have to like you.,Laugh
+healing_received_neu_str_01,healing_received,,neutral,any,strangers,Healing received. Thank you.,Mmhmm
+healing_received_neu_str_02,healing_received,,neutral,any,strangers,Oh. That's warm.,Hmm
+healing_received_neu_str_03,healing_received,,neutral,any,strangers,Much better. Unexpectedly.,Mmhmm
+healing_received_neu_str_04,healing_received,,neutral,any,strangers,Appreciated.,Mmhmm
+healing_received_neu_str_05,healing_received,,neutral,any,strangers,I'm told this is good for me.,Hmm
+healing_received_neu_acq_01,healing_received,,neutral,any,acquainted,Thanks. Back to work.,Mmhmm
+healing_received_neu_acq_02,healing_received,,neutral,any,acquainted,That's the good stuff.,Yeah
+healing_received_neu_acq_03,healing_received,,neutral,any,acquainted,I'll put that on your tab. You have a tab.,Mmhmm
+healing_received_neu_acq_04,healing_received,,neutral,any,acquainted,Ah. Fewer holes.,Hmm
+healing_received_neu_acq_05,healing_received,,neutral,any,acquainted,Right on time. Roughly.,Mmhmm
+healing_received_neu_tru_01,healing_received,,neutral,any,trusted,Thanks. You knew.,Mmhmm
+healing_received_neu_tru_02,healing_received,,neutral,any,trusted,You're my favorite light source.,Laugh
+healing_received_neu_tru_03,healing_received,,neutral,any,trusted,Better. I owe you a coffee.,Mmhmm
+healing_received_neu_tru_04,healing_received,,neutral,any,trusted,Of course it was you.,Laugh
+healing_received_neu_tru_05,healing_received,,neutral,any,trusted,"I'd thank you more, but, fight.",Hmm
+healing_received_fri_str_01,healing_received,,friendly,any,strangers,Thank you thank you thank you!,Yeah
+healing_received_fri_str_02,healing_received,,friendly,any,strangers,Wow! You fixed me! Best day!,Yeah
+healing_received_fri_str_03,healing_received,,friendly,any,strangers,I'll pay you back! In hugs!,Laugh
+healing_received_fri_str_04,healing_received,,friendly,any,strangers,"Ooh, that tingles!",Laugh
+healing_received_fri_str_05,healing_received,,friendly,any,strangers,We're friends now. That's how it works.,Mmhmm
+healing_received_fri_acq_01,healing_received,,friendly,any,acquainted,You're the best!,Yeah
+healing_received_fri_acq_02,healing_received,,friendly,any,acquainted,Healed! Okay! Back in!,Yah
+healing_received_fri_acq_03,healing_received,,friendly,any,acquainted,Every time! You're amazing!,Yeah
+healing_received_fri_acq_04,healing_received,,friendly,any,acquainted,I owe you like six favors now.,Laugh
+healing_received_fri_acq_05,healing_received,,friendly,any,acquainted,Thanks! I'll get hit less. Promise.,Mmhmm
+healing_received_fri_tru_01,healing_received,,friendly,any,trusted,There you are!,Yeah
+healing_received_fri_tru_02,healing_received,,friendly,any,trusted,My hero. Again.,Laugh
+healing_received_fri_tru_03,healing_received,,friendly,any,trusted,"Knew you'd come. Thanks, {ally}.",Mmhmm
+healing_received_fri_tru_04,healing_received,,friendly,any,trusted,Same time next fight?,Laugh
+healing_received_fri_tru_05,healing_received,,friendly,any,trusted,"Thanks, {ally}. Okay. Smashing resumes.",Yah
+healing_received_unf_str_to_fri_01,healing_received,,unfriendly,friendly,strangers,Stop glowing at me.,No
+healing_received_unf_str_to_fri_02,healing_received,,unfriendly,friendly,strangers,Why are you smiling? It's just healing.,Hmm
+healing_received_unf_acq_to_unf_01,healing_received,,unfriendly,unfriendly,acquainted,We don't talk about this.,No
+healing_received_unf_tru_to_fri_01,healing_received,,unfriendly,friendly,trusted,"Thanks, sunshine.",Mmhmm
+healing_received_unf_tru_to_unf_01,healing_received,,unfriendly,unfriendly,trusted,Ugh. Thanks. Ugh.,Mmhmm
+healing_received_neu_str_to_fri_01,healing_received,,neutral,friendly,strangers,Thank you. Please stop hugging me mid-fight.,Hmm
+healing_received_fri_str_to_unf_01,healing_received,,friendly,unfriendly,strangers,You healed me! You DO care!,Yeah
+healing_received_fri_str_to_unf_02,healing_received,,friendly,unfriendly,strangers,I knew you were nice inside!,Laugh
+healing_received_fri_tru_to_neu_01,healing_received,,friendly,neutral,trusted,You pretend you're not nice. I see you.,Laugh
+healing_received_fri_tru_to_unf_01,healing_received,,friendly,unfriendly,trusted,Grumpy heals are the best heals.,Laugh
+downtime_advice_ask_unf_str_01,downtime_advice,ask,unfriendly,any,strangers,What. You want me to do something?,Hmm
+downtime_advice_ask_unf_str_02,downtime_advice,ask,unfriendly,any,strangers,Make it quick.,Hmm
+downtime_advice_ask_unf_str_04,downtime_advice,ask,unfriendly,any,strangers,Pick something. I'll judge it.,Hmm
+downtime_advice_ask_unf_acq_01,downtime_advice,ask,unfriendly,any,acquainted,Got a plan for me? A good one?,Hmm
+downtime_advice_ask_unf_acq_02,downtime_advice,ask,unfriendly,any,acquainted,I'm open to suggestions. Narrowly.,Hmm
+downtime_advice_ask_unf_acq_04,downtime_advice,ask,unfriendly,any,acquainted,What's the job.,Hey
+downtime_advice_ask_unf_tru_01,downtime_advice,ask,unfriendly,any,trusted,Your call. I trust it. Mostly.,Mmhmm
+downtime_advice_ask_unf_tru_02,downtime_advice,ask,unfriendly,any,trusted,Point me at something.,Hey
+downtime_advice_ask_unf_tru_03,downtime_advice,ask,unfriendly,any,trusted,What do we need? I'll do it.,Mmhmm
+downtime_advice_ask_unf_tru_04,downtime_advice,ask,unfriendly,any,trusted,Go on. I'll even pretend to like it.,Laugh
+downtime_advice_ask_neu_str_01,downtime_advice,ask,neutral,any,strangers,Instructions?,Hmm
+downtime_advice_ask_neu_str_02,downtime_advice,ask,neutral,any,strangers,I have a free day. Allegedly.,Hmm
+downtime_advice_ask_neu_str_03,downtime_advice,ask,neutral,any,strangers,Tell me what's useful.,Mmhmm
+downtime_advice_ask_neu_str_04,downtime_advice,ask,neutral,any,strangers,I'll do whatever's on the list.,Mmhmm
+downtime_advice_ask_neu_acq_01,downtime_advice,ask,neutral,any,acquainted,"What's the plan, boss?",Hey
+downtime_advice_ask_neu_acq_02,downtime_advice,ask,neutral,any,acquainted,Advice welcome. Mild advice.,Hmm
+downtime_advice_ask_neu_acq_04,downtime_advice,ask,neutral,any,acquainted,My schedule is open. It's always open.,Mmhmm
+downtime_advice_ask_neu_tru_01,downtime_advice,ask,neutral,any,trusted,You know what I need better than I do.,Mmhmm
+downtime_advice_ask_neu_tru_02,downtime_advice,ask,neutral,any,trusted,Surprise me. Not too much.,Laugh
+downtime_advice_ask_neu_tru_03,downtime_advice,ask,neutral,any,trusted,"The usual, or something brave?",Hmm
+downtime_advice_ask_neu_tru_04,downtime_advice,ask,neutral,any,trusted,Just tell me. I'll pretend it was my idea.,Laugh
+downtime_advice_ask_fri_str_01,downtime_advice,ask,friendly,any,strangers,Hi! What should I do? I'll do anything!,Hey
+downtime_advice_ask_fri_str_02,downtime_advice,ask,friendly,any,strangers,"Ooh, a whole day! What's first?",Yeah
+downtime_advice_ask_fri_str_04,downtime_advice,ask,friendly,any,strangers,Is there a wrong answer? Please say no.,Hmm
+downtime_advice_ask_fri_acq_01,downtime_advice,ask,friendly,any,acquainted,Hey! Got a plan for me?,Hey
+downtime_advice_ask_fri_acq_02,downtime_advice,ask,friendly,any,acquainted,I'm ready! For what? You tell me!,Yeah
+downtime_advice_ask_fri_acq_04,downtime_advice,ask,friendly,any,acquainted,"Whatever you pick, I'm excited about it!",Yeah
+downtime_advice_ask_fri_tru_01,downtime_advice,ask,friendly,any,trusted,"Okay, coach. What's today?",Hey
+downtime_advice_ask_fri_tru_02,downtime_advice,ask,friendly,any,trusted,"You pick, I do. That's our system.",Mmhmm
+downtime_advice_ask_fri_tru_03,downtime_advice,ask,friendly,any,trusted,I already know. But you say it.,Laugh
+downtime_advice_ask_fri_tru_04,downtime_advice,ask,friendly,any,trusted,Big day or cozy day?,Hmm
+self_ko_unf_str_01,self_ko,,unfriendly,any,strangers,Ugh. Figures.,Dying
+self_ko_unf_str_02,self_ko,,unfriendly,any,strangers,Don't. Look. At me.,Dying
+self_ko_unf_acq_01,self_ko,,unfriendly,any,acquainted,Finish it. Not for me. Just finish it.,Dying
+self_ko_unf_acq_02,self_ko,,unfriendly,any,acquainted,I'm only lying down.,Dying
+self_ko_unf_tru_01,self_ko,,unfriendly,any,trusted,Win. Or I'm haunting you.,Dying
+self_ko_unf_tru_02,self_ko,,unfriendly,any,trusted,Don't you dare lose.,Dying
+self_ko_neu_str_01,self_ko,,neutral,any,strangers,Ah. Floor.,Dying
+self_ko_neu_str_02,self_ko,,neutral,any,strangers,This is fine. Lying down.,Dying
+self_ko_neu_acq_01,self_ko,,neutral,any,acquainted,I'll sit this one out.,Dying
+self_ko_neu_acq_02,self_ko,,neutral,any,acquainted,I'll be over here. Horizontally.,Dying
+self_ko_neu_tru_01,self_ko,,neutral,any,trusted,Your turn to be the reliable one.,Dying
+self_ko_neu_tru_02,self_ko,,neutral,any,trusted,Wake me at the good part.,Dying
+self_ko_fri_str_01,self_ko,,friendly,any,strangers,I tried my best! Hi! Bye!,Dying
+self_ko_fri_str_02,self_ko,,friendly,any,strangers,Ow! Good game!,Dying
+self_ko_fri_acq_01,self_ko,,friendly,any,acquainted,Go on without me! Then come back!,Dying
+self_ko_fri_acq_02,self_ko,,friendly,any,acquainted,I'm okay! I'm not okay!,Dying
+self_ko_fri_tru_01,self_ko,,friendly,any,trusted,Win it. Then tell me everything.,Dying
+self_ko_fri_tru_02,self_ko,,friendly,any,trusted,Save me a high five.,Dying
+crit_landed_unf_str_01,crit_landed,,unfriendly,any,strangers,Should've stayed home.,Hiyah
+crit_landed_unf_str_02,crit_landed,,unfriendly,any,strangers,That's how it's done.,Yah
+crit_landed_unf_acq_01,crit_landed,,unfriendly,any,acquainted,Watch and learn. You're welcome.,Hiyah
+crit_landed_unf_acq_02,crit_landed,,unfriendly,any,acquainted,Clean.,Yah
+crit_landed_unf_tru_01,crit_landed,,unfriendly,any,trusted,That one's for the squad. Don't cry.,Hiyah
+crit_landed_unf_tru_02,crit_landed,,unfriendly,any,trusted,Felt good. Want another?,Yah
+crit_landed_neu_str_01,crit_landed,,neutral,any,strangers,Oh. That went well.,Hiyah
+crit_landed_neu_str_02,crit_landed,,neutral,any,strangers,Precisely as planned. Loosely.,Yah
+crit_landed_neu_acq_01,crit_landed,,neutral,any,acquainted,Right in the weak spot. It had one.,Hiyah
+crit_landed_neu_acq_02,crit_landed,,neutral,any,acquainted,Big number. I like big numbers.,Yah
+crit_landed_neu_tru_01,crit_landed,,neutral,any,trusted,Did everyone see that? Somebody see that.,Yah
+crit_landed_neu_tru_02,crit_landed,,neutral,any,trusted,Showing off. Just this once.,Hiyah
+crit_landed_fri_str_01,crit_landed,,friendly,any,strangers,Whoa! Did I do that?,Hiyah
+crit_landed_fri_str_02,crit_landed,,friendly,any,strangers,Sorry! That was a lot!,Yah
+crit_landed_fri_acq_01,crit_landed,,friendly,any,acquainted,Super hit! Super hit!,Hiyah
+crit_landed_fri_acq_02,crit_landed,,friendly,any,acquainted,Nobody told me I could do that!,Yah
+crit_landed_fri_tru_01,crit_landed,,friendly,any,trusted,"Team move! Well, my move. Team spirit!",Hiyah
+crit_landed_fri_tru_02,crit_landed,,friendly,any,trusted,That one had love in it.,Yah
+dodged_unf_str_01,dodged,,unfriendly,any,strangers,Too slow.,No
+dodged_unf_str_02,dodged,,unfriendly,any,strangers,Missed. Obviously.,Hmm
+dodged_unf_acq_01,dodged,,unfriendly,any,acquainted,Try harder.,No
+dodged_unf_acq_02,dodged,,unfriendly,any,acquainted,Nope.,No
+dodged_unf_tru_01,dodged,,unfriendly,any,trusted,Not today.,No
+dodged_unf_tru_02,dodged,,unfriendly,any,trusted,Was that for me? Cute.,Laugh
+dodged_neu_str_01,dodged,,neutral,any,strangers,Missed.,Hmm
+dodged_neu_str_02,dodged,,neutral,any,strangers,Ah. Close.,Hmm
+dodged_neu_acq_01,dodged,,neutral,any,acquainted,I was standing there. Then I wasn't.,Hmm
+dodged_neu_acq_02,dodged,,neutral,any,acquainted,"Statistically, that should have hit.",Hmm
+dodged_neu_tru_01,dodged,,neutral,any,trusted,Saw it coming. Like your jokes.,Laugh
+dodged_neu_tru_02,dodged,,neutral,any,trusted,Not doing that today.,No
+dodged_fri_str_01,dodged,,friendly,any,strangers,Whoops! Missed me!,Laugh
+dodged_fri_str_02,dodged,,friendly,any,strangers,Eep! Okay! Still here!,Hey
+dodged_fri_acq_01,dodged,,friendly,any,acquainted,Ha! Missed!,Laugh
+dodged_fri_acq_02,dodged,,friendly,any,acquainted,Wheee!,Yeah
+dodged_fri_tru_01,dodged,,friendly,any,trusted,Missed me! Missed us!,Laugh
+dodged_fri_tru_02,dodged,,friendly,any,trusted,Dance break!,Laugh
+enemy_ko_unf_str_01,enemy_ko,,unfriendly,any,strangers,Stay down.,Hiyah
+enemy_ko_unf_str_02,enemy_ko,,unfriendly,any,strangers,Next.,Hmm
+enemy_ko_unf_acq_01,enemy_ko,,unfriendly,any,acquainted,One less problem.,Mmhmm
+enemy_ko_unf_acq_02,enemy_ko,,unfriendly,any,acquainted,Down. Who's next.,Yah
+enemy_ko_unf_tru_01,enemy_ko,,unfriendly,any,trusted,Got one. Your turn.,Yah
+enemy_ko_unf_tru_02,enemy_ko,,unfriendly,any,trusted,That was for all of us. Don't make it a thing.,Mmhmm
+enemy_ko_neu_str_01,enemy_ko,,neutral,any,strangers,Target down.,Mmhmm
+enemy_ko_neu_str_02,enemy_ko,,neutral,any,strangers,That's handled.,Mmhmm
+enemy_ko_neu_acq_01,enemy_ko,,neutral,any,acquainted,And that's that.,Mmhmm
+enemy_ko_neu_acq_02,enemy_ko,,neutral,any,acquainted,Check that one off.,Mmhmm
+enemy_ko_neu_tru_01,enemy_ko,,neutral,any,trusted,Who's keeping score? Me. I am.,Laugh
+enemy_ko_neu_tru_02,enemy_ko,,neutral,any,trusted,Tidy.,Mmhmm
+enemy_ko_fri_str_01,enemy_ko,,friendly,any,strangers,I got one! Is that good? It feels good!,Yeah
+enemy_ko_fri_str_02,enemy_ko,,friendly,any,strangers,Sorry! Good fight!,Yeah
+enemy_ko_fri_acq_01,enemy_ko,,friendly,any,acquainted,Down they go!,Yah
+enemy_ko_fri_acq_02,enemy_ko,,friendly,any,acquainted,Point for the team!,Yeah
+enemy_ko_fri_tru_01,enemy_ko,,friendly,any,trusted,That's for the squad!,Yah
+enemy_ko_fri_tru_02,enemy_ko,,friendly,any,trusted,Another one! We're so good!,Laugh
+battle_start_unf_str_01,battle_start,,unfriendly,any,strangers,Stay out of my way.,Hmm
+battle_start_unf_str_02,battle_start,,unfriendly,any,strangers,Let's get this over with.,Hmm
+battle_start_unf_acq_01,battle_start,,unfriendly,any,acquainted,Same as last time. Don't fall over.,Hmm
+battle_start_unf_acq_02,battle_start,,unfriendly,any,acquainted,Ready. Obviously.,Mmhmm
+battle_start_unf_tru_01,battle_start,,unfriendly,any,trusted,Let's ruin their day.,Yah
+battle_start_unf_tru_02,battle_start,,unfriendly,any,trusted,With you lot? Fine. Let's go.,Yeah
+battle_start_neu_str_01,battle_start,,neutral,any,strangers,"Here we go, I suppose.",Hmm
+battle_start_neu_str_02,battle_start,,neutral,any,strangers,Fight. Okay.,Mmhmm
+battle_start_neu_acq_01,battle_start,,neutral,any,acquainted,Positions. Probably.,Hmm
+battle_start_neu_acq_02,battle_start,,neutral,any,acquainted,"Another day, another hex.",Mmhmm
+battle_start_neu_tru_01,battle_start,,neutral,any,trusted,Same plan as always. There was a plan?,Laugh
+battle_start_neu_tru_02,battle_start,,neutral,any,trusted,Ready when you are.,Mmhmm
+battle_start_fri_str_01,battle_start,,friendly,any,strangers,First fight together! Hi everyone!,Hey
+battle_start_fri_str_02,battle_start,,friendly,any,strangers,Let's be nice to each other! Not to them!,Yeah
+battle_start_fri_acq_01,battle_start,,friendly,any,acquainted,Squad's back! Let's go!,Yeah
+battle_start_fri_acq_02,battle_start,,friendly,any,acquainted,I stretched! I'm ready!,Yeah
+battle_start_fri_tru_01,battle_start,,friendly,any,trusted,Us again! Best us!,Yeah
+battle_start_fri_tru_02,battle_start,,friendly,any,trusted,"Ready, team? I'm so ready.",Hey
+battle_won_unf_str_01,battle_won,,unfriendly,any,strangers,Fine. We won.,Mmhmm
+battle_won_unf_str_02,battle_won,,unfriendly,any,strangers,Don't expect a speech.,No
+battle_won_unf_acq_01,battle_won,,unfriendly,any,acquainted,Not bad. For you lot.,Mmhmm
+battle_won_unf_acq_02,battle_won,,unfriendly,any,acquainted,Hm. We work.,Hmm
+battle_won_unf_tru_01,battle_won,,unfriendly,any,trusted,"Good work. Ugh, I said it.",Laugh
+battle_won_unf_tru_02,battle_won,,unfriendly,any,trusted,That's my squad.,Yeah
+battle_won_neu_str_01,battle_won,,neutral,any,strangers,Victory. Neat.,Mmhmm
+battle_won_neu_str_02,battle_won,,neutral,any,strangers,That went about as planned.,Mmhmm
+battle_won_neu_acq_01,battle_won,,neutral,any,acquainted,We won. Is there food?,Hmm
+battle_won_neu_acq_02,battle_won,,neutral,any,acquainted,Another one done.,Mmhmm
+battle_won_neu_tru_01,battle_won,,neutral,any,trusted,"Nice work, everyone. Even me.",Laugh
+battle_won_neu_tru_02,battle_won,,neutral,any,trusted,We're kind of good at this.,Yeah
+battle_won_fri_str_01,battle_won,,friendly,any,strangers,We did it! We're a team now! Right?,Yeah
+battle_won_fri_str_02,battle_won,,friendly,any,strangers,Group hug? Group wave?,Laugh
+battle_won_fri_acq_01,battle_won,,friendly,any,acquainted,We won! Again!,Yeah
+battle_won_fri_acq_02,battle_won,,friendly,any,acquainted,Best squad! Objectively!,Yeah
+battle_won_fri_tru_01,battle_won,,friendly,any,trusted,That's us! That's what we do!,Yeah
+battle_won_fri_tru_02,battle_won,,friendly,any,trusted,Celebrate! Then nap!,Laugh
+level_up_unf_str_01,level_up,,unfriendly,any,strangers,Stronger. Good.,Yeah
+level_up_unf_str_02,level_up,,unfriendly,any,strangers,About time.,Hmm
+level_up_unf_acq_01,level_up,,unfriendly,any,acquainted,Leveled. Don't clap.,Mmhmm
+level_up_unf_acq_02,level_up,,unfriendly,any,acquainted,Improving. Unlike some.,Hmm
+level_up_unf_tru_01,level_up,,unfriendly,any,trusted,Stronger. For the squad. Don't repeat that.,Yeah
+level_up_unf_tru_02,level_up,,unfriendly,any,trusted,Ha. Keep up.,Laugh
+level_up_neu_str_01,level_up,,neutral,any,strangers,Number went up.,Mmhmm
+level_up_neu_str_02,level_up,,neutral,any,strangers,Incremental progress. Love that.,Mmhmm
+level_up_neu_acq_01,level_up,,neutral,any,acquainted,Slightly better at everything.,Mmhmm
+level_up_neu_acq_02,level_up,,neutral,any,acquainted,Growth. Or a rash. Growth.,Hmm
+level_up_neu_tru_01,level_up,,neutral,any,trusted,Level up. I'll be modest about it.,Laugh
+level_up_neu_tru_02,level_up,,neutral,any,trusted,"Stronger together. Mostly me, though.",Laugh
+level_up_fri_str_01,level_up,,friendly,any,strangers,I leveled up! Is there cake?,Yeah
+level_up_fri_str_02,level_up,,friendly,any,strangers,New me! Hi!,Yeah
+level_up_fri_acq_01,level_up,,friendly,any,acquainted,I'm getting so good!,Yeah
+level_up_fri_acq_02,level_up,,friendly,any,acquainted,Level up! Level up!,Yeah
+level_up_fri_tru_01,level_up,,friendly,any,trusted,We leveled! I mean me. But we!,Yeah
+level_up_fri_tru_02,level_up,,friendly,any,trusted,Couldn't have done it without you lot!,Yeah
+recruited_unf_str_01,recruited,,unfriendly,any,strangers,Don't expect gratitude.,No
+recruited_unf_str_02,recruited,,unfriendly,any,strangers,I'm here for the pay. Is there pay?,Hmm
+recruited_unf_str_03,recruited,,unfriendly,any,strangers,Yesterday I hit you. Let's not talk about it.,Hmm
+recruited_unf_str_04,recruited,,unfriendly,any,strangers,Fine. Your side. For now.,Mmhmm
+recruited_neu_str_01,recruited,,neutral,any,strangers,So I work here now.,Hmm
+recruited_neu_str_02,recruited,,neutral,any,strangers,"Sure. Different team, same job.",Mmhmm
+recruited_neu_str_03,recruited,,neutral,any,strangers,No hard feelings. Some hard feelings.,Hmm
+recruited_neu_str_04,recruited,,neutral,any,strangers,Where do I stand? Literally.,Hmm
+recruited_fri_str_01,recruited,,friendly,any,strangers,Oh! We're friends now! Sorry about earlier!,Yeah
+recruited_fri_str_02,recruited,,friendly,any,strangers,New team! Hi! I hit you yesterday!,Hey
+recruited_fri_str_03,recruited,,friendly,any,strangers,I was hoping you'd ask!,Yeah
+recruited_fri_str_04,recruited,,friendly,any,strangers,I'm better at helping than hurting. Promise.,Laugh
+downtime_advice_specialize_unf_str_01,downtime_advice,specialize,unfriendly,any,strangers,Fine. More of what works.,Mmhmm
+downtime_advice_specialize_unf_acq_01,downtime_advice,specialize,unfriendly,any,acquainted,I'll get better at being me. Again.,Hmm
+downtime_advice_specialize_unf_tru_01,downtime_advice,specialize,unfriendly,any,trusted,Sharpen what's sharp. Good call.,Yeah
+downtime_advice_specialize_neu_str_01,downtime_advice,specialize,neutral,any,strangers,Stick to what I know. Sensible.,Mmhmm
+downtime_advice_specialize_neu_acq_01,downtime_advice,specialize,neutral,any,acquainted,"Same thing, but more. I can do that.",Hmm
+downtime_advice_specialize_neu_tru_01,downtime_advice,specialize,neutral,any,trusted,Practice makes slightly less imperfect.,Laugh
+downtime_advice_specialize_fri_str_01,downtime_advice,specialize,friendly,any,strangers,"Ooh, focus day! I'll focus SO hard!",Yeah
+downtime_advice_specialize_fri_acq_01,downtime_advice,specialize,friendly,any,acquainted,Getting really good at my thing!,Yah
+downtime_advice_specialize_fri_tru_01,downtime_advice,specialize,friendly,any,trusted,Watch me get even better! Watch!,Laugh
+downtime_advice_branch_out_unf_str_01,downtime_advice,branch_out,unfriendly,any,strangers,Something new. Fine. Don't laugh.,No
+downtime_advice_branch_out_unf_acq_01,downtime_advice,branch_out,unfriendly,any,acquainted,New tricks. For an old dog.,Hmm
+downtime_advice_branch_out_unf_tru_01,downtime_advice,branch_out,unfriendly,any,trusted,I'll try it. Once.,Mmhmm
+downtime_advice_branch_out_neu_str_01,downtime_advice,branch_out,neutral,any,strangers,Something different? Sure.,Hmm
+downtime_advice_branch_out_neu_acq_01,downtime_advice,branch_out,neutral,any,acquainted,Let's see what else I'm bad at.,Laugh
+downtime_advice_branch_out_neu_tru_01,downtime_advice,branch_out,neutral,any,trusted,New things. Exciting. Mildly.,Mmhmm
+downtime_advice_branch_out_fri_str_01,downtime_advice,branch_out,friendly,any,strangers,Something new! I love new!,Yeah
+downtime_advice_branch_out_fri_acq_01,downtime_advice,branch_out,friendly,any,acquainted,"Ooh, what's this one do?",Hey
+downtime_advice_branch_out_fri_tru_01,downtime_advice,branch_out,friendly,any,trusted,"New stuff! Don't tell me, I'll find out!",Laugh
+downtime_advice_wander_unf_str_01,downtime_advice,wander,unfriendly,any,strangers,Finally. Don't follow me.,No
+downtime_advice_wander_unf_acq_01,downtime_advice,wander,unfriendly,any,acquainted,I'll be back. Probably.,Hmm
+downtime_advice_wander_unf_tru_01,downtime_advice,wander,unfriendly,any,trusted,A walk. Alone. Perfect.,Mmhmm
+downtime_advice_wander_neu_str_01,downtime_advice,wander,neutral,any,strangers,I'll just... go for a walk.,Hmm
+downtime_advice_wander_neu_acq_01,downtime_advice,wander,neutral,any,acquainted,Who knows what's out there.,Mmhmm
+downtime_advice_wander_neu_tru_01,downtime_advice,wander,neutral,any,trusted,Back by dinner. Maybe.,Laugh
+downtime_advice_wander_fri_str_01,downtime_advice,wander,friendly,any,strangers,Adventure! Bye! Back soon!,Yeah
+downtime_advice_wander_fri_acq_01,downtime_advice,wander,friendly,any,acquainted,I'll bring you something! Maybe!,Hey
+downtime_advice_wander_fri_tru_01,downtime_advice,wander,friendly,any,trusted,Off I go! Don't miss me too much!,Laugh

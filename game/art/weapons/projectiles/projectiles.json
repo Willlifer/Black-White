@@ -1,0 +1,158 @@
+{
+ "version": 1,
+ "generator": "game/tools/blender/build_projectiles.py",
+ "space": "Godot projectile-local: origin = the leading point (arrow tip, bullet nose, bolt centre), +Z = the flight direction, +Y up. Basis.looking_at(velocity, UP, true) orients one.",
+ "projectiles": {
+  "arrow": {
+   "used_by": "bow",
+   "tip": [
+    0,
+    0,
+    0
+   ],
+   "tail": [
+    0,
+    0,
+    -0.9
+   ],
+   "length": 0.904,
+   "aura_points": [
+    [
+     0,
+     0,
+     -0.78
+    ],
+    [
+     0,
+     0,
+     -0.45
+    ],
+    [
+     0,
+     0,
+     -0.06
+    ]
+   ],
+   "aabb": {
+    "min": [
+     -0.0559,
+     -0.04,
+     -0.904
+    ],
+    "max": [
+     0.0559,
+     0.062,
+     0.0
+    ]
+   },
+   "tris": 94,
+   "accent_tris": 36,
+   "glb": "res://art/weapons/projectiles/arrow.glb",
+   "notes": "Shaft, four-sided head, three accent vanes (the element), dark nock."
+  },
+  "bullet": {
+   "used_by": "pistols",
+   "tip": [
+    0,
+    0,
+    0.052
+   ],
+   "tail": [
+    0,
+    0,
+    -0.62
+   ],
+   "length": 0.672,
+   "aura_points": [
+    [
+     0,
+     0,
+     0.0
+    ],
+    [
+     0,
+     0,
+     -0.2
+    ],
+    [
+     0,
+     0,
+     -0.4
+    ]
+   ],
+   "aabb": {
+    "min": [
+     -0.0312,
+     -0.036,
+     -0.62
+    ],
+    "max": [
+     0.0312,
+     0.036,
+     0.052
+    ]
+   },
+   "tris": 56,
+   "accent_tris": 22,
+   "glb": "res://art/weapons/projectiles/bullet.glb",
+   "notes": "Slug with an accent nose and a white tracer streak behind it."
+  },
+  "bolt": {
+   "used_by": "staff",
+   "tip": [
+    0,
+    0,
+    0.19
+   ],
+   "tail": [
+    0,
+    0,
+    -0.24
+   ],
+   "length": 0.43,
+   "aura_points": [
+    [
+     0,
+     0,
+     0.0
+    ],
+    [
+     0,
+     0,
+     0.12
+    ],
+    [
+     0,
+     0,
+     -0.15
+    ],
+    [
+     0.1,
+     0.02,
+     -0.04
+    ],
+    [
+     -0.1,
+     -0.02,
+     -0.04
+    ]
+   ],
+   "aabb": {
+    "min": [
+     -0.1284,
+     -0.0713,
+     -0.24
+    ],
+    "max": [
+     0.1284,
+     0.0713,
+     0.19
+    ]
+   },
+   "tris": 42,
+   "accent_tris": 34,
+   "glb": "res://art/weapons/projectiles/bolt.glb",
+   "notes": "Faceted crystal shard, accent front facets, two satellite shards; flies with the aura."
+  }
+ }
+}
