@@ -3,10 +3,14 @@
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
 **Git:**
-- `main` is the full internal history; the overhaul, auto-equip, squall and 6v6 infrastructure are committed (`586d9e0`). The 6v6 modes lanes and polish pass 3 are **uncommitted** on top.
+- `main` is the full internal history; everything through `9c9117d` (schedule, Horde rework, weapon movement, wind shaping) is committed. D375-D378 (below) are **uncommitted** on top.
 - The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github` (no `design/art/` renders, references, raw audio, `archive/`, the concept docx). Re-export in the `../bw-export` worktree, never by switching branches here: `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, `git rm` anything deleted on main, commit, `git push origin github:main`. Last export: internal `aa5ef11` → `cc156eb` (2026-10-06).
 
-**Green as of 2026-10-07:** `--self-test` 643/643 in 57 suites, `--ui-probe`, `--flow-probe`, `--tutorial-probe` (exit 0), autoplay on arena, lake, tinderbox, catacombs, ravine, twins and obelisks with zero `SCRIPT ERROR`.
+**Green as of 2026-10-07 (late):** `--self-test` 744/744 in 65 suites, `--ui-probe` (99/99), `--flow-probe` (exit 0), autoplay obelisks and ravine with zero `SCRIPT ERROR`.
+
+## Latest (uncommitted): free climbs, Updraft, the stones' shared life (D375-D378)
+- **D375** climbing within your jump costs no extra move (forced moves keep the cap of 2). **D376/D377 Updraft**, part of the wind perk **Tailwind** (not automatic): holder +1 jump after all modifiers; its team starting a turn on its gale +1 (stacks to +2). Breakdown "Updraft +1 (Tailwind)". Renders `design/art/updraft_ally|holder.png`.
+- **D378** the Obelisks share one HP pool of **220** (`obelisk_sim` 71%, was ~50%); one plate bar "The Stones 150 / 220", both stone bars mirror it; L-18 closed (S-16). Renders `obelisk_shared_plate|card.png`.
 
 ## What landed: the Element Overhaul (design/ELEMENTS-v3.md, the author's rulings at its top)
 - **Spine (D261–D268):** ice slides and pillars, pools, steam, rinks, electrified water. ELEMENTS.md §14.
@@ -15,11 +19,8 @@
 - **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15.
 - **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
 - **Final pass (D301–D308):** no BBCode leaks on cards (D301), the keystone cap (D302), summed recap lines and the banner fix (D303), AI Wind Walls (D304), docs (D305), Self-detonate (D306), the L-30 riders (D307).
-  - **Re-tune (D308):** curve 0.97 1.05 1.95 0.7 1.35 1.15 1.1 1.1 1.0 1.03, Twins HP ×2.6 / stats ×1.25. Sim (24 runs, Standard): 87 62 75 54 87 70 62 79 75 75 %, Hard 12–25 under, rounds 6–8 from fight 3, Giant 95%. Also fixed a reach-tree cycle that hung `path_to`.
-- Review renders `design/art/v3_*.png`; this pass `v3_final_card*.png`, `v3_final_dive_1|2|3.png` (`tools/final_shots.gd`).
 - **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, rink, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
 - **Auto-equip (D315-D318, L-35):** gear panel **Optimize all [O]** / **Optimize** with a diff preview, Apply / Cancel and one-step Undo (`BWAutoEquip`, `test_auto_equip`, renders `autoequip_*.png`).
-
 ## Also landed: 6v6 modes, Split Front + Stop the Horde (D327-D334, LEDGER L-38)
 - Schedule: superseded by D353 (below). Shared `BWObjectives` (objects, verdicts, waves, exits; the castle lane builds on it). Maps `splitfront.json` (seeded fire/ice/wind divider, round-4 enemy break-through), `horde.json`. design/MAPS.md §15-16. Sim: Split Front 70%; `--combat splitfront --mode splitfront [--divider ice]`, `--combat horde --mode horde`; renders `mode_split_*.png` (`tools/mode_shots.gd`). **Horde rework (D347-D352, uncommitted):** protect the **Lil Fella** (`BWLilFella`: half the squad's best HP, flees on its own turn, only enemy sources hurt it; no exit any more); grunts act as one **group turn** (`BWUnit.group_turn`, generic: `BWTurnQueue` block, `BWBattle._group_open`, mode hook `group_order`), played back at once (`_play_group`). 70% / 76% at fights 8 / 10, rounds 9 (was 12-13); autoplay 37 s a round (was 58). `castle_sim MODE=horde CAMPAIGN=dir`; renders `horde2_*.png`.
 - **Castle modes (D335-D342, LEDGER L-39):** Defend the Castle (`keep.json`: hold the iron gate 8 rounds vs 3 waves) and Storm the Castle (`stronghold.json`, the same castle flipped: break the wooden gate, then the throne or the Warden; D255 phase on the gate's fall) via `BWCastle`/`BWCastleDefend`/`BWCastleStorm`. High ground +5%/level, wood x1.5 fire, glazed gate x1.5 thunder. Sim on campaign squads (`castle_sim CAMPAIGN=`): Defend ~73%, Storm ~68%. Self-test 700/700, probes exit 0, autoplay both 0 SCRIPT ERROR. Renders `mode_defend_*.png`, `mode_storm_*.png`.
@@ -29,13 +30,11 @@
 - **Weapon movement (D359-D364, LEDGER L-41, ELEMENTS.md §6.6):** move = weapon drawn at turn start (sword/daggers/fists 5, rest 4); jump 2 (lance 4; HighGrounder a pickable bow passive, jump 4: D371-D374, `jump2_*.png`); axe/daggers ignore mud; high-ground leaps/Charge +1 reach. Ravine ramp now a 1-level stair. Renders `move_*.png`. Sim 12 runs: mean 73 → 68% (noise; watch).
 ## Also landed: wind shaping (D365-D370, ELEMENTS.md §18, LEDGER L-40; 6v6 infra D319-D324 is L-36)
 - A wind skill's confirm box shows **WIND SHAPING**: lines Part left/right (mouse side or the arrow toward it) / Blast out, areas Draw in / Burst out, single targets a push heading (mouse round the target, ←/→), Hold on all; Tab/wheel cycle; Enter fires. Live arrows, ghosts, SLAM, INTO FIRE. AI simulates ≤ 4. Basics keep Gust/Vortex/Becalm. Wind Wall kept (D370: not spammable). Renders `design/art/wind2_*.png`; ui-probe parts a Ley Line right with →. Self-test fails only in the schedule / movement lanes' files.
-
 ## Do this first
-1. **Commit** the overhaul (see Git above).
-2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team. Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34 (this pass), L-18 (the Obelisks still 54%).
+1. **Commit** D375-D378 (see Git above).
+2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team. Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34, L-41 (climbs, Updraft), L-42 (fight 4: the shared-pool stones).
 3. Cheap OWED items while waiting: L-10 (art docs name pass), L-8 / L-13 (VFX and animation nits).
 4. Keep `HANDOFF.md` ≤ 40 lines, and rewrite it at the end of each session.
-
 ## Known exposures
 - Review renders (`design/art/*.png|gif`, ~250 MB+) are only in the local repo and on this disk. Back up `.git` (`git bundle create D:\backup\bw.bundle --all`).
 - The sim's 16–24-run rates move about ±10 points per fight; read trends, not single cells. A stray long-running `--self-test` Godot process (not started by this pass) was using CPU on 2026-10-07; check Task Manager if sims run slow.

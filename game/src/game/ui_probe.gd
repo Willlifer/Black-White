@@ -83,7 +83,7 @@ func _run() -> void:
 	var dest := u.pos
 	var best := -1
 	for h in r:
-		if r[h].stop and h != u.pos and r[h].cost > best and _clickable(h):
+		if r[h].stop and h != u.pos and r[h].cost > best and _clickable(h) and not _by_rock(b, h):   # D375: free climbs reach hexes behind pillars
 			best = r[h].cost
 			dest = h
 	var start := u.pos
@@ -843,6 +843,14 @@ func _hold_space_through() -> void:
 
 
 ## Not hidden under a HUD panel.
+## A hex beside tall rock: its top can hide behind the rock on screen.
+func _by_rock(b: BWBattle, h: Vector2i) -> bool:
+	for n in BWHex.neighbors(h):
+		if b.board.exists(n) and b.board.terrain(n) == BWBoard.JAGGED:
+			return true
+	return false
+
+
 func _clickable(h: Vector2i) -> bool:
 	var p := screen.cam.unproject_position(screen.board_view.top_center(h))
 	for rect in screen.ui.blocking_rects():

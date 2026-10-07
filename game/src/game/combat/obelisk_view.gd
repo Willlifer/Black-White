@@ -78,7 +78,7 @@ func _build() -> void:
 	_label.outline_modulate = Color.BLACK
 	_label.font_size = 14
 	add_child(_label)
-	_build_bar(BAR_W * 1.6)         # D215: the same bar rule, wider (it has 350 HP)
+	_build_bar(BAR_W * 1.6)         # D215: the same bar rule, wider (the shared pool, D378)
 	_place_bar()
 
 

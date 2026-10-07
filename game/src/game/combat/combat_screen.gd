@@ -194,8 +194,8 @@ func _ready() -> void:
 	ui.set_acting(battle.current(), battle.tiles)
 	if battle.objective_mode():                      # ---- D140/D145: the objective, said once
 		ui.set_objectives(battle.objectives())
-		ui.banner("Break an obelisk", 2.6)
-		ui.feed("[b]Objective:[/b] break either obelisk. Wiping the enemy does not end it; the stones pulse until one falls.")
+		ui.banner("Break the stones", 2.6)
+		ui.feed("[b]Objective:[/b] break the stones: they share one life, so damage to either counts. Wiping the enemy does not end it; the stones pulse until they fall.")
 		for o in battle.objectives():
 			ui.feed("%s: %s" % [o.name, (o as BWObelisk).rule_text()])
 	elif BWObjectives.active(battle) and BWObjectives.title(battle) != "":
@@ -883,6 +883,10 @@ func _play(e: Dictionary) -> void:
 			ui.feed("[b]Detonation![/b] %d%%" % int(e.pct))
 			if readability and not e.get("echo", false) and BWCutsceneTier.blast_hurts(_queue):   # ---- D237: no beat for a blast that hurts nobody
 				await readability.beat(e.hex)      # ---- D163 slow beat (marked edit)
+		"stone_pool":                                 # ---- D378: the stones' shared life: every stone's bar follows
+			for id in e.get("units", []):
+				if _views.has(str(id)):
+					_views[str(id)].refresh()
 		"ko":
 			ui.set_order(battle.queue.slice(maxi(battle.turn_index, 0)), battle.current(), BWTurnQueue.build(battle.units))
 			var v: BWUnitView = _views[e.unit]

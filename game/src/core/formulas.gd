@@ -544,6 +544,9 @@ static func move_text(u: BWUnit) -> String:
 	var j := BWWeaponMove.jump(u)                # D371: always named; the source when above 2
 	var src := BWWeaponMove.jump_source(u)
 	t += " · Climb %d" % j + (" (%s)" % src if src != "" else "")
+	var up := BWWeaponMove.updraft_text(u)       # D376/D377: "Updraft +1 (Tailwind)"
+	if up != "":
+		t += " · " + up
 	if BWWeaponMove.ignores_mud(u):
 		t += " · no mud penalty"
 	return t

@@ -1456,11 +1456,13 @@ func crit_flash_tiny() -> void:
 # ---- D140/D145 obelisks (marked edit) ----
 
 var _obj_panel: PanelContainer
-var _obj_rows := {}              # obelisk id -> { bar, label }
+var _obj_rows := {}              # D378: "stones" -> { bar, label, row } (one shared row)
 
 
-## The objective plate, top left: one row per stone, its name, an HP bar and
-## the numbers; a broken stone reads BROKEN. Built on first call, then updated.
+## The objective plate, top left. D378: the stones share ONE life, so the
+## plate shows one row: both stones' portraits, "The Stones   150 / 220" and
+## one bar (each stone's own bar on the board mirrors it). BROKEN when it's
+## gone. Built on first call, then updated.
 func set_objectives(stones: Array) -> void:
 	if stones.is_empty():
 		return
@@ -1475,36 +1477,45 @@ func set_objectives(stones: Array) -> void:
 		v.add_theme_constant_override("separation", 4)
 		_obj_panel.add_child(v)
 		var t := Label.new()
-		t.text = "BREAK AN OBELISK"
+		t.text = "BREAK THE STONES"
 		t.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 		t.add_theme_color_override("font_color", BWStyle.LABEL)
 		v.add_child(t)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		var tips: PackedStringArray = []
+		var icons := HBoxContainer.new()
+		icons.add_theme_constant_override("separation", 2)
 		for o in stones:
-			var row := HBoxContainer.new()
-			row.add_theme_constant_override("separation", 8)
-			row.mouse_filter = Control.MOUSE_FILTER_STOP
-			row.tooltip_text = "%s\n%s\n%s" % [o.name, (o as BWObelisk).rule_text(), (o as BWObelisk).codex_line()]
-			var ic := BWWidgets.Portrait.new(o, 30.0)        # D156: the stone, rendered
-			row.add_child(ic)
-			var col := VBoxContainer.new()
-			col.add_theme_constant_override("separation", 2)
-			var nm := Label.new()
-			nm.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-			col.add_child(nm)
-			var bar := BWWidgets.HPBar.new(Vector2(220, 10))
-			bar.enemy = (o as BWObelisk).look() != "bright"
-			bar.track = true
-			col.add_child(bar)
-			row.add_child(col)
-			v.add_child(row)
-			_obj_rows[o.id] = { "bar": bar, "label": nm, "row": row }
-	for o in stones:
-		var r: Dictionary = _obj_rows.get(o.id, {})
-		if r.is_empty():
-			continue
-		r.bar.set_hp(o.hp, o.max_hp())
-		r.label.text = o.name if o.alive() else "%s   BROKEN" % o.name     # D215: numbers on hover (the bar)
-		r.row.modulate = Color(1, 1, 1, 0.45) if not o.alive() else Color.WHITE
+			icons.add_child(BWWidgets.Portrait.new(o, 30.0))     # D156: each stone, rendered
+			tips.append("%s
+%s
+%s" % [o.name, (o as BWObelisk).rule_text(), (o as BWObelisk).codex_line()])
+		row.tooltip_text = "
+
+".join(tips)
+		row.add_child(icons)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		var nm := Label.new()
+		nm.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		col.add_child(nm)
+		var bar := BWWidgets.HPBar.new(Vector2(220, 10))
+		bar.enemy = false
+		bar.track = true
+		col.add_child(bar)
+		row.add_child(col)
+		v.add_child(row)
+		_obj_rows["stones"] = { "bar": bar, "label": nm, "row": row }
+	var r: Dictionary = _obj_rows.get("stones", {})
+	if r.is_empty():
+		return
+	var o: BWUnit = stones[0]                      # D378: every stone mirrors the pool
+	var alive := stones.all(func(x: BWUnit): return x.alive())
+	r.bar.set_hp(o.hp, o.max_hp())
+	r.label.text = "The Stones   %d / %d" % [o.hp, o.max_hp()] if alive else "The Stones   BROKEN"
+	r.row.modulate = Color.WHITE if alive else Color(1, 1, 1, 0.45)
 
 
 ## The texts of the objective plate (probes and review tools).
@@ -1533,7 +1544,7 @@ func _fill_obelisk_card(c: Dictionary, o: BWObelisk) -> void:
 		_set_rich(c.text, "\n".join(lines))
 		return
 	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]obelisk · objective[/color]" % [BWStyle.F_NAME, o.name, dim])
-	lines.append("[font_size=%d]HP %d / %d    Speed %d    never moves[/font_size]" % [BWStyle.F_BODY, o.hp, o.max_hp(), o.speed()])
+	lines.append("[font_size=%d]HP %d / %d (shared)    Speed %d    never moves[/font_size]" % [BWStyle.F_BODY, o.hp, o.max_hp(), o.speed()])
 	lines.append("[font_size=%d]%s[/font_size]" % [BWStyle.F_SMALL, o.rule_text()])
 	lines.append("[font_size=%d][color=#%s]Pulse: flat %d to every unit on the map, both sides; no hit roll, ignores DEF, RES and wards. Takes no ground damage and no statuses; can't be moved. The enemy never strikes it.[/color][/font_size]" % [
 		BWStyle.F_SMALL, dim, o.pulse_damage])

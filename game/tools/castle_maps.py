@@ -151,7 +151,7 @@ def step_cost(cells, a, b):
     rise = cells[b][1] - cells[a][1]
     if rise > JUMP:                             # D371: a walk climbs at most the jump (2; lance 4)
         return -1
-    return (2 if cells[b][0] == "muddy" else 1) + max(rise, 0)
+    return 2 if cells[b][0] == "muddy" else 1   # D375: a climb within the jump is free
 
 
 def walk(cells, start, statics=()):

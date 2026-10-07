@@ -45,7 +45,7 @@ func test_movement(t) -> void:
 	t.ok(not b.reachable(Vector2i(5, 5), 4).has(Vector2i(5, 4)) or b.step_cost(Vector2i(5, 5), Vector2i(5, 4)) < 0,
 		"a 3-level wall cannot be climbed directly")
 	b.set_cell(Vector2i(5, 6), "neutral", 2)
-	t.eq(b.step_cost(Vector2i(5, 5), Vector2i(5, 6)), 3, "climb 2 costs 1 + 2")
+	t.eq(b.step_cost(Vector2i(5, 5), Vector2i(5, 6)), 1, "D375: a 2-level climb within the cap costs the plain 1")
 	t.eq(b.step_cost(Vector2i(5, 6), Vector2i(5, 5)), 1, "dropping is free")
 
 

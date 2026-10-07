@@ -69,6 +69,12 @@ var wind := {}
 ## D327 objective modes (BWObjectives, src/core/objectives.gd): the mode's
 ## state (waves, reserve, escapes, the divider ...). {} = none.
 var objective_state := {}
+## D378: the Obelisks' shared life. Every stone's hp mirrors stone_pool; a
+## blow on either lowers it (BWBattle._stones_sync, after each event).
+var stone_pool := 0
+var stone_pool_max := 0
+var _stone_seen := {}          # obelisk id -> its hp at the last sync
+var _pool_syncing := false
 ## D347 group turns: the block playing now ({} = none): group key, cycle,
 ## the queue slots [from, to), a serial, the member ids (ids only: clones copy it).
 var group_live := {}
@@ -282,6 +288,51 @@ func _place_objectives() -> void:
 		var ob := BWObelisk.create(str(o.get("kind", "lantern")), Vector2i(int(at[0]), int(at[1])))
 		ob.begin_battle()
 		units.append(ob)
+	# D378: one life for all the stones (each stone's HP_MAX is the pool's size)
+	var stones := objectives()
+	if stones.is_empty():
+		return
+	stone_pool_max = (stones[0] as BWObelisk).hp_cap
+	stone_pool = stone_pool_max
+	for ob in stones:
+		ob.hp = stone_pool
+		_stone_seen[ob.id] = stone_pool
+
+
+## D378: fold whatever the stones lost since the last sync into the shared
+## pool, then set every stone to it. A stone at 0 drags the others down: each
+## one the pool breaks gets its own ko. Runs after every event (_emit), so a
+## blow on one stone shows on the other's bar at once.
+func _stones_sync() -> void:
+	if _pool_syncing:
+		return
+	var stones := objectives()
+	var lost := 0
+	var same := true
+	for o in stones:
+		lost += maxi(0, int(_stone_seen.get(o.id, o.hp)) - o.hp)
+		same = same and o.hp == stone_pool
+	if lost == 0 and same:
+		return
+	_pool_syncing = true
+	stone_pool = maxi(0, stone_pool - lost)
+	var broke: Array = []
+	for o in stones:
+		if o.hp != stone_pool:
+			if o.alive() and stone_pool <= 0:
+				broke.append(o)
+			o.hp = stone_pool
+		_stone_seen[o.id] = stone_pool
+	_emit({ "type": "stone_pool", "hp": stone_pool, "max": stone_pool_max, "lost": lost,
+		"units": stones.map(func(o): return o.id) })
+	for o in broke:
+		_ko(o, null, "shared")
+	_pool_syncing = false
+
+
+## D378: the shared pool, for views and tests: [hp, max] ([0, 0] off the Obelisks).
+func stones_life() -> Array:
+	return [stone_pool, stone_pool_max]
 
 
 ## May `u`'s blows land on `v` at all? D140: the enemy's never touch an
@@ -1994,6 +2045,7 @@ func end_turn() -> void:
 		u.fx["extra_move"] = 0
 		u.fx["move_notes"] = []
 		u.fx.erase("move_class")                   # D359: between turns the sheet follows the drawn weapon
+		u.fx.erase("updraft")                      # D377: the tile's jump is this turn's only
 		BWEnchant.turn_end(self, u)                # v2 hook: Tending, empowerments, Planted
 		_emit({ "type": "turn_end", "unit": u.id })
 	turn_index += 1
@@ -2525,6 +2577,7 @@ func _check_end() -> void:
 	elif objective_mode():
 		# D140: break any obelisk to win; wiping the enemy does not end it (the
 		# pulses go on until a stone falls or the squad does, no time limit).
+		# D378: the stones share one life, so they fall together.
 		if objectives().any(func(o: BWUnit): return not o.alive()):
 			over = true
 			winner = "player"
@@ -2546,6 +2599,8 @@ func _emit(e: Dictionary) -> void:
 	e["cycle"] = cycle
 	history.append(e)
 	event.emit(e)
+	if not _stone_seen.is_empty() and not _pool_syncing:
+		_stones_sync()                        # D378: the stones share one life
 	if picks_live and e.type == "growth":
 		_after_growth(_unit(str(e.unit)), e.events)
 
@@ -2872,6 +2927,10 @@ func _perk_turn_start(u: BWUnit) -> void:
 	for k in ["heat_rush_used", "shadowstep_used", "detonated", "free_water_used"]:
 		u.fx.erase(k)
 	u.fx["move_class"] = u.weapon_class           # D359: this turn's move is the weapon drawn now
+	u.fx.erase("updraft")
+	var ud := BWWeaponMove.updraft_tile(self, u)  # D377: starting on a Tailwind holder's gale, +1 jump
+	if ud != "":
+		u.fx["updraft"] = ud
 	u.fx["extra_move"] = 0
 	u.fx["start_move"] = 0
 	u.fx["move_notes"] = []
@@ -3017,7 +3076,7 @@ func _perk_step(rules: Dictionary, h: Vector2i, n: Vector2i, sc: int) -> int:
 	if rules.has("cost_on") and BWEffects.level_at(tiles, n, str(rules.cost_on[0])) > 0:
 		return int(rules.cost_on[1]) + g
 	if rules.has("skate") and BWEffects.level_at(tiles, n, "ice") > 0:
-		return int(rules.skate) + maxi(board.elevation(n) - board.elevation(h), 0) + g
+		return int(rules.skate) + g                     # D375: no climb cost
 	return sc + g
 
 

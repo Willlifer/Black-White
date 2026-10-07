@@ -59,7 +59,7 @@ const WEATHER_MODES := ["splitfront", "horde"]
 ## Boss cards: the card's title and its description (the room screen).
 const BOSS_TITLES := { OBELISKS: "The Obelisks", TWINS: "The Twins" }
 const BOSS_LINES := {
-	OBELISKS: ["Break either stone to win.",
+	OBELISKS: ["Break the stones: they share one life.",
 		"The White Lantern shrugs off half the ranged blows and pushes everyone away; the Black Well shrugs off half the melee and pulls everyone in."],
 	TWINS: ["Noon paints light and Dusk paints dark; each heals on its own colour and a beam joins them.",
 		"Under half HP the colours swap; down one and the other rages. Paint the other colour, break the beam with thunder."],

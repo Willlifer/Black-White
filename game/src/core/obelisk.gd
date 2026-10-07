@@ -12,7 +12,9 @@ extends BWUnit
 ##   well     the dark one, on the causeway island. Melee attacks have a flat
 ##            50% chance to miss it. Its pulse hits every unit for PULSE.well
 ##            and pulls everyone one hex toward it.
-## Both: HP_MAX hit points, no move, no statuses, no ground damage, can't be
+## Both share ONE life (D378): HP_MAX is the shared pool, every stone's hp
+## mirrors it (BWBattle._stones_sync) and a blow on either lowers it; at 0
+## they crumble together. Both: no move, no statuses, no ground damage, can't be
 ## displaced, not a chain-lightning target.
 ##
 ## A map declares them under "objective" (BWBoard.objective):
@@ -20,7 +22,7 @@ extends BWUnit
 ## and BWBattle.setup() places them, so every caller (the game, the sims,
 ## --combat) gets the mode from the map alone.
 
-const HP_MAX := 350                   # author 2026-10-05 (after D144 tuning: 320; their original 500)
+const HP_MAX := 220                   # D378: the SHARED pool, sim-tuned to ~70% at fight 4 (was D155's 350 a stone; D144 320; the original 500)
 const DODGE_PCT := 50.0               # flat: the hit chance is halved (D142)
 const TEAM := "neutral"
 
@@ -106,7 +108,11 @@ func begin_battle() -> void:
 
 ## Rules text for the hover card, the codex and the forecast.
 func rule_text() -> String:
-	return str(KINDS[kind].rule) % pulse_damage
+	return (str(KINDS[kind].rule) % pulse_damage) + " " + SHARED_RULE
+
+
+## D378: said on every stone's card, the plate and the room card.
+const SHARED_RULE := "The stones share one life: damage to either lowers it, and they fall together."
 
 
 func codex_line() -> String:

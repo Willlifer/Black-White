@@ -779,6 +779,11 @@ static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 				out.append("Vortex field: pulls units beside it onto it at the tick")
 			BECALM:
 				out.append("Becalm field: a foe of its owner entering it stops here")
+	var ge := b.tiles.at(h)                        # D377: a Tailwind holder's gale lifts its team
+	if str(ge.get("marker", "")) == "gale":
+		var o := _owner(b, ge)
+		if o != null and BWWeaponMove.has_updraft(o):
+			out.append("Updraft (%s's Tailwind): %s's side starting a turn here gets +1 jump" % [o.name, o.name])
 	if walled(b, h):
 		for k in walls(b):
 			if h in walls(b)[k].hexes:

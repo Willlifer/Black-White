@@ -74,8 +74,8 @@ static func move_rules(b: BWBattle, u: BWUnit, r: Dictionary) -> void:
 		r["skater"] = n
 
 
-## BWBattle._reach_fx: a step onto ice while free hexes are left costs only
-## its climb. The count rides the state key's bits 3+ (value 8 per hex).
+## BWBattle._reach_fx: a step onto ice while free hexes are left costs
+## nothing (D375: climbs are free). The count rides the state key's bits 3+ (value 8 per hex).
 ## Returns [cost, state] (unchanged when it doesn't apply).
 static func step(b: BWBattle, rules: Dictionary, h: Vector2i, n: Vector2i, sc: int, state: int) -> Array:
 	if not rules.has("skater") or not is_ice(b, n):
@@ -83,7 +83,7 @@ static func step(b: BWBattle, rules: Dictionary, h: Vector2i, n: Vector2i, sc: i
 	var used := state >> 3
 	if used >= int(rules.skater):
 		return [sc, state]
-	return [maxi(b.board.elevation(n) - b.board.elevation(h), 0), state + 8]
+	return [0, state + 8]                          # D375: climbs are free too
 
 
 ## After a walk: spend the free ice hexes it crossed.

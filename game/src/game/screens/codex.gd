@@ -486,7 +486,7 @@ func _stats() -> void:
 	v2.add_child(_rt(
 		"[b]Hit[/b]  =  %s\n" % _fmt(F.hit_chance(sword, sword, F.WEAPON).formula)
 		+ "Then: glance (×%.1f damage) → crit on a clean hit (×%.1f, chance %s) → resist, magic only (×%.1f, no side effects).\n" % [F.GLANCE_MULT, F.CRIT_MULT, _fmt(F.crit_chance(sword).formula), F.RESIST_MULT]
-		+ "Damage never drops below 1. Move: the drawn weapon's (4 or 5 hexes); climbing costs 1 per level, at most the jump (2; lance 4, a bow with HighGrounder 4) up a step.",
+		+ "Damage never drops below 1. Move: the drawn weapon's (4 or 5 hexes); a step may climb up to the jump (2; lance 4, a bow with HighGrounder 4; Tailwind's Updraft +1) at no extra cost.",
 		BWStyle.F_SMALL))
 
 
@@ -526,7 +526,7 @@ func _terrain() -> void:
 		v.add_child(_rt(_dim(d[1]), BWStyle.F_SMALL))
 	var v2 := _card("")
 	v2.add_child(_rt("[font_size=%d][b]Height[/b][/font_size]" % (BWStyle.F_SUB + 3)))
-	v2.add_child(_rt(_dim("Each level climbed costs one extra move, and a step can rise at most the walker's jump: 2, or 4 with a lance or with a bow and the HighGrounder pick. Dropping down is free. Leaps and charges from 1+ level above reach 1 farther."), BWStyle.F_SMALL))
+	v2.add_child(_rt(_dim("A step can rise at most the walker's jump, and climbing within it costs no extra move: 2, or 4 with a lance or with a bow and the HighGrounder pick, +1 with Tailwind's Updraft. Dropping down is free. Leaps and charges from 1+ level above reach 1 farther."), BWStyle.F_SMALL))
 
 
 # ---------------------------------------------------------------- bosses (D260)

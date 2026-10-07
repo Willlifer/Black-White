@@ -61,6 +61,7 @@ func test_setup_places_a_neutral_side(t) -> void:
 	t.eq(l.team, "neutral", "a third side")
 	t.eq(l.max_hp(), BWObelisk.HP_MAX, "the stone's own HP (not the CON formula)")
 	t.eq(l.hp, BWObelisk.HP_MAX, "full")
+	t.eq(b.stones_life(), [BWObelisk.HP_MAX, BWObelisk.HP_MAX], "D378: one shared pool, full")
 	t.eq(l.move_range(), 0, "never moves")
 	t.ok(l in b.queue and w in b.queue, "both stones are in the speed queue (D140)")
 	t.ok(l in b.foes_of(b.side("player")[0]), "the player may target a stone")
@@ -433,3 +434,72 @@ func _walk_to(bd: BWBoard, from: Vector2i, stone: Vector2i) -> int:
 		if r.has(n):
 			best = mini(best, int(r[n].cost))
 	return best
+
+
+## D378: the stones share one life. A blow on either lowers the pool and
+## both stones mirror it; at 0 both break (a ko each) and the player wins.
+func test_shared_pool(t) -> void:
+	var b := _battle(7, ["sword", "sword", "sword"])
+	var p: BWUnit = b.side("player")[0]
+	var l := _stone(b, "lantern")
+	var w := _stone(b, "well")
+	p.pos = Vector2i(3, 6)                 # beside the Lantern (a sword: no dodge vs it)
+	_until(b, p)
+	var landed := false
+	for k in 30:
+		p.acted = false
+		var before := b.stone_pool
+		b.attack(p, l)
+		if b.stone_pool < before:
+			landed = true
+			break
+	t.ok(landed, "a blow on the Lantern landed")
+	t.ok(b.stone_pool < BWObelisk.HP_MAX, "the pool went down: %d" % b.stone_pool)
+	t.eq(l.hp, b.stone_pool, "the Lantern mirrors the pool")
+	t.eq(w.hp, b.stone_pool, "and so does the untouched Well")
+	t.ok(b.history.any(func(e): return e.type == "stone_pool"), "a stone_pool event for the views")
+	# damage on the other stone counts against the same pool
+	var pool := b.stone_pool
+	w.hp -= 40
+	b._emit({ "type": "test_tick" })
+	t.eq(b.stone_pool, pool - 40, "a 40 blow on the Well takes 40 off the pool")
+	t.eq(l.hp, pool - 40, "and the Lantern follows")
+	# two stones hit in one action, before a sync: both losses count
+	l.hp -= 10
+	w.hp -= 15
+	b._emit({ "type": "test_tick" })
+	t.eq(b.stone_pool, pool - 65, "losses on both stones in one go both count")
+	t.eq(l.hp, w.hp, "still mirrored")
+	t.ok(not b.over, "not over while the pool lasts")
+	# the breaking blow: the pool to 0 breaks both, the player wins
+	p.acted = false
+	l.hp = 1
+	b._emit({ "type": "test_tick" })
+	t.eq(w.hp, 1, "the pool at 1")
+	for k in 30:
+		if b.over:
+			break
+		p.acted = false
+		b.attack(p, l)
+	t.ok(b.over and b.winner == "player", "the pool at 0 wins")
+	t.ok(not l.alive() and not w.alive(), "both stones broke together")
+	t.ok(b.history.any(func(e): return e.type == "ko" and e.unit == w.id), "the Well got its own ko (it crumbles too)")
+	t.ok(b.history.any(func(e): return e.type == "ko" and e.unit == l.id), "and the Lantern")
+
+
+## D378: the pool survives an AI clone (the sims and the AI's lookahead).
+func test_shared_pool_clone(t) -> void:
+	var b := _battle()
+	var l := _stone(b, "lantern")
+	l.hp -= 50
+	b._emit({ "type": "test_tick" })
+	var c := b.clone()
+	t.eq(c.stone_pool, BWObelisk.HP_MAX - 50, "the clone keeps the pool")
+	var cw: BWUnit = null
+	for o in c.objectives():
+		if (o as BWObelisk).kind == "well":
+			cw = o
+	cw.hp -= 20
+	c._emit({ "type": "test_tick" })
+	t.eq(c.stone_pool, BWObelisk.HP_MAX - 70, "the clone's pool moves")
+	t.eq(b.stone_pool, BWObelisk.HP_MAX - 50, "the original's doesn't")

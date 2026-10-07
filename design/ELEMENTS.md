@@ -533,12 +533,12 @@ Detonation splash simply finds no unit on it.
 ```
 cost(hex) = terrain_base(hex)               # 1 neutral/grassy, 2 muddy (1 Rough-Footed), ∞ jagged
           + water_penalty(hex)              # 0/0/1/2 for water 0..3; 0 if glazed
-          + max(rise, 0)                    # +1 per level climbed (D20)
-a step is refused when rise > jump.
+a step is refused when rise > jump; a rise within the jump costs nothing
+extra (D375, superseding D20's +1 per level climbed).
 cost is never below 1.
 ```
 
-### 6.6 Move and jump by weapon (D359, D360, D371–D373)
+### 6.6 Move and jump by weapon (D359, D360, D371–D373, D375–D377)
 
 **Move** is the weapon drawn when the unit's turn starts (`weapons.csv`
 `move`): bow, pistols, staff **4**; sword, daggers, fists **5**; axe,
@@ -546,12 +546,22 @@ lance **4**. A mid-turn swap keeps this turn's move (and jump); the next turn
 reads the new weapon. Between turns the sheets show the drawn weapon's.
 Perks, sets, statuses, terrain bonuses and Wander add on top, named in the
 Move hover: "Move 5 (Daggers) +1 Swift · Climb 2", "Move 4 (Lance) · Climb 4
-(Lance)", "Move 4 (Bow) · Climb 4 (HighGrounder)".
+(Lance)", "Move 4 (Bow) · Climb 4 (HighGrounder)", "Move 5 (Sword) · Climb 3
+· Updraft +1 (Tailwind)".
 
 **Jump** is the most levels one step may rise (D371, superseding D360's 1):
 **2** for everyone, **4** (double) for the lance (`weapons.csv` `jump`).
-Each level climbed still costs +1 move; dropping down is free and unlimited.
-Forced moves (shoves, charges, pulls) keep D20's cap of 2. The Move hover
+**Climbing is free up to the jump (D375):** a step that rises at most the
+jump costs the normal step (1, mud 2, …); a higher step is a wall; dropping
+down is free and unlimited. Forced moves (shoves, charges, pulls) keep D20's cap of 2.
+
+**Updraft (D376/D377)** is part of the wind perk **Tailwind**, not automatic
+for wind units: the holder's jump gets **+1 after every other modifier** (a
+lance 5, a HighGrounder bow 5), and any unit of the holder's team whose turn
+starts on one of the holder's gale markers (a wind field included) gets
+**+1 jump that turn** (read at turn start, like the move lock). They stack:
++2 at most (the holder on its own gale). The Move hover names it: "· Climb 3
+· Updraft +1 (Tailwind)", "Updraft +1 (Tailwind, on Ana's gale)". The Move hover
 always names the jump ("Climb 2"; "Climb 4 (Lance)").
 
 **HighGrounder (D372)** is a **pickable bow passive**, not an innate trait:
@@ -987,7 +997,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Fire | Kindling | +5/+10/+15% damage when you or the target stands on fire (the higher level). | `stand_on_mod` either |
 | Fire | Wildfire | Your fresh fire at 2+ is `wild`: on the next tick it seeds fire 1 onto every neighbour whose fire axis is neutral, once per cast (origin flips to spread). Wild seeds never dry wet ground and never seed again. D307: your Overheat ring hexes at 2+ are wild too (spread origin; the flag is spent at the tick). | `wildfire` |
 | Fire | Coal Engine | Allies (you included) starting their turn on fire 1/2/3: +1/+2/+3 move that turn. | `start_move` team |
-| Ice | Skate | Glazed and stasis hexes cost 1 (plus climb) even on mud; +1 move starting on one. | `skate` |
+| Ice | Skate | Glazed and stasis hexes cost 1 even on mud; +1 move starting on one. | `skate` |
 | Ice | Rime Armour | −10% damage taken on a glazed or stasis hex; Shatter doesn't apply to you. | `rime_armour` |
 | Ice | Fault Lines | Your Shatter is +30% (base 15) and your Shatter hit breaks the glaze (glaze → 0, the charge stays). | `fault_lines` |
 | Ice | Frostbite | A foe starting its turn on glaze you laid (`glaze_source`) is Drenched for that turn. | `frostbite` |
@@ -997,7 +1007,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Thunder | Overcharge | An arc from a target you hit jumps once more: a second arc at 50% of the first's damage to the next-nearest of that team. With it, nobody is arced twice in one action. | `overcharge` |
 | Thunder | Static Field | Your fuses last 5 cycles (base 3); a foe ending its move on one is Staggered. D307: your allies' paint can't set off, re-arm or wash your fuses (`fuse_guard` in the paint opts). | `static_field` |
 | Thunder | Lightning Rod | An arc that would hit an ally within 3 of you hits you instead at 50%. | `lightning_rod` |
-| Wind | Tailwind | +2 move starting on a gale marker; after any wind action, move 1 more. | `tailwind` |
+| Wind | Tailwind | +2 move starting on a gale marker; after any wind action, move 1 more. **Updraft** (D376/D377): +1 jump after every other modifier; a unit of your team starting its turn on your gale marker gets +1 jump that turn (you on your own: +2). | `tailwind` |
 | Wind | Eye of the Storm | Immune to displacement; bow, pistol and thrown (daggers beyond 1) attacks on you get −15 hit. | `eye_of_storm` |
 | Wind | Gale Force | +5% damage per hex moved this turn, up to +20%. D307: after moving 4+, your first landed hit on a foe that turn applies your wind mode (within the wind caps). | `attack_mod` |
 | Wind | Gust | A foe your wind skill hits (unresisted) is pushed 1 away; if rock or a unit stops it, it slams for 8%. | `gust` |
@@ -1288,8 +1298,8 @@ Code: `src/core/ks_ice.gd` (BWKsIce); defs `flash_freeze`, `glacier_shatter`.
 
 - **Skater:** never slides (pushed or pulled onto ice it stops there; a walk
   crosses ice like ground, so "where to stop on the slide line" is where the
-  walk ends). Its first 4 ice hexes entered each turn cost 0 (only a climb
-  costs), then 1; the count rides the walk search's state. **Skate** (the
+  walk ends). Its first 4 ice hexes entered each turn cost 0 (climbs are
+  free since D375), then 1; the count rides the walk search's state. **Skate** (the
   perk) stays the cheap version: it never slides and ice costs it 1; with
   both, Skater's free hexes come first.
 - **Flash Freeze:** an action, once a battle (gone from the menu once spent),

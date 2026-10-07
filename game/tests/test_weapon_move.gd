@@ -105,9 +105,9 @@ func test_jump_two_vs_four(t) -> void:
 	var up4: Vector2i = nbs[2]
 	var bd := _board({ up1: ["neutral", 1], up2: ["neutral", 2], up3: ["neutral", 3], up4: ["neutral", 4] })
 	t.eq(BWBoard.DEFAULT_JUMP, 2, "D371: the base jump is 2")
-	t.eq(bd.step_cost(C, up2, { "jump": 2 }), 3, "jump 2: a 2-level step for 1 + 2")
+	t.eq(bd.step_cost(C, up2, { "jump": 2 }), 1, "D375: jump 2, a 2-level step for the plain 1")
 	t.eq(bd.step_cost(C, up3, { "jump": 2 }), -1, "jump 2: a 3-level step is a wall")
-	t.eq(bd.step_cost(C, up4, { "jump": 4 }), 5, "jump 4: 1 + 4 levels")
+	t.eq(bd.step_cost(C, up4, { "jump": 4 }), 1, "D375: jump 4, a 4-level step for the plain 1")
 	t.eq(bd.step_cost(C, up3), -1, "forced moves keep D20's cap of 2")
 	t.eq(bd.step_cost(up4, C, { "jump": 2 }), 1, "dropping is free and unlimited")
 	var cases := { "sword": false, "axe": false, "bow": false, "staff": false, "lance": true, "hg": true }
@@ -115,12 +115,11 @@ func test_jump_two_vs_four(t) -> void:
 		var u := _hg() if k == "hg" else _u("u", k)
 		var b := _fight(bd, [u], [_u("f", "axe", "enemy")], [C], [Vector2i(12, 12)])
 		_turn(b, u)
-		u.statuses["swift"] = { "armed": true }       # +1 move: the 4-level step costs 5
 		var r := b.reachable(u)
-		t.eq(int(r[up2].cost), 3, "%s climbs 2 levels for 3" % k)
+		t.eq(int(r[up2].cost), 1, "%s climbs 2 levels for 1 (D375)" % k)
 		var four: bool = cases[k]
-		t.eq(r.has(up3) and int(r[up3].cost) == 4, four, "%s %s the 3-level step" % [k, "climbs" if four else "can't take"])
-		t.eq(r.has(up4) and int(r[up4].cost) == 5, four, "%s %s the 4-level step" % [k, "climbs" if four else "can't take"])
+		t.eq(r.has(up3) and int(r[up3].cost) == 1, four, "%s %s the 3-level step" % [k, "climbs" if four else "can't take"])
+		t.eq(r.has(up4) and int(r[up4].cost) == 1, four, "%s %s the 4-level step" % [k, "climbs" if four else "can't take"])
 
 
 ## D372: HighGrounder is the bow's pickable passive, not a trait.
@@ -303,3 +302,90 @@ func test_daggers_plain_is_five_and_leaden_is_named(t) -> void:
 	t.eq(p.move_range(), 3, "Leaden (cursed, -2): 3 on the sheet as in battle")
 	t.ok(BWFormulas.move_text(p).contains("-2 ") and BWFormulas.move_text(p).contains("cursed"), "named: %s" % BWFormulas.move_text(p))
 	t.ok(BWWeaponMove.card_bb(p).contains("cursed"), "the card's hover carries it")
+
+
+# ---------------------------------------------------------------- D375 free climbs, D376/D377 Updraft
+
+## D375: a climb within the jump costs the plain step; mud still costs 2;
+## above the jump is a wall; forced moves keep the cap of 2.
+func test_free_climb_within_jump(t) -> void:
+	var nbs := BWHex.neighbors(C)
+	var up2: Vector2i = nbs[0]
+	var mud2: Vector2i = nbs[1]
+	var up3: Vector2i = nbs[2]
+	var bd := _board({ up2: ["neutral", 2], mud2: ["mud", 2], up3: ["neutral", 3] })
+	t.eq(bd.step_cost(C, up2, { "jump": 2 }), 1, "2 levels up: 1")
+	t.eq(bd.step_cost(C, mud2, { "jump": 2 }), 2, "2 levels up onto mud: mud's 2, nothing for the climb")
+	t.eq(bd.step_cost(C, up3, { "jump": 2 }), -1, "3 levels at jump 2: a wall")
+	t.eq(bd.step_cost(C, up3), -1, "forced moves keep the cap of 2")
+	t.eq(bd.step_cost(C, up2), 1, "a forced step within the cap: 1")
+	var u := _u("s", "sword")
+	var b := _fight(bd, [u], [_u("f", "axe", "enemy")], [C], [Vector2i(12, 12)])
+	_turn(b, u)
+	var r := b.reachable(u)
+	t.eq(int(r[up2].cost), 1, "the walk agrees")
+	t.ok(BWWeaponMove.walk_hint(b, u, r, up2).contains("1 of 5 move"), BWWeaponMove.walk_hint(b, u, r, up2))
+
+
+## A unit holding Tailwind (the wind perk that carries Updraft).
+func _tail(id: String, wc: String, team: String = "player") -> BWUnit:
+	var u := _u(id, wc, team)
+	u.affinity["wind"] = 10
+	u.perks.append("wind_tail")
+	u.refresh_effects()
+	return u
+
+
+## D376: Tailwind's holder jumps +1 after every other modifier; nobody gets
+## it for being a wind unit.
+func test_updraft_holder(t) -> void:
+	t.eq(BWWeaponMove.jump(_tail("s", "sword")), 3, "a sword with Tailwind: 2 + 1")
+	t.eq(BWWeaponMove.jump(_tail("l", "lance")), 5, "a lance: 4 + 1 (after the double)")
+	var hg := _tail("b", "bow")
+	hg.known_skills.append(BWWeaponMove.HIGH_GROUNDER)
+	t.eq(BWWeaponMove.jump(hg), 5, "a HighGrounder bow: 2 x 2 + 1")
+	var w := _u("w", "sword")
+	w.element = "wind"
+	w.affinity["wind"] = 30
+	w.focus_element = "wind"
+	t.eq(BWWeaponMove.jump(w), 2, "a wind-focused unit without the perk: no Updraft")
+	var nbs := BWHex.neighbors(C)
+	var up3: Vector2i = nbs[0]
+	var bd := _board({ up3: ["neutral", 3] })
+	var s := _tail("s", "sword")
+	var b := _fight(bd, [s], [_u("f", "axe", "enemy")], [C], [Vector2i(12, 12)])
+	s.refresh_effects()
+	_turn(b, s)
+	t.ok(b.reachable(s).has(up3), "the holder climbs the 3-level step")
+	t.ok(BWFormulas.move_text(s).contains("Climb 3 · Updraft +1 (Tailwind)"), BWFormulas.move_text(s))
+
+
+## D377: a unit of the holder's team starting its turn on the holder's gale
+## gets +1 jump that turn; a foe doesn't; on its own gale the holder has +2.
+func test_updraft_tiles(t) -> void:
+	var nbs := BWHex.neighbors(C)
+	var up3: Vector2i = nbs[0]
+	var up4: Vector2i = nbs[1]
+	var bd := _board({ up3: ["neutral", 3], up4: ["neutral", 4] })
+	var holder := _tail("h", "staff")
+	var ally := _u("a", "sword")
+	var foe := _u("f", "sword", "enemy")
+	var b := _fight(bd, [holder, ally], [foe], [Vector2i(9, 9), C], [Vector2i(12, 12)])
+	holder.refresh_effects()
+	b.tiles.apply([C], "wind", holder.id)
+	t.eq(str(b.tiles.at(C).get("marker", "")), "gale", "a gale marker under the ally")
+	_turn(b, ally)
+	t.eq(BWWeaponMove.jump(ally), 3, "the ally starting on the holder's gale: 2 + 1")
+	t.ok(b.reachable(ally).has(up3), "so it climbs 3")
+	t.ok(BWFormulas.move_text(ally).contains("Updraft +1 (Tailwind, on h's gale)"), BWFormulas.move_text(ally))
+	b.end_turn()
+	t.ok(b.current() == ally or not ally.fx.has("updraft"), "the tile's jump ends with the turn")
+	foe.pos = C
+	_turn(b, foe)
+	t.eq(BWWeaponMove.jump(foe), 2, "a foe on the gale: nothing")
+	foe.pos = Vector2i(12, 12)
+	holder.pos = C
+	_turn(b, holder)
+	t.eq(BWWeaponMove.jump(holder), 4, "the holder on its own gale: 2 + 1 + 1")
+	t.ok(b.reachable(holder).has(up4), "so it climbs 4")
+	t.ok(BWFormulas.move_text(holder).contains("Updraft +1 (Tailwind) +1 (Tailwind, on its gale)"), BWFormulas.move_text(holder))

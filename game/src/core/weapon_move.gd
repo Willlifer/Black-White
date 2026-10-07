@@ -9,8 +9,14 @@ class_name BWWeaponMove
 ##           turn (sheets, cards) it follows the weapon drawn now. Perks,
 ##           sets, statuses, terrain and Wander still add on top (D359).
 ##   Jump  — the most levels one step may rise (D360, D371). 2 by default;
-##           the lance's `jump` is 4 (double). Each level climbed still costs
-##           +1 move; dropping is unlimited.
+##           the lance's `jump` is 4 (double). D375: a climb within the jump
+##           costs the normal step (no +1 a level); dropping is unlimited.
+##   Updraft — D376/D377: part of the wind perk Tailwind. Its holder gets +1
+##           jump after every other modifier (a lance 5, a HighGrounder bow
+##           5); a unit of the holder's team whose turn starts on one of the
+##           holder's gale markers / wind fields gets +1 more for that turn
+##           (read at turn start, fx.updraft, like the move-class lock). They
+##           stack: +2 at most (one tile bonus, however many holders).
 ##   Passives — D372: a weapon class's pickable passives (weapons.csv
 ##           `passives`; the bow's HighGrounder) are offered in that class's
 ##           expertise picks next to Improve / Learn (BWPicks, "passive:<id>").
@@ -28,6 +34,8 @@ const HIGH_GROUNDER := "high_grounder"
 const ROUGH_FOOTED := "rough_footed"
 const HIGH_GROUNDER_MULT := 2          # D372: doubles the jump while a bow is drawn
 const HIGH_GROUND_MIN := 1             # levels above the destination
+const UPDRAFT := 1                     # D376: Tailwind's jump, and its tiles' (D377)
+const UPDRAFT_KEY := "tailwind"        # the effect key that carries it
 const TRAITS := {
 	ROUGH_FOOTED: ["Rough-Footed", "mud costs 1 move, not 2"],
 }
@@ -68,12 +76,67 @@ static func class_jump(wc: String) -> int:
 	return maxi(1, int(r.get("jump", BWBoard.DEFAULT_JUMP)) if str(r.get("jump", "")) != "" else BWBoard.DEFAULT_JUMP)
 
 
-## Max levels a step may rise for this unit (D360, D371, D372).
+## Max levels a step may rise for this unit (D360, D371, D372), Updraft
+## added last (D376).
 static func jump(u: BWUnit) -> int:
 	var j := class_jump(move_class(u))
 	if has_passive(u, HIGH_GROUNDER):
 		j *= HIGH_GROUNDER_MULT
-	return j
+	return j + updraft(u)
+
+
+## The jump before Updraft (what jump_source names).
+static func base_jump(u: BWUnit) -> int:
+	return jump(u) - updraft(u)
+
+
+# ---------------------------------------------------------------- updraft (D376/D377)
+
+## Does `u` hold Tailwind (the Updraft perk)?
+static func has_updraft(u: BWUnit) -> bool:
+	return u != null and BWEffects.has(u, UPDRAFT_KEY)
+
+
+## [label, value] per Updraft term: the holder's own, then the turn-start
+## tile's ("on Ana's gale"), stamped by BWBattle at turn start.
+static func updraft_notes(u: BWUnit) -> Array:
+	var out: Array = []
+	if has_updraft(u):
+		out.append(["Tailwind", UPDRAFT])
+	var tile := str(u.fx.get("updraft", ""))
+	if tile != "":
+		out.append(["Tailwind, " + tile, UPDRAFT])
+	return out
+
+
+static func updraft(u: BWUnit) -> int:
+	var n := 0
+	for x in updraft_notes(u):
+		n += int(x[1])
+	return n
+
+
+## BWBattle turn start: the tile half. "" when `u` starts off any holder's
+## wind; else words for the breakdown ("on its gale", "on Ana's gale").
+static func updraft_tile(b: BWBattle, u: BWUnit) -> String:
+	var e := b.tiles.at(u.pos)
+	if str(e.get("marker", "")) != "gale":
+		return ""
+	var o := b._unit(str(e.get("source", "")))
+	if o == null or o.team != u.team or not has_updraft(o):
+		return ""
+	return "on its gale" if o == u else "on %s's gale" % o.name
+
+
+## "Updraft +1 (Tailwind) +1 (Tailwind, on Ana's gale)", or "".
+static func updraft_text(u: BWUnit) -> String:
+	var n := updraft_notes(u)
+	if n.is_empty():
+		return ""
+	var t := "Updraft"
+	for x in n:
+		t += " %+d (%s)" % [int(x[1]), str(x[0])]
+	return t
 
 
 ## Where the jump comes from, for the hover ("Lance", "HighGrounder"); ""
@@ -81,7 +144,7 @@ static func jump(u: BWUnit) -> int:
 static func jump_source(u: BWUnit) -> String:
 	if has_passive(u, HIGH_GROUNDER):
 		return passive_name(HIGH_GROUNDER)
-	return class_name_of(move_class(u)) if jump(u) > BWBoard.DEFAULT_JUMP else ""
+	return class_name_of(move_class(u)) if base_jump(u) > BWBoard.DEFAULT_JUMP else ""
 
 
 # ---------------------------------------------------------------- passives (D372)
@@ -135,7 +198,7 @@ static func card_text(u: BWUnit) -> String:
 ## card_text with the breakdown on hover (BBCode [hint]): "Move 3" over
 ## "Move 5 (Daggers) -2 Leaden Chaps (cursed)".
 static func card_bb(u: BWUnit) -> String:
-	return "[hint=%s]%s[/hint]" % [BWFormulas.move_text(u).replace("[", "(").replace("]", ")"), card_text(u)]
+	return "[hint=%s]%s[/hint]" % [BWFormulas.move_text(u).replace("[", "(").replace("]", ")").replace("'", "’"), card_text(u)]   # D377: a bare ' breaks the tag
 
 
 ## [name, words] per movement line on a unit card: the class's own jump
@@ -192,7 +255,9 @@ static func walk_hint(b: BWBattle, u: BWUnit, r: Dictionary, h: Vector2i) -> Str
 	var path := BWBoard.path_to(r, h)
 	var t := "%s — %d of %d move" % [u.name, int(r[h].get("cost", 0)), u.move_range()]
 	var rise := max_rise(b.board, path)
-	if rise > BWBoard.DEFAULT_JUMP:
+	if rise > base_jump(u) and updraft(u) > 0:
+		t += " · Climb %d · %s" % [rise, updraft_text(u)]          # D376/D377
+	elif rise > BWBoard.DEFAULT_JUMP:
 		t += " · Climb %d (%s)" % [rise, jump_source(u)]
 	elif rise >= 2:
 		t += " · Climb %d" % rise

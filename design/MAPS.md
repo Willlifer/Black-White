@@ -41,8 +41,8 @@ on both sides; the bottom three are the player's.
 
 These rules shaped the maps (D17, D20):
 - Every unit moves 4 hexes (daggers 5).
-- A step can rise at most 2 levels, and each level climbed costs 1 extra move.
-  Drops are free.
+- A step can rise at most the walker's jump (2; D371), and since D375 a
+  climb within the jump costs no extra move. Drops are free.
 - Line of sight is blocked by jagged hexes, and by any hex that stands 2 or
   more levels above both ends.
 
@@ -183,7 +183,7 @@ pistols (range 5).
 - The middle of the span (rows 7–9) is grass, like wooden planks, so fire can
   cut the bridge in half.
 - An under-ledge at elevation 0 sits on the west side. Stepping down onto it
-  is free, and climbing back up costs 2 extra moves. From the ledge, units can
+  is free, and climbing back up is a 2-level step (free since D375). From the ledge, units can
   flank or shoot upward: it sees 31 hexes within range 6.
 
 **Decisions I made**
@@ -631,8 +631,14 @@ a "+N" for the rest of a crowd.
 `L` = the White Lantern, `W` = the Black Well; `l1` / `d1` = seeded light 1 / dark 1.
 
 **Intent.** Two stones on the centre row, at the west and east ends, so both
-teams (top and bottom, exact mirror) are equally far from each. Break either
-to win (D140).
+teams (top and bottom, exact mirror) are equally far from each. **The stones
+share one life (D378):** one pool of 220 HP (`BWObelisk.HP_MAX`), every blow on either
+stone lowers it, and at 0 both crumble and the player wins. Each stone keeps
+its own rules (the Lantern dodges ranged and pushes, the Well dodges melee
+and pulls), so the squad picks whichever stone its weapons hit best; there's
+no point in focusing one. The plate shows one bar ("The Stones 150 / 220");
+each stone's own bar on the board mirrors it. The room card: "Break the
+stones: they share one life."
 - **West, the White Lantern** (dodges ranged): a raised island (elev 1, the
   stone on a dais at 2) cut off by a two-hex **void** moat, reached by exactly
   **three bridges**: east (shared), north-east (the enemy's), south-east (the
