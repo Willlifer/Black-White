@@ -1306,3 +1306,73 @@ ice pillar has an ink hull and heavier side edges. The Twins hover (0.3 m, a
 slow bob) and glide (the Beings' motion, D220) over a faint shadow. Glossary:
 Frozen, Doomed, Gale 3. Renders `design/art/v3_c3_*.png`
 (`tools/keystones_c3_shots.gd`).
+
+## 17. Squall and Overfreeze (D309-D314, the author's 2026-10-07 additions)
+
+The author: "Elements overlapping identity is completely fine." Code:
+`src/core/squall.gd` (BWSquall), `src/core/overfreeze.gd` (BWOverfreeze);
+hooks marked D309/D312 in `BWTiles.apply`, `BWPools.finish`, `BWBattle`
+(paint, _plan, _mods), `BWWind.tick`, `BWAI._best_skill`, readability. View:
+`BWSquallView` (`src/game/combat/squall_view.gd`). Tests:
+`tests/test_squall_overfreeze.gd`. Renders: `design/art/v3_squall_*.png`,
+`v3_overfreeze_*.png` (`tools/squall_shots.gd`).
+
+### 17.1 Wind: Squall (D309-D311)
+
+- **Start:** a FRESH wind arrival on a hex holding light 2+ or dark 2+ (a
+  wind cast that gales it, or a fresh light/dark arrival that fires a gale
+  marker and leaves the hex at 2+). Owner: the caster; a firing gale's owner
+  is the gale's. The gale copies its ring as ever; the front starts one ring
+  past the copies (ring 2; ring 3/4 for a gale 2/3).
+- **Advance:** at each of the next **3 ticks** (in `BWWind.tick`, after the
+  vortex fields, before the beams and the decay) the front moves one ring
+  out. Each hex of that ring gets a **propagated +1** of the squall's light
+  or dark (source = owner; never fires a marker; skips glazed hexes, pillars,
+  walls; seeds and statics follow §5.5/§5.6). The unit on each ring hex is
+  **pushed 1 outward**, both teams, as a wind field move: the wind caps (2
+  hexes a cycle, a field once a turn), dark 3 gravity, a slam (8%) when
+  blocked, a slide on ice. Wind set holders' allies are spared.
+- **Always outward (Claude, D310):** the caster's Gust heading doesn't bend
+  it; a squall is an explosion and the push already goes "away".
+- Light and dark only. **One squall per owner**; a new one replaces it. One
+  action over several light hexes starts one, from the strongest.
+- Interplay: more light means more beam hexes (the beams resolve right after
+  the advance); dark spread under foes is the owner's dark (Rot at their turn
+  end); a dark 3 squall's own ring-1 copies hold ring-2 foes by gravity.
+- **Readability (D311):** the board draws a spinning three-arm swirl and an
+  outward-drifting chevron on every hex the front reaches next (light: yellow
+  over ink; dark: violet over a white hairline). The blast preview draws a
+  starting squall's first front with "SQUALL: NEXT TICK" and "SQUALL (LIGHT)".
+  Tile card: "Squall: advances next tick (...)". Forecast note "Squall: ...".
+  Glossary: Squall. VFX: the origin flares; each advance sweeps chevrons out.
+
+### 17.2 Ice: Overfreeze (D312, D313)
+
+- A FRESH ice arrival on a hex that was **glazed water** before the action
+  (water, glaze > 0, no marker, not a pillar) overfreezes and shatters:
+  **12% ice** (Shattering's potency of the centre's glazer applies) to every
+  unit on the hex and its six neighbours, both teams, **once per unit per
+  action** however many centres reach it.
+- Then the hex and its ring become a **radius-1 rink** as a propagated
+  arrival: charged unglazed hexes glaze, empty ground gets a thin ice sheet
+  (water 1, glazed); already-glazed, marked hexes, pillars and walls are left.
+- **No pillar (Claude, D313):** it just shattered; even empty water 3 stays a
+  flat rink. Ice on a pillar doesn't overfreeze (Glacier Wall and thunder
+  break pillars).
+- Once per hex per action; the rink is propagated, so nothing chains.
+  Thunder on glazed water still detonates with the x1.5 shatter. Blizzard
+  glazes directly and never overfreezes.
+- **Readability:** forecast "Overfreeze: ..." (skills and ice basics), the
+  blast preview hatches the seven hexes ice-blue with "OVERFREEZE 12%", the
+  tile card names it on glazed water, glossary Overfreeze. VFX: a white burst
+  ring with an ice-cyan core and white/cyan spikes, white shards flung out,
+  the seven hexes flashing white with cyan rims.
+
+### 17.3 AI (D314)
+
+`BWAI._best_skill` simulates only when cheap pre-checks pass: an ice skill
+over glazed water scores the bursts on foes minus 1.5x on allies
+(`BWOverfreeze.ai_skill`); a cast that would start a squall scores the
+front's three rings (dark under foes, light under allies, 3% max HP each,
++1 per foe on the first ring) from the simulated `squall` event
+(`BWSquall.ai_skill`).

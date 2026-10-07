@@ -328,13 +328,27 @@ func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
 	for c in _order.get_children():
 		_order.remove_child(c)
 		c.queue_free()
+	var now: Array = queue.filter(func(u): return u.alive())
+	var nxt: Array = upcoming.filter(func(u): return u.alive())
+	var fit := order_fit(_root.get_viewport_rect().size.x if _root else 1600.0, now.size(), nxt.size())   # D324
 	var shown := 0
-	for u in queue:
-		if not u.alive() or shown >= 8:
-			continue
+	for u in now:
+		if shown >= fit.now:
+			break
 		shown += 1
 		_order.add_child(_order_icon(u, u == current, false))
-	if not upcoming.is_empty() and shown < 12:
+	# D211/D324: past what fits, say how many more act this round
+	var left: int = now.size() - shown
+	if left > 0:
+		var more := Label.new()
+		more.text = "+%d" % left
+		more.tooltip_text = "%d more act this round" % left
+		more.mouse_filter = Control.MOUSE_FILTER_PASS
+		more.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		more.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_order.add_child(more)
+	if fit.next > 0:
 		var sep := VBoxContainer.new()
 		sep.alignment = BoxContainer.ALIGNMENT_CENTER
 		var line := ColorRect.new()
@@ -348,23 +362,40 @@ func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
 		nl.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 		sep.add_child(nl)
 		_order.add_child(sep)
-		for u in upcoming:
-			if not u.alive() or shown >= 13:
-				continue
-			shown += 1
-			_order.add_child(_order_icon(u, false, true))
-	# D211: a crowd (the Horde's ten) doesn't fit; say how many more act this round
-	var left := queue.filter(func(u): return u.alive()).size() - mini(queue.filter(func(u): return u.alive()).size(), 8)
-	if left > 0:
-		var more := Label.new()
-		more.text = "+%d" % left
-		more.tooltip_text = "%d more act this round" % left
-		more.mouse_filter = Control.MOUSE_FILTER_PASS
-		more.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-		more.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
-		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		_order.add_child(more)
-		_order.move_child(more, mini(8, _order.get_child_count() - 1))
+		for i in mini(fit.next, nxt.size()):
+			_order.add_child(_order_icon(nxt[i], false, true))
+
+
+## D324: how many turn-order icons fit in ORDER_FRAC of the HUD width (the
+## design width is 1600, so the same count at 1080p): this round first (the
+## current unit's 58 px, then 42 px icons, a "+N" past the fit), then next
+## round's 34 px icons after the NEXT divider, at most ORDER_NEXT_MAX of them.
+## The old fixed caps (8 this round, 13 in all) are the floor, so 3v3 reads
+## as before. { now, next }.
+const ORDER_FRAC := 0.56
+const ORDER_NEXT_MAX := 8
+
+
+static func order_fit(width: float, n_now: int, n_next: int) -> Dictionary:
+	var budget := width * ORDER_FRAC
+	var gap := 6.0
+	var reserve := (36.0 + gap + mini(n_next, 4) * (34.0 + gap)) if n_next > 0 else 0.0
+	var now := 1
+	var used := 58.0
+	while now < n_now and used + 42.0 + gap + (30.0 if now + 1 < n_now else 0.0) + reserve <= budget:
+		used += 42.0 + gap
+		now += 1
+	now = mini(n_now, maxi(now, 8))
+	if now < n_now:
+		used += 30.0 + gap                                 # the "+N"
+	var nxt := 0
+	if n_next > 0:
+		used += 36.0 + gap
+		while nxt < mini(n_next, ORDER_NEXT_MAX) and used + 34.0 + gap <= budget:
+			used += 34.0 + gap
+			nxt += 1
+		nxt = mini(n_next, maxi(nxt, 13 - now)) if now < 13 else nxt
+	return { "now": now, "next": nxt }
 
 
 func _order_icon(u: BWUnit, current: bool, next_round: bool) -> Control:

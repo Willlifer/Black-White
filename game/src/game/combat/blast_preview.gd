@@ -149,6 +149,7 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 				_ring(st, bh, 0.42 + 0.2 * k2, 0.06)
 			_hex_tag(bh, "BECALM", BWLook.glow_color("wind"), 0.55)
 	BWElementsView.preview(self, st, sim)          # D285-D292: Overheat rings, beams + Empowered, Static fuse, launch, Magnify
+	BWSquallView.preview(self, st, sim)            # D311/D313: a squall's first front, an Overfreeze burst
 	_mesh.mesh = st.commit()
 	for id in sim.units:
 		_unit_tag(sim.units[id])

@@ -36,6 +36,12 @@ var board_view: BWBoardView
 var ui: BWCombatUI
 var cam: Camera3D
 var rig: BWCameraRig
+## D323: per AI turn (ms, autoplay and enemies) and per frame (ms), for the
+## autoplay PERF line (perf_line) printed when the fight ends.
+var perf_ai_ms: Array = []
+var perf_frame_ms: Array = []
+## D322: the opening zoom on a big board (the rig's default is 24).
+const BIG_OPEN_DIST := 34.0
 var _views := {}            # unit id -> BWUnitView
 var _queue: Array = []      # pending battle events
 var _busy := false          # replaying events / cutscene
@@ -72,6 +78,7 @@ var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate,
 var wind_view: BWWindView       # ---- D269-D276: fields, walls, gravity, Rot marks
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
+var squall_view: BWSquallView       # ---- D309-D313: squall fronts, Overfreeze bursts
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -139,6 +146,9 @@ func _ready() -> void:
 	elements_view = BWElementsView.new()  # ---- D285-D292: fire, light and thunder marks and VFX
 	add_child(elements_view)
 	elements_view.setup(self)
+	squall_view = BWSquallView.new()      # ---- D309-D313: the squall front and the Overfreeze burst
+	add_child(squall_view)
+	squall_view.setup(self)
 	ui.wind_changed = _wind_mode_changed  # the forecast's mode toggle re-opens the forecast
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
@@ -151,6 +161,7 @@ func _ready() -> void:
 	_face_all()
 	var focus := BWLook.world(board.camera_focus, board.elevation(board.camera_focus))
 	rig.follow(focus, true)
+	_fit_big_board()                      # ---- D322: big boards: wider zoom, edge scroll, pan clamp, Space on the active unit
 	ui.feed("[b]%s[/b]" % board.name)
 	_queue.clear()          # setup's own events aren't replayed; show their state directly
 	ui.set_order(battle.queue.slice(maxi(battle.turn_index, 0)), battle.current(), BWTurnQueue.build(battle.units))
@@ -176,6 +187,7 @@ func _ready() -> void:
 # ---------------------------------------------------------------- input
 
 func _process(_delta: float) -> void:
+	perf_frame_ms.append(_delta * 1000.0 / maxf(Engine.time_scale, 0.01))   # ---- D323: real frame time
 	# the action menu rides beside the acting unit, wherever the camera is
 	var u := battle.current() if battle else null
 	if u and _views.has(u.id):
@@ -594,7 +606,9 @@ func _after_events() -> void:
 			continue
 		if u and BWAI.controls(u, autoplay):          # enemies and autoplay
 			await get_tree().create_timer(0.35).timeout
+			var t_ai := Time.get_ticks_usec()
 			BWAI.take_turn(battle)
+			perf_ai_ms.append((Time.get_ticks_usec() - t_ai) / 1000.0)   # ---- D323: the autoplay PERF line
 			continue
 		if u and u.team == "player" and u.acted and u.follow_up.is_empty() and not battle.can_move(u):
 			battle.end_turn()
@@ -608,6 +622,8 @@ func _after_events() -> void:
 		open_pause.call_deferred()
 	if battle.over:
 		await get_tree().create_timer(1.0).timeout
+		if autoplay:
+			print(perf_line())                       # ---- D323
 		finished.emit(battle.winner, battle)
 		return
 	ui.set_acting(battle.current(), battle.tiles)
@@ -816,6 +832,9 @@ func _play(e: Dictionary) -> void:
 		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "eye_pull", "riptide", "event_horizon":   # ---- D293-D299
 			if ks_view:
 				await ks_view.on_event(e)
+		"squall", "squall_advance", "squall_end", "overfreeze":   # ---- D309-D313
+			if squall_view:
+				await squall_view.on_event(e)
 		"detonate":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): flash + ring burst
 			ui.feed("[b]Detonation![/b] %d%%" % int(e.pct))
@@ -1836,6 +1855,42 @@ func _face_all() -> void:
 			if BWHex.distance(u.pos, f.pos) < BWHex.distance(u.pos, near.pos):
 				near = f
 		_views[u.id].face(_unit_pos(near.pos))
+
+
+## D323: "PERF <map> NvM: rounds, turns, AI turn mean/p95/worst, frame mean/p95/worst".
+func perf_line() -> String:
+	var ai := perf_ai_ms.duplicate()
+	var fr := perf_frame_ms.slice(30)               # past the first frames (loading, prewarm)
+	ai.sort()
+	fr.sort()
+	var pick := func(a: Array, p: float) -> float: return float(a[mini(a.size() - 1, int(a.size() * p))]) if not a.is_empty() else 0.0
+	var mean := func(a: Array) -> float:
+		var t := 0.0
+		for x in a:
+			t += float(x)
+		return t / maxf(1.0, a.size())
+	return "PERF %s %dv%d: rounds %d, AI turns %d mean %.1f p95 %.1f worst %.1f ms; frames %d mean %.1f p95 %.1f worst %.1f ms" % [
+		battle.board.name, battle.units.filter(func(x): return x.team == "player").size(),
+		battle.units.filter(func(x): return x.team == "enemy").size(), battle.cycle, ai.size(), mean.call(ai), pick.call(ai, 0.95),
+		pick.call(ai, 1.0), fr.size(), mean.call(fr), pick.call(fr, 0.95), pick.call(fr, 1.0)]
+
+
+## D322: on a big board (a 6v6 map, deploy_count > 3) the rig gets a wider
+## zoom range, edge scroll and a pan clamp to the board, opens further out,
+## and Space recentres on the acting unit. 3v3 maps keep the V8 rig as is.
+func _fit_big_board() -> void:
+	if battle == null or not rig.fit_board(battle.board):
+		return
+	rig.dist = BIG_OPEN_DIST
+	var mine := Vector3.ZERO                      # open a third of the way toward the squad (the near edge sat under the HUD)
+	var ps: Array = battle.side("player")
+	for u in ps:
+		mine += BWLook.world(u.pos, battle.board.elevation(u.pos))
+	if not ps.is_empty():
+		rig.follow(rig.pivot.lerp(mine / ps.size(), 0.33), true)
+	rig.recentre_fn = func():
+		var u := battle.current() if battle else null
+		return _views[u.id].global_position if u != null and _views.has(u.id) else null
 
 
 func _closest_angle(from: float, to: float) -> float:

@@ -44,6 +44,11 @@ var _elev := {}        # Vector2i -> int
 var spawns := { "player": [] as Array[Vector2i], "enemy": [] as Array[Vector2i] }
 ## Legal pre-battle placement hexes per side (the 3 rows at each edge).
 var deploy := { "player": [] as Array[Vector2i], "enemy": [] as Array[Vector2i] }
+## D319: units a side fields on this map (JSON "deploy_count"; 3 when absent,
+## 6 on the big 6v6 maps). Each side needs that many spawns, all inside its
+## deploy zone (test_maps). The squad fields min(deploy_count, its size).
+const DEPLOY_DEFAULT := 3
+var deploy_count := DEPLOY_DEFAULT
 var notes := ""
 var camera_focus := Vector2i(-1, -1)
 ## D115: permanent floor charge per hex, Vector2i -> Vector2i(h, v). BWTiles
@@ -110,6 +115,7 @@ static func from_dict(d: Dictionary) -> BWBoard:
 			b.deploy[team].append(h)
 		if b.deploy[team].is_empty():
 			b.deploy[team] = b.spawns[team].duplicate()
+	b.deploy_count = maxi(1, int(d.get("deploy_count", DEPLOY_DEFAULT)))   # D319
 	b.notes = str(d.get("notes", ""))
 	if d.get("objective") is Dictionary:                  # D140
 		b.objective = (d.objective as Dictionary).duplicate(true)
@@ -143,6 +149,37 @@ static func load_file(path: String) -> BWBoard:
 		b.errors.append("could not parse map " + path)
 		return b
 	return from_dict(parsed)
+
+
+## D320: where n units of `team` start by default: its spawns in order, then
+## the free deploy hexes nearest the first spawn (ties in hex order), then any
+## free standable hex nearest it. `taken` hexes are skipped. Deterministic,
+## so the pre-battle auto-placement and BWBattle.setup agree.
+func default_starts(team: String, n: int, taken: Array = []) -> Array:
+	var out: Array = []
+	var occ := {}
+	for h in taken:
+		occ[h] = true
+	for h in spawns.get(team, []):
+		if out.size() >= n:
+			return out
+		if not occ.has(h):
+			out.append(h)
+			occ[h] = true
+	var sp: Array = spawns.get(team, [])
+	var anchor: Vector2i = sp[0] if not sp.is_empty() else Vector2i(cols / 2, rows - 1 if team == "player" else 0)
+	for pool in [Array(deploy.get(team, [])), cells()]:
+		var free: Array = pool.filter(func(h): return not occ.has(h) and is_passable(h))
+		free.sort_custom(func(a, b):
+			var da := BWHex.distance(a, anchor)
+			var db := BWHex.distance(b, anchor)
+			return da < db or (da == db and a < b))
+		for h in free:
+			if out.size() >= n:
+				return out
+			out.append(h)
+			occ[h] = true
+	return out
 
 
 static func fold_terrain(t: String) -> String:

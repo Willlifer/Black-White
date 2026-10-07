@@ -86,11 +86,17 @@ func _init(p_board: BWBoard, seed_value: int = 1) -> void:
 ## else the nearest hex that fits (the maps' spawns are single hexes).
 func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 	units.clear()
+	var starts := board.default_starts("player", players.size(), player_at.slice(0, players.size()))   # D320: any count
+	var si := 0
 	for i in players.size():
 		var u: BWUnit = players[i]
 		u.team = "player"
 		u.begin_battle()
-		u.pos = player_at[i] if i < player_at.size() else board.spawns.player[i]
+		if i < player_at.size():
+			u.pos = player_at[i]
+		else:
+			u.pos = starts[si] if si < starts.size() else Vector2i.ZERO
+			si += 1
 		units.append(u)
 	var lay := enemy_layout(board, enemies, units.map(func(p): return p.pos))   # D211: any number, any size
 	for i in enemies.size():
@@ -666,6 +672,7 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	BWCurse.rot_mods(dfn, mods)               # D275: Rot, +5% taken per stack
 	BWBeams.mods(self, att, mods)             # D287: Empowered, on its own turn
 	BWOverheat.basic_mods(self, att, dfn, el, basic, mods)   # D285: an Overheat note
+	BWOverfreeze.basic_mods(self, dfn, el, basic, mods)      # D312: an Overfreeze note
 	BWKeystoneFx.blow_mods(self, att, dfn, mods)   # D294: Frozen (x2, counts as glazed)
 	if _fx_units.is_empty():
 		return mods
@@ -1242,6 +1249,8 @@ func _plan(u: BWUnit, s: Dictionary, element: String, target: Vector2i, choice: 
 	_widen(u, d, p)
 	BWBeams.magnify(self, u, d, p)            # D289: an ally on a Magnify holder's light casts magnified
 	BWOverheat.plan_notes(self, u, p)         # D285: the forecast names an Overheat
+	BWOverfreeze.plan_notes(self, u, p)       # D312: ... an Overfreeze
+	BWSquall.plan_notes(self, u, p)           # D309: ... a Squall
 	p.victims = (p.victims as Array).filter(func(v): return can_harm(u, v))   # D140: the enemy's shapes pass over an obelisk
 	return p
 
@@ -2170,6 +2179,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 		_tile_hurt(u, hurt[u][0], "detonation", hurt[u][1])
 	BWEnchant.after_blast(self, hurt)          # v2 hook: Sapping
 	BWOverheat.after_paint(self, by, r)        # D285: Overheat rings (events, 6% summed per unit)
+	BWOverfreeze.after_paint(self, by, r)      # D312: Overfreeze bursts (12%, once per unit)
 	for g in r.gales:
 		for e in BWEffects.list(by, "knockback", "wind"):
 			if str(BWEffects.p(e, "on", "")) != "trigger" or not _chance(e):
@@ -2181,6 +2191,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
 	BWWind.after_paint(self, by, element, r, wsnap)   # D270: stamp the mode on new gales; fired fields act; copies carry states
+	BWSquall.after_paint(self, by, r, wsnap)       # D309: a fresh gale on light/dark 2+ starts a squall
 	BWKeystoneFx.after_paint(self, by, r)          # D294 Glacier Wall: its pillars last all battle
 	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
 	BWPhases.after_paint(self, hexes, element, by)   # D256: thunder breaks the Twins' beam
@@ -2507,7 +2518,7 @@ func _picked(u: BWUnit, rec: Dictionary) -> void:
 
 ## Tile damage causes that count as an elemental effect (D93: a Frost Ward or
 ## Nightborn negates one). Slams and plain blows don't.
-const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "steam", "ember_skin", "shock", "overheat", "light_beam"]   # D285/D287
+const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "steam", "ember_skin", "shock", "overheat", "light_beam", "overfreeze"]   # D285/D287/D312
 
 
 ## D93: negate one elemental effect landing on `u`, if it holds a negation.

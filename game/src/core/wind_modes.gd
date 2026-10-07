@@ -547,6 +547,8 @@ static func tick(b: BWBattle) -> void:
 		if not near.is_empty():
 			apply_mode(b, _owner(b, f), VORTEX, near, h, true)
 	if not b.over:
+		BWSquall.tick(b)                              # D309: every squall front advances one ring
+	if not b.over:
 		BWCurse.tick(b)
 	if not b.over:
 		BWKeystoneFx.tick(b)                          # D294/D295: Wellspring heals, Frozen thaws

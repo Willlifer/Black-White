@@ -10,6 +10,8 @@ extends RefCounted
 const FIGHTS := 10
 const BOSS_FIGHT := 11
 const SQUAD := 6
+## The default units a side fields (the 3v3 maps). D319: a map's own
+## `deploy_count` (BWBoard) decides: 3, or 6 on a big map; see deploy_for().
 const DEPLOY := 3
 ## D145 (supersedes D118's fixed order): fight 4 is always the Obelisks (D140,
 ## an objective fight: break a stone), the Giant stays on the arena, and the
@@ -205,7 +207,34 @@ func tier_for(n: int) -> String:
 	return TIERS[clampi((n - 1) / 2, 0, TIERS.size() - 1)]
 
 
+## D319 (tools and tests only, never saved): every fight plays this map
+## ("" = the run's own maps). `campaign_sim` MAP=commons uses it for 6v6.
+var force_map := ""
+
+
+## D319: the units the squad fields in fight n: the map's deploy_count (3, or
+## 6 on a big map), capped by the squad's size (fewer owned: field them all).
+## The enemy side fields the map's count (BWRooms draws it, as many as the
+## roster outside the squad can spare).
+func deploy_for(n: int) -> int:
+	var c := deploy_count_of(map_for(n))
+	return mini(c, squad.size()) if not squad.is_empty() else c
+
+
+static var _deploy_counts := {}
+
+
+## D319: a map's deploy_count (read once per map name, then cached).
+static func deploy_count_of(map_name: String) -> int:
+	if not _deploy_counts.has(map_name):
+		var path := "res://maps/%s.json" % map_name
+		_deploy_counts[map_name] = BWBoard.load_file(path).deploy_count if FileAccess.file_exists(path) else DEPLOY
+	return int(_deploy_counts[map_name])
+
+
 func map_for(n: int) -> String:
+	if force_map != "":
+		return force_map
 	if n >= BOSS_FIGHT:
 		return "arena"
 	if n == OBJECTIVE_FIGHT:

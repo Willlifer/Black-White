@@ -97,19 +97,26 @@ static func chosen_index(run: BWRun) -> int:
 ## in between were Standard; the Obelisks and the Giant a fixed room.
 static func room_for(run: BWRun, n: int) -> Dictionary:
 	if not has_choice(n):
-		return { "kind": STANDARD, "map": projected_map(run, n), "enemies": _draw_ids(run, n, [], false), "fight": n }
+		var fm := projected_map(run, n)
+		return { "kind": STANDARD, "map": fm, "enemies": _draw_ids(run, n, [], false, _count(run, fm)), "fight": n }
 	if n == run.fight:
 		var rooms: Array = run.room_offer.rooms if int(run.room_offer.get("fight", 0)) == n else roll(run, n)
 		var i := chosen_index(run)
 		return rooms[i if i >= 0 else 0]
-	return { "kind": STANDARD, "map": projected_map(run, n), "enemies": _draw_ids(run, n, [], false), "fight": n }
+	var pm := projected_map(run, n)
+	return { "kind": STANDARD, "map": pm, "enemies": _draw_ids(run, n, [], false, _count(run, pm)), "fight": n }
+
+
+## D319: the enemies a room on `map` fields: its deploy_count (run.force_map wins).
+static func _count(run: BWRun, map: String) -> int:
+	return BWRun.deploy_count_of(run.force_map if run.force_map != "" else map)
 
 
 ## Both rooms for fight n from the run's state now (pure; offer() stores it).
 static func roll(run: BWRun, n: int) -> Array:
 	var maps := offer_maps(run, run.map_queue, n)
-	var std_ids := _draw_ids(run, n, [], false)
-	var hard_ids := _draw_ids(run, n, std_ids, true)
+	var std_ids := _draw_ids(run, n, [], false, _count(run, maps[0]))
+	var hard_ids := _draw_ids(run, n, std_ids, true, _count(run, maps[1]))
 	var enc := BWEncounters.kind_for(run, n)           # D208: a third of the Hard rooms are encounters
 	var rooms := [
 		{ "kind": STANDARD, "map": maps[0], "enemies": std_ids, "fight": n },
@@ -293,20 +300,21 @@ static func _slot(n: int) -> int:
 	return (n - 1) if n < BWRun.OBJECTIVE_FIGHT else (n - 2)
 
 
-## Three roster ids outside the squad (and outside `avoid` while the pool
-## allows), drawn on fight n's enemy rng (Hard: its own stream).
-static func _draw_ids(run: BWRun, n: int, avoid: Array, hard: bool) -> Array:
+## `count` (3; D319: the map's deploy_count) roster ids outside the squad (and
+## outside `avoid` while the pool allows), drawn on fight n's enemy rng (Hard:
+## its own stream). The first three draws are the same at any count.
+static func _draw_ids(run: BWRun, n: int, avoid: Array, hard: bool, count: int = BWRun.DEPLOY) -> Array:
 	var pool: Array = []
 	for row in run.roster_rows:
 		if run.unit(str(row.id)) == null:
 			pool.append(str(row.id))
 	pool.sort()
 	var fresh: Array = pool.filter(func(id): return not id in avoid)
-	if fresh.size() >= BWRun.DEPLOY:
+	if fresh.size() >= count:
 		pool = fresh
 	var erng := RandomNumberGenerator.new()
 	erng.seed = hash("hard|%d|%d" % [run.seed_value, n]) if hard else run.seed_value * 7919 + n
 	var out: Array = []
-	for i in mini(BWRun.DEPLOY, pool.size()):
+	for i in mini(count, pool.size()):
 		out.append(pool.pop_at(erng.randi() % pool.size()))
 	return out

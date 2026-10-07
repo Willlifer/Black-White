@@ -373,7 +373,8 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	for l in BWWind.card_lines(b, h) + BWCurse.card_lines(b, h) + BWKeystoneFx.card_lines(b, h):   # D297: keystone lines
 		lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color("wind" if str(l).find("Rot") < 0 and str(l).find("Gravity") < 0 else "dark").lightened(0.35)), BWGlossary.markup(str(l))])
 	# D285-D292: Overheat, beams, Dawn, Magnify, Empowered, Static fuses, keystone holders
-	for pair in [["fire", BWOverheat.card_lines(b, h)], ["light", BWBeams.card_lines(b, h)], ["thunder", BWThunderKeys.card_lines(b, h)]]:
+	for pair in [["fire", BWOverheat.card_lines(b, h)], ["light", BWBeams.card_lines(b, h)], ["thunder", BWThunderKeys.card_lines(b, h)],
+			["wind", BWSquall.card_lines(b, h)], ["ice", BWOverfreeze.card_lines(b, h)]]:   # D309/D312: Squall, Overfreeze
 		for l in pair[1]:
 			lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color(str(pair[0])).lightened(0.35)), BWGlossary.markup(str(l))])
 	# the occupant

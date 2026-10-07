@@ -168,6 +168,8 @@ static func finish(t: BWTiles, sp: Dictionary, element: String, caster: String, 
 			out.changed.append(h)
 	if fresh and element == "ice":
 		for h in out.changed:
+			if h in sp.get("no_pillar", []):
+				continue                              # D312: an Overfreeze centre just shattered: no pillar
 			if raise_pillar(t, h, caster, rep.melted):
 				rep.pillars.append(h)
 	var groups: Array = sp.shock.values()

@@ -341,6 +341,30 @@ armour). The bias stays invisible to the player, per the brief.
   reactive, one supportive and one passive at a time (my reading of "can only
   equip one type at a time").
 
+## 6.1 Auto-equip (D315-D318)
+
+The gear panel (pre-battle and the hall's prep) has **Optimize all [O]** in
+its header and **Optimize** under the sets line. Both show the changes first
+(one line per unit: "Della: +Fire Chain Mail [C] (from Bob) · +Iron Helm
+[D]"), with Apply / Cancel (Esc cancels); after Apply, **Undo optimize** puts
+everything back (one step; gone after a change by hand). Code: `BWAutoEquip`
+(`src/core/auto_equip.gd`).
+
+- **Who goes first:** most fights deployed this run, then damage dealt, then
+  level, then squad order.
+- **What a unit wants:** its used element (highest affinity; ties go to the
+  focus, then the native element) and its drawn weapon's class.
+- **Scoring, in order:** the main hand keeps the class; the second weapon
+  slot prefers another class the unit has expertise in; the piece's element
+  is the unit's element; it brings a learned set to 2 or 3 pieces; tier; stat
+  total. A worn piece stays unless another beats it by 3+ stat points.
+- **Cursed pieces** are never handed out; one already worn may stay.
+- **Optimize all** may take from units used less, never from units used more.
+  A second weapon is never someone's drawn weapon, and nobody is left
+  without a weapon. Leftovers go to the inventory; the discard pile is left
+  alone.
+- **Optimize** (one unit) takes from the loose inventory only.
+
 ## 7. Decisions I made
 
 Overturn any of these freely.

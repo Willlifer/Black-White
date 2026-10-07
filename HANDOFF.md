@@ -21,6 +21,13 @@
   - **Self-detonate**, Blast Rider's free action, enables the dagger bomber dive (D306). All five L-30 riders are built (D307).
   - **Re-tune (D308):** curve 0.97 1.05 1.95 0.7 1.35 1.15 1.1 1.1 1.0 1.03, Twins HP ×2.6 / stats ×1.25. Sim (24 runs, Standard): 87 62 75 54 87 70 62 79 75 75 %, Hard 12–25 under, rounds 6–8 from fight 3, Giant 95%. Also fixed a reach-tree cycle that hung `path_to`.
 - Review renders `design/art/v3_*.png`; this pass `v3_final_card*.png`, `v3_final_dive_1|2|3.png` (`tools/final_shots.gd`).
+- **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, rink, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
+
+## Also landed: auto-equip (D315-D318, LEDGER L-35)
+- Gear panel: **Optimize all [O]** (header; most-used unit first, may take from units used less) and **Optimize** (one unit, inventory only); a diff preview with Apply / Cancel, then one-step **Undo optimize**. Core `BWAutoEquip` (`src/core/auto_equip.gd`), `test_auto_equip`, ui-probe presses O → Apply → Undo. Renders `design/art/autoequip_*.png` (`tools/autoequip_shots.gd`).
+
+## Also landed: 6v6 infrastructure (D319-D324, LEDGER L-36; the 6v6 modes lane, D325-D326, builds on it)
+- Map `deploy_count` (3 default, 6 big) through setup, pre-battle (six slots, auto-placed, Auto), rooms, `campaign_sim` (MAP=commons) and `--combat`; big-board camera; 12-unit turn order; AI pruning on big maps only (worst turn ~500 → ~130 ms, `tools/sixes_perf.gd`). Test map **Commons** (17×15, not in the rotation). Green then: self-test 674/674 in 60 suites, both probes, `--combat commons --autoplay`. Renders `design/art/6v6_*.png`.
 
 ## Do this first
 1. **Commit** the overhaul (see Git above).

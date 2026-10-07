@@ -151,9 +151,10 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 	var roster := BWData.table("roster")
 	var players: Array = []
 	var enemies: Array = []
-	for i in 3:
+	var count := BWRun.deploy_count_of(map_name)       # D319: the map's deploy count (6 on Commons)
+	for i in count:
 		players.append(BWUnit.from_roster(roster[i]))
-		enemies.append(BWUnit.from_roster(roster[i + 10]))
+		enemies.append(BWUnit.from_roster(roster[(i + 10) % roster.size()]))
 	if carry:                            # D195: a carried weapon of another class each, so the AI swaps
 		var run := BWRun.start([], seed_value)
 		var classes := BWRun.weapon_classes()

@@ -14,10 +14,11 @@ func _maps() -> Array:
 
 
 func test_ten_maps(t) -> void:
-	t.eq(_maps(), ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "court.json", "forge.json", "lake.json",
-		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json"], "the eleven maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court)")
+	t.eq(_maps(), ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "commons.json", "court.json", "forge.json", "lake.json",
+		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json"], "the twelve maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court; D319: Commons, 6v6, not in the rotation)")
 	for m in BWRun.MAPS:
 		t.ok(FileAccess.file_exists(MAP_DIR + m + ".json"), "rotation map %s exists" % m)
+	t.ok(not "commons" in BWRun.MAPS and not "commons" in BWRun.MAP_POOL, "D319: Commons is a test map, not in the rotation yet")
 
 
 ## D145: fight 4 is always the Obelisks, the boss is on the arena, and the
@@ -61,9 +62,11 @@ func test_maps_load_clean(t) -> void:
 	for f in _maps():
 		var b := BWBoard.load_file(MAP_DIR + f)
 		t.ok(b.errors.is_empty(), "%s: %s" % [f, b.errors])
-		t.eq(b.spawns.player.size(), 3, "%s player spawns" % f)
-		t.eq(b.spawns.enemy.size(), 3, "%s enemy spawns" % f)
-		t.ok(b.deploy.player.size() >= 3, "%s player deploy zone" % f)
+		var n := b.deploy_count                                     # D319: 3, or 6 on a big map
+		t.ok(n in [3, 6], "%s deploy_count %d is 3 or 6" % [f, n])
+		t.eq(b.spawns.player.size(), n, "%s player spawns = deploy_count" % f)
+		t.eq(b.spawns.enemy.size(), n, "%s enemy spawns = deploy_count" % f)
+		t.ok(b.deploy.player.size() >= n, "%s player deploy zone holds %d" % [f, n])
 		for h in b.spawns.player:
 			t.ok(h in b.deploy.player, "%s spawn %s inside deploy zone" % [f, h])
 
@@ -75,7 +78,7 @@ func test_maps_host_a_fight(t) -> void:
 		var b := BWBattle.new(BWBoard.load_file(MAP_DIR + f), 11)
 		var ps: Array = []
 		var es: Array = []
-		for i in 3:
+		for i in BWRun.deploy_count_of(f.get_basename()):       # D319: 6 a side on Commons
 			ps.append(BWUnit.from_roster(roster[i]))
 			es.append(BWUnit.from_roster(roster[i + 10]))
 		b.setup(ps, es)
@@ -86,3 +89,39 @@ func test_maps_host_a_fight(t) -> void:
 		t.ok(b.over, "%s: AI fight finishes (%d turns)" % [f, turns])
 		lengths[f.get_basename()] = b.cycle
 	print("    [info] rounds per map: %s" % [lengths])
+
+
+## D319: a 6v6 map's deploy rules (Commons, and the big maps to come): six
+## spawns a side, distinct, standable, inside the side's deploy zone; the
+## zones are the three edge rows, mirror images, at most 24 hexes; every
+## player spawn walks to an enemy spawn; the map is 17×15 to 19×17.
+func test_six_a_side_maps(t) -> void:
+	var big := 0
+	for f in _maps():
+		var b := BWBoard.load_file(MAP_DIR + f)
+		if b.deploy_count <= BWRun.DEPLOY:
+			continue
+		big += 1
+		t.ok(b.cols >= 17 and b.cols <= 19 and b.rows >= 15 and b.rows <= 17, "%s is 17×15 to 19×17 (%d×%d)" % [f, b.cols, b.rows])
+		for team in ["player", "enemy"]:
+			var sp: Array = b.spawns[team]
+			var uniq := {}
+			for h in sp:
+				uniq[h] = true
+				t.ok(b.is_passable(h), "%s %s spawn %s standable" % [f, team, h])
+				t.ok(h in b.deploy[team], "%s %s spawn %s in its zone" % [f, team, h])
+			t.eq(uniq.size(), 6, "%s %s: six distinct spawns" % [f, team])
+			t.ok(b.deploy[team].size() >= 6 and b.deploy[team].size() <= 24, "%s %s zone %d hexes (6-24)" % [f, team, b.deploy[team].size()])
+			var edge := 0 if team == "enemy" else b.rows - 1
+			t.ok(b.deploy[team].all(func(h): return absi(h.y - edge) <= 2), "%s %s zone on its three edge rows" % [f, team])
+		for h in b.spawns.player:
+			t.ok(not h in b.spawns.enemy and not h in b.deploy.enemy, "%s: %s on one side only" % [f, h])
+			var reach := b.reachable(h, 99)
+			t.ok(b.spawns.enemy.any(func(e): return b.neighbors(e).any(func(nb): return reach.has(nb))), "%s: spawn %s walks to the enemy" % [f, h])
+	t.ok(big >= 1, "at least one 6v6 map (Commons)")
+	var c := BWBoard.load_file(MAP_DIR + "commons.json")
+	t.eq(c.deploy_count, 6, "Commons fields six a side")
+	t.eq([c.cols, c.rows], [17, 15], "Commons is 17×15")
+	t.ok(not c.seeds.is_empty(), "Commons has seeded patches")
+	t.ok(c.cells().any(func(h): return c.elevation(h) >= 2), "Commons has elevation")
+	t.eq(BWBoard.load_file(MAP_DIR + "arena.json").deploy_count, 3, "a map without deploy_count fields 3")

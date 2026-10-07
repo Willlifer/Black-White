@@ -37,6 +37,24 @@ const THREAT_BONUS := 0.5
 ## nothing else is in reach).
 const OBJECTIVE_WEIGHT := 2.0
 const OFF_FOCUS_WEIGHT := 0.25
+## D323: big-board pruning (a 6v6 on a 17×15-19×17 map ran 400-560 ms worst
+## turns): on a map fielding more than BWRun.DEPLOY a side, a turn forecasts
+## from at most BIG_HEX_CAP attack hexes and previews at most BIG_TARGET_CAP
+## targets per skill and element (see _skip_hexes, _cap_targets). Counts,
+## not the clock, so a seed still replays the same fight. 0 = no cap.
+static var BIG_HEX_CAP := 12
+static var BIG_TARGET_CAP := 8
+## D323: skill previews per _best_skill call on a big board, shared over the
+## kit's skill × element pairs (each pair keeps at least one); the swap look
+## (turn_value, both weapons) gets BIG_SWAP_PREVIEWS.
+static var BIG_PREVIEWS := 16
+static var BIG_SWAP_PREVIEWS := 6
+## D323: attack hexes the swap look forecasts from (per weapon).
+static var BIG_SWAP_HEXES := 6
+## D323: previews per _best_skill call that also run the simulated extras
+## (Blast Rider, Overfreeze, squall: each may simulate the whole action), the
+## targets nearest a foe first. 0 = no cap.
+static var BIG_SIMS := 3
 
 
 ## Who BWAI plays: every enemy (D177 removed D129's rogue, a player unit the
@@ -124,12 +142,13 @@ static func _consider_swap(b: BWBattle, u: BWUnit) -> void:
 static func turn_value(b: BWBattle, u: BWUnit) -> float:
 	var best := 0.0
 	var reach := b.reachable(u) if b.can_move(u) else { u.pos: { "stop": true } }
+	var skip := _skip_hexes(b, u, reach, BIG_SWAP_HEXES)   # D323: big boards only
 	for h in reach:
-		if reach[h].stop or h == u.pos:
+		if (reach[h].stop or h == u.pos) and not skip.has(h):
 			var t := _best_target(b, u, h)
 			if not t.is_empty():
 				best = maxf(best, float(t.score))
-	var sk := _best_skill(b, u)
+	var sk := _best_skill(b, u, BIG_SWAP_PREVIEWS)     # D323: a lighter look on big boards
 	if not sk.is_empty():
 		best = maxf(best, float(sk.score))
 	return best
@@ -217,14 +236,16 @@ static func _safest_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 ## as attacks is BWSkillDef.ai_considers (by default: not follow-up granters,
 ## set-ups or move-only skills). Deterministic: kit order, element order,
 ## target order; ties keep the first.
-static func _best_skill(b: BWBattle, u: BWUnit) -> Dictionary:
+static func _best_skill(b: BWBattle, u: BWUnit, previews: int = -1) -> Dictionary:
 	var best := {}
+	var per := _pair_cap(b, u, BIG_PREVIEWS if previews < 0 else previews)   # D323: 0 off a big board
+	var sims := 0
 	for row in b.skills_for(u):
 		var d := BWSkillRegistry.get_def(str(row.key))
 		if not d.ai_considers(row):
 			continue
 		for el in row.elements:
-			for h in b.skill_targets(u, row.key, el):
+			for h in _cap_targets(b, u, b.skill_targets(u, row.key, el), per):   # D323: big boards only
 				if el == "wind":                              # D274: a cheap mode per target
 					u.wind_mode = BWWind.ai_choose(b, u, _focus(b, u, h), BWWind.skill_origin(u, row, h))
 				var pv := b.skill_preview(u, row.key, el, h)
@@ -232,7 +253,11 @@ static func _best_skill(b: BWBattle, u: BWUnit) -> Dictionary:
 					continue
 				var score := d.ai_score(b, u, pv)
 				score += BWOverheat.ai_skill(b, u, pv)                      # D285: Overheat rings and setups
-				score += BWThunderKeys.ai_skill(b, u, row.key, el, h, pv)   # D291: the Blast Rider dive (simulated)
+				sims += 1
+				if per <= 0 or BIG_SIMS <= 0 or sims <= BIG_SIMS:            # D323: big boards cap the simulated extras
+					score += BWThunderKeys.ai_skill(b, u, row.key, el, h, pv)   # D291: the Blast Rider dive (simulated)
+					score += BWOverfreeze.ai_skill(b, u, row.key, el, h, pv)   # D314: Overfreeze bursts (simulated, ice on glazed water only)
+					score += BWSquall.ai_skill(b, u, row.key, el, h, pv)       # D314: a squall's front (simulated, light/dark 2+ only)
 				if score > 0.0 and (best.is_empty() or score > best.score):
 					best = { "key": row.key, "element": el, "target": h, "score": score, "mode": u.wind_mode }
 	if not best.is_empty() and str(best.element) == "wind":
@@ -281,8 +306,9 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 	var keys := reach.keys()
 	keys.sort()
 	var wfc := BWWeather.forecast(b)                  # D253: the next tick's telegraphed hazards
+	var skip := _skip_hexes(b, u, reach)              # D323: big boards only
 	for h in keys:
-		if not reach[h].stop:
+		if not reach[h].stop or skip.has(h):
 			continue
 		var score := 0.0
 		var t := _best_target(b, u, h)
@@ -415,3 +441,90 @@ static func walk_field(b: BWBattle, o: BWUnit) -> Dictionary:
 				frontier.append([c + sc, n])
 	b.set_meta(key, dist)
 	return dist
+
+
+# ---------------------------------------------------------------- D323 big boards
+
+## A map fielding more than the 3v3 default (BWBoard.deploy_count, D319).
+static func big(b: BWBattle) -> bool:
+	return b.board.deploy_count > BWRun.DEPLOY
+
+
+## D323: the reachable stops NOT worth a full forecast this turn ({} on a 3v3
+## map: nothing pruned). An attack hex has a foe within weapon range by
+## distance; past BIG_HEX_CAP of them, the kept ones are dealt round-robin
+## over the foes, the weakest (fewest HP) first, each foe's hexes cheapest walk
+## first (then hex order), so every foe in reach keeps its best approaches.
+## `cap` -1 = BIG_HEX_CAP (the swap look passes BIG_SWAP_HEXES).
+## Hexes with no foe in range are never skipped (their score is cheap).
+static func _skip_hexes(b: BWBattle, u: BWUnit, reach: Dictionary, cap: int = -1) -> Dictionary:
+	if cap < 0:
+		cap = BIG_HEX_CAP
+	if cap <= 0 or not big(b):
+		return {}
+	var wr := b.weapon_range(u)
+	var foes: Array = b.foes_of(u).filter(func(f): return f.alive())
+	foes.sort_custom(func(x, y): return x.hp < y.hp or (x.hp == y.hp and x.id < y.id))
+	var per: Array = []
+	var attack := {}
+	for f in foes:
+		var hs: Array = []
+		for h in reach:
+			if (reach[h].stop or h == u.pos) and BWHex.distance(h, f.pos) <= wr + maxi(f.size, 1) - 1:
+				hs.append(h)
+				attack[h] = true
+		hs.sort_custom(func(x, y):
+			var cx: float = reach[x].get("cost", 0) if reach[x] is Dictionary else 0
+			var cy: float = reach[y].get("cost", 0) if reach[y] is Dictionary else 0
+			return cx < cy or (cx == cy and x < y))
+		per.append(hs)
+	if attack.size() <= cap:
+		return {}
+	var keep := {}
+	var i := 0
+	while keep.size() < cap:
+		var any := false
+		for hs in per:
+			if i < hs.size():
+				any = true
+				keep[hs[i]] = true
+				if keep.size() >= cap:
+					break
+		if not any:
+			break
+		i += 1
+	var skip := {}
+	for h in attack:
+		if not keep.has(h):
+			skip[h] = true
+	return skip
+
+
+## D323: targets previewed per skill × element pair on a big board: `budget`
+## previews shared over the kit's pairs, at least 1, at most BIG_TARGET_CAP.
+## 0 (no cap) on a 3v3 map or with the caps off.
+static func _pair_cap(b: BWBattle, u: BWUnit, budget: int) -> int:
+	if BIG_TARGET_CAP <= 0 or budget <= 0 or not big(b):
+		return 0
+	var pairs := 0
+	for row in b.skills_for(u):
+		if BWSkillRegistry.get_def(str(row.key)).ai_considers(row):
+			pairs += row.elements.size()
+	return clampi(budget / maxi(pairs, 1), 1, BIG_TARGET_CAP)
+
+
+## D323: a skill's targets, at most `cap` (0 = all): the ones nearest a living
+## foe (then hex order). Unchanged on a 3v3 map (cap 0).
+static func _cap_targets(b: BWBattle, u: BWUnit, targets: Array, cap: int) -> Array:
+	if cap <= 0 or targets.size() <= cap:
+		return targets
+	var foes: Array = b.foes_of(u).filter(func(f): return f.alive())
+	var near := {}
+	for h in targets:
+		var d := 1 << 20
+		for f in foes:
+			d = mini(d, BWHex.distance(h, f.pos))
+		near[h] = d
+	var out: Array = targets.duplicate()
+	out.sort_custom(func(x, y): return near[x] < near[y] or (near[x] == near[y] and x < y))
+	return out.slice(0, cap)

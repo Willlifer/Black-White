@@ -38,6 +38,8 @@ extends SceneTree
 ## D308: per keystone the squad's AI took (BWPicks.auto_resolve), the win rate
 ## of the fights (1-10, rooms as played) a deployed unit holding it fought
 ## (informational: spotting an overpowered keystone; late fights hold more).
+## MAP=<name> (D319, tools only) plays every fight on that map at its deploy
+## count, e.g. MAP=commons for 6v6 (the enemies drawn six to a room).
 ## TRACE_SIM=1 prints each fight's turns, cycles and time; TRACE_FIGHT="run:fight"
 ## prints the acting unit before every turn of that one fight (D308: finding a hang).
 
@@ -133,6 +135,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				var j := rng.randi() % (i + 1)
 				var t = pick[i]; pick[i] = pick[j]; pick[j] = t
 			var run := BWRun.start(pick.slice(0, BWRun.SQUAD), 9000 + s)
+			run.force_map = OS.get_environment("MAP")         # D319: MAP=commons plays every fight there (6v6)
 			for u in run.squad:
 				BWPicks.auto_resolve(u)
 			var healthy := true
@@ -187,14 +190,18 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				var guard := 0
 				var t0 := Time.get_ticks_msec()
 				var tf := OS.get_environment("TRACE_FIGHT") == "%d:%d" % [s, n]
+				var worst_us := 0
 				while not b.over and guard < 1500:
 					if tf:
 						var cu := b.current()
 						print("  turn %d %s %s pos %s ks %s" % [guard, cu.id if cu else "-", cu.team if cu else "", str(cu.pos) if cu else "", str(cu.keystones) if cu else ""])
+					var tt := Time.get_ticks_usec()
 					BWAI.take_turn(b)
+					worst_us = maxi(worst_us, Time.get_ticks_usec() - tt)
 					guard += 1
-				if OS.get_environment("TRACE_SIM") == "1":       # timing: which fight runs long
-					print("run %d fight %d %s turns %d cycles %d %d ms %s" % [s, n, mname, guard, b.cycle, Time.get_ticks_msec() - t0, b.winner])
+				if OS.get_environment("TRACE_SIM") == "1":       # timing: which fight runs long (D323: the worst AI turn)
+					print("run %d fight %d %s %dv%d turns %d cycles %d %d ms (worst turn %.0f ms) %s" % [s, n, mname, deployed.size(), enemies.size(),
+						guard, b.cycle, Time.get_ticks_msec() - t0, worst_us / 1000.0, b.winner])
 				var won := b.winner == "player"
 				if won:
 					wins[n - 1] += 1
@@ -231,7 +238,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 		for f in BWRun.BOSS_FIGHT:
 			var r: Array = rounds[f]
 			r.sort()
-			out.append("  fight %2d %-9s  win %3d%%  rounds med %2d  survivors %.1f/3%s" % [f + 1,
+			out.append("  fight %2d %-9s  win %3d%%  rounds med %2d  survivors %.1f%s" % [f + 1,
 				"(Giant)" if f + 1 == BWRun.BOSS_FIGHT else "(Twins)" if f + 1 == BWRun.TWINS_FIGHT else "(%s)" % _maps_label(played[f]),
 				100 * wins[f] / maxi(r.size(), 1), r[r.size() / 2] if r.size() > 0 else 0,
 				float(alive[f]) / maxf(r.size(), 1), _room_rates(by_room, f + 1)])
@@ -311,7 +318,7 @@ static func _room_rates(by_room: Dictionary, n: int) -> String:
 func _deploy(run: BWRun) -> Array:
 	var s := run.squad.duplicate()
 	s.sort_custom(func(a, b): return a.level > b.level or (a.level == b.level and a.max_hp() > b.max_hp()))
-	return s.slice(0, BWRun.DEPLOY)
+	return s.slice(0, run.deploy_for(run.fight))         # D319: the map's count (6 on a big map)
 
 
 ## Put the best legal loose piece (by stat total) into each empty or weaker slot.

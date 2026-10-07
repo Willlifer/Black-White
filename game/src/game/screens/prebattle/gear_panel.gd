@@ -21,6 +21,12 @@ extends PanelContainer
 ## starts (BWGame.go_combat -> BWRun.empty_trash).
 ## D235 the grid sorts by BWInvSort (Newest / Element / Slot / Tier), the
 ## filters stay; the order is shared with the shop for the session.
+## D315-D318 auto-equip (BWAutoEquip): "Optimize all [O]" in the header hands
+## the squad's gear out, most-used unit first (it may take from units below
+## it); "Optimize" under the sets line fills this unit from the loose
+## inventory only. Both show the changes first (Apply / Cancel, Esc cancels);
+## after Apply, "Undo optimize" puts everything back (one step, until the
+## gear is changed by hand).
 
 signal changed
 signal closed
@@ -51,6 +57,15 @@ var _trash_box: PanelContainer     # D234
 var _trash_row: HBoxContainer
 var _trash_title: Label
 var _trash_btn: Button
+var _opt_all: Button               # D315-D318
+var _opt_unit: Button
+var _undo_btn: Button
+var _preview: PanelContainer
+var _preview_text: RichTextLabel
+var _preview_title: Label
+var _plan := {}                    # the plan on preview
+var _undo_snap := {}               # BWAutoEquip.apply's snapshot (one step)
+var _applying := false
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -79,6 +94,20 @@ func _init(p_run: BWRun) -> void:
 		b.pressed.connect(func(): _filter = f[0]; _fill_grid())
 		hb.add_child(b)
 		_filter_btns[f[0]] = b
+	_opt_all = Button.new()                            # ---- D318
+	_opt_all.name = "optimize_all"
+	_opt_all.text = "Optimize all [O]"
+	_opt_all.focus_mode = Control.FOCUS_NONE
+	_opt_all.add_theme_font_size_override("font_size", BWStyle.F_SMALL)   # the hall's 1050 px header fits
+	_opt_all.tooltip_text = "Hand out the whole squad's gear, most-used unit first:\nits element and weapon first, then the higher tier. It may take\npieces from units used less. You see the changes before they apply."
+	var sc_ev := InputEventKey.new()
+	sc_ev.keycode = KEY_O
+	var o_sc := Shortcut.new()
+	o_sc.events = [sc_ev]
+	_opt_all.shortcut = o_sc
+	_opt_all.shortcut_in_tooltip = false
+	_opt_all.pressed.connect(optimize_all)
+	hb.add_child(_opt_all)
 	var close := Button.new()
 	close.text = "Close  [Esc]"
 	close.focus_mode = Control.FOCUS_NONE
@@ -145,11 +174,31 @@ func _init(p_run: BWRun) -> void:
 	_sets.bbcode_enabled = true
 	_sets.fit_content = true
 	_sets.scroll_active = false
-	_sets.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_sets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # D318: an unwrapped hint widened the panel off screen
 	_sets.custom_minimum_size = Vector2(500, 0)
 	_sets.add_theme_font_size_override("normal_font_size", BWStyle.F_SMALL - 1)
 	_sets.add_theme_font_size_override("bold_font_size", BWStyle.F_SMALL - 1)
 	dc.add_child(_sets)
+	var orow := HBoxContainer.new()                    # ---- D317: this unit, from the inventory
+	orow.add_theme_constant_override("separation", 8)
+	dc.add_child(orow)
+	_opt_unit = Button.new()
+	_opt_unit.name = "optimize_unit"
+	_opt_unit.text = "Optimize"
+	_opt_unit.focus_mode = Control.FOCUS_NONE
+	_opt_unit.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_opt_unit.tooltip_text = "Fill this unit's slots from the loose inventory (never from another unit):\nits element and weapon first, then the higher tier."
+	_opt_unit.pressed.connect(optimize_unit)
+	orow.add_child(_opt_unit)
+	_undo_btn = Button.new()
+	_undo_btn.name = "undo_optimize"
+	_undo_btn.text = "Undo optimize"
+	_undo_btn.focus_mode = Control.FOCUS_NONE
+	_undo_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_undo_btn.tooltip_text = "Put everyone's gear back as it was before the last Optimize"
+	_undo_btn.visible = false
+	_undo_btn.pressed.connect(undo_optimize)
+	orow.add_child(_undo_btn)
 	_msg = Label.new()
 	_msg.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
 	_msg.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
@@ -219,6 +268,10 @@ func _init(p_run: BWRun) -> void:
 	ic.add_child(cs)
 	card = BWItemCard.new()
 	cs.add_child(card)
+	_build_preview()
+	changed.connect(func():
+		if not _applying:
+			_set_undo({}))                             # a change by hand ends the one-step undo
 
 
 ## Put a screen's own control in the header, after the title (index 1).
@@ -791,3 +844,198 @@ func give(to: BWUnit, it: Dictionary, from_slot: String = "") -> bool:
 	refresh()
 	changed.emit()
 	return true
+
+
+# ---------------------------------------------------------------- auto-equip (D315-D318)
+
+func _build_preview() -> void:
+	_preview = PanelContainer.new()
+	_preview.name = "optimize_preview"
+	_preview.top_level = true                          # floats over the panel, not in its layout
+	_preview.z_index = 20
+	_preview.visible = false
+	var ps := BWStyle.prompt_style()
+	ps.bg_color.a = 0.98                               # opaque: the gear panel mustn't read through
+	ps.set_content_margin_all(18)
+	_preview.add_theme_stylebox_override("panel", ps)
+	add_child(_preview)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	_preview.add_child(v)
+	_preview_title = Label.new()
+	_preview_title.add_theme_font_size_override("font_size", BWStyle.F_SUB)
+	v.add_child(_preview_title)
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.custom_minimum_size = Vector2(720, 0)
+	sc.name = "preview_scroll"
+	v.add_child(sc)
+	_preview_text = RichTextLabel.new()
+	_preview_text.bbcode_enabled = true
+	_preview_text.fit_content = true
+	_preview_text.scroll_active = false
+	_preview_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_preview_text.add_theme_font_size_override("normal_font_size", BWStyle.F_SMALL)
+	_preview_text.add_theme_font_size_override("bold_font_size", BWStyle.F_SMALL)
+	_preview_text.add_theme_constant_override("line_separation", 6)
+	sc.add_child(_preview_text)
+	var bh := HBoxContainer.new()
+	bh.add_theme_constant_override("separation", 10)
+	bh.alignment = BoxContainer.ALIGNMENT_END
+	v.add_child(bh)
+	var cancel := Button.new()
+	cancel.name = "preview_cancel"
+	cancel.text = "Cancel  [Esc]"
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.pressed.connect(cancel_preview)
+	bh.add_child(cancel)
+	var ok := Button.new()
+	ok.name = "preview_apply"
+	ok.text = "Apply"
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.custom_minimum_size = Vector2(140, 0)
+	ok.pressed.connect(apply_preview)
+	bh.add_child(ok)
+
+
+## Optimize all [O]: plan the whole squad, show the changes.
+func optimize_all() -> void:
+	if preview_open():
+		return
+	_show_plan(BWAutoEquip.plan_all(run), "Optimize all")
+
+
+## Optimize: this unit, from the loose inventory.
+func optimize_unit() -> void:
+	if unit == null or preview_open():
+		return
+	_show_plan(BWAutoEquip.plan_unit(run, unit), "Optimize %s" % unit.name)
+
+
+func preview_open() -> bool:
+	return _preview != null and _preview.visible
+
+
+func _show_plan(plan: Dictionary, title: String) -> void:
+	if BWAutoEquip.empty(plan):
+		_msg.text = "Nothing to change: the best pieces are already on."
+		return
+	_plan = plan
+	var n: int = plan.changes.size()
+	_preview_title.text = "%s · %d change%s" % [title, n, "" if n == 1 else "s"]
+	_preview_text.text = preview_bbcode(run, plan)
+	_preview.visible = true
+	_fit_preview()
+	_fit_preview.call_deferred()                       # again once the text has wrapped at its width
+	_opt_all.disabled = true
+	_opt_unit.disabled = true
+	BWEsc.push(_preview, cancel_preview, { "name": "optimize preview" })
+
+
+## Size the scroll to the wrapped text (up to 440 px) and centre the box on the panel.
+func _fit_preview() -> void:
+	var sc: ScrollContainer = _preview.find_child("preview_scroll", true, false)
+	_preview_text.size.x = sc.custom_minimum_size.x
+	sc.custom_minimum_size.y = minf(_preview_text.get_content_height() + 6, 440.0)
+	_preview.reset_size()
+	var r := get_global_rect()
+	_preview.global_position = (r.position + (r.size - _preview.get_combined_minimum_size()) * 0.5).round()
+
+
+func cancel_preview() -> void:
+	_preview.visible = false
+	_plan = {}
+	BWEsc.remove(_preview)
+	_opt_all.disabled = false
+	_opt_unit.disabled = false
+
+
+func apply_preview() -> void:
+	if _plan.is_empty():
+		return
+	var plan := _plan
+	cancel_preview()
+	var snap := BWAutoEquip.apply(run, plan)
+	_sel = {}
+	_show_give({}, "")
+	var n: int = plan.changes.size()
+	_msg.text = "Optimized: %d change%s. Undo optimize puts it all back." % [n, "" if n == 1 else "s"]
+	doll.refresh()
+	refresh()
+	_applying = true
+	changed.emit()
+	_applying = false
+	_set_undo(snap)
+
+
+func undo_optimize() -> void:
+	if _undo_snap.is_empty():
+		return
+	if not BWAutoEquip.undo(run, _undo_snap):
+		_msg.text = "✕ The gear changed since (a trade or a discard): can't undo."
+		_set_undo({})
+		return
+	_msg.text = "Undone: everyone's gear is back as it was."
+	_sel = {}
+	doll.refresh()
+	refresh()
+	_applying = true
+	changed.emit()
+	_applying = false
+	_set_undo({})
+
+
+func _set_undo(snap: Dictionary) -> void:
+	_undo_snap = snap
+	if _undo_btn != null:
+		_undo_btn.visible = not snap.is_empty()
+
+
+func can_undo() -> bool:
+	return not _undo_snap.is_empty()
+
+
+## The diff, one line per unit that changes (priority order):
+## "Della: +Fire Chain Mail [C] (from Bob) · +Iron Helm [D]", a slot left
+## empty as "−Old Cap (to inventory)", then how many pieces go back.
+static func preview_bbcode(p_run: BWRun, plan: Dictionary) -> String:
+	var names := {}
+	for u in p_run.squad:
+		names[u.id] = u.name
+	var dest := {}                                     # item uid -> who wears it after
+	for id in plan.get("loadouts", {}):
+		for slot in plan.loadouts[id]:
+			if not plan.loadouts[id][slot].is_empty():
+				dest[str(plan.loadouts[id][slot].uid)] = str(id)
+	var by := {}
+	for c in plan.changes:
+		if not by.has(c.unit):
+			by[c.unit] = []
+		by[c.unit].append(c)
+	var dim := BWGearText.hex(BWStyle.TEXT_DIM)
+	var lines: PackedStringArray = []
+	for u in BWAutoEquip.priority(p_run):
+		if not by.has(u.id):
+			continue
+		var parts: PackedStringArray = []
+		for c in by[u.id]:
+			if c.item.is_empty():
+				var to := str(dest.get(str(c.out.get("uid", "")), ""))
+				parts.append("[color=#%s]−%s (to %s)[/color]" % [dim, BWGearText.plain_name(c.out),
+					names.get(to, to) if to != "" else "inventory"])
+				continue
+			var col := BWGearText.hex(BWGearText.readable(BWGearText.item_color(c.item)))
+			var note := ""
+			if str(c.from) != "" and str(c.from) != u.id:
+				note = " (from %s)" % names.get(str(c.from), str(c.from))
+			elif str(c.slot) == "main_hand" and str(c.from) == u.id:
+				note = " (drawn)"
+			elif str(c.slot) == BWUnit.SECOND:
+				note = " (carried)"
+			parts.append("[color=#%s]+%s[/color] [color=#%s][lb]%s[rb]%s[/color]" % [col,
+				BWGearText.plain_name(c.item), dim, str(c.item.get("tier", "E")), note])
+		lines.append("[b]%s[/b]:  %s" % [u.name, "  ·  ".join(parts)])
+	var freed: int = plan.get("freed", []).size()
+	if freed > 0:
+		lines.append("[color=#%s]%d piece%s back to the inventory.[/color]" % [dim, freed, "" if freed == 1 else "s"])
+	return "\n".join(lines)

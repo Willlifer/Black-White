@@ -291,6 +291,8 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	var fresh: bool = not opts.get("propagated", false)
 	var spine := BWPools.begin(self, hexes, element, fresh, steps, caster, opts)   # D264: pool reactions, pre-action
 	var hot := BWOverheat.begin(self, hexes, element, fresh, opts)   # D285: fresh fire on fire 3 erupts
+	var frz := BWOverfreeze.begin(self, hexes, element, fresh, opts)   # D312: fresh ice on glazed water shatters
+	spine["no_pillar"] = frz
 	var guard: Array = opts.get("fuse_guard", [])   # D307 Static Field: an ally's fuse ignores this paint
 	for hex in hexes:
 		if can_hold(hex) and not plans.has(hex):
@@ -324,6 +326,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 		if p.get("fired", false):
 			out.marker_fired.append(hex)
 	BWPools.finish(self, spine, element, caster, fresh, out, int(opts.get("glaze_plus", 0)))   # D262/D264
+	BWOverfreeze.finish(self, frz, caster, out)   # D312: the burst's rink (radius 1, no pillar), out.overfreeze
 	if opts.has("erupt"):
 		for hex in out.changed:
 			if carries(hex, element) and entries.has(hex) and str(entries[hex].source) == caster:
@@ -339,7 +342,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 		# D95: a gale 2 copies one ring further (rings 1 and 2, same skip rules)
 		var copies := _gale_copy(g[0], g[1], caster, out.changed,
 			int(opts.get("gale_radius", 1)) + int(g[2]) - 1, int(opts.get("gale_timer_plus", 0)))
-		out.gales.append({ "origin": g[0], "copies": copies, "level": int(g[2]) })
+		out.gales.append({ "origin": g[0], "copies": copies, "level": int(g[2]), "hv": g[1], "fresh": fresh })   # D309: the squall reads hv
 	return out
 
 

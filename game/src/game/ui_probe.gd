@@ -165,6 +165,7 @@ func _run() -> void:
 	_check(not names.is_empty() and names.all(func(n): return n in BWCutsceneTier.NAMES), "every blow got a tier (%s)" % ", ".join(names.slice(0, 8)))
 	_check(screen.last_tiers.any(func(x): return x[0] == "attack" and (x[1] == "minimal" or x[1] == "full")), "basic attacks play minimal (or full on a crit / KO)")
 	await _gear_tooltip_probe()                  # D171: the author's stuck tooltip
+	await _autoequip_probe()                     # D315-D318
 	_finish()
 
 
@@ -560,6 +561,63 @@ func _gear_tooltip_probe() -> void:
 		else:
 			await _key(KEY_ESCAPE)
 			_check(not BWEsc.tooltip_open() and BWEsc.top_name() != "tooltip", "gear panel: Esc closes it")
+	layer.queue_free()
+	await get_tree().process_frame
+
+
+## D315-D318: O opens Optimize all's preview, Esc cancels it, Apply hands the
+## gear out, Undo optimize puts it all back.
+func _autoequip_probe() -> void:
+	var ids: Array = BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+	var run := BWRun.start(ids, 1)
+	run.fight = 6
+	for i in 10:
+		run.inventory.append(run.random_item(["D", "C", "B"][i % 3]))
+	run.stats.units[run.squad[3].id] = { "fights": 4, "kos": 0, "damage": 200, "taken": 0, "mvp": 0 }
+	var sig := func() -> Array:
+		var out: Array = run.inventory.map(func(it): return str(it.uid))
+		for u in run.squad:
+			for slot in BWRun.GEAR_SLOTS:
+				out.append("%s:%s:%s" % [u.id, slot, str(u.equipment.get(slot, {}).get("uid", ""))])
+		return out
+	var before: Array = sig.call()
+	var layer := CanvasLayer.new()
+	layer.layer = 80
+	add_child(layer)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = BWStyle.theme()
+	layer.add_child(root)
+	var gp := BWGearPanel.new(run)
+	gp.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gp.offset_left = 20
+	gp.offset_top = 40
+	gp.offset_right = -20
+	gp.offset_bottom = -40
+	root.add_child(gp)
+	gp.set_unit(run.squad[0])
+	for k in 4:
+		await get_tree().process_frame
+	await _key(KEY_O)
+	_check(gp.preview_open(), "auto-equip: O opens Optimize all's preview")
+	_check(BWEsc.top_name() == "optimize preview", "auto-equip: the preview is on the Esc stack")
+	await _key(KEY_ESCAPE)
+	_check(not gp.preview_open() and sig.call() == before, "auto-equip: Esc cancels, nothing changes")
+	await _press(_ctl_center(gp._opt_all), true)
+	await _press(_ctl_center(gp._opt_all), false)
+	await get_tree().process_frame
+	_check(gp.preview_open(), "auto-equip: clicking Optimize all opens it too")
+	var apply_btn: Button = gp.find_child("preview_apply", true, false)
+	await _press(_ctl_center(apply_btn), true)
+	await _press(_ctl_center(apply_btn), false)
+	await get_tree().create_timer(0.2).timeout
+	_check(not gp.preview_open() and sig.call() != before, "auto-equip: Apply hands the gear out")
+	_check(gp._undo_btn.is_visible_in_tree(), "auto-equip: Undo optimize shows")
+	await _press(_ctl_center(gp._undo_btn), true)
+	await _press(_ctl_center(gp._undo_btn), false)
+	await get_tree().create_timer(0.2).timeout
+	_check(sig.call() == before, "auto-equip: Undo puts everything back")
+	_check(not gp._undo_btn.visible, "auto-equip: one step: the Undo button goes")
 	layer.queue_free()
 	await get_tree().process_frame
 

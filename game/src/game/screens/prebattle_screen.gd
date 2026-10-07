@@ -36,7 +36,10 @@ var _board: BWBoard
 var _bv: BWBoardView
 var _cam: Camera3D
 var _sel: BWUnit
-var _deployed: Array = []        # BWUnit, up to 3
+var _deployed: Array = []        # BWUnit, up to _need
+## D320: units this fight fields: the map's deploy_count capped by the squad
+## (BWRun.deploy_for): 3 on the 3v3 maps, 6 on a big map.
+var _need := BWRun.DEPLOY
 var _placed := {}                # unit id -> Vector2i
 var _views := {}                 # unit id -> BWUnitView (placed only)
 var _enemy_at: Array = []        # D211: where each enemy starts (BWBattle.enemy_layout)
@@ -70,6 +73,7 @@ func _ready() -> void:
 	add_child(we)
 	BWItemIcons.ensure(self)
 	_board = BWBoard.load_file("res://maps/%s.json" % run.map_for(run.fight))
+	_need = run.deploy_for(run.fight)                   # D320
 	_bv = BWBoardView.new()
 	add_child(_bv)
 	_bv.build(_board, BWTileFX.authored(_board, "res://maps/%s.json" % run.map_for(run.fight)))   # tile FX (D82)
@@ -79,6 +83,7 @@ func _ready() -> void:
 	add_child(rig)
 	_cam = rig.cam
 	rig.clicked.connect(_on_map_click)
+	rig.fit_board(_board)              # D322: big boards: wider zoom, pan clamp (edge scroll once input is the rig's)
 	# Show who you're facing at their start.
 	_enemies = run.enemies_for(run.fight)
 	_enemy_at = BWBattle.enemy_layout(_board, _enemies, _board.spawns.player)   # D211: a Horde fans out, a Colossus fits
@@ -95,6 +100,8 @@ func _ready() -> void:
 	BWPortraits.prewarm(run.squad + _enemies)
 	_build_ui()
 	_sel = run.squad[0]
+	if _need > BWRun.DEPLOY:
+		_auto_fill()                                   # D321: a 6v6 opens placed (3v3 unchanged: tick your three)
 	_refresh()
 	_fit_camera.call_deferred()
 	get_viewport().size_changed.connect(_fit_camera)
@@ -144,7 +151,7 @@ func _fit_camera() -> void:
 		if a != Vector3.INF and b != Vector3.INF:
 			rig.pivot += (a - b) * 0.8
 		var k := maxf(box.size.x / free.size.x, box.size.y / free.size.y)
-		rig.dist = clampf(rig.dist * lerpf(1.0, k, 0.5), BWCameraRig.DIST_MIN, BWCameraRig.DIST_MAX)
+		rig.dist = clampf(rig.dist * lerpf(1.0, k, 0.5), BWCameraRig.DIST_MIN, rig.dist_max)
 	rig.follow(rig.pivot, true)
 
 
@@ -315,13 +322,13 @@ func _refresh() -> void:
 	_stats.set_unit(_sel)
 	_refresh_board()
 	var placed := _deployed.filter(func(u): return _placed.has(u.id)).size()
-	if _deployed.size() < BWRun.DEPLOY:
-		_status.text = "Tick %d more  ·  drag units onto the ringed hexes  ·  hover the enemy to read them" % (BWRun.DEPLOY - _deployed.size())
-	elif placed < BWRun.DEPLOY:
-		_status.text = "Place %d more on the ringed hexes" % (BWRun.DEPLOY - placed)
+	if _deployed.size() < _need:
+		_status.text = "Tick %d more  ·  drag units onto the ringed hexes  ·  hover the enemy to read them" % (_need - _deployed.size())
+	elif placed < _need:
+		_status.text = "Place %d more on the ringed hexes" % (_need - placed)
 	else:
 		_status.text = "Ready  ·  drag to rearrange (drop on a unit to swap)  ·  Enter to begin"
-	_begin.disabled = not (_deployed.size() == BWRun.DEPLOY and placed == BWRun.DEPLOY)
+	_begin.disabled = not (_deployed.size() == _need and placed == _need)
 
 
 ## Bars share one scale across the squad: the best stat (with gear),
@@ -339,14 +346,25 @@ func _refresh_list() -> void:
 		c.queue_free()
 	var head := HBoxContainer.new()
 	var hl := Label.new()
-	hl.text = "Squad — pick %d" % BWRun.DEPLOY
+	hl.text = ("Squad — all %d" % _need) if _need >= run.squad.size() and _need > BWRun.DEPLOY else ("Squad — pick %d" % _need)
 	hl.add_theme_font_size_override("font_size", BWStyle.F_SUB)
 	hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hl)
 	var cnt := Label.new()
-	cnt.text = "%d / %d" % [_deployed.size(), BWRun.DEPLOY]
+	cnt.text = "%d / %d" % [_deployed.size(), _need]
 	cnt.add_theme_color_override("font_color", BWStyle.LABEL)
 	head.add_child(cnt)
+	if _need > BWRun.DEPLOY:                           # D321: big maps: one click fills and places the rest
+		var auto := Button.new()
+		auto.name = "auto_place"
+		auto.text = "Auto"
+		auto.focus_mode = Control.FOCUS_NONE
+		auto.tooltip_text = "Fill the empty slots with the highest-level units and place everyone on the default starts"
+		auto.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+		auto.pressed.connect(func():
+			_auto_fill(true)
+			_refresh())
+		head.add_child(auto)
 	_list.add_child(head)
 	for u in run.squad:
 		_list.add_child(_squad_row(u))
@@ -377,7 +395,7 @@ func _squad_row(u: BWUnit) -> Control:
 	var dep := CheckBox.new()
 	dep.button_pressed = u in _deployed
 	dep.focus_mode = Control.FOCUS_NONE
-	dep.disabled = not dep.button_pressed and _deployed.size() >= BWRun.DEPLOY
+	dep.disabled = not dep.button_pressed and _deployed.size() >= _need
 	dep.tooltip_text = "Deploy" if not dep.button_pressed else "Bench"
 	dep.toggled.connect(_on_deploy.bind(u))
 	h.add_child(dep)
@@ -517,17 +535,38 @@ func open_codex(tab: String = "stats") -> void:
 # ---------------------------------------------------------------- deploy
 
 func _on_deploy(on: bool, u: BWUnit) -> void:
-	if on and not u in _deployed and _deployed.size() < BWRun.DEPLOY:
+	if on and not u in _deployed and _deployed.size() < _need:
 		_deployed.append(u)
 		_sel = u
 		var free: Array = _board.deploy.player.filter(func(h): return not h in _placed.values())
 		if not free.is_empty():
-			var spawn: Vector2i = _board.spawns.player[_deployed.size() - 1]
+			var sp: Array = _board.spawns.player
+			var spawn: Vector2i = sp[_deployed.size() - 1] if _deployed.size() - 1 < sp.size() else free[0]   # D320
 			_placed[u.id] = spawn if not spawn in _placed.values() else free[0]
 	elif not on:
 		_deployed.erase(u)
 		_placed.erase(u.id)
 	_refresh()
+
+
+## D321: the auto-placement default. Fills the open slots with the squad's
+## highest-level units (ties: squad order) and puts every unplaced deployed
+## unit on the map's default starts (BWBoard.default_starts: the spawns, then
+## the deploy hexes nearest them). `reseat` moves everyone back to the
+## default starts in deploy order (the Auto button).
+func _auto_fill(reseat: bool = false) -> void:
+	var bench: Array = run.squad.filter(func(x): return not x in _deployed)
+	bench.sort_custom(func(a, b): return a.level > b.level or (a.level == b.level and run.squad.find(a) < run.squad.find(b)))
+	for x in bench:
+		if _deployed.size() >= _need:
+			break
+		_deployed.append(x)
+	if reseat:
+		_placed.clear()
+	var todo: Array = _deployed.filter(func(x): return not _placed.has(x.id))
+	var starts := _board.default_starts("player", todo.size(), _placed.values())
+	for i in mini(todo.size(), starts.size()):
+		_placed[todo[i].id] = starts[i]
 
 
 func _refresh_board() -> void:
@@ -817,7 +856,7 @@ func _target_at(p: Vector2) -> Dictionary:
 		if deployed:
 			return { "hex": h, "ok": true, "swap": swap, "text": "Swap with %s" % other.name }
 		return { "hex": h, "ok": true, "swap": swap, "text": "Send %s in, bench %s" % [u.name, other.name] }
-	if not deployed and _deployed.size() >= BWRun.DEPLOY:
+	if not deployed and _deployed.size() >= _need:
 		return { "hex": h, "ok": false, "swap": "", "text": "Squad full — drop onto a unit to swap them out" }
 	return { "hex": h, "ok": true, "swap": "", "text": "Move here" if deployed else "Deploy %s here" % u.name }
 
