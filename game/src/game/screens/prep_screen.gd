@@ -138,6 +138,20 @@ func _make_tag(i: int) -> Dictionary:
 	nm.add_theme_color_override("font_outline_color", Color.BLACK)
 	nm.add_theme_constant_override("outline_size", 7)
 	box.add_child(nm)
+	# D233: the first perk, drawn at random at run start (no picker), shown here once
+	var u: BWUnit = run.squad[i]
+	var pid := BWRun.first_perk(u)
+	if pid != "":
+		var pk := Label.new()
+		pk.name = "perk"
+		pk.text = "✦ " + str(BWPicks.perk(pid).get("name", pid))
+		pk.mouse_filter = Control.MOUSE_FILTER_IGNORE      # the hall's clicks pick units
+		pk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		pk.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 3)
+		pk.add_theme_color_override("font_color", BWGearText.readable(BWLook.element_color(u.element)))
+		pk.add_theme_color_override("font_outline_color", Color.BLACK)
+		pk.add_theme_constant_override("outline_size", 6)
+		box.add_child(pk)
 	var pips := BWDowntimeWidgets.GearPips.new()
 	pips.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	pips.set_unit(run.squad[i])

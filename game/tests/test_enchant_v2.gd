@@ -481,37 +481,31 @@ func test_scrolls_per_element_and_rerolled_each_battle(t) -> void:
 	t.eq(BWRun.from_dict(d).scrolls.size(), 7, "an older save rolls them")
 
 
-func test_scroll_two_for_one_and_overwrite(t) -> void:
+func test_scroll_free_and_overwrite(t) -> void:      # D236: scrolls cost nothing
 	var r := _run()
 	var fire: Dictionary = r.scrolls[0]
-	var a := r.make_item("chaps", "E")
-	var b := r.make_item("tights", "E")
 	var c := r.make_item("crown", "E", "radiant")
-	r.inventory.append_array([a, b, c])
+	r.inventory.append(c)
 	var n := r.inventory.size()
-	t.ok(not r.can_use_scroll(fire, [a], c), "one item isn't enough")
-	t.ok(not r.can_use_scroll(fire, [a, c], c), "the target can't be part of the price")
-	var worn: Dictionary = r.squad[0].equipment.main_hand
-	t.ok(not r.can_use_scroll(fire, [a, worn], c), "only loose items pay")
-	t.ok(r.use_scroll(fire, [a, b], c), "two loose items for the scroll")
-	t.eq(r.inventory.size(), n - 2, "the two given are gone")
-	t.ok(not a in r.inventory and not b in r.inventory, "both of them")
+	t.ok(not r.can_use_scroll(fire, {}), "it needs a target")
+	t.ok(not r.can_use_scroll(fire, r.make_item("vest", "E")), "only an item the run owns")
+	t.ok(r.use_scroll(fire, c), "free: no payment")
+	t.eq(r.inventory.size(), n, "nothing given up")
 	t.eq(str(c.enchant), str(fire.enchant), "armour: the scroll overwrites its enchantment")
 	t.ok(fire.sold, "the scroll is spent until the next battle")
-	var v1 := r.make_item("vest", "E")
-	var v2 := r.make_item("scarf", "E")
-	r.inventory.append_array([v1, v2])
-	t.ok(not r.use_scroll(fire, [v1, v2], c), "a sold scroll can't be used again")
+	t.ok(not r.use_scroll(fire, c), "a sold scroll can't be used again")
 	# a weapon: the scroll sets its imbue; its own enchantment stays (D203)
+	var worn: Dictionary = r.squad[0].equipment.main_hand
 	var water: Dictionary = r.scrolls[1]
-	var x := r.make_item("chaps", "E")
-	var y := r.make_item("tights", "E")
-	r.inventory.append_array([x, y])
 	var ench0 := str(worn.enchant)
-	t.ok(r.use_scroll(water, [x, y], worn), "a worn E weapon can take a scroll (it gains an imbue)")
+	t.ok(r.use_scroll(water, worn), "a worn E weapon can take a scroll (it gains an imbue)")
 	t.eq(str(worn.get("imbue", "")), "water", "D206: the imbue becomes the scroll's element")
 	t.eq(str(worn.get("imbue_enchant", "")), str(water.enchant), "and carries the scroll's enchantment")
 	t.eq(str(worn.enchant), ench0, "the weapon's own enchantment stays")
+	var e := r.enemies_for(1)
+	r.after_fight(true, r.squad.slice(0, 3), e, e, [])
+	t.eq(r.scrolls.size(), 7, "seven again after the battle")
+	t.ok(r.scrolls.all(func(s): return not s.get("sold", false)), "all restocked")
 
 
 ## D206: an imbue = an element + one of that element's rows; it works only drawn.

@@ -171,6 +171,13 @@ func test_run_start_owes_one_perk(t) -> void:
 ## D174: two options, drawn per unit and pick (reproducible, stable across
 ## a save), never one it owns; apply takes only an offered one; the AI takes
 ## the first; every option turns up across units.
+## D233: the first perk is drawn at run start; rank 2 owes the first two-card pick.
+func _rank2(r: BWRun) -> BWRun:
+	var u: BWUnit = r.squad[0]
+	u.affinity[u.element] = 2 * BWUnit.POINTS_PER_RANK
+	return r
+
+
 func test_two_options(t) -> void:
 	var fire := { "kind": "perk", "element": "fire" }
 	var seen := {}
@@ -198,15 +205,15 @@ func test_two_options(t) -> void:
 	var second := BWPicks.offered(u, fire)
 	t.ok(second.size() == 2 and not str(first[1]) in second, "rank 2 offers two it doesn't own: %s" % [second])
 	# a run: the same seed offers the same, a save keeps it, another seed differs
-	var r1 := BWRun.start(["aureli", "della"], 41)
-	var r2 := BWRun.start(["aureli", "della"], 41)
+	var r1 := _rank2(BWRun.start(["aureli", "della"], 41))
+	var r2 := _rank2(BWRun.start(["aureli", "della"], 41))
 	var o1 := BWPicks.offered(r1.squad[0], BWPicks.next_request(r1.squad[0]))
 	t.eq(BWPicks.offered(r2.squad[0], BWPicks.next_request(r2.squad[0])), o1, "same run seed, same two")
 	var back := BWRun.from_dict(JSON.parse_string(JSON.stringify(r1.to_dict())))
 	t.eq(BWPicks.offered(back.squad[0], BWPicks.next_request(back.squad[0])), o1, "a reload shows the same two")
 	var differ := false
 	for sd in range(42, 62):
-		var r3 := BWRun.start(["aureli", "della"], sd)
+		var r3 := _rank2(BWRun.start(["aureli", "della"], sd))
 		differ = differ or BWPicks.offered(r3.squad[0], BWPicks.next_request(r3.squad[0])) != o1
 	t.ok(differ, "another run seed can offer another pair")
 	# skills: two of the class's improve / learn pool
@@ -365,6 +372,8 @@ func test_ai_auto_picks_deterministically(t) -> void:
 func test_picks_persist(t) -> void:
 	var run := BWRun.start(["aureli", "della"], 21)
 	var u: BWUnit = run.squad[0]
+	u.affinity[u.element] = 2 * BWUnit.POINTS_PER_RANK      # D233: the first perk is drawn; rank 2 owes the pick
+	run.squad[1].affinity[run.squad[1].element] = 2 * BWUnit.POINTS_PER_RANK
 	var preq := BWPicks.next_request(u)
 	BWPicks.apply(u, preq, str(BWPicks.offered(u, preq)[1]))
 	u.expertise[u.weapon_class] = 10
@@ -381,7 +390,7 @@ func test_picks_persist(t) -> void:
 	t.eq(v.loadout(v.weapon_class), u.loadout(u.weapon_class), "loadout")
 	t.eq(BWPicks.pending(v), BWPicks.pending(u), "the same picks owed (none banked)")
 	t.eq(BWPicks.pending(back.squad[1]), [{ "kind": "perk", "element": back.squad[1].element }],
-		"an unmade start pick is still owed after a load")
+		"an unmade pick is still owed after a load")
 
 
 func test_save_v1_migrates(t) -> void:

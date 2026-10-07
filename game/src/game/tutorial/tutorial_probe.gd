@@ -111,7 +111,7 @@ func _lessons() -> void:
 	_check(has.call(func(e): return e.type == "battle_end" and e.winner == "player"), "lesson 10: the fight was won")
 	_check(tut.run.squad.all(func(u): return u.level == 2), "lesson 10: every unit levelled once")
 	var della := tut.run.unit("della")
-	_check(della != null and not della.perks.is_empty(), "lesson 10: a perk was picked (%s)" % [della.perks if della else []])
+	_check(della != null and della.perks.size() >= 2, "lesson 10: a perk was picked on top of the drawn first one (D233) (%s)" % [della.perks if della else []])
 	_check(della != null and int(della.skill_picks.get("sword", 0)) >= 1, "lesson 10: a skill was picked")
 
 

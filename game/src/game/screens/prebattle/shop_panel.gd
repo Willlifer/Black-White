@@ -6,13 +6,17 @@ extends PanelContainer
 ##   Trade      pick yours → pick theirs (1 head, 1 chest, 1 legs, 2 weapons
 ##              at the current tier) → the comparison → Confirm trade
 ##              (BWRun.trade: 1-for-1, loose items only)
-##   Scroll     click a scroll → pick 2 loose items to pay → pick the item it
-##              goes on (worn or loose) → the scroll and the item after →
-##              Confirm (BWRun.use_scroll). Armour: the enchantment is
+##   Scroll     click a scroll → pick the item it goes on (worn on the left,
+##              loose on the right) → the scroll and the item after →
+##              Use scroll (BWRun.use_scroll). Free since D236 (author,
+##              playtest 1); it's spent until the next battle. Armour: the enchantment is
 ##              overwritten. A weapon: it takes the scroll's element and row as
 ##              its imbue (D206); its own enchantment stays.
 ## Re-imbue (D38/D183) is gone (D202). Hover any tile for its card.
 ## `unit` (the screen's selected unit) is who the cards compare against.
+## D235: the grids sort by BWInvSort (Newest / Element / Slot / Tier, the
+## header's buttons, shared with the gear panel for the session). D234: items
+## set aside to throw away (BWRun.trash) aren't loose, so never offered here.
 
 signal changed
 signal closed
@@ -23,7 +27,7 @@ var mode := "trade"               # trade | scroll
 var mine: Dictionary = {}         # trade: yours
 var theirs: Dictionary = {}       # trade: theirs / scroll: the item it goes on
 var scroll: Dictionary = {}       # scroll: the chosen scroll
-var pay: Array = []               # scroll: the loose items given (BWRun.SCROLL_COST)
+var _sort_btns := {}              # D235
 var _title: Label
 var _scroll_row: HBoxContainer
 var _left_title: Label
@@ -51,6 +55,21 @@ func _init(p_run: BWRun) -> void:
 	_title.add_theme_font_size_override("font_size", BWStyle.F_NAME - 6)
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(_title)
+	var sl := Label.new()                       # ---- D235: sort
+	sl.text = "Sort"
+	sl.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	sl.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+	hb.add_child(sl)
+	for m in BWInvSort.MODES:
+		var sb := Button.new()
+		sb.text = BWInvSort.LABELS[m]
+		sb.name = "sort_" + m
+		sb.toggle_mode = true
+		sb.focus_mode = Control.FOCUS_NONE
+		sb.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+		sb.pressed.connect(func(): set_sort(m))
+		hb.add_child(sb)
+		_sort_btns[m] = sb
 	_back = Button.new()
 	_back.text = "Back to trading"
 	_back.focus_mode = Control.FOCUS_NONE
@@ -67,15 +86,15 @@ func _init(p_run: BWRun) -> void:
 	v.add_child(feat)
 	var fl := BWStyle.section_label("Featured
 imbuement scrolls")
-	fl.tooltip_text = "One per element, %d loose items each, new ones after every battle." % BWRun.SCROLL_COST
+	fl.tooltip_text = "One per element, free, new ones after every battle."
 	fl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	feat.add_child(fl)
 	_scroll_row = HBoxContainer.new()
 	_scroll_row.add_theme_constant_override("separation", 8)
 	feat.add_child(_scroll_row)
 	var fn := Label.new()
-	fn.text = "one per element · %d loose items each
-new scrolls after every battle" % BWRun.SCROLL_COST
+	fn.text = "one per element · free
+new scrolls after every battle"
 	fn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
 	fn.add_theme_color_override("font_color", BWStyle.FAINT)
 	fn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -158,11 +177,16 @@ func open(u: BWUnit) -> void:
 	refresh()
 
 
+## D235: the grids' order (shared with the gear panel for the session).
+func set_sort(m: String) -> void:
+	BWInvSort.set_mode(m)
+	refresh()
+
+
 func set_mode(m: String) -> void:
 	mode = m
 	mine = {}
 	theirs = {}
-	pay = []
 	if m == "trade":
 		scroll = {}
 	refresh()
@@ -184,30 +208,29 @@ func refresh() -> void:
 	_back.visible = mode == "scroll"
 	if not mine.is_empty() and not (mine in run.inventory):
 		mine = {}
-	pay = pay.filter(func(it): return it in run.inventory)
+	for m in _sort_btns:
+		_sort_btns[m].button_pressed = m == BWInvSort.mode
 	if mode == "trade":
 		_title.text = "Shop — tier %s stock" % run.tier_for(run.fight)
 		if not theirs.is_empty() and not theirs in run.shop:
 			theirs = {}
 		_left_title.text = "1 · YOURS — loose items (%d)" % run.inventory.size()
 		_right_title.text = "2 · THEIRS — 1 head, 1 chest, 1 legs, 2 weapons"
-		_fill(_left, run.inventory, func(it): return it == mine, func(it): _pick_mine(it), "Nothing loose to trade. Unequip something first (Equipment).")
-		_fill(_right, run.shop, func(it): return it == theirs, func(it): _on_shop_item_selected(it), "The shop is empty.")
+		_fill(_left, BWInvSort.sorted(run.inventory), func(it): return it == mine, func(it): _pick_mine(it), "Nothing loose to trade. Unequip something first (Equipment).")
+		_fill(_right, BWInvSort.sorted(run.shop), func(it): return it == theirs, func(it): _on_shop_item_selected(it), "The shop is empty.")
 		_arrow.text = "⇄"
 		_confirm.text = "Confirm trade"
 	else:
-		_title.text = "Scroll of %s — pay %d, imbue 1" % [str(scroll.element).capitalize(), BWRun.SCROLL_COST]
-		var targets: Array = _all_items().filter(func(it): return not it in pay)
-		if not theirs.is_empty() and not theirs in targets:
+		_title.text = "Scroll of %s — free, imbue 1" % str(scroll.element).capitalize()
+		var worn := _worn_items()
+		if not theirs.is_empty() and not theirs in worn and not theirs in run.inventory:
 			theirs = {}
-		_left_title.text = "1 · PAY — pick %d loose items (%d/%d)" % [BWRun.SCROLL_COST, pay.size(), BWRun.SCROLL_COST]
-		_right_title.text = "2 · USE IT ON — the squad's gear, worn or loose"
-		_fill(_left, run.inventory, func(it): return it in pay, func(it): _toggle_pay(it),
-			"Nothing loose to pay with. Unequip something first (Equipment).")
-		_fill(_right, targets, func(it): return it == theirs, func(it): theirs = it if theirs != it else {}; refresh(),
-			"Nothing to imbue.")
+		_left_title.text = "USE IT ON — worn by the squad (%d)" % worn.size()
+		_right_title.text = "OR — loose (%d)" % run.inventory.size()
+		_fill(_left, BWInvSort.sorted(worn), func(it): return it == theirs, _pick_target, "Nobody wears anything.")
+		_fill(_right, BWInvSort.sorted(run.inventory), func(it): return it == theirs, _pick_target, "Nothing loose.")
 		_arrow.text = "→"
-		_confirm.text = "Buy scroll & imbue"
+		_confirm.text = "Use scroll"
 	_cards()
 
 
@@ -226,15 +249,20 @@ func _fill_scrolls() -> void:
 		_scroll_row.add_child(t)
 
 
-## Every item the run holds: worn by the squad, then loose.
-func _all_items() -> Array:
+## Every item the squad wears or carries (D180: the second weapon too).
+func _worn_items() -> Array:
 	var out: Array = []
 	for u in run.squad:
-		for slot in BWRun.GEAR_SLOTS:                   # D180: the carried weapon too
+		for slot in BWRun.GEAR_SLOTS:
 			if u.equipment.has(slot):
 				out.append(u.equipment[slot])
-	out.append_array(run.inventory)
 	return out
+
+
+## Scroll mode: the item the scroll goes on (click again to clear).
+func _pick_target(it: Dictionary) -> void:
+	theirs = it if theirs != it else {}
+	refresh()
 
 
 func _fill(g: GridContainer, items: Array, is_sel: Callable, on_pick: Callable, empty_text: String) -> void:
@@ -264,19 +292,6 @@ func _pick_mine(it: Dictionary) -> void:
 	refresh()
 
 
-## Scroll mode: toggle a loose item in the payment; a third pick replaces the oldest.
-func _toggle_pay(it: Dictionary) -> void:
-	if it in pay:
-		pay.erase(it)
-	else:
-		pay.append(it)
-		while pay.size() > BWRun.SCROLL_COST:
-			pay.pop_front()
-		if it == theirs:
-			theirs = {}
-	refresh()
-
-
 ## Hover is the read (the author's 10/4 note): any tile shows its full card at
 ## once; click is the pick. Selecting a shop item makes it "theirs"; once both
 ## sides are picked the cards show the give/get comparison and Confirm unlocks.
@@ -291,7 +306,7 @@ func _hover(it: Dictionary, left: bool) -> void:
 	var c := _card_a if left else _card_b
 	var hint := "Click to pick it for the trade."
 	if mode == "scroll":
-		hint = "Click to pay with it." if left else "Click to put the scroll on it."
+		hint = "Click to put the scroll on it."
 	c.show_item(it, unit, run, _worn_cmp(it), { "vs": _vs_line(it), "no_check": mode == "scroll", "hint": hint })
 
 
@@ -300,8 +315,7 @@ func _hover_scroll(s: Dictionary) -> void:
 	if s.get("sold", false):
 		_status.text = "Sold — a new scroll comes after the next battle."
 	else:
-		_status.text = "Scroll of %s: %d loose items. Click it, pick what to pay, then the item it goes on." % [
-			str(s.element).capitalize(), BWRun.SCROLL_COST]
+		_status.text = "Scroll of %s: free. Click it, then the item it goes on." % str(s.element).capitalize()
 
 
 func _worn_cmp(it: Dictionary) -> Dictionary:
@@ -342,7 +356,7 @@ func _cards() -> void:
 		_status.text = ("Trade %s for %s. One for one; it lands in your inventory." % [BWGearText.plain_name(mine), BWGearText.plain_name(theirs)]) \
 			if both else "Pick yours, then theirs, then confirm."
 		return
-	_card_a.show_scroll(scroll, { "pay": pay })
+	_card_a.show_scroll(scroll)
 	if theirs.is_empty():
 		_card_b.clear("2 · Pick the item the scroll goes on. Armour: its enchantment is replaced. A weapon: it takes the scroll's element and enchantment as its imbue.")
 	else:
@@ -351,13 +365,13 @@ func _cards() -> void:
 		var who := run.owner_of(theirs)
 		_card_b.show_item(after, unit, run, after, { "no_check": true, "vs": "After the scroll%s — was %s" % [
 			" (worn by %s)" % who.name if who else "", BWGearText.plain_name(theirs)] })
-	var ok := run.can_use_scroll(scroll, pay, theirs)
+	var ok := run.can_use_scroll(scroll, theirs)
 	_confirm.disabled = not ok
 	if ok:
-		_status.text = "Give %s for the Scroll of %s, and use it on %s. The two you give are gone." % [
-			" and ".join(pay.map(func(it): return BWGearText.plain_name(it))), str(scroll.element).capitalize(), BWGearText.plain_name(theirs)]
+		_status.text = "Use the Scroll of %s on %s. Free; the scroll is gone until the next battle." % [
+			str(scroll.element).capitalize(), BWGearText.plain_name(theirs)]
 	else:
-		_status.text = "Pick %d loose items to pay (%d so far), then the item the scroll goes on." % [BWRun.SCROLL_COST, pay.size()]
+		_status.text = "Pick the item the scroll goes on, worn or loose. It's free."
 
 
 func _on_confirm() -> void:
@@ -367,11 +381,10 @@ func _on_confirm() -> void:
 		if ok:
 			_status.text = "Traded."
 	else:
-		ok = run.use_scroll(scroll, pay, theirs)
+		ok = run.use_scroll(scroll, theirs)
 		if ok:
 			mode = "trade"
 			scroll = {}
-			pay = []
 	if ok:
 		mine = {}
 		theirs = {}

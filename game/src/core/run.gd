@@ -42,8 +42,9 @@ const SHOP_STOCK := 5
 ## current tier (traded 1-for-1 as before).
 const SHOP_SLOTS := ["head", "chest", "legs", "main_hand", "main_hand"]
 ## D203: the featured imbuement scrolls, one per element, re-rolled after every
-## battle. Each holds one element row; it costs SCROLL_COST loose items.
-const SCROLL_COST := 2
+## battle. Each holds one element row. D236 (author, playtest 1): scrolls are
+## free; using one spends it until the next battle's re-roll.
+const SCROLL_COST := 0
 
 ## D127 downtime (replaces D37/D85's eight actions): each unit takes one of
 ## three choices a day. The screen shows only the names (author: no effect
@@ -113,6 +114,10 @@ var trust := {}                   # "a|b" (sorted ids) -> points
 var last_enemies: Array = []      # unit dicts from the last fight, for recruiting
 var shop: Array = []
 var scrolls: Array = []           # D203: { uid, kind: "scroll", element, enchant, tier, sold }
+## D234: loose items set aside to throw away. Out of the inventory (so the
+## shop never offers them), back with untrash_item, deleted by empty_trash
+## when a battle starts. Saved, so a reload keeps the pile.
+var trash: Array = []
 var learned := {}                 # unit id -> [ability ids]
 var ability_ranks := {}           # unit id -> { ability id: rank }
 var equipped_ability := {}        # unit id -> { type: ability id }
@@ -142,6 +147,7 @@ static func start(chosen_ids: Array, p_seed: int, p_roster: Array = [], p_roster
 	for id in chosen_ids:
 		var u := BWUnit.from_roster(r.roster_row(id))
 		r.seed_unit(u)                   # D174
+		r.auto_first_perk(u)             # D233: no run-start picker
 		r.squad.append(u)
 		r.learned[u.id] = []
 		r.ability_ranks[u.id] = {}
@@ -427,17 +433,12 @@ func roll_scrolls() -> void:
 			"enchant": _weighted(pool, r), "tier": tier, "sold": false })
 
 
-## D203: may `scroll` be bought with the two loose items in `give` and used on
-## `target` (an item the run owns: loose, or worn by the squad, not one given)?
-func can_use_scroll(scroll: Dictionary, give: Array, target: Dictionary) -> bool:
+## D203/D236: may `scroll` be used on `target` (an item the run owns: loose,
+## or worn by the squad)? Free since D236: no payment.
+func can_use_scroll(scroll: Dictionary, target: Dictionary) -> bool:
 	if not scroll in scrolls or scroll.get("sold", false) or str(scroll.get("enchant", "")) == "":
 		return false
-	if give.size() != SCROLL_COST or give[0] == give[1]:
-		return false
-	for g in give:
-		if not g in inventory:
-			return false
-	if target.is_empty() or target in give:
+	if target.is_empty():
 		return false
 	return target in inventory or owner_of(target) != null
 
@@ -451,13 +452,11 @@ func owner_of(item: Dictionary) -> BWUnit:
 	return null
 
 
-## D203: pay two loose items for the scroll and use it on `target`. The given
-## items are gone; the scroll is spent until the next battle's re-roll.
-func use_scroll(scroll: Dictionary, give: Array, target: Dictionary) -> bool:
-	if not can_use_scroll(scroll, give, target):
+## D203/D236: use the scroll on `target`, free. The scroll is spent until the
+## next battle's re-roll (restock_shop).
+func use_scroll(scroll: Dictionary, target: Dictionary) -> bool:
+	if not can_use_scroll(scroll, target):
 		return false
-	for g in give:
-		inventory.erase(g)
 	apply_scroll(scroll, target)
 	scroll["sold"] = true
 	return true
@@ -474,6 +473,33 @@ static func apply_scroll(scroll: Dictionary, item: Dictionary) -> void:
 		item["imbue_enchant"] = str(scroll.enchant)
 	else:
 		item["enchant"] = str(scroll.enchant)
+
+
+# ---------------------------------------------------------------- trash (D234)
+
+## Set a loose item aside to be thrown away when the next battle starts.
+func trash_item(it: Dictionary) -> bool:
+	if it.is_empty() or not it in inventory:
+		return false
+	inventory.erase(it)
+	trash.append(it)
+	return true
+
+
+## Take a set-aside item back into the inventory.
+func untrash_item(it: Dictionary) -> bool:
+	if not it in trash:
+		return false
+	trash.erase(it)
+	inventory.append(it)
+	return true
+
+
+## The battle starts: the pile is gone. Returns how many were thrown away.
+func empty_trash() -> int:
+	var n := trash.size()
+	trash.clear()
+	return n
 
 
 ## 1-for-1 trade: give an inventory item, take a shop item. (D202: re-imbue,
@@ -845,6 +871,31 @@ func progress_day(plan: Array, auto: bool = true) -> Array:
 
 
 ## D174: a unit's pick salt, from the run seed and its id (never saved).
+## D233 (author, playtest 1: "autopick it at random and skip the selection
+## phase"): a unit's first perk, rank 1 in its own element, is drawn at random
+## from all of that element's perks, from its own rng (the run seed + the unit
+## id), so the run's rng stream doesn't move. Later picks keep the two cards.
+## Returns the perk id, or "" when the unit already has one (or can't).
+func auto_first_perk(u: BWUnit) -> String:
+	var el := str(u.element)
+	if el == "" or not BWPicks.owned(u, el).is_empty() or BWPicks.allowance(u, el) < 1:
+		return ""
+	var pool: Array = BWPicks.perks_of(el)
+	if pool.is_empty():
+		return ""
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("first_perk|%d|%s" % [seed_value, u.id])
+	var id := str(pool[r.randi() % pool.size()].id)
+	u.perks.append(id)
+	return id
+
+
+## D233: the unit's first perk in its own element (what the hall shows), or "".
+static func first_perk(u: BWUnit) -> String:
+	var own: Array = BWPicks.owned(u, str(u.element))
+	return str(own[0]) if not own.is_empty() else ""
+
+
 func seed_unit(u: BWUnit) -> void:
 	u.pick_seed = hash("picks|%d|%s" % [seed_value, u.id])
 
@@ -1133,6 +1184,7 @@ func recruit(id: String = "") -> BWUnit:
 	if not fists.is_empty():
 		inventory.append(make_item(str(fists[rng.randi() % fists.size()].id), "E"))
 	seed_unit(nu)                        # D174
+	auto_first_perk(nu)                  # D233
 	squad.append(nu)
 	learned[nu.id] = []
 	ability_ranks[nu.id] = {}
@@ -1249,7 +1301,7 @@ func to_dict() -> Dictionary:
 	return {
 		# seed and rng state as strings: JSON numbers are doubles and would truncate them
 		"version": SAVE_VERSION, "seed": str(seed_value), "rng_state": str(rng.state), "fight": fight, "day": day,
-		"squad": sq, "inventory": inventory.duplicate(true), "trust": trust.duplicate(),
+		"squad": sq, "inventory": inventory.duplicate(true), "trash": trash.duplicate(true), "trust": trust.duplicate(),
 		"last_enemies": last_enemies.duplicate(true), "shop": shop.duplicate(true), "scrolls": scrolls.duplicate(true),
 		"learned": learned.duplicate(true), "ability_ranks": ability_ranks.duplicate(true),
 		"equipped_ability": equipped_ability.duplicate(true), "uid": _uid,
@@ -1328,6 +1380,7 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.hp = u.max_hp()
 		r.squad.append(u)
 	r.inventory = d.inventory.duplicate(true)
+	r.trash = Array(d.get("trash", [])).duplicate(true)     # D234 (older saves: none)
 	migrate_imbues(r.inventory, r.seed_value)              # D206 (save v9)
 	for u in r.squad:
 		migrate_imbues(u.equipment.values(), r.seed_value)

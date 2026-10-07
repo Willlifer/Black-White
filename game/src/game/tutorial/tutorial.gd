@@ -438,6 +438,9 @@ func _pick(p: Dictionary) -> void:
 	var req := { "kind": str(p.kind) }
 	if req.kind == "perk":
 		req["element"] = str(p.element)
+		# D233: the first perk is drawn at run start now, so the lesson's pick is a free one
+		if BWPicks.allowance(u, req.element) <= BWPicks.owned(u, req.element).size():
+			u.bonus_perks[req.element] = int(u.bonus_perks.get(req.element, 0)) + 1
 	else:
 		req["weapon"] = str(p.weapon)
 		if BWPicks.skill_picks_owed(u, req.weapon) <= 0:
@@ -535,7 +538,7 @@ class ClosingCard:
 		row.add_child(_panel("Rooms", "rooms",
 			"From fight 3 you pick a room: Standard, or Hard for better spoils. Some Hard rooms are special encounters."))
 		row.add_child(_panel("The shop", "shop",
-			"Trade gear one for one. An imbuement scroll costs two spare items and adds an element's enchantment to any item."))
+			"Trade gear one for one. An imbuement scroll is free and adds an element's enchantment to any item."))
 		var b := Button.new()
 		b.name = "card_back"
 		b.text = "Back to the title  [Enter]"

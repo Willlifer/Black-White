@@ -9,7 +9,7 @@ Draft for review. Powers stay in the existing bands (skill 8–14, spell 9–13)
 **Element perks**
 - 5 perks per element: mobility, defence, offence, control, support.
 - Affinity rank 1 gives 1 pick, rank 2 a second pick (each from 2 drawn options), and rank 3 unlocks all five.
-- Units start at rank 1 in their own element, so 1 pick at the start. A newly learned element gives its own first pick.
+- Units start at rank 1 in their own element. That first perk is **drawn at random** from all five at run start, with no picker (D233; the hall names it). A newly learned element gives its own first pick (two cards).
 - You pick as soon as you earn it, even mid-fight. The perk works from that moment.
 - Passives only; some have a once-per-battle trigger. No new buttons.
 

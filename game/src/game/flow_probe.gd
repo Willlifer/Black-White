@@ -1,8 +1,9 @@
 class_name BWFlowProbe
 extends Node
 ## Drives the real BWGame through every screen transition: title → roster
-## (portrait unpick, codex) → the run-start perk pickers (D90) → the hall's
-## prep (equip, give) → the room select (D190) → pre-battle → combat (autoplayed; picks auto) →
+## (portrait unpick, codex) → (D233: the first perks are drawn, no picker) → the hall's
+## prep (equip, give, the discard pile and sorting, D234/D235) → the room select (D190) →
+## pre-battle (the free scrolls, D236) → combat (autoplayed; picks auto) →
 ## results → downtime (D127: one of three choices each, the day, one result
 ## card per unit, its pickers) → the next pre-battle. Uses each screen's own entry points, not internals of the
 ## rules. `godot --path game -- --flow-probe` (windowed). Exit 0 = passed.
@@ -55,12 +56,11 @@ func _run() -> void:
 	var rolled_seed := roster.roster_seed
 	var rolled_rows: Array = roster.rows
 	roster._try_begin()
-	# D90: the first perks, one picker per unit, before the hall.
-	var picks: BWPicksScreen = await _wait_screen(BWPicksScreen, 12.0)
-	await _probe_run_start_picks(picks)
-	# Before fight 1: the hall (D84, replaced the loading-screen intro).
-	var prep: BWPrepScreen = await _wait_screen(BWPrepScreen)
+	# D233: no picker: straight from the roster to the hall, every first perk drawn.
+	var prep: BWPrepScreen = await _wait_screen(BWPrepScreen, 12.0)
+	_probe_first_perks(prep)
 	await _probe_prep(prep)
+	var trashed: Array = game.run.trash.duplicate()
 	_key(KEY_ENTER)
 	# D208: fight 1 has no room choice: straight from the hall to the pre-battle
 	var pre_n: Node = await _wait_any([BWPrebattleScreen, BWRoomScreen], 12.0)
@@ -75,8 +75,10 @@ func _run() -> void:
 	_check(not pre._begin.disabled, "three placed, Begin enabled")
 	await _probe_prebattle(pre)
 	_check(not pre._begin.disabled, "still three placed after the drags, Begin enabled")
+	_check(not trashed.is_empty() and game.run.trash == trashed, "the discard pile carried from the hall to the pre-battle")
 	pre._try_begin()
 	var combat: BWCombatScreen = await _wait_screen(BWCombatScreen)
+	_check(game.run.trash.is_empty() and trashed.all(func(x): return not x in game.run.inventory), "the battle started: the discard pile is gone (D234)")
 	combat.autoplay = true
 	# The probe tests transitions, not balance: tilt this one fight so it is won.
 	for e in combat.battle.side("enemy"):
@@ -255,37 +257,17 @@ func _probe_downtime(down: BWDowntimeScreen) -> void:
 	_check(run.day == day_before + 1, "the day advanced")
 
 
-## D90 run start: one picker per unit, in squad order; the first by real
-## keys (2 then Enter), the rest by clicking a card twice. Each unit ends
-## with its element's first perk and nothing owed.
-func _probe_run_start_picks(ps: BWPicksScreen) -> void:
+## D233 run start: no picker; each unit already holds one perk of its own
+## element, drawn at random, and the hall names it under the unit.
+func _probe_first_perks(prep: BWPrepScreen) -> void:
 	var run := game.run
-	_check(run.pending_picks().size() == 6, "six first perks owed at run start")
-	for i in 6:
-		var t := 0.0
-		while (ps.current == null or not ps.current.is_inside_tree()) and t < 3.0:
-			await get_tree().process_frame
-			t += get_process_delta_time()
-		var pk := ps.current
-		if pk == null:
-			_check(false, "a picker for unit %d" % i)
-			return
-		var u := pk.unit
-		_check(u == run.squad[i], "picker %d is %s's, in squad order" % [i + 1, run.squad[i].name])
-		_check(pk.request.kind == "perk" and pk.request.element == u.element, "%s: a %s perk" % [u.name, u.element])
-		_check(pk._cards.size() == BWPicks.OFFER and pk.options.map(func(o): return str(o.id)) == BWPicks.offered(u, pk.request),
-			"two %s perks drawn for it (D174): %s" % [u.element, BWPicks.offered(u, pk.request)])
-		if i == 0:
-			_key(KEY_2)
-			await get_tree().process_frame
-			_key(KEY_ENTER)
-		else:
-			var card: Control = pk._cards[i % pk._cards.size()]
-			await get_tree().process_frame
-			await _click(card.get_global_rect().get_center(), true)
-		await get_tree().create_timer(0.15).timeout
-		_check(u.perks.size() == 1 and BWPicks.pending(u).is_empty(), "%s took %s" % [u.name, u.perks])
-	_check(run.pending_picks().is_empty(), "every first perk taken")
+	_check(run.pending_picks().is_empty(), "nothing owed at run start (D233)")
+	for i in run.squad.size():
+		var u: BWUnit = run.squad[i]
+		var pid := BWRun.first_perk(u)
+		_check(u.perks.size() == 1 and pid != "" and str(BWPicks.perk(pid).element) == u.element, "%s drew %s" % [u.name, pid])
+		var lab: Label = (prep._tags[i].box as Control).find_child("perk", false, false)
+		_check(lab != null and lab.text.contains(str(BWPicks.perk(pid).name)), "the hall shows %s's perk (%s)" % [u.name, lab.text if lab else "-"])
 
 
 ## The hall before fight 1 (D84): six under their lights, the starting kit
@@ -324,6 +306,7 @@ func _probe_prep(prep: BWPrepScreen) -> void:
 		var ok := prep._panel.give(b, it, slot)
 		_check(ok and b.equipment.get(slot, {}) == it and not a.equipment.has(slot), "gave it to %s" % b.name)
 		_check(before_b.is_empty() or before_b in run.inventory, "what %s wore there went to the inventory" % b.name)
+	await _probe_trash_and_sort(prep._panel)
 	_key(KEY_I)
 	await get_tree().process_frame
 	_check(prep.get_children().any(func(c): return c is BWCodex), "Info opens the codex in the hall")
@@ -332,6 +315,86 @@ func _probe_prep(prep: BWPrepScreen) -> void:
 	_key(KEY_ESCAPE)
 	await get_tree().process_frame
 	_check(not prep._open, "Esc closes the panel")
+
+
+## D234 the discard pile and D235 sorting in the hall's gear panel: drag a
+## loose tile onto the pile (real mouse), a double-click on it takes it back,
+## the Discard button sends the picked one; Element sorts the grid by the
+## element order; the shop won't offer what's on the pile. One stays on the
+## pile for the battle to throw away.
+func _probe_trash_and_sort(gp: BWGearPanel) -> void:
+	var run := game.run
+	for b in ["vest", "chaps"]:
+		run.inventory.append(run.make_item(b, "E"))
+	var fire := run.make_item("tights", "C")
+	fire["imbue"] = "fire"
+	run.inventory.append(fire)
+	gp.refresh()
+	await get_tree().process_frame
+	var tiles: Array = gp._grid.get_children().filter(func(c): return c is BWItemTile)
+	var n := run.inventory.size()
+	if tiles.is_empty():
+		_check(false, "loose tiles to discard")
+		return
+	var src: BWItemTile = tiles[0]
+	for c in tiles:
+		if str(c.item.base) == "vest":
+			src = c
+	var it: Dictionary = src.item
+	var where := "tile %s, pile %s" % [src.get_global_rect(), gp._trash_box.get_global_rect()]
+	await _drag(src.get_global_rect().get_center(), gp._trash_box.get_global_rect().get_center())
+	await get_tree().process_frame
+	_check(it in run.trash and run.inventory.size() == n - 1, "a tile dragged onto the pile is set aside (%s)" % where)
+	_check(gp._trash_title.text.contains("1"), "the pile shows its count (%s)" % gp._trash_title.text)
+	var tt: Array = gp._trash_row.get_children().filter(func(c): return c is BWItemTile)
+	if not tt.is_empty():
+		await _click(tt[0].get_global_rect().get_center(), true)
+	_check(it in run.inventory and run.trash.is_empty(), "a double-click on the pile keeps it")
+	gp._pick_tile(_tile_of(gp, it))
+	gp._trash_btn.pressed.emit()
+	await get_tree().process_frame
+	_check(it in run.trash and gp._sel.is_empty(), "Discard picked sends the picked one")
+	gp.set_sort("element")
+	await get_tree().process_frame
+	var order: Array = gp._grid.get_children().filter(func(c): return c is BWItemTile and not c.is_queued_for_deletion()).map(func(c): return c.item)
+	_check(order == BWInvSort.sorted(run.inventory, "element") and order.size() == run.inventory.size(), "Element sorts the grid")
+	var first_el := BWRun.item_element(order[0]) if not order.is_empty() else ""
+	_check(first_el != "" , "an elemental piece leads (%s)" % first_el)
+	_check(gp._sort_btns["element"].button_pressed, "the Element button shows pressed")
+	var sh := BWShopPanel.new(run)
+	add_child(sh)
+	sh.open(run.squad[0])
+	var offered: Array = sh._left.get_children().filter(func(c): return c is BWItemTile).map(func(c): return c.item)
+	_check(not it in offered, "the shop doesn't offer a discarded item")
+	_check(sh._sort_btns["element"].button_pressed, "the shop keeps the session's sort")
+	sh.queue_free()
+	BWInvSort.set_mode("newest")
+
+
+func _tile_of(gp: BWGearPanel, it: Dictionary) -> BWItemTile:
+	for c in gp._grid.get_children():
+		if c is BWItemTile and c.item == it and not c.is_queued_for_deletion():
+			return c
+	return null
+
+
+## D236 the shop's scrolls are free: pick one, pick a worn piece, Use scroll.
+func _probe_free_scroll(pre: BWPrebattleScreen) -> void:
+	var run := game.run
+	pre._open_overlay(pre._shop)
+	await get_tree().create_timer(0.4).timeout
+	var sh := pre._shop
+	var s: Dictionary = run.scrolls[0]
+	var n := run.inventory.size()
+	sh.pick_scroll(s)
+	_check(sh.mode == "scroll" and sh._title.text.contains("free"), "a scroll opens its flow, free (%s)" % sh._title.text)
+	var target: Dictionary = run.squad[0].equipment.main_hand
+	sh._pick_target(target)
+	_check(not sh._confirm.disabled and sh._confirm.text == "Use scroll", "a target alone unlocks Use scroll")
+	sh._confirm.pressed.emit()
+	await get_tree().process_frame
+	_check(s.sold and str(target.get("imbue", "")) == str(s.element) and run.inventory.size() == n, "used for free: the weapon took %s, nothing paid" % s.element)
+	pre._close_overlays()
 
 
 ## Pre-battle placement through real (synthetic) mouse events, in window
@@ -400,6 +463,7 @@ func _probe_prebattle(pre: BWPrebattleScreen) -> void:
 		_check(pre._equip.doll.character != null and pre._stats.unit == pre._sel, "the paperdoll and sheet follow the equip")
 		_check(pre._sel.equipment.get(it.slot, {}) == it, "double-click equips %s" % BWRun.item_name(it))
 	pre._close_overlays()
+	await _probe_free_scroll(pre)
 
 
 func _hex_px(pre: BWPrebattleScreen, h: Vector2i) -> Vector2:
@@ -410,10 +474,15 @@ func _win(p: Vector2) -> Vector2:
 	return get_viewport().get_final_transform() * p
 
 
+var _last_mouse := Vector2.ZERO
+
+
 func _move(p: Vector2, mask: int = 0) -> void:
 	var mm := InputEventMouseMotion.new()
 	mm.position = _win(p)
 	mm.global_position = mm.position
+	mm.relative = mm.position - _last_mouse        # the GUI's drag threshold sums `relative` (D234's drag)
+	_last_mouse = mm.position
 	mm.button_mask = mask
 	Input.parse_input_event(mm)
 	await get_tree().process_frame

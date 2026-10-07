@@ -183,7 +183,7 @@ func _hold(sec: float) -> void:
 
 ## D122: the tier for a blow event under the player's cutscene mode.
 func _tier(e: Dictionary) -> Dictionary:
-	var tc := BWCutsceneTier.tier_for(e, str(BWSettings.value("cutscenes")))
+	var tc := BWCutsceneTier.tier_for(e, str(BWSettings.value("cutscenes")), null, _queue)   # ---- D237: the action's tail decides ground skills
 	last_tiers.append([str(e.get("type", "")), str(tc.name)])
 	if last_tiers.size() > 64:
 		last_tiers.pop_front()
@@ -745,7 +745,7 @@ func _play(e: Dictionary) -> void:
 		"detonate":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): flash + ring burst
 			ui.feed("[b]Detonation![/b] %d%%" % int(e.pct))
-			if readability and not e.get("echo", false):
+			if readability and not e.get("echo", false) and BWCutsceneTier.blast_hurts(_queue):   # ---- D237: no beat for a blast that hurts nobody
 				await readability.beat(e.hex)      # ---- D163 slow beat (marked edit)
 		"ko":
 			ui.set_order(battle.queue.slice(maxi(battle.turn_index, 0)), battle.current(), BWTurnQueue.build(battle.units))

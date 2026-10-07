@@ -1,6 +1,6 @@
 class_name BWGame
 extends Node
-## The run's flow (brief): title → pick 6 of 20 → the first perks (D90) →
+## The run's flow (brief): title → pick 6 of 20 (the first perks auto-picked, D233) →
 ## the hall (share out the gear, D84) → [pre-battle (pick 3, place)
 ## → combat → results → downtime] × 10 → the boss → the end.
 ## One screen at a time; each screen emits `done(payload)` and this decides
@@ -64,13 +64,12 @@ func go_roster() -> void:
 		run_seed = BWRosterGen.fixed_seed                      # D154: --seed / probes reproduce
 	run = BWRun.start(chosen, run_seed, s.rows, s.roster_seed)   # D150: the screen's roll
 	_save()
-	await go_picks()
-	go_prep()
+	go_prep()                                      # D233: first perks auto-picked in BWRun.start, no picker
 
 
 ## D90: owed picks, one picker per unit, before anything else happens
-## (run start: each unit's first perk; after a load that owes any).
-func go_picks(title: String = "Before the hall") -> void:
+## (after a load that owes any; D233: no longer at run start).
+func go_picks(title: String = "Picks owed") -> void:
 	if run.pending_picks().is_empty():
 		return
 	var s := BWPicksScreen.new()
@@ -126,6 +125,7 @@ func go_prebattle() -> void:
 
 func go_combat(plan: Dictionary) -> void:
 	var enemies := run.enemies_for(run.fight)
+	run.empty_trash()                              # D234: the discard pile is gone once the battle starts
 	run.prepare_for_battle(plan.units)
 	var s := BWCombatScreen.new()
 	s.configure("res://maps/%s.json" % run.map_for(run.fight), plan.units, enemies, plan.at,

@@ -266,8 +266,8 @@ The full shop rules live in `EQUIPMENT.md` §6. In short: per visit the stock
 is 1 head, 1 chest, 1 legs and 2 weapons at the current tier, and seven
 **imbuement scrolls** are featured, one per element. Each holds one element
 row unlocked at the shop's tier (the §3 weights; the cursed element rows,
-Pyre and Lightning-Touched, can appear). A scroll costs **2 loose items** and
-is used at once on any item the squad owns, worn or loose:
+Pyre and Lightning-Touched, can appear). A scroll is **free** (D236; it
+was 2 loose items) and is used at once on any item the squad owns, worn or loose:
 
 - **Armour:** its enchantment is overwritten with the scroll's row.
 - **A weapon (D206):** its **imbue** becomes the scroll's element **and** its row, replacing any old imbue; an E/D weapon gains one. The weapon's own enchantment stays (D38).

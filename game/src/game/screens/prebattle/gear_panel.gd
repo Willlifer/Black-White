@@ -15,6 +15,12 @@ extends PanelContainer
 ##   give_enabled = true     moving gear between units: a picked inventory item
 ##                           shows "Equip on: <unit> …"; a picked worn piece shows
 ##                           "Give to: <unit> …" (it comes off and onto them)
+## D234 the discard pile under the grid (BWRun.trash): drag a loose (or worn)
+## piece onto it, or pick one and press Discard; drag it back to the grid or
+## double-click it to keep it. Everything there is thrown away when the battle
+## starts (BWGame.go_combat -> BWRun.empty_trash).
+## D235 the grid sorts by BWInvSort (Newest / Element / Slot / Tier), the
+## filters stay; the order is shared with the shop for the session.
 
 signal changed
 signal closed
@@ -39,6 +45,11 @@ var _give_box: HBoxContainer
 var _give_flow: HFlowContainer
 var _give_label: Label
 var _swap_btn: Button              # D180
+var _sort_btns := {}               # D235
+var _trash_box: PanelContainer     # D234
+var _trash_row: HBoxContainer
+var _trash_title: Label
+var _trash_btn: Button
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -161,8 +172,24 @@ func _init(p_run: BWRun) -> void:
 	var ic := VBoxContainer.new()
 	ic.add_theme_constant_override("separation", 8)
 	body.add_child(ic)
+	var ih := HBoxContainer.new()
+	ih.add_theme_constant_override("separation", 4)
+	ic.add_child(ih)
 	_inv_title = BWStyle.section_label("Inventory")
-	ic.add_child(_inv_title)
+	_inv_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ih.add_child(_inv_title)
+	for m in BWInvSort.MODES:                          # ---- D235: sort
+		var sb := Button.new()
+		sb.text = BWInvSort.LABELS[m]
+		sb.name = "sort_" + m
+		sb.toggle_mode = true
+		sb.focus_mode = Control.FOCUS_NONE
+		sb.tooltip_text = "Sort the inventory by %s" % BWInvSort.LABELS[m].to_lower()
+		sb.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 4)
+		sb.custom_minimum_size = Vector2(0, 26)
+		sb.pressed.connect(func(): set_sort(m))
+		ih.add_child(sb)
+		_sort_btns[m] = sb
 	var sc := _GridDrop.new()
 	sc.panel = self
 	sc.custom_minimum_size = Vector2(BWItemCard.W + 8, 178)
@@ -173,6 +200,7 @@ func _init(p_run: BWRun) -> void:
 	_grid.add_theme_constant_override("h_separation", 8)
 	_grid.add_theme_constant_override("v_separation", 8)
 	sc.add_child(_grid)
+	ic.add_child(_build_trash())                       # ---- D234
 	ic.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var cs := ScrollContainer.new()
 	cs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -223,14 +251,18 @@ func refresh() -> void:
 	elif not _sel in run.inventory:
 		_sel = {}
 		card.clear()
+	_fill_trash()
 
 
 func _fill_grid() -> void:
 	for f in _filter_btns:
 		_filter_btns[f].button_pressed = f == _filter
+	for m in _sort_btns:
+		_sort_btns[m].button_pressed = m == BWInvSort.mode
 	for c in _grid.get_children():
 		c.queue_free()
-	var items := run.inventory.filter(func(it): return _filter == "" or str(it.slot) == _filter)
+	_fill_trash()
+	var items := BWInvSort.sorted(run.inventory.filter(func(it): return _filter == "" or str(it.slot) == _filter))
 	_inv_title.text = ("Inventory · %d item%s" % [items.size(), "" if items.size() == 1 else "s"]).to_upper()
 	if items.is_empty():
 		var l := Label.new()
@@ -249,10 +281,168 @@ func _fill_grid() -> void:
 		t.unhovered.connect(_unhover)
 		t.picked.connect(_pick_tile)
 		t.activated.connect(func(tile): _equip(tile.item))
-		# a worn piece dropped on any tile comes off, like a drop on the grid
-		t.accept = func(x: Dictionary) -> bool: return not x in run.inventory and str(x.get("slot", "")) != "main_hand"
-		t.on_drop = func(x: Dictionary): _unequip(str(x.slot))
+		# a worn piece dropped on any tile comes off, like a drop on the grid;
+		# a discarded one comes back (D234)
+		t.accept = func(x: Dictionary) -> bool: return x in run.trash or (not x in run.inventory and str(x.get("slot", "")) != "main_hand")
+		t.on_drop = func(x: Dictionary): _back_to_grid(x)
 		_grid.add_child(t)
+
+
+## D235: the grid's order (shared with the shop for the session).
+func set_sort(m: String) -> void:
+	BWInvSort.set_mode(m)
+	_fill_grid()
+
+
+## A drop on the grid: a discarded piece comes back, a worn one comes off.
+func _back_to_grid(x: Dictionary) -> void:
+	if x in run.trash:
+		restore(x)
+	elif str(x.get("slot", "")) != "main_hand":
+		_unequip(_worn_slot(x))
+
+
+## The slot `x` is worn in on this unit, or "".
+func _worn_slot(x: Dictionary) -> String:
+	for slot in BWRun.GEAR_SLOTS:
+		if unit != null and unit.equipment.get(slot, {}) == x:
+			return slot
+	return ""
+
+
+# ---------------------------------------------------------------- discard (D234)
+
+func _build_trash() -> Control:
+	_trash_box = _TrashDrop.new()
+	_trash_box.panel = self
+	_trash_box.name = "trash"
+	var st := BWStyle.column_style()
+	st.bg_color = Color(0, 0, 0, 0.35)
+	st.border_color = Color(1, 1, 1, 0.22)
+	st.set_border_width_all(1)
+	st.set_content_margin_all(4)
+	st.content_margin_left = 8
+	_trash_box.add_theme_stylebox_override("panel", st)
+	_trash_box.custom_minimum_size = Vector2(BWItemCard.W + 8, 0)
+	_trash_box.tooltip_text = "Drag a loose item here to throw it away when the battle starts.\nDrag it back, or double-click it, to keep it."
+	# one compact row: the title and its rule | the pile | Discard picked
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trash_box.add_child(h)
+	var tv := VBoxContainer.new()
+	tv.add_theme_constant_override("separation", 0)
+	tv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(tv)
+	_trash_title = BWStyle.section_label("Discard")
+	tv.add_child(_trash_title)
+	for line in ["Discarded when", "the battle starts"]:      # two Labels: the theme spaces lines wide
+		var note := Label.new()
+		note.text = line
+		note.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
+		note.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+		tv.add_child(note)
+	var sc := ScrollContainer.new()
+	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.custom_minimum_size = Vector2(0, 44)
+	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.mouse_filter = Control.MOUSE_FILTER_PASS
+	h.add_child(sc)
+	_trash_row = HBoxContainer.new()
+	_trash_row.add_theme_constant_override("separation", 5)
+	_trash_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_trash_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	sc.add_child(_trash_row)
+	_trash_btn = Button.new()
+	_trash_btn.name = "discard_picked"
+	_trash_btn.text = "Discard
+picked"
+	_trash_btn.focus_mode = Control.FOCUS_NONE
+	_trash_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_trash_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
+	_trash_btn.tooltip_text = "Throw away the picked loose item when the battle starts"
+	_trash_btn.pressed.connect(func(): discard(_sel))
+	h.add_child(_trash_btn)
+	return _trash_box
+
+
+func _fill_trash() -> void:
+	if _trash_row == null:
+		return
+	for c in _trash_row.get_children():
+		c.queue_free()
+	var n := run.trash.size()
+	_trash_title.text = ("Discard · %d" % n).to_upper() if n > 0 else "DISCARD"
+	_trash_btn.disabled = _sel.is_empty() or not _sel in run.inventory
+	if n == 0:
+		var l := Label.new()
+		l.text = "Drag loose items here"
+		l.add_theme_color_override("font_color", BWStyle.FAINT)
+		l.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 3)
+		l.custom_minimum_size = Vector2(0, 42)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_trash_row.add_child(l)
+		return
+	for it in run.trash:
+		var t := BWItemTile.new(it, 42.0)
+		t.source = "trash"
+		t.modulate = Color(1, 1, 1, 0.6)
+		t.hovered.connect(_hover_trash)
+		t.unhovered.connect(_unhover)
+		t.activated.connect(func(tile): restore(tile.item))
+		_trash_row.add_child(t)
+
+
+func _hover_trash(t: BWItemTile) -> void:
+	_peek = false
+	card.show_item(t.item, unit, run, unit.equipment.get(str(t.item.slot), {}),
+		{ "hint": "Discarded when the battle starts. Drag it back or double-click to keep it." })
+
+
+## Put a loose piece (or, from a slot, a worn one) on the discard pile.
+func discard(it: Dictionary) -> bool:
+	if it.is_empty():
+		return false
+	if not it in run.inventory:
+		var slot := _worn_slot(it)
+		if slot == "" or slot == "main_hand":
+			return false
+		run.unequip(unit, slot)
+		doll.refresh()
+	if not run.trash_item(it):
+		return false
+	if _sel == it:
+		_sel = {}
+		_show_give({}, "")
+		doll.refresh()
+	_msg.text = "%s goes in the discard pile: thrown away when the battle starts." % BWGearText.plain_name(it)
+	refresh()
+	changed.emit()
+	return true
+
+
+## Take a piece back off the discard pile.
+func restore(it: Dictionary) -> bool:
+	if not run.untrash_item(it):
+		return false
+	_msg.text = "Kept %s." % BWGearText.plain_name(it)
+	refresh()
+	changed.emit()
+	return true
+
+
+## The discard pile as a drop target: loose pieces, or worn ones (not the main hand).
+class _TrashDrop:
+	extends PanelContainer
+	var panel: BWGearPanel
+	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+		if not (data is Dictionary and data.has("bw_item")):
+			return false
+		var it: Dictionary = data.bw_item
+		return it in panel.run.inventory or (str(data.get("from", "")) == "slot" and str(data.get("slot", "")) != "main_hand")
+	func _drop_data(_at: Vector2, data: Variant) -> void:
+		panel.discard(data.bw_item)
 
 
 ## (item) -> bool for a slot box: the right slot and allowed for this unit.
@@ -273,6 +463,7 @@ func _pick_tile(t: BWItemTile) -> void:
 		if c is BWItemTile:
 			c.selected = c.item == _sel
 			c.queue_redraw()
+	_trash_btn.disabled = _sel.is_empty()
 	if _sel.is_empty():
 		doll.refresh()
 		card.clear()
@@ -507,8 +698,13 @@ class _GridDrop:
 	extends ScrollContainer
 	var panel: BWGearPanel
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+		if data is Dictionary and data.get("from", "") == "trash":
+			return true                                  # D234: back off the discard pile
 		return data is Dictionary and data.get("from", "") == "slot" and str(data.get("slot", "")) != "main_hand"
 	func _drop_data(_at: Vector2, data: Variant) -> void:
+		if data.get("from", "") == "trash":
+			panel.restore(data.bw_item)
+			return
 		panel._unequip(str(data.slot))
 
 

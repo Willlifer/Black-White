@@ -1,4 +1,4 @@
-# Handoff — 2026-10-06
+# Handoff — 2026-10-06 (playtest 1 pass)
 
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
@@ -20,6 +20,8 @@
 - **Special encounters (D208–D214):** fights 1–2 skip the room screen (choice from fight 3). A third of the Hard rooms from fight 3 are an encounter (Horde of 10, Colossus on 7 hexes with a line thrust, Blanks immune to elements and ×2 from melee, Elemental Beings immune to physical), built at the squad's level, Hard pay. Physical vs elemental lives in `BWFormulas.damage_class`. Renders: `design/art/encounters_*.png`. Balance: L-20.
 - **HP bars + card fit (D215–D218):** bars are black with white pips at/above 50%, white with black pips below, numbers only on hover, a pulse at the flip; over-unit bars clamp below the turn order; item cards fit unscrolled; no "Sword · Sword". Renders `design/art/hpbar_*.png` (`tools/hpbar_shots.gd`). Watch: L-21, L-22.
 - **Cleanup + accessibility (D227–D232):** glossary stops (Charge, light/dark grey, Covering Fire); `hides_hair` per head piece; the gear panel fits 16:9; over-unit bars hide behind HUD panels; VFX shaders pre-warm offscreen at boot (`tools/prewarm_probe.gd`: worst first-use frame +26–29 ms → +2–3 ms); **Settings › Accessibility › Element kanji** (off by default): 火水氷雷風闇光 on tiles (weight = level), markers, cards, picks, rooms. Renders `design/art/a11y_*.png` (`tools/a11y_shots.gd`).
+
+- **Playtest 1 fixes (D233–D238):** the first perk is drawn at random (no picker after the roster; the hall names it); a **discard pile** under the gear grid (thrown away when the battle starts); **sorting** (Newest/Element/Slot/Tier) in the gear panel and shop; **scrolls are free**; ground-aimed skills that hurt nobody play **without a cutscene** (and a blast that hurts nobody gets no slow beat). Renders `design/art/playtest1_*.png` (`tools/playtest1_shots.gd`). Not committed. L-23.
 
 ## Do this first
 1. **The author plays a full run** (`game\run.bat`), then sends notes. Most open items are AWAITING PLAY (`LEDGER.md` L-1, L-3, L-20).

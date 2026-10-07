@@ -17,7 +17,7 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Input probe | `godot --path . -- --ui-probe` (clicks/keys through combat, the pause menu + settings, F, hold-to-skip, a glossary hover; exit 0 = ok) |
 | Battle / run summary frames (D119–D121) | `[SHOTS=<dir>] godot --path . --script res://tools/summary_shots.gd` (a real AI-played run → `design/art/summary_win\|loss\|run.png`) |
 | UI review frames | `godot --path . -- --ui-shots` (roster 0/3/6 picks, codex tabs, loading, results → `design/art/ui_*.png`) |
-| Flow probe | `godot --path . -- --flow-probe` (every screen transition, the hall prep's equip and give, the downtime choices, the day, the per-unit result cards and their pickers; exit 0 = ok) |
+| Flow probe | `godot --path . -- --flow-probe` (every screen transition, the drawn first perks (D233), the hall prep's equip and give, the discard pile and sorting (D234/D235), a free scroll (D236), the downtime choices, the day, the per-unit result cards and their pickers; exit 0 = ok) |
 | Downtime review (D127–D132) | `[SHOTS=<dir>] [MODE=hall\|cards] godot --path . --script res://tools/downtime2_shots.gd` (→ `design/art/downtime2_*.png`) |
 | Two-choice review (D174–D176) | `[SHOTS=<dir>] godot --path . --script res://tools/choice2_shots.gd` (→ `design/art/choice2_*.png`: the hall's 2 tiles with the Branch out cards, a 2-card perk and skill pick) |
 | Campaign sim | `RUNS=n [POLICY=mixed] [ROOMS=standard\|hard\|mixed\|all] godot --headless --path . --script res://tools/campaign_sim.gd` (downtime policies specialize / branch / wander / mixed; room policy D188, win rate per room kind per fight) |
@@ -36,6 +36,7 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Accessibility + cleanup review (D227–D232) | `[SHOTS=<dir>] [MODE=all\|board\|panel\|helm\|settings\|gear] godot --path . --resolution 1920x1080 --script res://tools/a11y_shots.gd` (element kanji on the board / cards, bars hidden behind the log, full helms, the Accessibility setting, the gear panel at 16:9 → `design/art/a11y_*.png`) |
 | Shader pre-warm A/B (D232) | `[BW_PREWARM=0] godot --path . --resolution 1920x1080 --disable-vsync -s res://tools/prewarm_probe.gd` (each VFX shader's first-use frame, cold vs warmed; `BW_PREWARM=0` also turns the boot warm pass off, `BW_PREWARM_LOG=1` prints its cost) |
 | Animation fit sweep + encounter motion (D219–D222) | `godot --headless --path . --script res://tools/anim_audit.gd` (every skill used once: its events and the clip it plays, `BWClipRoute`) · `godot --path . --resolution 1600x900 --script res://tools/anim2_shots.gd [-- --only colossus_walk\|colossus_thrust\|being\|horde\|blank\|jab]` (→ `design/art/anim2_*.png`) · one suite: `SUITE=test_animation [ONLY=test_markers] godot --headless --path . --script res://tools/one_suite.gd` |
+| Playtest 1 fixes (D233–D238) | `[SHOTS=<dir>] godot --path . --resolution 1920x1080 --script res://tools/playtest1_shots.gd` (→ `design/art/playtest1_*.png`: the gear panel's discard pile, the grid sorted by Element, the shop's free scrolls and the scroll flow, the hall's drawn first perks) |
 | Boss fight | `godot --path . -- --combat arena --boss` |
 | Special encounters (D208–D213) | `godot --path . -- --combat <map> --encounter horde\|colossus\|blank\|being [--fight n] --autoplay` (a squad levelled to fight n, default 5) · review frames: `[SHOTS=<dir>] [FIGHT=n] godot --path . --resolution 1920x1080 --script res://tools/encounter_shots.gd` (→ `design/art/encounters_*.png`: horde, colossus, blank, being, immune, blank_x2) · room cards: `ENC=<kind> FIGHT=5 godot --path . --resolution 1600x900 --script res://tools/room_shots.gd` (→ `encounters_room_<kind>.png`) · balance: `RUNS=n POLICY=mixed SHADOW=1 ENC=1 [ENC_TUNE=...] campaign_sim` |
 | Audio capture | `godot --path . -- --audio-capture` (61 s scripted run → `design/audio/capture.wav`; analyse with `python tools/audio/analyse_capture.py`) |
@@ -56,7 +57,7 @@ Enter confirms · Esc first closes the newest open window (a tooltip, card, code
 Grapple Throw, D109) → aiming → **undo the move** (D48) → with nothing left to back out of, the
 **pause menu** (D124: resume, settings, codex & glossary, quit) · T ends the turn · **Swap weapon** (menu, under Attack) draws the carried weapon: free, as often as you like (D181, D195) · F11 / Alt+Enter toggles fullscreen.
 
-Cutscenes (D122/D123): basic attacks, counters and setup skills play in place; quick skills zoom
+Cutscenes (D122/D123): basic attacks, counters, setup skills and skills aimed at the ground that hurt nobody (D237) play in place; quick skills zoom
 briefly; long-cooldown and once-per-battle skills, crits and KOs get the full cutscene. **Hold Space
 (or the right mouse button) to fast-forward** any playback; **F** cycles Default → Fast → Minimal.
 Hover any dotted-underlined word (forecast, unit cards, gear, picks, codex) for its definition (D125).
@@ -113,7 +114,8 @@ src/game/      Presentation. Reads core, never the reverse.
                  time of day) and the downtime widgets (the three choice tiles, chips, the arrow), D83/D127;
                  codex.gd = BWCodex, the rules overlay: `BWCodex.summon(self, "weapons")`, Esc closes
     prebattle/   item icons (rendered from the glbs, cached), item tile + card, paperdoll,
-                 stat panel, unit hover card, gear and shop panels (D77, D78);
+                 stat panel, unit hover card, gear and shop panels (D77, D78); the discard pile (D234);
+                 inv_sort.gd = BWInvSort, the grids' sort (D235);
                  review renders: tools/prebattle_shots.gd
   portraits.gd   BWPortraits — head-and-shoulders snapshots per look, memory + user://portraits/v1 (D156);
                  BWWidgets.Portrait draws them, BWWidgets.LivePortrait is the big panels' live feed

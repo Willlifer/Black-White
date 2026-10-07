@@ -283,13 +283,19 @@ armour). The bias stays invisible to the player, per the brief.
 - **Stock:** each visit offers 1 head, 1 chest, 1 legs piece and 2 weapons at
   your current tier. Trade 1 loose item for 1 of them; what you give joins the
   stock. There is no currency. The stock rerolls after every battle.
+- **Discard pile (D234):** under the gear panel's grid. Loose pieces set
+  aside there leave the inventory (the shop won't offer them) and can be
+  dragged back; whatever is still there when a battle starts is thrown away.
+- **Sorting (D235):** the gear panel's grid and the shop's grids sort by
+  Newest, Element (fire … light, plain last), Slot or Tier; the choice holds
+  for the session.
 - **Imbuement scrolls (featured):** seven, one per element. Each holds one
   element row (`element` = that element) unlocked at the shop's tier, with the
   D200 weights; the cursed element rows can appear. They re-roll after every
   battle, from their own rng (run seed, fight, element).
-  - A scroll costs **2 loose items**, which are gone. Pick the two, then the
-    item it goes on: any item the squad owns, worn or loose (not one you pay
-    with). It's used at once; the scroll is then spent until the re-roll.
+  - A scroll is **free** (D236; it was 2 loose items). Pick the item it goes
+    on: any item the squad owns, worn (left grid) or loose (right grid). It's
+    used at once; the scroll is then spent until the re-roll.
   - **Armour:** the scroll overwrites its enchantment (the old one is lost).
     Any armour piece takes any element row, and the model recolours.
   - **A weapon (D206):** the scroll sets its **imbue** to the scroll's

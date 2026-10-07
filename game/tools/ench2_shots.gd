@@ -4,7 +4,7 @@ extends SceneTree
 ##   [SHOTS=<dir>] [MODE=shop|knell] godot --path . --resolution 1920x1080 --script res://tools/ench2_shots.gd
 ## ench2_shop.png          the shop: the featured scrolls over the stock (1 head, 1 chest, 1 legs, 2 weapons)
 ## ench2_scroll_card.png   a scroll's hover card (the row it holds, armour vs weapon, the price)
-## ench2_scroll_trade.png  the scroll flow: 2 loose items picked to pay, the target after
+## ench2_scroll_trade.png  the scroll flow (free since D236): the target picked, the item after
 ## ench2_scroll_weapon.png   the scroll on a weapon: the after card (D206)
 ## ench2_imbued_card.png    an imbued C weapon: its enchantment, its imbue, the imbue's enchantment
 ## ench2_cursed_card.png   a cursed item's card: the curse mark on tile, name and kind line
@@ -80,12 +80,10 @@ func _shop() -> void:
 	sh._hover_scroll(tt.item)
 	await _wait(0.3)
 	await _shot("ench2_scroll_card")
-	# the scroll flow: fire scroll, two loose items to pay, the unit's chest as the target
+	# the scroll flow: fire scroll (free, D236), the unit's chest as the target
 	await _move(Vector2(4, 4))
 	sh.pick_scroll(run.scrolls[0])
 	await _wait(0.2)
-	sh._toggle_pay(run.inventory[run.inventory.size() - 1])
-	sh._toggle_pay(run.inventory[run.inventory.size() - 2])
 	var target: Dictionary = run.squad[0].equipment.get("chest", {})
 	if target.is_empty():
 		target = run.inventory[0]
