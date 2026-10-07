@@ -43,7 +43,7 @@ func test_enemies(t) -> void:
 		t.eq(e.equipment.main_hand.tier, "E", "D99: fight 4 enemies carry fight 2's tier, E")
 	for e in r.enemies_for(5):
 		t.eq(e.equipment.main_hand.tier, "D", "D99: fight 5 enemies carry fight 3's tier, D")
-	t.ok(r.enemies_for(10)[0].level > r.enemies_for(1)[0].level, "enemies grow over the run")
+	t.ok(r.enemies_for(9)[0].level > r.enemies_for(1)[0].level, "enemies grow over the run")
 	var boss: BWUnit = r.enemies_for(11)[0]
 	t.eq(boss.max_hp(), 500, "the boss has 500 HP")
 	t.eq(boss.stat("str"), 50, "and 50 in the rest")

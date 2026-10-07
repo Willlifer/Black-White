@@ -66,6 +66,7 @@ var _pause_wanted := false       # Esc during playback: the menu opens when it e
 var last_tiers: Array = []       # [event type, tier name] per blow event played (probes / review)
 var pause_menu: BWPauseMenu
 var readability: BWReadability   # ---- D160-D163 (marked edit)
+var name_labels: BWNameLabels    # ---- D344
 var vfx: BWVfxCasts              # ---- D167-D169 cast / spectacle VFX (marked edit)
 var feel: BWHitFeel              # ---- D170 hit feel (marked edit)
 # ---- D223 tutorial hooks (marked edit): BWTutorial steers the real screen
@@ -79,6 +80,9 @@ var wind_view: BWWindView       # ---- D269-D276: fields, walls, gravity, Rot ma
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
 var squall_view: BWSquallView       # ---- D309-D313: squall fronts, Overfreeze bursts
+var mode_view: BWModeView           # ---- D327-D333: the 6v6 modes (waves, exits, the divider)
+var castle_view: BWCastleView       # ---- D340: the castle maps' walls, gate, throne
+var mode_opts := {}                 # ---- D328: BWObjectives.configure before setup (tools)
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -91,6 +95,8 @@ func _ready() -> void:
 	battle.picks_live = picks_live                 # ---- D91 picks (marked edit)
 	if weather_kind != "":
 		battle.set_weather(weather_kind)           # ---- D249: before setup, so cycle 1 shows the telegraphs
+	if not mode_opts.is_empty():
+		BWObjectives.configure(battle, mode_opts)  # ---- D328: a tool's divider pick (the game seeds it)
 	battle.event.connect(func(e): _queue.append(e))
 
 	var we := WorldEnvironment.new()
@@ -149,10 +155,21 @@ func _ready() -> void:
 	squall_view = BWSquallView.new()      # ---- D309-D313: the squall front and the Overfreeze burst
 	add_child(squall_view)
 	squall_view.setup(self)
+	mode_view = BWModeView.new()          # ---- D327-D333: the mode plate, the exit, wave telegraphs
+	add_child(mode_view)
+	mode_view.setup(self)
+	castle_view = BWCastleView.new()      # ---- D340: castle dressing (inert off a castle map)
+	add_child(castle_view)
+	castle_view.setup(self)
+	name_labels = BWNameLabels.new()      # ---- D344: names only where they fit (focus full size)
+	add_child(name_labels)
+	name_labels.setup(self)
 	ui.wind_changed = _wind_mode_changed  # the forecast's mode toggle re-opens the forecast
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
-		var v: BWUnitView = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
+		var v: BWUnitView = BWCastleView.make_view(u)   # ---- D340: the castle gate / throne
+		if v == null:
+			v = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
 		add_child(v)
 		v.setup(u)
 		v.position = _unit_pos(u.pos)
@@ -172,6 +189,8 @@ func _ready() -> void:
 		ui.feed("[b]Objective:[/b] break either obelisk. Wiping the enemy does not end it; the stones pulse until one falls.")
 		for o in battle.objectives():
 			ui.feed("%s: %s" % [o.name, (o as BWObelisk).rule_text()])
+	elif BWObjectives.active(battle) and BWObjectives.title(battle) != "":
+		mode_view.intro()                             # ---- D327: the banner names the mode and its objective
 	elif BWPhases.kind(battle) != "twins":
 		ui.banner("Battle start")
 	get_tree().create_timer(1.6).timeout.connect(barks.on_start)
@@ -832,6 +851,14 @@ func _play(e: Dictionary) -> void:
 		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "eye_pull", "riptide", "event_horizon":   # ---- D293-D299
 			if ks_view:
 				await ks_view.on_event(e)
+		"wave_incoming", "spawn", "wave", "escape", "divider_break", "divider_open", "divider_breach", "divider_gust":   # ---- D327-D333
+			if mode_view:
+				await mode_view.on_event(e)
+		"castle_breach":                                # ---- D340: Storm's phase change
+			if mode_view:
+				mode_view.refresh()
+			if castle_view:
+				await castle_view.on_event(e)
 		"squall", "squall_advance", "squall_end", "overfreeze":   # ---- D309-D313
 			if squall_view:
 				await squall_view.on_event(e)
@@ -866,11 +893,12 @@ func _play(e: Dictionary) -> void:
 			if e.winner == "player" and not broke.is_empty():
 				ui.banner("Victory: %s breaks" % broke[0].name, 3.0)   # D145
 			else:
-				ui.banner("Victory" if e.winner == "player" else "Defeat", 3.0)
+				var mt := mode_view.end_text(str(e.winner)) if mode_view else ""   # ---- D327
+				ui.banner(mt if mt != "" else ("Victory" if e.winner == "player" else "Defeat"), 3.0)
 			if e.winner == "player":
 				barks.on_won()
 			for u in battle.units:
-				if u.alive() and u.team == e.winner:
+				if u.alive() and u.team == e.winner and _views.has(u.id):
 					_views[u.id].pose_named("cheer")
 
 
@@ -1642,24 +1670,20 @@ func _shake(strength: float) -> void:
 	tw.parallel().tween_property(cam, "v_offset", 0.0, 0.04)
 
 
+## D344: a number ("-12", "+8") floats at a number's size (capped); any word
+## is a small stacked tag (BWFloaters), below the turn order either way.
 func _float_text(v: Node3D, text: String, col: Color, hold: float = 0.6) -> void:
-	var l := Label3D.new()
-	l.text = text
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.fixed_size = true
-	l.pixel_size = 0.0016
-	l.font_size = 40
-	l.outline_size = 14
-	l.modulate = col
-	l.outline_modulate = Color.BLACK
-	l.render_priority = 20             # D102: over the board's transparent pass (it washed floaters out)
-	l.outline_render_priority = 19
+	var h := _label_height(v)
+	if not RegEx.create_from_string("^[-+≈]?[0-9]").search(text):
+		BWFloaters.tag(self, v, text, col, hold, "", h)
+		return
+	var l := BWFloaters.label(text, col, 34, 12, v)
 	add_child(l)
-	l.global_position = v.global_position + Vector3(0, _label_height(v), 0)
+	l.global_position = v.global_position + Vector3(0, h, 0)
 	var tw := create_tween()
-	tw.tween_property(l, "global_position", l.global_position + Vector3(0, 0.6, 0), hold).set_ease(Tween.EASE_OUT)
+	BWFloaters.rise(tw, l, hold)                 # D344: a fixed screen rise
 	tw.tween_property(l, "modulate:a", 0.0, 0.25)
+	tw.parallel().tween_property(l, "outline_modulate:a", 0.0, 0.25)
 	tw.tween_callback(l.queue_free)
 
 
@@ -1714,37 +1738,8 @@ func _exit_tree() -> void:
 ## D102: a status floats as its name (with its glyph: Pinned's nail) over a
 ## smaller line of its rule ("no skills", "no crit, reach 2").
 func _float_status(v: BWUnitView, key: String, label: String, rule: String) -> void:
-	var root := Node3D.new()
-	add_child(root)
-	root.global_position = v.global_position + Vector3(0, _label_height(v), 0)
-	var l := Label3D.new()
-	l.text = label
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.fixed_size = true
-	l.pixel_size = 0.0016
-	l.font_size = 24
-	l.outline_size = 10
-	l.modulate = Color(0.9, 0.9, 0.94)
-	l.outline_modulate = Color.BLACK
-	l.render_priority = 20             # D102: over the board's transparent pass (it washed floaters out)
-	l.outline_render_priority = 19
-	root.add_child(l)
-	if rule != "":
-		var r := Label3D.new()
-		r.text = rule
-		r.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		r.no_depth_test = true
-		r.fixed_size = true
-		r.pixel_size = 0.0016
-		r.font_size = 16
-		r.outline_size = 8
-		r.modulate = Color(0.72, 0.72, 0.76)
-		r.outline_modulate = Color.BLACK
-		r.render_priority = 20             # D102: over the board's transparent pass (it washed floaters out)
-		r.outline_render_priority = 19
-		r.offset = Vector2(0, -26)
-		root.add_child(r)
+	# D344: a small stacked tag (BWFloaters) with its rule line under it
+	var root := BWFloaters.tag(self, v, label, Color(0.9, 0.9, 0.94), 1.0, rule, _label_height(v))
 	var glyph := BWCombatUI.status_glyph(key)
 	if glyph:
 		var sp := Sprite3D.new()
@@ -1752,23 +1747,14 @@ func _float_status(v: BWUnitView, key: String, label: String, rule: String) -> v
 		sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sp.no_depth_test = true
 		sp.fixed_size = true
-		sp.pixel_size = 0.0016 * 0.42
+		sp.pixel_size = BWFloaters.PIXEL * 0.45
 		sp.render_priority = 21
 		# above the word, point down: the nail is driven into it
-		sp.offset = Vector2(0, 150.0)
+		var base_y: float = (root.get_child(0) as BWFloaters.Floater).base_offset.y
+		sp.offset = Vector2(0, (base_y + 80.0) / 0.45)
 		root.add_child(sp)
 		var drop := create_tween()                  # the nail is driven in
-		drop.tween_property(sp, "offset:y", 64.0, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	var tw := create_tween()
-	tw.tween_property(root, "global_position", root.global_position + Vector3(0, 0.6, 0), 1.1).set_ease(Tween.EASE_OUT)
-	tw.tween_method(func(k: float):
-		for c in root.get_children():
-			if c is Label3D:
-				(c as Label3D).modulate.a = k
-				(c as Label3D).outline_modulate.a = k
-			elif c is Sprite3D:
-				(c as Sprite3D).modulate.a = k, 1.0, 0.0, 0.3)
-	tw.tween_callback(root.queue_free)
+		drop.tween_property(sp, "offset:y", (base_y + 26.0) / 0.45, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 # ---- end D100 / D101 / D102 ----
 
@@ -1810,26 +1796,7 @@ func _float_tags(t: BWUnitView, r: Dictionary) -> void:
 	for i in tags.size():
 		var tag := str(tags[i])
 		var col := BWLook.element_color(TAG_COLOR[tag]) if TAG_COLOR.has(tag) else Color(0.9, 0.9, 0.9)
-		var l := Label3D.new()
-		l.text = tag
-		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		l.no_depth_test = true
-		l.fixed_size = true
-		l.pixel_size = 0.0016
-		l.font_size = 26
-		l.outline_size = 10
-		l.modulate = col
-		l.outline_modulate = Color.BLACK
-		l.render_priority = 20             # D102: over the board's transparent pass (it washed floaters out)
-		l.outline_render_priority = 19
-		add_child(l)
-		l.global_position = t.global_position + Vector3(0, _label_height(t) - 0.35 - 0.3 * i, 0)
-		var tw := create_tween()
-		tw.tween_property(l, "scale", Vector3.ONE * 1.25, 0.08).from(Vector3.ONE * 0.6)
-		tw.tween_property(l, "scale", Vector3.ONE, 0.1)
-		tw.tween_interval(0.7)
-		tw.tween_property(l, "modulate:a", 0.0, 0.25)
-		tw.tween_callback(l.queue_free)
+		BWFloaters.tag(self, t, tag, col, 0.8, "", _label_height(t))   # D344: small, stacked
 		rider_shown.emit(t.unit.id, tag)
 
 ## Floating numbers start just above the HP bar (rig figures are 2.2 tall,
@@ -1854,7 +1821,8 @@ func _face_all() -> void:
 		for f in foes:
 			if BWHex.distance(u.pos, f.pos) < BWHex.distance(u.pos, near.pos):
 				near = f
-		_views[u.id].face(_unit_pos(near.pos))
+		if _views.has(u.id):                       # ---- D327: a spawned unit's view arrives with its event
+			_views[u.id].face(_unit_pos(near.pos))
 
 
 ## D323: "PERF <map> NvM: rounds, turns, AI turn mean/p95/worst, frame mean/p95/worst".

@@ -121,6 +121,12 @@ func look() -> String:
 	return str(KINDS[kind].look)
 
 
+## D327: who may strike it. A stone: the player only (the enemy defends it,
+## D140). BWObjective overrides it with its `hittable` list.
+func hittable_by(t: String) -> bool:
+	return t == "player"
+
+
 static func is_objective(u: BWUnit) -> bool:
 	return u is BWObelisk
 

@@ -65,6 +65,7 @@ var _rings := {}                 # deploy hex -> MeshInstance3D
 var _mark_to: MeshInstance3D
 var _mark_from: MeshInstance3D
 var _codex: BWCodex
+var _mode_plate: BWModePrebattle    # D327: the 6v6 mode's additions (null otherwise)
 
 
 func _ready() -> void:
@@ -85,7 +86,7 @@ func _ready() -> void:
 	rig.clicked.connect(_on_map_click)
 	rig.fit_board(_board)              # D322: big boards: wider zoom, pan clamp (edge scroll once input is the rig's)
 	# Show who you're facing at their start.
-	_enemies = run.enemies_for(run.fight)
+	_enemies = BWModePrebattle.visible_enemies(run.enemies_for(run.fight))   # D331: a wave mode shows its first wave
 	_enemy_at = BWBattle.enemy_layout(_board, _enemies, _board.spawns.player)   # D211: a Horde fans out, a Colossus fits
 	for i in _enemies.size():
 		var fv := BWUnitView.new()
@@ -102,6 +103,7 @@ func _ready() -> void:
 	_sel = run.squad[0]
 	if _need > BWRun.DEPLOY:
 		_auto_fill()                                   # D321: a 6v6 opens placed (3v3 unchanged: tick your three)
+	_mode_plate = BWModePrebattle.attach(self)         # D327: a 6v6 mode's plate, fronts, divider, exit
 	_refresh()
 	_fit_camera.call_deferred()
 	get_viewport().size_changed.connect(_fit_camera)
@@ -329,6 +331,8 @@ func _refresh() -> void:
 	else:
 		_status.text = "Ready  ·  drag to rearrange (drop on a unit to swap)  ·  Enter to begin"
 	_begin.disabled = not (_deployed.size() == _need and placed == _need)
+	if _mode_plate:
+		_mode_plate.refresh()                          # D328: Split Front waits for three a front
 
 
 ## Bars share one scale across the squad: the best stat (with gear),

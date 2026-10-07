@@ -55,13 +55,13 @@ const CHOICE_FROM := 3
 
 ## Fight n offers a choice of rooms (fight 3 on; not the Obelisks, not the Giant).
 static func has_choice(n: int) -> bool:
-	return n >= CHOICE_FROM and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT   # D256: the Twins are fixed
+	return n >= CHOICE_FROM and n <= BWRun.FIGHTS and not BWRun.is_fixed(n)   # D256 the Twins, D327 the 6v6 modes are fixed
 
 
 ## D208: fight n plays a map off the queue (every fight but the Obelisks and
 ## the Giant): the opening fights without a choice, then every choice fight.
 static func queued(n: int) -> bool:
-	return n >= 1 and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT
+	return n >= 1 and n <= BWRun.FIGHTS and not BWRun.is_fixed(n)
 
 
 ## The two rooms for the run's current fight, rolled once and stored on the
@@ -98,7 +98,10 @@ static func chosen_index(run: BWRun) -> int:
 static func room_for(run: BWRun, n: int) -> Dictionary:
 	if not has_choice(n):
 		var fm := projected_map(run, n)
-		return { "kind": STANDARD, "map": fm, "enemies": _draw_ids(run, n, [], false, _count(run, fm)), "fight": n }
+		var fixed := { "kind": STANDARD, "map": fm, "enemies": _draw_ids(run, n, [], false, _count(run, fm)), "fight": n }
+		if run.mode_for(n) != "":
+			fixed["mode"] = run.mode_for(n)            # D327: a fixed 6v6 mode
+		return fixed
 	if n == run.fight:
 		var rooms: Array = run.room_offer.rooms if int(run.room_offer.get("fight", 0)) == n else roll(run, n)
 		var i := chosen_index(run)
@@ -152,7 +155,7 @@ static func advance(q: Array, played: String, other: String) -> Array:
 ## fight's own choice counts once it is made).
 static func projected_map(run: BWRun, n: int) -> String:
 	if not queued(n):
-		return _fixed_map(n)
+		return run.mode_map(run.mode_for(n)) if run.mode_for(n) != "" else _fixed_map(n)   # D327
 	if run.room_log.has(str(n)):
 		return str(run.room_log[str(n)].map)
 	if n < run.fight:
@@ -187,7 +190,10 @@ static func close_fight(run: BWRun) -> Dictionary:
 		if queued(n):
 			run.map_queue = advance(run.map_queue, m, "")   # D208: the opening fights use up their map
 		run.room_log[str(n)] = { "kind": STANDARD, "map": m }
-		return run.room_log[str(n)]
+		if run.mode_for(n) != "":
+			run.room_log[str(n)]["mode"] = run.mode_for(n)   # D327: the run log names the mode
+		var out: Dictionary = run.room_log[str(n)].duplicate()
+		return out
 	var rooms: Array = run.room_offer.rooms if int(run.room_offer.get("fight", 0)) == n else roll(run, n)
 	var i := maxi(chosen_index(run), 0)
 	var room: Dictionary = rooms[i]
@@ -249,6 +255,8 @@ static func load_state(r: BWRun, d: Dictionary) -> void:
 				r.room_log[str(k)]["encounter"] = str(e.encounter)
 			if str(e.get("weather", "")) != "":
 				r.room_log[str(k)]["weather"] = str(e.weather)          # D249
+			if str(e.get("mode", "")) != "":
+				r.room_log[str(k)]["mode"] = str(e.mode)                # D327
 		var o: Dictionary = d.get("room_offer", {})
 		if not o.is_empty():
 			r.room_offer = { "fight": int(o.fight), "chosen": int(o.get("chosen", -1)), "rooms": Array(o.rooms).map(

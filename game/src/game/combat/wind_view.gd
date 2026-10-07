@@ -26,7 +26,7 @@ const WALL_H := 1.9
 var screen: BWCombatScreen
 var _mesh: MeshInstance3D
 var _sig := ""
-var _rot_labels := {}          # unit id -> Label3D
+var _rot_labels := {}          # unit id -> [word Label3D, marks Label3D] (D346)
 var shown := {}                # what is drawn (probes, review): { fields, walls, gravity, rot }
 
 
@@ -212,31 +212,63 @@ func _wall(st: SurfaceTool, hexes: Array, i: int) -> void:
 
 # ---------------------------------------------------------------- Rot marks
 
+## D346: the word is small ink ("ROT", ROT_WORD, the names' size) and the
+## stacks are their own label of fat ink slashes (ROT_MARK, a thick white
+## rim), so ONE stack reads at game distance and 3 reads as three. The pair
+## sits beside the HP bar's right end, in screen pixels (it used to hang
+## under the bar at 30 px and covered the next unit in a crowd).
+const ROT_WORD := 13
+const ROT_MARK := 24
+
 func _place_rot(b: BWBattle) -> void:
 	for id in _rot_labels.keys():
 		var u := b._unit(str(id))
 		if u == null or not u.alive() or BWCurse.rot(u) <= 0:
-			(_rot_labels[id] as Label3D).queue_free()
+			for l in _rot_labels[id]:
+				if is_instance_valid(l):
+					(l as Label3D).queue_free()
 			_rot_labels.erase(id)
 	for u in b.units:
 		if not u.alive() or BWCurse.rot(u) <= 0 or not screen._views.has(u.id):
 			continue
-		var l: Label3D = _rot_labels.get(u.id)
-		if l == null or not is_instance_valid(l):
-			l = BWKeystoneView.make_tag(30)
-			_rot_labels[u.id] = l
-		# D299: a word plus the slashes, so a single stack reads ("ROT /"), on the
-		# unit's HP bar (it follows the bar's clamp below the turn order and its
-		# cull behind HUD panels)
-		l.text = "ROT " + "/".repeat(BWCurse.rot(u))
+		var pair: Array = _rot_labels.get(u.id, [])
+		if pair.size() != 2 or not is_instance_valid(pair[0]) or not is_instance_valid(pair[1]):
+			var w := BWKeystoneView.make_tag(ROT_WORD)
+			var m := BWKeystoneView.make_tag(ROT_MARK)
+			m.outline_size = 10
+			pair = [w, m]
+			_rot_labels[u.id] = pair
+		var word: Label3D = pair[0]
+		var marks: Label3D = pair[1]
+		word.text = "ROT"
+		marks.text = "/".repeat(BWCurse.rot(u))
 		var v: Node3D = screen._views[u.id]
-		BWKeystoneView.bar_mark(v, l, 0)
+		BWKeystoneView.bar_mark(v, word, 0)
+		BWKeystoneView.bar_mark(v, marks, 0)
+		# beside the bar's right end (offsets in label pixels, from the screen)
+		var f := ThemeDB.fallback_font
+		var ww := f.get_string_size("ROT", HORIZONTAL_ALIGNMENT_LEFT, -1, ROT_WORD).x
+		var mw := f.get_string_size(marks.text, HORIZONTAL_ALIGNMENT_LEFT, -1, ROT_MARK).x
+		var half := 40.0
+		var cam: Camera3D = screen.cam
+		var bar: BWHPBar3D = v.get("_hp_bar") if "_hp_bar" in v else null
+		if cam != null and bar != null and word.is_inside_tree() and not cam.is_position_behind(bar.global_position):
+			half = bar.screen_rect(cam).size.x * 0.5 / maxf(BWBlastPreview.px_scale(cam, word.pixel_size), 0.001)
+		word.offset = Vector2(half + 5.0 + ww * 0.5, 0.0)
+		marks.offset = Vector2(half + 5.0 + ww + 3.0 + mw * 0.5, 1.0)
 
 
-## Rot labels by unit id (probes, review).
+## Rot labels by unit id (probes, review): "ROT /", "ROT ///".
 func rot_text(id: String) -> String:
-	var l: Label3D = _rot_labels.get(id)
-	return l.text if l != null else ""
+	var pair: Array = _rot_labels.get(id, [])
+	if pair.size() != 2 or not is_instance_valid(pair[0]):
+		return ""
+	return "%s %s" % [(pair[0] as Label3D).text, (pair[1] as Label3D).text]
+
+
+## The Rot labels of a unit (review / probes).
+func rot_labels(id: String) -> Array:
+	return _rot_labels.get(id, [])
 
 
 # ---------------------------------------------------------------- UI helpers (BWCombatUI)

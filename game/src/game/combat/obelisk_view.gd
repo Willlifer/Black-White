@@ -57,7 +57,7 @@ func setup(u: BWUnit) -> void:
 func _build() -> void:
 	var o := ob()
 	var m: Dictionary = load_meta().get(o.kind, {})
-	_height = float(m.get("height", 3.2))
+	_height = float(m.get("height", (o as BWObjective).view_height if o is BWObjective else 3.2))   # D327: an objective object's own height
 	var scene := load(str(m.get("glb", ""))) as PackedScene if not m.is_empty() else null
 	if scene:
 		model = scene.instantiate() as Node3D
@@ -124,7 +124,11 @@ func _build_fallback() -> void:
 	mi.mesh = pm
 	mi.position.y = _height * 0.5
 	mi.material_override = BWLook.flat()
-	mi.set_instance_shader_parameter("tint", Color.WHITE if ob().look() == "bright" else Color(0.08, 0.08, 0.09))
+	var lk := ob().look()
+	var tint := Color.WHITE if lk == "bright" else Color(0.08, 0.08, 0.09)
+	if ob() is BWObjective and not lk in ["bright", "dark"]:
+		tint = BWLook.element_color(lk).lerp(Color.WHITE, 0.25)   # D327: an object in an element's colour (a wind wall)
+	mi.set_instance_shader_parameter("tint", tint)
 	add_child(mi)
 
 

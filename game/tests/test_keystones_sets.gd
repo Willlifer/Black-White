@@ -82,6 +82,8 @@ func test_enemy_keystones_by_stage(t) -> void:
 	var run := BWRun.start(["aureli", "della"], 3)
 	for n in range(1, 12):
 		var es: Array = run.enemies_for(n)
+		if n in BWRun.SIX_FIGHTS:
+			es = es.filter(func(u): return u.encounter == "")   # D331: a mode's grunts carry none; its roster enemies do
 		var with: Array = es.filter(func(u): return not u.keystones.is_empty())
 		if n <= 3:
 			t.eq(with.size(), 0, "fight %d: no keystones" % n)

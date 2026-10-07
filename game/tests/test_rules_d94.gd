@@ -366,8 +366,8 @@ func test_enemy_scaling(t) -> void:
 	t.eq(BWRun.enemy_stage(7), 6, "fight 7 uses fight 6 (one behind for 6-8)")
 	t.eq(BWRun.enemy_stage(9), 9, "fight 9 is level with you")
 	# fight: [tier, level, expertise rank]; D194: an enemy's level is its stage
-	# (D256: fight 7 is the Twins, built at the squad's level, so fight 8 stands in for "one behind")
-	var want := { 1: ["E", 1, 0], 5: ["D", 3, 1], 8: ["B", 7, 3], 9: ["A", 9, 4] }
+	# (D256: fight 7 is the Twins; D327: 8 and 10 are 6v6 modes, so fight 6 stands in for "one behind")
+	var want := { 1: ["E", 1, 0], 5: ["D", 3, 1], 6: ["C", 5, 2], 9: ["A", 9, 4] }
 	for n in want:
 		var es := run.enemies_for(n)
 		for u in es:
@@ -404,7 +404,7 @@ func test_enemy_curve(t) -> void:
 			t.eq(u.hp, u.max_hp(), "HP follows CON")
 	t.ok(BWRun.enemy_curve(1).mult < 1.0, "fight 1: below full strength")
 	# D139: armour 0 / 1 / 2 / full by fight, at the stage's tier
-	for n in [1, 2, 3, 4, 6, 9, 10]:
+	for n in [1, 2, 3, 4, 6, 9]:               # D327: fight 10 is a 6v6 mode (its own build)
 		var want := mini(n - 1, 3)
 		t.eq(BWRun.enemy_curve(n).armor, want, "fight %d: %d armour pieces" % [n, want])
 		for e in run.enemies_for(n):

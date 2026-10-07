@@ -343,3 +343,54 @@ func test_ai_and_preview(t) -> void:
 	var lines := BWSquall.card_lines(b2, _far(C, 1, 2))
 	t.ok(lines.size() == 1 and str(lines[0]).begins_with("Squall: advances next tick"), "the front's tile card says it advances next tick")
 	t.ok(BWGlossary.markup("Squall and Overfreeze").find("[hint") >= 0, "both are glossary terms")
+
+
+## D343: once per unit per ACTION, not per paint. One staff basic paints twice
+## on the target's hex (Frostbitten's lay_on, then the staff's channel); the
+## second fresh ice found the centre still glazed water and burst again
+## ("Aureli 50 overfreeze (x2)" from one Rem attack).
+func test_overfreeze_once_per_action(t) -> void:
+	var me := _u("me", "staff", "ice")
+	me.stats["dex"] = 99
+	var row := BWData.row("enchantments", "frostbitten")
+	var base := str(BWData.list(row.applies_to)[0])
+	var eq := BWData.row("equipment", base)
+	me.equipment[str(eq.slot)] = { "uid": "t_fb", "base": base, "slot": str(eq.slot),
+		"weight": str(eq.weight), "tier": "E", "stats": {}, "enchant": "frostbitten", "worn": {} }
+	me.affinity["ice"] = 10
+	var foe := _u("fo")
+	foe.stats["con"] = 300
+	var al := _u("al")
+	al.stats["con"] = 300
+	var b := _fight([me, al], [foe], [_far(C, 3, 1), _far(C, 0, 1)], [C])
+	me.refresh_effects()
+	me.attuned = "ice"
+	_lay(b, C, -2)
+	b.tiles.entries[C].glaze = 2
+	b.queue = [me]
+	b.turn_index = 0
+	b._begin_turn()
+	b.attack(me, foe)
+	t.ok(_ev(b, "paint").size() >= 2, "the blow paints the target's hex twice (lay_on + channel)")
+	t.eq(_ev(b, "overfreeze").size(), 1, "one burst: the hex overfreezes once per action")
+	t.eq(_hurt(b, al, "overfreeze"), b._tile_dmg(al, 12.0, "ice"), "an ally on the ring takes ONE burst")
+	var foe_hits := b.history.filter(func(e): return str(e.type) == "tile_damage" and str(e.unit) == foe.id and str(e.cause) == "overfreeze")
+	t.eq(foe_hits.size(), 1, "the target takes ONE burst")
+	# two paints in one action on two different glazed water hexes: a unit
+	# between them still takes one burst; the next action may burst again
+	var b2 := _fight([me], [foe], [Vector2i(0, 12)], [_nb(C, E)])
+	var c2 := _far(C, E, 2)
+	for h in [C, c2]:
+		_lay(b2, h, -2)
+		b2.tiles.entries[h].glaze = 2
+	BWEnchant.begin_action(b2, me)
+	b2.paint([C], "ice", me)
+	b2.paint([c2], "ice", me)
+	t.eq(_ev(b2, "overfreeze").size(), 2, "two hexes, two bursts")
+	t.eq(_hurt(b2, foe, "overfreeze"), b2._tile_dmg(foe, 12.0, "ice"), "but one per unit per action")
+	_lay(b2, C, -2)
+	b2.tiles.entries[C].glaze = 2
+	BWEnchant.begin_action(b2, me)
+	var before := _hurt(b2, foe, "overfreeze")
+	b2.paint([C], "ice", me)
+	t.eq(_hurt(b2, foe, "overfreeze") - before, b2._tile_dmg(foe, 12.0, "ice"), "a new action bursts again")

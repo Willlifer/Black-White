@@ -21,9 +21,9 @@ const STOP_HUGE := 0.35
 const STOP_SECS := [0.045, 0.075] # real seconds frozen (big, huge)
 const STOP_SCALE := 0.03
 const NUM_MIN := 30               # font size: a miss / tiny chip
-const NUM_MAX := 58               # a hit for 40%+ of max HP
+const NUM_MAX := 46               # a hit for 40%+ of max HP (D344: was 58)
 const NUM_CRIT := 1.3
-const NUM_CAP := 76
+const NUM_CAP := 54               # D344: a crit's ceiling (was 76: it covered the crowd)
 const KO_SCALE := 0.25            # final knockout slow-mo
 const KO_SECS := 0.85             # real seconds (Fast: x0.55)
 const KO_FOV := 0.8               # the camera pushes in to this share of its FOV
@@ -108,25 +108,14 @@ func float_number(v: Node3D, text: String, res: Dictionary, hold: float = 0.8) -
 	var hit := bool(res.get("hit", true))
 	var crit := bool(res.get("crit", false)) and hit
 	var size := number_size(int(res.get("damage", 0)), mh, crit, hit)
-	var l := Label3D.new()
-	l.text = text
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.fixed_size = true
-	l.pixel_size = 0.0016
-	l.font_size = size
-	l.outline_size = clampi(int(size * 0.34), 10, 30)
-	l.modulate = Color.WHITE
-	l.outline_modulate = Color.BLACK
-	l.render_priority = 20
-	l.outline_render_priority = 19
+	var l := BWFloaters.label(text, Color.WHITE, size, clampi(int(size * 0.34), 10, 22), v)   # D344: kept below the turn order
 	screen.add_child(l)
 	var h: float = screen.call("_label_height", v) if screen.has_method("_label_height") else 2.4
 	l.global_position = v.global_position + Vector3(0, h, 0)
 	var big := float(size) / float(NUM_MAX)
 	var tw := create_tween()
-	tw.tween_property(l, "scale", Vector3.ONE, 0.09 + 0.06 * big).from(Vector3.ONE * (1.25 + 0.5 * big))
-	tw.tween_property(l, "global_position", l.global_position + Vector3(0, 0.6, 0), hold).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "scale", Vector3.ONE, 0.09 + 0.06 * big).from(Vector3.ONE * (1.2 + 0.25 * big))
+	BWFloaters.rise(tw, l, hold)                 # D344: a fixed screen rise
 	tw.tween_property(l, "modulate:a", 0.0, 0.25)
 	tw.parallel().tween_property(l, "outline_modulate:a", 0.0, 0.25)
 	tw.tween_callback(l.queue_free)

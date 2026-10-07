@@ -38,6 +38,14 @@ extends SceneTree
 ## D308: per keystone the squad's AI took (BWPicks.auto_resolve), the win rate
 ## of the fights (1-10, rooms as played) a deployed unit holding it fought
 ## (informational: spotting an overpowered keystone; late fights hold more).
+## CASTLE="d_gate,d_mult,d_hp,s_gate,s_mult,s_hp" (D341) overrides the castle modes' knobs.
+## SNAPSHOT=<dir> (D341) saves the run and the deployed six before fights 8 and 10
+## (the squads tools/castle_sim.gd CAMPAIGN=<dir> replays against each castle mode).
+## SIX=1 (D333): at fights 8 and 10 the same squad, same day, also plays each
+## 6v6 mode with a shipped map on a copy of the run (paired, off the record);
+## printed per mode. STOP_AT=n ends each run after fight n (tuning the early
+## fights fast). SPLIT="mult,wind_hp" and HORDE="grunt_mult,grunt_hp,elite_mult,limit"
+## override the Split Front and Horde knobs (D334).
 ## MAP=<name> (D319, tools only) plays every fight on that map at its deploy
 ## count, e.g. MAP=commons for 6v6 (the enemies drawn six to a room).
 ## TRACE_SIM=1 prints each fight's turns, cycles and time; TRACE_FIGHT="run:fight"
@@ -78,6 +86,19 @@ func _init() -> void:
 		var k := OS.get_environment("HARD").split(",")
 		BWRooms.HARD_STAGES = int(k[0]); BWRooms.HARD_LEVELS = int(k[1])
 		BWRooms.HARD_MULT = float(k[2]); BWRooms.HARD_ARMOR = int(k[3])
+	if OS.get_environment("CASTLE") != "":                 # D341 tuning: "d_gate,d_mult,d_hp,s_gate,s_mult,s_hp"
+		var c := OS.get_environment("CASTLE").split(",")
+		BWCastleDefend.GATE_HP = float(c[0]); BWCastleDefend.ENEMY_MULT = float(c[1]); BWCastleDefend.ENEMY_HP = float(c[2])
+		BWCastleStorm.GATE_HP = float(c[3]); BWCastleStorm.ENEMY_MULT = float(c[4]); BWCastleStorm.ENEMY_HP = float(c[5])
+	if OS.get_environment("SPLIT") != "":                  # D334 tuning: "mult,wind_hp"
+		var sp := OS.get_environment("SPLIT").split(",")
+		BWSplitFront.ENEMY_MULT = float(sp[0])
+		if sp.size() > 1:
+			BWSplitFront.WIND_HP = int(sp[1])
+	if OS.get_environment("HORDE") != "":                  # D334 tuning: "grunt_mult,grunt_hp,elite_mult,limit"
+		var hp := OS.get_environment("HORDE").split(",")
+		BWHordeMode.GRUNT_MULT = float(hp[0]); BWHordeMode.GRUNT_HP = float(hp[1])
+		BWHordeMode.ELITE_MULT = float(hp[2]); BWHordeMode.ESCAPE_LIMIT = int(hp[3])
 	if OS.get_environment("CURVE") != "":                  # tuning: the ten base-stat multipliers
 		var m := OS.get_environment("CURVE").split(",")
 		BWRun.curve_override = []
@@ -178,8 +199,22 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 						var wkk := "%d|w:%s" % [n, wk if wk != "" else "clear"]
 						var wwp: Array = by_room.get(wkk, [0, 0])
 						by_room[wkk] = [wwp[0] + (1 if _fight(wr, n, wk) else 0), wwp[1] + 1]
+				if OS.get_environment("SIX") == "1" and n in BWRun.SIX_FIGHTS:
+					# D333: the same squad, same day, against each 6v6 mode (paired, off the record)
+					for md in BWRun.SIX_MODES:
+						if BWRun.mode_map(md) == BWRun.MODE_PLACEHOLDER:
+							continue
+						var xr := BWRun.from_dict(JSON.parse_string(JSON.stringify(run.to_dict())))
+						xr.mode_override = { n: md }
+						var mk := "%d|six:%s" % [n, md]
+						var mp: Array = by_room.get(mk, [0, 0])
+						by_room[mk] = [mp[0] + (1 if _fight(xr, n) else 0), mp[1] + 1]
 				var deployed := _deploy(run)
 				_gear(run, deployed)
+				if OS.get_environment("SNAPSHOT") != "" and n in BWRun.SIX_FIGHTS:   # D341: squads for tools/castle_sim.gd CAMPAIGN=dir
+					var sf := FileAccess.open("%s/%s_r%d_f%d.json" % [OS.get_environment("SNAPSHOT"), pol, s, n], FileAccess.WRITE)
+					sf.store_string(JSON.stringify({ "run": run.to_dict(), "deployed": deployed.map(func(u): return u.id), "fight": n }))
+					sf.close()
 				var enemies := run.enemies_for(n)
 				run.prepare_for_battle(deployed)
 				var mname := run.map_for(n)
@@ -226,7 +261,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				for u in run.squad:
 					u.hp = u.max_hp()
 					BWPicks.auto_resolve(u)
-				if n >= BWRun.BOSS_FIGHT:
+				if n >= BWRun.BOSS_FIGHT or (OS.get_environment("STOP_AT") != "" and n >= int(OS.get_environment("STOP_AT"))):
 					break
 				var plan: Array = []
 				for i in run.squad.size():
@@ -254,6 +289,19 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 						tw += wp[0]
 						tp += wp[1]
 				out.append("  %-14s fights 3-10 %3d%% (%d)   %s" % ["hard (paired)" if ek == "shadow" else ek.substr(4), 100 * tw / maxi(tp, 1), tp, "  ".join(row)])
+		if OS.get_environment("SIX") == "1":
+			for md in BWRun.SIX_MODES:
+				var row: PackedStringArray = []
+				var tw := 0
+				var tp := 0
+				for f in BWRun.SIX_FIGHTS:
+					var wp: Array = by_room.get("%d|six:%s" % [f, md], [0, 0])
+					if wp[1] > 0:
+						row.append("%d:%3d%% (%d)" % [f, 100 * wp[0] / wp[1], wp[1]])
+						tw += wp[0]
+						tp += wp[1]
+				if tp > 0:
+					out.append("  six %-8s (paired) %3d%% (%d)   %s" % [md, 100 * tw / tp, tp, "  ".join(row)])
 		if OS.get_environment("WEATHER") == "1":
 			var clear: Array = [0, 0]
 			for f in range(BWWeather.FROM_FIGHT, BWRun.FIGHTS + 1):

@@ -66,6 +66,9 @@ var weather := {}
 ## D269-D274 wind (BWWind, src/core/wind_modes.gd): walls { owner id: {hexes,
 ## ticks} } and the tick flag. Ids and numbers only, so clone() copies it.
 var wind := {}
+## D327 objective modes (BWObjectives, src/core/objectives.gd): the mode's
+## state (waves, reserve, escapes, the divider ...). {} = none.
+var objective_state := {}
 
 
 func _init(p_board: BWBoard, seed_value: int = 1) -> void:
@@ -106,6 +109,7 @@ func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 		u.pos = lay[i]
 		units.append(u)
 	_place_objectives()                       # D140: the map's obelisks, a third side
+	BWObjectives.setup(self)                  # D327: a mode's objects, waves, exits
 	BWPhases.setup(self)                      # D255: a boss's phase script (the Twins)
 	_fx_units = units.filter(func(u: BWUnit): return not u.effects.is_empty())
 	for u in units:
@@ -246,9 +250,9 @@ func side(team: String) -> Array:
 func foes_of(u: BWUnit) -> Array:
 	match u.team:
 		"player":
-			return side("enemy") + side(BWObelisk.TEAM)
+			return side("enemy") + side(BWObelisk.TEAM).filter(func(o): return o.hittable_by("player"))   # D327
 		"enemy":
-			return side("player")
+			return side("player") + side(BWObelisk.TEAM).filter(func(o): return o.hittable_by("enemy"))
 	return []
 
 
@@ -279,7 +283,7 @@ func _place_objectives() -> void:
 ## May `u`'s blows land on `v` at all? D140: the enemy's never touch an
 ## obelisk (they defend them; their area skills pass over it).
 func can_harm(u: BWUnit, v: BWUnit) -> bool:
-	return not (BWObelisk.is_objective(v) and (u == null or u.team != "player"))
+	return not (BWObelisk.is_objective(v) and (u == null or not (v as BWObelisk).hittable_by(u.team)))   # D327
 
 
 ## D140: one obelisk's turn. Its pulse hits EVERY other unit on the map, both
@@ -502,6 +506,7 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	BWPools.on_walk(self, u, path)            # D264: an electrified pool's entry shock
 	BWSlides.after_walk(self, u, slide)       # D261: the slam, then +1 move
 	BWPhases.after_move(self, u, path)        # D256: the Twins' beam (crossing it)
+	BWObjectives.after_move(self, u)          # D327: a grunt reaching the exit escapes
 	if u.alive() and not over:
 		_static_field_check(u)                # D93 Static Field: ending a move on its fuse
 		_zone_check(u)                        # D97: ending a move inside an enemy zone
@@ -674,6 +679,7 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	BWOverheat.basic_mods(self, att, dfn, el, basic, mods)   # D285: an Overheat note
 	BWOverfreeze.basic_mods(self, dfn, el, basic, mods)      # D312: an Overfreeze note
 	BWKeystoneFx.blow_mods(self, att, dfn, mods)   # D294: Frozen (x2, counts as glazed)
+	BWCastle.mods(self, att, dfn, ap, el, mods)    # D336/D337: castle high ground, a wood / glazed gate
 	if _fx_units.is_empty():
 		return mods
 	var e := tiles.at(dfn.pos)
@@ -886,6 +892,7 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 	_fire_pistol(u, target_hex)
 	BWThunderKeys.after_basic(self, u, target, first, target_hex)   # D290: Static Blades (burst, else arm)
 	BWWind.after_basic(self, u, target, first)  # D271: a wind basic's mode on its target
+	BWObjectives.after_basic(self, u, target, first)   # D327: a Gust on a wind divider
 	_after_action(u, u.attuned if spell else "", true)
 	_answer(counters)
 	_counter_check(u, struck)
@@ -1573,6 +1580,7 @@ func _ko(victim: BWUnit, by: BWUnit, cause: String = "") -> void:
 	BWEnchant.on_ko(self, victim, by, cause)   # v2 hook: on-kill, ally_kill, ally_ko
 	BWPhases.on_ko(self, victim)               # D255: a boss unit fell (the rage clock)
 	BWCurse.on_ko(self, victim, by)            # D275: Lane C's Contagion hooks here
+	BWObjectives.on_ko(self, victim, by)       # D327: an objective object broke
 
 
 func _trigger(u: BWUnit, trig: String) -> void:
@@ -1953,6 +1961,9 @@ func end_turn() -> void:
 		BWPhases.turn_end(self, u)  # D256: the Twins paint; a foe ending on the beam pays
 		if over:
 			return
+		BWObjectives.turn_end(self, u)   # D327: escapes, the divider's clock
+		if over:
+			return
 		u.follow_up = []           # waiting declines a follow-up
 		u.fx.erase("momentum")
 		var st_steady: Dictionary = u.statuses.get("steadied", {})
@@ -2008,6 +2019,9 @@ func _new_cycle() -> void:
 			BWWeather.tick(self)               # D250: the weather acts at the cycle tick
 		if over:
 			return
+	BWObjectives.cycle_start(self, cycle + 1)   # D327: waves spawn / are telegraphed
+	if over:
+		return
 	cycle += 1
 	queue = BWTurnQueue.build(units)
 	turn_index = 0
@@ -2116,6 +2130,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 		o["fuse_guard"] = guard
 	BWKeystoneFx.paint_opts(by, o)             # D293 Jetstream: gale 3, copies last 2
 	BWOverheat.paint_opts(by, element, o)      # D285: Conflagration
+	BWOverfreeze.paint_opts(self, o)           # D343: a hex / unit overfreezes once per action
 	hexes = BWThunderKeys.filter_rearm(self, by, element, hexes)   # D291: Blast Rider's locked hex
 	var wsnap := BWWind.before_paint(self, hexes)   # D270: the fields about to fire (their mode)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
@@ -2428,7 +2443,12 @@ func _unit(id: String) -> BWUnit:
 func _check_end() -> void:
 	if over:
 		return
-	if side("player").is_empty():
+	var mv := BWObjectives.verdict(self)       # D327: a mode's own win / lose ("-" = not over)
+	if mv != "":
+		if mv != "-":
+			over = true
+			winner = mv
+	elif side("player").is_empty():
 		over = true
 		winner = "enemy"
 	elif objective_mode():
@@ -3244,6 +3264,7 @@ func clone() -> BWBattle:
 			c.set(p, val)
 	c._undo = {}
 	c.picks_live = false
+	c.set_meta("clone", true)                  # D327: a clone's wave spawns copy the reserve
 	return c
 
 

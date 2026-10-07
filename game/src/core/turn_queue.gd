@@ -5,7 +5,7 @@ class_name BWTurnQueue
 
 
 static func build(units: Array) -> Array:
-	var q: Array = units.filter(func(u: BWUnit): return u.alive())
+	var q: Array = units.filter(func(u: BWUnit): return u.alive() and BWObjectives.in_queue(u))   # D327: objects wait
 	q.sort_custom(func(a: BWUnit, b: BWUnit) -> bool:
 		if a.speed() != b.speed():
 			return a.speed() > b.speed()

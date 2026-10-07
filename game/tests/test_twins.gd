@@ -47,7 +47,7 @@ func test_fight_7_is_fixed(t) -> void:
 	t.eq([e[0].element, e[1].element], ["light", "dark"], "light and dark")
 	t.ok(e[0].max_hp() > 2 * BWFormulas.hp_value(e[0].stat("con"), e[0].level) - 1, "a boss's HP (%d)" % e[0].max_hp())
 	for n in range(3, BWRun.FIGHTS + 1):
-		if n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT:
+		if not BWRun.is_fixed(n):                  # D327: the 6v6 modes are fixed too
 			t.ok(BWRooms.has_choice(n), "fight %d keeps its choice" % n)
 	# the court: half light, half dark, seeded (D134)
 	var bd := BWBoard.load_file("res://maps/court.json")

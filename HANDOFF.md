@@ -3,7 +3,7 @@
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
 **Git:**
-- `main` is the full internal history. The working tree holds the whole overhaul (lanes C1–C3 and this final pass) **uncommitted** on top of `f2ff1b1`: commit it as one "Element Overhaul" commit (or per lane) before the next session.
+- `main` is the full internal history; the overhaul, auto-equip, squall and 6v6 infrastructure are committed (`586d9e0`). The 6v6 modes lanes and polish pass 3 are **uncommitted** on top.
 - The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github` (no `design/art/` renders, references, raw audio, `archive/`, the concept docx). Re-export in the `../bw-export` worktree, never by switching branches here: `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, `git rm` anything deleted on main, commit, `git push origin github:main`. Last export: internal `aa5ef11` → `cc156eb` (2026-10-06).
 
 **Green as of 2026-10-07:** `--self-test` 643/643 in 57 suites, `--ui-probe`, `--flow-probe`, `--tutorial-probe` (exit 0), autoplay on arena, lake, tinderbox, catacombs, ravine, twins and obelisks with zero `SCRIPT ERROR`.
@@ -14,17 +14,17 @@
 - **C1 (D277–D284):** the rank ladder (keystones at ranks 3 and 6, max 2), 21 keystones in `data/keystones.csv`, enemy keystones by stage, 28 perks, 2/3-piece element sets, save v11.
 - **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15.
 - **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
-- **Final pass (D301–D308):**
-  - Unit cards no longer leak BBCode: an `=` in a hint payload broke the tag (D301). Keystone cap enforced in `grant`; the old 3-keystone render was the shot tool (D302).
-  - Recap and log sum per unit and cause; the banner always clears and review tools wait for it (D303).
-  - The AI raises Wind Walls (D304). Magnify text and §16 docs fixed (D305).
-  - **Self-detonate**, Blast Rider's free action, enables the dagger bomber dive (D306). All five L-30 riders are built (D307).
+- **Final pass (D301–D308):** no BBCode leaks on cards (D301), the keystone cap (D302), summed recap lines and the banner fix (D303), AI Wind Walls (D304), docs (D305), Self-detonate (D306), the L-30 riders (D307).
   - **Re-tune (D308):** curve 0.97 1.05 1.95 0.7 1.35 1.15 1.1 1.1 1.0 1.03, Twins HP ×2.6 / stats ×1.25. Sim (24 runs, Standard): 87 62 75 54 87 70 62 79 75 75 %, Hard 12–25 under, rounds 6–8 from fight 3, Giant 95%. Also fixed a reach-tree cycle that hung `path_to`.
 - Review renders `design/art/v3_*.png`; this pass `v3_final_card*.png`, `v3_final_dive_1|2|3.png` (`tools/final_shots.gd`).
 - **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, rink, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
+- **Auto-equip (D315-D318, L-35):** gear panel **Optimize all [O]** / **Optimize** with a diff preview, Apply / Cancel and one-step Undo (`BWAutoEquip`, `test_auto_equip`, renders `autoequip_*.png`).
 
-## Also landed: auto-equip (D315-D318, LEDGER L-35)
-- Gear panel: **Optimize all [O]** (header; most-used unit first, may take from units used less) and **Optimize** (one unit, inventory only); a diff preview with Apply / Cancel, then one-step **Undo optimize**. Core `BWAutoEquip` (`src/core/auto_equip.gd`), `test_auto_equip`, ui-probe presses O → Apply → Undo. Renders `design/art/autoequip_*.png` (`tools/autoequip_shots.gd`).
+## Also landed: 6v6 modes, Split Front + Stop the Horde (D327-D334, LEDGER L-38)
+- Fixed schedule: fight 5 Split Front, fights 8/10 two of defend/storm/horde (seeded), 9 a room choice (`BWRun.mode_for`). Shared `BWObjectives` (objects, verdicts, waves, exits; the castle lane builds on it). Maps `splitfront.json` (seeded fire/ice/wind divider, round-4 enemy break-through), `horde.json` (4 waves, 8 escapes lose). design/MAPS.md §15-16. Sim: Split Front 70%, the Horde 65% (paired, fights 8 and 10; rounds ~12); `--combat splitfront --mode splitfront [--divider ice]`, `--combat horde --mode horde`; renders `mode_split_*.png`, `mode_horde_*.png` (`tools/mode_shots.gd`).
+- **Castle modes (D335-D342, LEDGER L-39):** Defend the Castle (`keep.json`: hold the iron gate 8 rounds vs 3 waves) and Storm the Castle (`stronghold.json`, the same castle flipped: break the wooden gate, then the throne or the Warden; D255 phase on the gate's fall) via `BWCastle`/`BWCastleDefend`/`BWCastleStorm`. High ground +5%/level, wood x1.5 fire, glazed gate x1.5 thunder. Sim on campaign squads (`castle_sim CAMPAIGN=`): Defend ~73%, Storm ~68%. Self-test 700/700, probes exit 0, autoplay both 0 SCRIPT ERROR. Renders `mode_defend_*.png`, `mode_storm_*.png`.
+## Also landed: polish pass 3 (D343-D346, LEDGER L-37)
+- **Overfreeze bug:** one staff basic painted the target hex twice (Frostbitten + channel) and burst twice: real damage, now once per unit and hex per action (`test_overfreeze_once_per_action`). Floaters small, stacked, under the turn order; names only for acting/hovered/previewed units (others where they fit); dark squall deep violet over ink; Rot as word + fat slashes by the bar. Renders `design/art/polish3_*.png` (`tools/polish3_shots.gd`). Verified: ui/flow probes exit 0, autoplay commons + lake 0 SCRIPT ERROR; self-test 687/700, all 13 fails in the in-flight 6v6 modes lane (maps, rooms, run schedule, enemy curve).
 
 ## Also landed: 6v6 infrastructure (D319-D324, LEDGER L-36; the 6v6 modes lane, D325-D326, builds on it)
 - Map `deploy_count` (3 default, 6 big) through setup, pre-battle (six slots, auto-placed, Auto), rooms, `campaign_sim` (MAP=commons) and `--combat`; big-board camera; 12-unit turn order; AI pruning on big maps only (worst turn ~500 → ~130 ms, `tools/sixes_perf.gd`). Test map **Commons** (17×15, not in the rotation). Green then: self-test 674/674 in 60 suites, both probes, `--combat commons --autoplay`. Renders `design/art/6v6_*.png`.

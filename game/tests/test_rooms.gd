@@ -53,8 +53,10 @@ func test_no_choice_at_obelisks_or_giant(t) -> void:
 	t.ok(not BWRooms.has_choice(4), "fight 4 (Obelisks): no choice")
 	t.ok(not BWRooms.has_choice(BWRun.BOSS_FIGHT), "the Giant: no choice")
 	t.ok(not BWRooms.has_choice(BWRun.TWINS_FIGHT), "fight 7 (the Twins): no choice (D256)")
-	for n in [3, 5, 6, 8, 9, 10]:
+	for n in [3, 6, 9]:
 		t.ok(BWRooms.has_choice(n), "fight %d offers rooms" % n)
+	for n in [5, 8, 10]:
+		t.ok(not BWRooms.has_choice(n), "fight %d is a fixed 6v6 (D325)" % n)
 	var r := _run()
 	for n in 3:
 		_play(r)
@@ -65,7 +67,9 @@ func test_no_choice_at_obelisks_or_giant(t) -> void:
 	t.eq(r.map_for(BWRun.BOSS_FIGHT), "arena", "the Giant stays on the arena")
 	var rep := _play(r)
 	t.eq(rep.room, "standard", "fight 4 plays as a standard room")
-	t.eq(BWRooms.offer(r).size(), 2, "fight 5 offers rooms again")
+	t.eq(BWRooms.offer(r).size(), 0, "fight 5 is Split Front: no rooms (D325)")
+	_play(r)
+	t.eq(BWRooms.offer(r).size(), 2, "fight 6 offers rooms again")
 
 
 func test_hard_is_tougher_and_pays_more(t) -> void:
@@ -139,13 +143,13 @@ func test_maps_over_a_run(t) -> void:
 		var uniq: Dictionary = {}
 		for m in played:
 			uniq[m] = true
-		t.eq(played.size(), 8, "eight queued fights (D256: fight 7 is the Twins)")
-		t.eq(offered.size(), 6, "six choice fights (3, 5, 6, 8-10)")
+		t.eq(played.size(), 5, "five queued fights (D256, D327: 4, 5, 7, 8, 10 are fixed)")
+		t.eq(offered.size(), 3, "three choice fights (3, 6, 9)")
 		if pick == 0:
-			t.eq(uniq.size(), 8, "always Standard: eight pool maps, no repeats (%s)" % [played])
+			t.eq(uniq.size(), 5, "always Standard: five pool maps, no repeats (%s)" % [played])
 		else:
-			t.ok(uniq.size() >= 8, "always Hard: at most one replay (%s)" % [played])
-		for i in 6:
+			t.ok(uniq.size() >= 5, "always Hard: no replay (%s)" % [played])
+		for i in 3:
 			t.ok(not offered[i][0] in before[i] and not offered[i][1] in before[i],
 				"offer %d: no played map while fresh ones remain" % (i + 1))
 
@@ -171,8 +175,10 @@ func test_save_load_mid_choice(t) -> void:
 		d.erase(k)
 	var old := BWRun.from_dict(d)
 	t.eq(old.room_log, { "1": { "kind": "standard", "map": str(r.map_order[0]) }, "2": { "kind": "standard", "map": str(r.map_order[1]) } }, "v6: fights 1-2 played their D145 slots")
-	var rest: Array = r.map_order.slice(2)
-	rest.remove_at(BWRooms._slot(BWRun.TWINS_FIGHT) - 2)     # D256: fight 7 takes no map
+	var rest: Array = []                                      # D256, D327: the fixed fights take no map
+	for n in range(3, BWRun.FIGHTS + 1):
+		if BWRooms.queued(n):
+			rest.append(r.map_order[BWRooms._slot(n)])
 	t.eq(old.map_queue, rest, "v6: the rest of the order is the queue")
 	t.eq(BWRooms.chosen_index(old), -1, "v6: nothing on offer yet")
 	t.eq(BWRooms.offer(old).size(), 2, "v6: the room screen rolls a fresh offer")

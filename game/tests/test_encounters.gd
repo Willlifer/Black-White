@@ -55,7 +55,7 @@ func test_offer_rate_and_kinds(t) -> void:
 		var r := _run(1000 + s)
 		for n in range(1, BWRun.FIGHTS + 1):
 			var k := BWEncounters.kind_for(r, n)
-			if n < 3 or n == BWRun.OBJECTIVE_FIGHT:
+			if not BWRooms.has_choice(n):            # D327: the fixed fights (Obelisks, Twins, the 6v6 modes) never
 				if k != "":
 					t.ok(false, "fight %d never has an encounter" % n)
 				continue

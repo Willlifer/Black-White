@@ -45,9 +45,10 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, opts: 
 		return out
 	var all: Array = hexes.duplicate()
 	all.append_array((opts.get("ring", {}) as Dictionary).keys())
+	var act := int(opts.get("ofz_act", -1))
 	for h in all:
-		if not h in out and is_target(t, h):
-			out.append(h)
+		if not h in out and is_target(t, h) and (act < 0 or int(t.at(h).get("ofz_act", -2)) != act):
+			out.append(h)   # D343: a hex shatters once per ACTION (not per paint)
 	out.sort()
 	return out
 
@@ -103,13 +104,24 @@ static func _sheet(t: BWTiles, h: Vector2i, caster: String) -> bool:
 
 # ---------------------------------------------------------------- the battle's side
 
-## After a paint: the bursts' events and damage, one burst per unit.
+## Before a paint (BWBattle.paint): tag the opts with the action, so
+## `begin` skips hexes that already shattered in it (D343).
+static func paint_opts(b: BWBattle, o: Dictionary) -> void:
+	o["ofz_act"] = b._action_serial
+
+
+## After a paint: the bursts' events and damage, one burst per unit per
+## ACTION (D343: one blow can paint twice, Frostbitten's lay_on and then the
+## staff's channel, and the centre is still glazed water for the second).
 static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
 	var recs: Array = r.get("overfreeze", [])
 	if recs.is_empty() or b.over:
 		return
 	var hurt := {}
 	for rec in recs:
+		var ce := b.tiles.at(rec.hex)
+		if not ce.is_empty():
+			ce["ofz_act"] = b._action_serial
 		var hit: Array = []
 		for u in b.units:
 			if not u.alive() or BWObelisk.is_objective(u):
@@ -117,7 +129,7 @@ static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
 			for f in u.footprint():
 				if BWHex.distance(f, rec.hex) <= 1:
 					hit.append(u.id)
-					if not hurt.has(u):
+					if not hurt.has(u) and int(u.fx.get("ofz_act", -1)) != b._action_serial:
 						hurt[u] = float(rec.pct)
 					break
 		b._emit({ "type": "overfreeze", "hex": rec.hex, "ring": rec.ring, "glazed": rec.glazed,
@@ -125,6 +137,7 @@ static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
 	var src := str(recs[0].source)
 	for u in b.units:
 		if hurt.has(u) and u.alive() and not b.over:
+			u.fx["ofz_act"] = b._action_serial
 			b._tile_hurt(u, b._tile_dmg(u, float(hurt[u]), "ice"), "overfreeze", src)
 
 

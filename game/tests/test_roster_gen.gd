@@ -190,7 +190,7 @@ func test_enemies_use_rolled_rows(t) -> void:
 	var rows := BWRosterGen.roll(_ids(), 31337)
 	var run := BWRun.start(["aureli", "della", "jericho", "will", "gail", "kira"], 11, rows, 31337)
 	var differs := false
-	for n in [1, 4, 8]:
+	for n in [1, 4, 9]:                     # D327: 8 and 10 are 6v6 modes (grunts, castle units)
 		for e in run.enemies_for(n):
 			var base: String = e.id.split("_f")[0]
 			var r := BWRosterGen.row_by_id(rows, base)

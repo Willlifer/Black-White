@@ -286,7 +286,7 @@ func test_hard_weather_pays_one_more_and_saves(t) -> void:
 	var old := BWWeather.RATE
 	BWWeather.RATE = 1.0
 	var r := _run(4242)
-	while r.fight < 5:
+	while r.fight < 6:                       # D327: fight 5 is Split Front (fixed, no weather)
 		_play(r)
 	var rooms := BWRooms.offer(r)
 	t.ok(rooms.all(func(x): return str(x.get("weather", "")) in BWWeather.KINDS), "rate 1: both rooms have weather")
@@ -298,7 +298,7 @@ func test_hard_weather_pays_one_more_and_saves(t) -> void:
 	var rep := _play(r)
 	t.eq(rep.loot.size(), 5, "Hard + weather: one more drop")
 	t.eq(str(rep.get("weather", "")), str(rooms[1].weather), "the report names it")
-	t.eq(str(r.room_log["5"].get("weather", "")), str(rooms[1].weather), "the room log keeps it")
+	t.eq(str(r.room_log["6"].get("weather", "")), str(rooms[1].weather), "the room log keeps it")
 	var back2 := BWRun.from_dict(JSON.parse_string(JSON.stringify(r.to_dict())))
 	t.eq(back2.room_log, r.room_log, "and saves it")
 	t.eq(BWWeather.for_fight(r, BWRun.OBJECTIVE_FIGHT), "", "the Obelisks: never")

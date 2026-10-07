@@ -14,8 +14,12 @@ func _maps() -> Array:
 
 
 func test_ten_maps(t) -> void:
-	t.eq(_maps(), ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "commons.json", "court.json", "forge.json", "lake.json",
-		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json"], "the twelve maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court; D319: Commons, 6v6, not in the rotation)")
+	for m in ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "commons.json", "court.json", "forge.json", "lake.json",
+		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json", "splitfront.json", "horde.json"]:
+		t.ok(m in _maps(), "%s ships" % m)
+	t.ok(_maps().all(func(m): return m.get_basename() in BWRun.MAPS + BWRun.MAP_POOL + [BWRun.TWINS_MAP, "commons"] + BWRun.MODE_MAPS.values()),
+		"every map is in the rotation, fixed, a mode's map or Commons (%s)" % [_maps()])
+	t.ok(true, "the maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court; D319: Commons, 6v6, not in the rotation)")
 	for m in BWRun.MAPS:
 		t.ok(FileAccess.file_exists(MAP_DIR + m + ".json"), "rotation map %s exists" % m)
 	t.ok(not "commons" in BWRun.MAPS and not "commons" in BWRun.MAP_POOL, "D319: Commons is a test map, not in the rotation yet")
@@ -29,7 +33,7 @@ func test_rotation(t) -> void:
 	var r := BWRun.start(ids, 4242)
 	var seen: Array = []
 	for n in range(1, BWRun.FIGHTS + 1):
-		if n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT:
+		if not BWRun.is_fixed(n):                  # D327: the 6v6 modes are fixed too
 			seen.append(r.map_for(n))
 	t.eq(r.map_for(4), "obelisks", "fight 4 is the Obelisks")
 	t.eq(r.map_for(BWRun.TWINS_FIGHT), "court", "fight 7 is the Twins' court (D256)")
@@ -40,12 +44,12 @@ func test_rotation(t) -> void:
 	for m in sorted:
 		if not m in uniq:
 			uniq.append(m)
-	t.eq(uniq.size(), sorted.size(), "fights 1-3, 5-6, 8-10: eight pool maps, no repeats (D256: fight 7 is fixed)")
+	t.eq(uniq.size(), sorted.size(), "fights 1-3, 6, 9: five pool maps, no repeats (D256, D327: 4, 5, 7, 8, 10 are fixed)")
 	t.ok(sorted.all(func(m): return m in BWRun.MAP_POOL), "all from the pool")
 	# D187/D208: fights 1-2 take the front map; rooms take the front two from fight 3; always Standard plays the first,
-	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6, 8, 5, 3 (D256: fight 7 takes none).
+	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6 (D256, D327: the fixed fights take none).
 	var sh := BWRun.shuffled_maps(4242)
-	t.eq(seen, [0, 1, 2, 4, 6, 8, 5, 3].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
+	t.eq(seen, [0, 1, 2, 4, 6].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
 	var again := BWRun.start(ids, 4242)
 	t.eq(range(1, 11).map(func(n): return again.map_for(n)), range(1, 11).map(func(n): return r.map_for(n)), "same seed, same order")
 	var other := BWRun.start(ids, 4243)
@@ -113,7 +117,10 @@ func test_six_a_side_maps(t) -> void:
 			t.eq(uniq.size(), 6, "%s %s: six distinct spawns" % [f, team])
 			t.ok(b.deploy[team].size() >= 6 and b.deploy[team].size() <= 24, "%s %s zone %d hexes (6-24)" % [f, team, b.deploy[team].size()])
 			var edge := 0 if team == "enemy" else b.rows - 1
-			t.ok(b.deploy[team].all(func(h): return absi(h.y - edge) <= 2), "%s %s zone on its three edge rows" % [f, team])
+			var mode_name := str(b.objective.get("mode", ""))
+			var keep_side: bool = mode_name in BWCastle.MODES and team == ("player" if mode_name == "defend" else "enemy")
+			if not keep_side:                   # D335: a castle's holders deploy on its walls and yard
+				t.ok(b.deploy[team].all(func(h): return absi(h.y - edge) <= 2), "%s %s zone on its three edge rows" % [f, team])
 		for h in b.spawns.player:
 			t.ok(not h in b.spawns.enemy and not h in b.deploy.enemy, "%s: %s on one side only" % [f, h])
 			var reach := b.reachable(h, 99)

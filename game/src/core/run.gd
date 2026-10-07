@@ -24,6 +24,18 @@ const OBJECTIVE_MAP := "obelisks"
 ## choice, no weather, the boss music; a win gives every squad unit a pick.
 const TWINS_FIGHT := 7
 const TWINS_MAP := "court"
+## D325/D327: the fixed 6v6 fights (no room choice). Fight 5 is always Split
+## Front; fights 8 and 10 play two of SIX_MODES, seeded per run, no repeat
+## (six_modes_for). Fight 9 stays a 3v3 room choice. A mode whose map isn't
+## shipped yet plays MODE_PLACEHOLDER (Commons, a plain 6v6 wipe-out).
+const SPLIT_FIGHT := 5
+const SIX_FIGHTS := [8, 10]
+const SIX_MODES := ["defend", "storm", "horde"]
+const MODE_MAPS := { "splitfront": "splitfront", "horde": "horde", "defend": "keep", "storm": "stronghold" }
+const MODE_NAMES := { "splitfront": "Split Front", "horde": "Stop the Horde", "defend": "Defend the Castle", "storm": "Storm the Castle" }
+const MODE_PLACEHOLDER := "commons"
+## D334: a mode fight pays this many drops on a win (a horde's head count would flood the bag).
+const MODE_DROPS := 5
 const MAP_POOL := ["arena", "paintball", "bridge", "lake", "chapel", "ravine", "catacombs", "tinderbox", "forge"]
 ## Every battle map (the pool plus the objective map).
 const MAPS := ["arena", "paintball", "bridge", "lake", "obelisks", "chapel", "ravine", "catacombs", "tinderbox", "forge"]
@@ -210,6 +222,9 @@ func tier_for(n: int) -> String:
 ## D319 (tools and tests only, never saved): every fight plays this map
 ## ("" = the run's own maps). `campaign_sim` MAP=commons uses it for 6v6.
 var force_map := ""
+## D327 (tools only, never saved): fight n -> the 6v6 mode it plays instead of
+## the run's own draw (campaign_sim SIX=1 plays each mode at fights 8 and 10).
+var mode_override := {}
 
 
 ## D319: the units the squad fields in fight n: the map's deploy_count (3, or
@@ -237,6 +252,8 @@ func map_for(n: int) -> String:
 		return force_map
 	if n >= BOSS_FIGHT:
 		return "arena"
+	if mode_for(n) != "":
+		return mode_map(mode_for(n))               # D327: the fixed 6v6 fights
 	if n == OBJECTIVE_FIGHT:
 		return OBJECTIVE_MAP
 	if n == TWINS_FIGHT:
@@ -269,6 +286,40 @@ static func shuffled_maps(p_seed: int) -> Array:
 ## is for the screens: the pre-battle note, the results line.
 func objective_for(n: int) -> Dictionary:
 	return BWBoard.load_file("res://maps/%s.json" % map_for(n)).objective
+
+
+## D327: fight n's fixed 6v6 mode ("" = none): Split Front at SPLIT_FIGHT,
+## the run's seeded pair at SIX_FIGHTS.
+func mode_for(n: int) -> String:
+	if mode_override.has(n):
+		return str(mode_override[n])               # tools only (campaign_sim SIX=1)
+	if n == SPLIT_FIGHT:
+		return "splitfront"
+	var i := SIX_FIGHTS.find(n)
+	return str(six_modes_for(seed_value)[i]) if i >= 0 else ""
+
+
+## D325: two of SIX_MODES for fights 8 and 10, no repeat, from the run seed
+## on its own rng (loot and maps don't move).
+static func six_modes_for(p_seed: int) -> Array:
+	var pool: Array = SIX_MODES.duplicate()
+	var mrng := RandomNumberGenerator.new()
+	mrng.seed = hash("sixes|%d" % p_seed)
+	var a: String = pool.pop_at(mrng.randi() % pool.size())
+	var b: String = pool[mrng.randi() % pool.size()]
+	return [a, b]
+
+
+## The map a mode plays on (MODE_PLACEHOLDER until the mode's map ships).
+static func mode_map(mode: String) -> String:
+	var m := str(MODE_MAPS.get(mode, MODE_PLACEHOLDER))
+	return m if FileAccess.file_exists("res://maps/%s.json" % m) else MODE_PLACEHOLDER
+
+
+## A fight with no room choice and no map off the queue: the Obelisks, the
+## Twins, the 6v6 modes (D327).
+static func is_fixed(n: int) -> bool:
+	return n == OBJECTIVE_FIGHT or n == TWINS_FIGHT or n == SPLIT_FIGHT or n in SIX_FIGHTS
 
 
 ## D256: the current fight is the Twins.
@@ -899,6 +950,8 @@ static func scale_stats(u: BWUnit, mult: float) -> void:
 func enemies_for(n: int, room: Dictionary = {}) -> Array:
 	var out := _enemies_for(n, room)
 	BWKeystones.arm_enemies(out, n, room)          # D279: enemy keystones by stage
+	if str(BWRooms.room_for(self, n).get("mode", "") if room.is_empty() else room.get("mode", "")) == "horde":
+		BWKeystones.arm_enemies(out.filter(func(u): return u.encounter == ""), n, {})   # D331: the elites are a normal squad
 	return out
 
 
@@ -909,6 +962,12 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 		room = BWRooms.room_for(self, n)
 	if n == TWINS_FIGHT:
 		return BWTwins.build(self, n)                  # D256: the mid-run boss
+	if str(room.get("mode", "")) == "horde":
+		return BWHordeMode.build(self, n)              # D331: the waves
+	if str(room.get("mode", "")) == "defend":
+		return BWCastleDefend.build(self, n)           # D341: raiders and their waves
+	if str(room.get("mode", "")) == "storm":
+		return BWCastleStorm.build(self, n)            # D341: guards, the Warden, reinforcements
 	if str(room.get("encounter", "")) != "":
 		return BWEncounters.build(self, n, str(room.encounter))   # D208: a special encounter
 	var build := BWRooms.enemy_build(n, str(room.get("kind", BWRooms.STANDARD)))
@@ -931,7 +990,7 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 		seed_unit(u)                     # D174: its two-card picks, from the run seed
 		var levels := int(build.levels)
 		BWProgression.level_up(u, levels)          # D179: levels, not XP
-		scale_stats(u, float(curve.mult))
+		scale_stats(u, float(curve.mult) * (BWSplitFront.ENEMY_MULT if str(room.get("mode", "")) == "splitfront" else 1.0))   # D334
 		var save := rng.state
 		rng.seed = erng.randi()
 		u.equipment["main_hand"] = make_item(u.weapon_model, tier)
@@ -998,12 +1057,16 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 	report["map"] = str(room.get("map", ""))
 	if room.has("encounter"):
 		report["encounter"] = str(room.encounter)
+	if str(room.get("mode", "")) != "":
+		report["mode"] = str(room.mode)                # D327: the 6v6 mode, named on the results
 	if str(room.get("weather", "")) != "":
 		report["weather"] = str(room.weather)          # D249
 	if won:
 		var hard: bool = report.room == BWRooms.HARD
 		var enc: bool = room.has("encounter")         # D208: an encounter pays as a three-enemy Hard room
 		var drops := (DEPLOY if enc else defeated.size()) + (BWRooms.HARD_EXTRA_DROPS if hard else 0)
+		if report.has("mode"):
+			drops = MODE_DROPS                         # D334
 		if hard and str(room.get("weather", "")) != "":
 			drops += BWWeather.HARD_EXTRA_DROPS        # D249: a Hard room in weather pays one more
 		for i in drops:

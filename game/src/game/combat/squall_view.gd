@@ -8,7 +8,8 @@ extends Node3D
 ## Board marks (rebuilt when the squalls change):
 ##   squall front  every hex the front reaches at the next tick gets a
 ##                 spinning three-arm swirl in the squall's colour (light:
-##                 yellow over ink; dark: violet over a white hairline) and an
+##                 yellow over ink; dark: deep violet over ink over a white
+##                 hairline, D345) and an
 ##                 outward chevron that drifts out and back: a moving front.
 ## Event VFX:
 ##   squall          the origin flares in the squall's colour (feed line)
@@ -30,12 +31,23 @@ var played: Array = []
 var shown := {}                # probes / review: { front: [hexes] }
 
 
+## D345: the dark front was a pale lavender over a white stroke and read as
+## a light mark; now a deep violet over an ink outline (the dark tiles' own
+## ink-and-violet), with a thin white halo outside the ink so it still reads
+## on a dark tile.
+const DARK_VIOLET := Color(0.37, 0.16, 0.66)
+
 static func col_of(el: String) -> Color:
-	return BWLook.glow_color(el) if el == "light" else BWLook.element_color("dark").lightened(0.15)
+	return BWLook.glow_color(el) if el == "light" else DARK_VIOLET
 
 
-static func under_of(el: String) -> Color:
-	return INK if el == "light" else Color(WHITE, 0.9)
+static func under_of(_el: String) -> Color:
+	return INK
+
+
+## The outermost hairline (dark only): white, so ink on a dark tile still reads.
+static func halo_of(el: String) -> Color:
+	return Color(WHITE, 0.85) if el == "dark" else Color(0, 0, 0, 0)
 
 
 static func ice_col() -> Color:
@@ -120,23 +132,24 @@ func _front_mark(h: Vector2i, origin: Vector2i, el: String) -> void:
 	var col := col_of(el)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	swirl(st, Vector3.ZERO, 0.62, under_of(el), col)
+	swirl(st, Vector3.ZERO, 0.62, under_of(el), col, halo_of(el))
 	var sw := _node(st, c)
 	var o := _top(origin)
 	var out := Vector3(c.x - o.x, 0, c.z - o.z)
 	out = out.normalized() if out.length() > 0.01 else Vector3.RIGHT
 	var cs := SurfaceTool.new()
 	cs.begin(Mesh.PRIMITIVE_TRIANGLES)
-	chevron(cs, Vector3(0, 0.01, 0), out, 0.3, under_of(el), col)
+	chevron(cs, Vector3(0, 0.01, 0), out, 0.3, under_of(el), col, halo_of(el))
 	var ch := _node(cs, c)
 	_front.append([sw, ch, c, out])
 
 
 ## A three-arm swirl (wind's mark) in `col` over an `under` stroke.
-static func swirl(st: SurfaceTool, c: Vector3, rad: float, under: Color, col: Color) -> void:
-	for pass_i in 2:
-		var w := 0.11 if pass_i == 0 else 0.06
-		var cc := under if pass_i == 0 else col
+## `halo` (alpha > 0): a wider hairline under the ink (D345, the dark front).
+static func swirl(st: SurfaceTool, c: Vector3, rad: float, under: Color, col: Color, halo := Color(0, 0, 0, 0)) -> void:
+	for pass_i in range(-1 if halo.a > 0.0 else 0, 2):
+		var w := 0.16 if pass_i < 0 else (0.11 if pass_i == 0 else (0.07 if halo.a > 0.0 else 0.06))
+		var cc := halo if pass_i < 0 else (under if pass_i == 0 else col)
 		for arm in 3:
 			var prev := Vector3.ZERO
 			for i in 13:
@@ -150,14 +163,14 @@ static func swirl(st: SurfaceTool, c: Vector3, rad: float, under: Color, col: Co
 
 
 ## An outward chevron (two strokes meeting at the tip).
-static func chevron(st: SurfaceTool, c: Vector3, out: Vector3, size: float, under: Color, col: Color) -> void:
+static func chevron(st: SurfaceTool, c: Vector3, out: Vector3, size: float, under: Color, col: Color, halo := Color(0, 0, 0, 0)) -> void:
 	var side := Vector3(-out.z, 0, out.x)
 	var tip := c + out * size
 	var a := c - out * size * 0.2 + side * size
 	var b := c - out * size * 0.2 - side * size
-	for pass_i in 2:
-		var w := 0.12 if pass_i == 0 else 0.06
-		var cc := under if pass_i == 0 else col
+	for pass_i in range(-1 if halo.a > 0.0 else 0, 2):
+		var w := 0.17 if pass_i < 0 else (0.12 if pass_i == 0 else (0.07 if halo.a > 0.0 else 0.06))
+		var cc := halo if pass_i < 0 else (under if pass_i == 0 else col)
 		var lift := Vector3(0, 0.004 * pass_i, 0)
 		_flat(st, a + lift, tip + lift, w, cc)
 		_flat(st, b + lift, tip + lift, w, cc)
@@ -181,7 +194,7 @@ func on_event(e: Dictionary) -> void:
 	match str(e.type):
 		"squall":
 			var el := str(e.element)
-			_flare(e.hex, col_of(el), under_of(el))
+			_flare(e.hex, col_of(el), under_of(el), halo_of(el))
 			screen.ui.feed("[b]Squall![/b] %s's wind catches the %s: it spreads a ring a tick for %d ticks%s" % [
 				screen._name(str(e.unit)), el, int(e.left), " (the old squall is gone)" if bool(e.get("replaced", false)) else ""])
 			_sig = ""
@@ -215,10 +228,10 @@ func _fade(mi: MeshInstance3D, life: float, grow: float = 1.0) -> void:
 	tw.chain().tween_callback(mi.queue_free)
 
 
-func _flare(hex: Vector2i, col: Color, under: Color) -> void:
+func _flare(hex: Vector2i, col: Color, under: Color, halo := Color(0, 0, 0, 0)) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	swirl(st, Vector3.ZERO, 0.9, under, col)
+	swirl(st, Vector3.ZERO, 0.9, under, col, halo)
 	var mi := _node(st, _top(hex))
 	_fade(mi, 0.5, 1.8)
 
@@ -231,7 +244,7 @@ func _sweep(origin: Vector2i, ring: Array, el: String) -> void:
 	for h in ring:
 		var c := _top(h) - o
 		var out := Vector3(c.x, 0, c.z).normalized()
-		chevron(st, c, out, 0.42, under_of(el), col_of(el))
+		chevron(st, c, out, 0.42, under_of(el), col_of(el), halo_of(el))
 		_flat(st, c - out * 0.45, c + out * 0.2, 0.05, col_of(el))
 	var mi := _node(st, o)
 	_fade(mi, 0.55, 1.12)
@@ -325,7 +338,7 @@ static func preview(bp: BWBlastPreview, st: SurfaceTool, sim: Dictionary) -> voi
 				for h in nxt:
 					bp._hatch(st, h, col_of(el), "sparse", 0.75)
 					bp._rim(st, h, Color(BWLook.glow_color("wind"), 0.95), BWBlastPreview.RIM_W, true)
-					swirl(st, bp._top(h) + Vector3(0, 0.01, 0), 0.45, under_of(el), col_of(el))
+					swirl(st, bp._top(h) + Vector3(0, 0.01, 0), 0.45, under_of(el), col_of(el), halo_of(el))
 				if not nxt.is_empty():
 					bp._hex_tag(nxt[0], "SQUALL: NEXT TICK", BWLook.glow_color("wind"), 0.55)
 				bp._hex_tag(ev.hex, "SQUALL (%s)" % el.to_upper(), col_of(el) if el == "light" else BWLook.glow_color("wind"), 0.85)

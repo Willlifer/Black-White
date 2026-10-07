@@ -74,6 +74,8 @@ static func take_turn(b: BWBattle) -> void:
 	if BWTwins.is_twin(u):
 		BWTwins.ai_turn(b, u)                         # D257: the Twins' phase-aware turn
 		return
+	if BWObjectives.ai_turn(b, u):
+		return                                        # D327: a mode plays this turn (grunts walk for the exit)
 	_consider_swap(b, u)                              # D181: draw the carried weapon if it scores better
 	var best := _best_target(b, u, u.pos)
 	if not best.is_empty() and b.objective_mode() and u.team == "player":
@@ -287,10 +289,14 @@ static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:
 		if fc.has("immune"):
 			continue                                        # D209: a Being shrugs off the blow: not a target
 		var ev: float = fc.expected.value
+		var w := BWObjectives.ai_target_weight(b, u, f)    # D327: a mode's weights (0 = not a target)
+		if w <= 0.0:
+			continue
 		var score := ev + (1000.0 if ev >= f.hp else 0.0)   # finishing blows first
 		score += float(fc.get("arc_ev", 0.0))               # D86 chain lightning
 		score += objective_bonus(b, u, f, ev)               # D145
 		score += BWThunderKeys.ai_target(b, u, f, from)     # D290: a Static Blades backstab bursts
+		score *= w
 		if best.is_empty() or score > best.score:
 			best = { "target": f, "score": score }
 	return best

@@ -8,6 +8,7 @@ extends Node
 ##   --carry                     every unit also carries a second weapon (another class, D193/D195: swaps)
 ##   --boss                      fight the Giant instead
 ##   --encounter <kind> [--fight n]  a special encounter (horde|colossus|blank|being, D208)
+##   --mode splitfront|horde|defend|storm [--fight n] [--divider fire|ice|wind]  a 6v6 mode with a run's six (D327-D333; use with --combat)
 ##                               against a squad levelled and geared to fight n (default 5)
 ##   --weather <kind>            D249: the fight's weather (rain|ashfall|eclipse|blizzard|gale)
 ##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
@@ -205,9 +206,30 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 		players = run.squad.slice(0, 3)
 		run.prepare_for_battle(players)
 		enemies = BWEncounters.build(run, n, enc)
+	var md := _arg(OS.get_cmdline_user_args(), "--mode", "")
+	if md in ["splitfront", "horde", "defend", "storm"]:   # D341: the castles too
+		# D327-D333: a run at the mode's fight (Split Front 5, the Horde 8 or --fight n),
+		# its six levelled and geared, against the mode's enemies on its map
+		var mrun := BWRun.start(BWData.table("roster").slice(0, 6).map(func(r): return str(r.id)), seed_value)
+		var mn := int(_arg(OS.get_cmdline_user_args(), "--fight", str(BWRun.SPLIT_FIGHT if md == "splitfront" else BWRun.SIX_FIGHTS[0])))
+		for u in mrun.squad:
+			BWProgression.level_up(u, mn - u.level)
+			BWPicks.auto_resolve(u)
+			for slot in BWRun.ARMOR_SLOTS:
+				var bases: Array = BWData.table("equipment").filter(func(r): return r.slot == slot)
+				u.equipment[slot] = mrun.make_item(str(bases[absi(hash(u.id + slot)) % bases.size()].id), mrun.tier_for(mn))
+			u.equipment["main_hand"] = mrun.make_item(u.weapon_model, mrun.tier_for(mn))
+		mrun.fight = mn
+		players = mrun.squad.slice(0, 6)
+		mrun.prepare_for_battle(players)
+		map_name = BWRun.MODE_MAPS[md]
+		var room := { "kind": BWRooms.STANDARD, "map": map_name, "fight": mn, "mode": md,
+			"enemies": BWRooms._draw_ids(mrun, mn, [], false, 6) }
+		enemies = mrun.enemies_for(mn, room)
 	var s := BWCombatScreen.new()
 	s.configure("res://maps/%s.json" % map_name, players, enemies, [], seed_value)
 	s.weather_kind = _arg(OS.get_cmdline_user_args(), "--weather", "")   # D249
+	s.mode_opts = { "divider": _arg(OS.get_cmdline_user_args(), "--divider", "") } if "--divider" in OS.get_cmdline_user_args() else {}   # D328
 	s.autoplay = autoplay
 	s.finished.connect(func(w, _b): print("battle over: ", w))
 	if autoplay and not "--shot" in OS.get_cmdline_user_args():
