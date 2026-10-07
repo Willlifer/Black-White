@@ -192,7 +192,7 @@ poses bone by bone, and they match the baked `rig_stress` to 0.0°.
 ```gdscript
 var rig := BWCharacterRig.new()
 add_child(rig)
-BWClothing.dress_from_row(rig, BWData.row("roster", "jet"))   # top, bottom, clothing_shade
+BWClothing.dress_from_row(rig, BWData.row("roster", "kai"))   # top, bottom, clothing_shade (D379: a seated id; pool ids like "jet" roll only in a run)
 BWClothing.wear(rig, "shorts", "light")    # replaces the bottom only
 BWClothing.set_shade(rig, "dark")
 BWClothing.garment(rig, "top")             # the MeshInstance3D, e.g. to hide under a chest plate

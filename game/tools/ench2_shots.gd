@@ -74,7 +74,7 @@ func _shop() -> void:
 	await _shot("ench2_shop")
 	# a scroll's hover card (the thunder one)
 	var tiles := sh._scroll_row.get_children()
-	var tt: BWItemTile = tiles[3]
+	var tt: BWItemTile = tiles[3].get_child(1)          # D380: each scroll tile sits under its FEATURED tag
 	await _move(tt.get_global_rect().get_center())
 	await _wait(0.5)
 	sh._hover_scroll(tt.item)

@@ -159,6 +159,10 @@ var _uid := 0
 ## and the 20 rows the squad, the enemies (enemies_for) and recruits come from.
 var roster_seed := -1
 var roster_rows: Array = []
+## D379: rolled rows for every identity NOT seated (the swapped-out core and
+## the unseated pool): the enemy side draws from these too, so a 6v6 always
+## has enough. Saved with the run (a save without them re-rolls them).
+var reserve_rows: Array = []
 
 
 # ---------------------------------------------------------------- setup
@@ -171,6 +175,7 @@ static func start(chosen_ids: Array, p_seed: int, p_roster: Array = [], p_roster
 	r.rng.seed = p_seed
 	r.roster_rows = (p_roster if not p_roster.is_empty() else BWData.table("roster")).duplicate(true)
 	r.roster_seed = p_roster_seed if not p_roster.is_empty() else BWData.roster_seed
+	r.reserve_rows = BWRosterGen.reserve(BWData.all_identities(), r.roster_rows, r.roster_seed)   # D379
 	r.map_order = shuffled_maps(p_seed)          # D145
 	r.map_queue = r.map_order.duplicate()        # D187
 	for id in chosen_ids:
@@ -708,6 +713,91 @@ func roll_scrolls() -> void:
 			"enchant": _weighted(pool, r), "tier": tier, "sold": false })
 
 
+## D380: the one scroll the shop marks "Featured", a suggestion for this
+## squad: { scroll, reason, score } ({} when every scroll is spent). Each
+## unsold scroll scores
+##   FEAT_STRENGTH x its row's `strength` (enchantments.csv, 1-3)
+##   + FEAT_SET when it would bring a squad member's learned element to a
+##     2- or 3-piece set (one of its head / chest / legs / drawn weapon not yet
+##     that colour: BWSets), + FEAT_USED per member whose most-used element
+##     (BWAutoEquip.used_element, D315) is the scroll's
+##   + FEAT_ITEM per owned item the row fits (its applies_to; any weapon), up
+##     to FEAT_ITEMS_CAP
+## Ties: element order. The reason is the strongest term, in one line.
+const FEAT_STRENGTH := 10.0
+const FEAT_SET := 25.0
+const FEAT_USED := 8.0
+const FEAT_ITEM := 1.5
+const FEAT_ITEMS_CAP := 6
+
+func featured_scroll() -> Dictionary:
+	var best := {}
+	for sc in scrolls:
+		if sc.get("sold", false) or str(sc.get("enchant", "")) == "":
+			continue
+		var f := _feature(sc)
+		if best.is_empty() or float(f.score) > float(best.score):
+			best = f
+	return best
+
+
+func _feature(sc: Dictionary) -> Dictionary:
+	var el := str(sc.element)
+	var row := BWData.row("enchantments", str(sc.enchant))
+	var strength := clampi(int(row.get("strength", 1)), 1, 3)
+	var score := FEAT_STRENGTH * strength
+	# set progress: the best completion among the squad (a 3-piece beats a 2)
+	var set_unit: BWUnit = null
+	var set_tier := 0
+	var users: Array = []
+	for u in squad:
+		if BWAutoEquip.used_element(u) == el:
+			users.append(u)
+		if int(u.affinity.get(el, 0)) <= 0:
+			continue
+		var p := BWSets.pieces(u, el)
+		if p >= 3:
+			continue
+		var open := false
+		for slot in ["head", "chest", "legs", "main_hand"]:
+			var it: Dictionary = u.equipment.get(slot, {})
+			if not it.is_empty() and item_element(it) != el:
+				open = true
+		if open and p + 1 >= 2 and p + 1 > set_tier:
+			set_tier = p + 1
+			set_unit = u
+	if set_unit != null:
+		score += FEAT_SET * (1.0 if set_tier == 2 else 1.4)
+	score += FEAT_USED * users.size()
+	var fits: Array = str(row.get("applies_to", "")).split("|", false)
+	var n_items := 0
+	for it in inventory + _owned_worn():
+		if str(it.get("slot", "")) == "main_hand" or str(it.get("base", "")) in fits:
+			n_items += 1
+	n_items = mini(n_items, FEAT_ITEMS_CAP)
+	score += FEAT_ITEM * n_items
+	var elc := el.capitalize()
+	var reason := ""
+	if set_unit != null:
+		reason = "completes %s's %s set (%d-piece)" % [set_unit.name, elc, set_tier]
+	elif not users.is_empty():
+		reason = "%s's most-used element is %s" % [users[0].name, elc] if users.size() == 1 			else "%d of your squad fight mostly with %s" % [users.size(), elc]
+	elif strength >= 3:
+		reason = "a strong %s row, fits %d of your items" % [elc, n_items]
+	else:
+		reason = "fits %d of your items" % n_items
+	return { "scroll": sc, "score": score, "reason": "Featured: " + reason }
+
+
+func _owned_worn() -> Array:
+	var out: Array = []
+	for u in squad:
+		for slot in GEAR_SLOTS:
+			if u.equipment.has(slot) and not u.equipment[slot].is_empty():
+				out.append(u.equipment[slot])
+	return out
+
+
 ## D203/D236: may `scroll` be used on `target` (an item the run owns: loose,
 ## or worn by the squad)? Free since D236: no payment.
 func can_use_scroll(scroll: Dictionary, target: Dictionary) -> bool:
@@ -873,11 +963,16 @@ const ENEMY_STAGE_LAG := 2        # the D99 lag; fights past the table use it
 ## D308 re-tune with the whole Element Overhaul on (keystones and sets both
 ## sides, weather, the Twins, rooms): fights 1, 3, 5, 6, 8, 10 harder (the
 ## last measurement had 5-10 at ~92%); fight 7 is the Twins (BWTwins knobs).
+## D385: a fifth column, the 3v3 scale: multiplies the base-stat multiplier
+## in 3v3 rooms only (the single opener, Standard, Hard); bosses, encounters
+## and the 6v6 modes read the multiplier unscaled. Eases Standard back toward
+## ~75% (it was 69-71% after the D359 movement change). 24 runs, mixed,
+## card policy: Standard 71% (before) -> 75% (122 fights) at 0.93 on 1, 2, 3, 6, 9.
 const ENEMY_CURVE := [
-	[0, 0.97, false, 0], [0, 1.05, false, 1],                     # 1-2: gentle start (fight 1 under full strength), no perks
-	[2, 1.95, true, 2], [2, 0.7, true, 3], [2, 1.35, true, 3],    # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
-	[1, 1.15, true, 3], [1, 1.1, true, 3], [1, 1.1, true, 3],     # 6-8: one behind
-	[0, 1.0, true, 3], [0, 1.03, true, 3],                        # 9-10: level with you
+	[0, 0.97, false, 0, 0.93], [0, 1.05, false, 1, 0.93],               # 1-2: gentle start (fight 1 under full strength), no perks
+	[2, 1.95, true, 2, 0.93], [2, 0.7, true, 3, 1.0], [2, 1.35, true, 3, 1.0],   # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
+	[1, 1.15, true, 3, 0.93], [1, 1.1, true, 3, 1.0], [1, 1.1, true, 3, 1.0],    # 6-8: one behind
+	[0, 1.0, true, 3, 0.93], [0, 1.03, true, 3, 1.0],                   # 9-10: level with you
 ]
 ## D193: enemies carry a second weapon (a random other class) from this fight.
 const ENEMY_SECOND_FROM := 3
@@ -897,8 +992,9 @@ static func enemy_curve(n: int) -> Dictionary:
 	if n >= 1 and n <= table.size():
 		var row: Array = table[n - 1]
 		return { "lag": int(row[0]), "mult": float(row[1]), "perks": bool(row[2]),
-			"armor": int(row[3]) if row.size() > 3 else ARMOR_SLOTS.size() }
-	return { "lag": ENEMY_STAGE_LAG, "mult": 1.0, "perks": true, "armor": ARMOR_SLOTS.size() }
+			"armor": int(row[3]) if row.size() > 3 else ARMOR_SLOTS.size(),
+			"three": float(row[4]) if row.size() > 4 else 1.0 }     # D385
+	return { "lag": ENEMY_STAGE_LAG, "mult": 1.0, "perks": true, "armor": ARMOR_SLOTS.size(), "three": 1.0 }
 
 
 ## The stage fight n's enemies are built at (D99, D133).
@@ -970,6 +1066,8 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 	var curve := build
 	var tier := tier_for(stage)
 	var ranks: Array = ENEMY_RANKS[tier]
+	# D385: the 3v3 scale, for a plain room of three (no mode)
+	var three := float(enemy_curve(n).get("three", 1.0)) if str(room.get("mode", "")) == "" and (room.enemies as Array).size() <= DEPLOY else 1.0
 	for id in room.enemies:
 		var row: Dictionary = roster_row(str(id))
 		var u := BWUnit.from_roster(row)
@@ -977,7 +1075,7 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 		seed_unit(u)                     # D174: its two-card picks, from the run seed
 		var levels := int(build.levels)
 		BWProgression.level_up(u, levels)          # D179: levels, not XP
-		scale_stats(u, float(curve.mult) * (BWSplitFront.ENEMY_MULT if str(room.get("mode", "")) == "splitfront" else 1.0))   # D334
+		scale_stats(u, float(curve.mult) * (BWSplitFront.ENEMY_MULT if str(room.get("mode", "")) == "splitfront" else 1.0) * three)   # D334, D385
 		var save := rng.state
 		rng.seed = erng.randi()
 		u.equipment["main_hand"] = make_item(u.weapon_model, tier)
@@ -1503,8 +1601,22 @@ func recruit(id: String = "") -> BWUnit:
 ## Room for one more recruit: the enemies of later fights are roster
 ## characters outside the squad, so DEPLOY of them must stay outside.
 func can_recruit() -> bool:
-	var outside := roster_rows.filter(func(r): return unit(str(r.id)) == null).size()
-	return outside > DEPLOY
+	return enemy_ids().size() > ENEMY_SIDE_MAX       # D379: seats and reserve, a full 6v6 side spare
+
+
+## D379: the largest enemy side a fight fields (6v6).
+const ENEMY_SIDE_MAX := 6
+
+
+## D379: every identity the enemy side may draw (seated and reserve, outside
+## the squad), sorted.
+func enemy_ids() -> Array:
+	var out: Array = []
+	for row in roster_rows + reserve_rows:
+		if unit(str(row.id)) == null:
+			out.append(str(row.id))
+	out.sort()
+	return out
 
 
 ## A weapon of class `wc` (a random model of it, random enchantment), into the inventory.
@@ -1618,7 +1730,7 @@ func to_dict() -> Dictionary:
 		"stats": stats.duplicate(true),
 		"map_order": (map_order if not map_order.is_empty() else shuffled_maps(seed_value)).duplicate(),   # D145
 		"map_queue": map_queue.duplicate(), "room_offer": room_offer.duplicate(true), "room_log": room_log.duplicate(true),   # D189
-		"roster_seed": str(roster_seed), "roster": roster_rows.duplicate(true),
+		"roster_seed": str(roster_seed), "roster": roster_rows.duplicate(true), "reserve": reserve_rows.duplicate(true),   # D379
 	}
 
 
@@ -1627,9 +1739,18 @@ static func can_load(d: Variant) -> bool:
 	return d is Dictionary and int(d.get("version", 1)) >= OLDEST_LOADABLE and d.has("roster")
 
 
-## A row of this run's roster by id ({} when unknown).
+## A row of this run's roster by id: the seats, then the reserve (D379);
+## "<id>~k" is a duplicate enemy of <id> with its own roll ({} when unknown).
 func roster_row(id: String) -> Dictionary:
-	return BWRosterGen.row_by_id(roster_rows, id)
+	var r := BWRosterGen.row_by_id(roster_rows, id)
+	if r.is_empty():
+		r = BWRosterGen.row_by_id(reserve_rows, id)
+	if r.is_empty() and "~" in id:
+		var base := roster_row(id.get_slice("~", 0))
+		if not base.is_empty():
+			r = BWRosterGen.roll_one(base, hash("bw-dup:%d:%s" % [roster_seed, id]))
+			r["id"] = id
+	return r
 
 
 static func from_dict(d: Dictionary) -> BWRun:
@@ -1641,10 +1762,21 @@ static func from_dict(d: Dictionary) -> BWRun:
 	r.roster_rows = []
 	for row in d.get("roster", BWData.table("roster")):
 		var rr: Dictionary = Dictionary(row).duplicate()
-		for k in BWUnit.STATS + ["seat"]:
+		for k in BWUnit.STATS + ["seat", "pool"]:
 			if rr.has(k):
 				rr[k] = int(rr[k])
 		r.roster_rows.append(rr)
+	# D379: the reserve as saved (an older save re-rolls it from the seed)
+	r.reserve_rows = []
+	if d.has("reserve"):
+		for row in d.reserve:
+			var rr: Dictionary = Dictionary(row).duplicate()
+			for k in BWUnit.STATS + ["seat", "pool"]:
+				if rr.has(k):
+					rr[k] = int(rr[k])
+			r.reserve_rows.append(rr)
+	else:
+		r.reserve_rows = BWRosterGen.reserve(BWData.all_identities(), r.roster_rows, r.roster_seed)
 	r.rng.seed = r.seed_value
 	r.rng.state = str(d.rng_state).to_int()
 	# D145: the saved map order (an older save: the same shuffle from its seed)

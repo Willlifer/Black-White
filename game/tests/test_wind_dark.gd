@@ -108,6 +108,7 @@ func test_wind_surge_gust_slams(t) -> void:
 	var wall := _nb(near, dir)                 # a unit right behind: the slam
 	var b := _duel(me, [f, g], [near, wall])
 	me.wind_mode = "gust"
+	BWWindShape.set_choice(me, "surge", "burst")   # D383: areas default to Draw in; this checks Burst out's slam
 	var hp_g := g.hp
 	var ev := b.use_skill(me, "surge", "wind", tgt)
 	t.ok(not ev.is_empty(), "the surge resolves")

@@ -12,12 +12,12 @@ extends Node
 ##                               against a squad levelled and geared to fight n (default 5)
 ##   --weather <kind>            D249: the fight's weather (rain|ashfall|eclipse|blizzard|gale)
 ##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
-##   --screen <title|roster|prep|rooms|prebattle|downtime|results>   open one screen on a sample run
+##   --screen <title|roster|prep|rooms|prebattle|downtime|results|boot>   open one screen on a sample run (boot: D381, held at 67%)
 ##   --ui-probe                  drive combat with synthetic input and check it responds
 ##   --tutorial                  open the tutorial (D223); --tutorial-probe steps through all of it
 ##                               with synthetic input (SHOTS=<dir>: review frames), exit 0 = completed
 ##   --flow-probe                walk the real game through every screen transition
-##   --ui-shots [dir]            render roster / codex / loading / results review frames
+##   --ui-shots [dir]            render roster / codex / boot / results review frames
 ##                               to <dir>/ui_*.png (default design/art), then quit
 ##   --audio-capture [dir]       record a scripted 61 s run (title, roster, combat, boss)
 ##                               from the Master bus to <dir>/capture.wav + capture.json
@@ -65,6 +65,7 @@ func _ready() -> void:
 	if "--audio-capture" in args:
 		var ac := BWAudioCapture.new()
 		ac.drop2 = "--drop2" in args                # D242: the author's drop 2 cues and stings
+		ac.placeholders = "--placeholders" in args  # D394: the ph_* placeholders + short pick reveal
 		ac.out_dir = _arg(args, "--audio-capture", ProjectSettings.globalize_path("res://").path_join("../design/audio").simplify_path())
 		add_child(ac)
 		return
@@ -253,6 +254,11 @@ func _one_screen(which: String) -> void:
 	var s: Node
 	match which:
 		"title": s = BWTitleScreen.new()
+		"boot":                                    # D381: held mid-warm for review renders
+			var bs := BWBootScreen.new()
+			bs.freeze_at = 0.67
+			add_child(bs)
+			return
 		"roster": s = BWRosterScreen.new()
 		"prebattle":
 			s = BWPrebattleScreen.new()
@@ -278,5 +284,8 @@ func _one_screen(which: String) -> void:
 		BWMusic.play(cue)                          # D239: each screen with its own cue
 
 
+## D381: the title builds under the boot screen while the warm pass runs,
+## then the boot screen fades away onto it.
 func _start_game() -> void:
 	add_child(BWGame.new())
+	add_child(BWBootScreen.new())

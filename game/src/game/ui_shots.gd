@@ -1,6 +1,6 @@
 class_name BWUIShots
 extends Node
-## Renders the review frames for the roster, codex, loading and results
+## Renders the review frames for the roster, codex, boot (D381) and results
 ## screens into design/art/ui_*.png (real frames from the live viewport):
 ## `godot --path game -- --ui-shots [dir]` (windowed). Quits when done.
 
@@ -54,18 +54,13 @@ func _run() -> void:
 	r.queue_free()
 	await _wait(0.3)
 
-	# ---- loading: first map, mid-crossfade, ready
-	var l := BWLoadingScreen.new()
-	l.next_map = "arena"
-	add_child(l)
-	await _wait(2.2)
-	await _shot("loading_map")
-	await _wait(1.8)
-	await _shot("loading_crossfade")
-	l._show_ready()
-	await _wait(1.6)
-	await _shot("loading_ready")
-	l.queue_free()
+	# ---- the boot screen (D381; replaces the loading montage), held mid-warm
+	var bs := BWBootScreen.new()
+	bs.freeze_at = 0.67
+	add_child(bs)
+	await _wait(0.6)
+	await _shot("boot")
+	bs.queue_free()
 	await _wait(0.3)
 
 	# ---- results, on a sample run (as boot --screen results)

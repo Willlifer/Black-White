@@ -1,6 +1,8 @@
 """Frame strips for the cast / spectacle VFX review (D167-D170).
 
-    python tools/vfx_strip.py <frames dir> [out dir]
+    python tools/vfx_strip.py <frames dir> [out dir] [prefix]
+
+The prefix defaults to casts_ (D387-D390's pass writes vfx2_).
 
 Reads the folders tools/vfx_shots.gd writes (<frames dir>/<mode>/NN.png) and
 writes one strip per mode, casts_<mode>.png, to <out dir> (default
@@ -22,7 +24,7 @@ def label(im, text):
     d.text((4, 3), text, fill=(255, 255, 255))
 
 
-def strip(src, dst, name):
+def strip(src, dst, name, prefix="casts_"):
     files = sorted(f for f in os.listdir(src) if f.endswith(".png"))
     if not files:
         return
@@ -39,7 +41,7 @@ def strip(src, dst, name):
     sheet = Image.new("RGB", (cols * W + (cols - 1) * 4, rows * h + (rows - 1) * 4), (40, 40, 40))
     for i, im in enumerate(frames):
         sheet.paste(im, ((i % cols) * (W + 4), (i // cols) * (h + 4)))
-    out = os.path.join(dst, "casts_%s.png" % name)
+    out = os.path.join(dst, "%s%s.png" % (prefix, name))
     sheet.save(out)
     print("wrote", out)
 
@@ -70,6 +72,7 @@ def elements(src, dst):
 def main():
     src = sys.argv[1]
     dst = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "..", "..", "design", "art")
+    prefix = sys.argv[3] if len(sys.argv) > 3 else "casts_"
     for name in sorted(os.listdir(src)):
         d = os.path.join(src, name)
         if not os.path.isdir(d):
@@ -77,7 +80,7 @@ def main():
         if name == "elements":
             elements(d, dst)
         else:
-            strip(d, dst, name)
+            strip(d, dst, name, prefix)
 
 
 if __name__ == "__main__":

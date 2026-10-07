@@ -44,7 +44,7 @@ func _ready() -> void:
 	add_child(we)
 	_build_stage()
 	roster_seed = BWRosterGen.first_seed()
-	rows = BWRosterGen.roll(BWData.identities(), roster_seed)
+	rows = BWRosterGen.roll(BWData.identities(), roster_seed, BWData.pool_identities())   # D379: the pool rotates into the back row
 	for row in rows:
 		_units.append(BWUnit.from_roster(row))
 	for i in _units.size():
@@ -82,7 +82,7 @@ func randomize_roster() -> void:
 		pv.position = _seat(i)
 	_chosen.clear()
 	roster_seed = BWRosterGen.next_seed(roster_seed)
-	rows = BWRosterGen.roll(BWData.identities(), roster_seed)
+	rows = BWRosterGen.roll(BWData.identities(), roster_seed, BWData.pool_identities())   # D379: the pool rotates into the back row
 	_units.clear()
 	for row in rows:
 		_units.append(BWUnit.from_roster(row))

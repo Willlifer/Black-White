@@ -30,11 +30,21 @@ extends Node
 ##                                        frozen world doesn't matter)
 ##   ward_broken (D102, screen signal)    glass: tile_glaze pitched up twice, a hit_glance
 ##                                        crack under it
+## D393 placeholders (ph_*, tools/audio/make_placeholders.py; the author replaces them):
+##   enchant                              on-kill (Death Knell, Relentless, a kill's
+##                                        spread) -> ph_proc_onkill; pity (Second Chance,
+##                                        Graze, Follow-Through, Steady Hand) -> ph_proc_pity
+##   heal from an enchantment / Mend-Link ph_proc_heal instead of the heal shimmer
+##   immune                               ph_immune at the unit
+##   skill: a big cast (a caster's AoE)   the caster's release plays ph_cast_<element>
+##   skill: Fan of Knives                 the spin plays ph_fan_knives
+##   Horde grunts walking                 one ph_horde_shuffle loop while any walks
 
 var screen: BWCombatScreen
 var _pending: Array = []
 var _hooked := false
 var _level := -1
+var _shuffle: Node                   # D393: the Horde's shuffle loop
 
 
 func _ready() -> void:
@@ -59,6 +69,7 @@ func _process(_delta: float) -> void:
 			screen.ward_broken.connect(_on_ward_break)
 		_hooked = true
 		_update_intensity()
+	_horde_shuffle()
 	var q: Variant = screen.get("_queue")
 	while not _pending.is_empty():
 		var e: Dictionary = _pending[0]
@@ -89,10 +100,23 @@ func _replayed(e: Dictionary) -> void:
 			_expect(e.get("unit"), [{ "target": e.get("target"), "result": e.get("result", {}), "ko": e.get("ko", false) }], "")
 		"skill", "riposte":
 			_expect(e.get("unit"), e.get("results", []), str(e.get("element", "")))
+			if str(e.get("type", "")) == "skill":
+				_big_cast(e)
 		"heal":
 			var v := _view(e.get("unit"))
 			if v:
-				BWSfx.play("heal", v, { "tag": "heal" })
+				var cause := str(e.get("cause", ""))
+				if cause.begins_with("enchant:") or cause == "mend_link":
+					BWSfx.play("ph_proc_heal", v, { "tag": "proc_heal" })        # D393
+				else:
+					BWSfx.play("heal", v, { "tag": "heal" })
+		# ---- D393 placeholders ----
+		"enchant":
+			var kind := proc_kind(str(e.get("text", "")))
+			if kind != "":
+				BWSfx.play("ph_proc_" + kind, _view(e.get("unit")), { "tag": "proc_" + kind })
+		"immune":
+			BWSfx.play("ph_immune", _view(e.get("unit")), { "tag": "immune" })
 		"tile_damage":
 			var v := _view(e.get("unit"))
 			var cause := str(e.get("cause", ""))
@@ -184,6 +208,75 @@ func _on_ward_break(unit_id: String) -> void:
 	BWSfx.play("hit_glance", v, { "pitch": 1.5, "gain_db": -2.0, "stack": true, "tag": "ward_break" })
 
 # ---- end D100 / D101 / D102 ----
+
+
+# ---- D393 placeholders ----
+
+## The proc an `enchant` event's text announces: "onkill", "pity" or "".
+static func proc_kind(text: String) -> String:
+	for w in ["Death Knell", "Relentless", " spreads"]:
+		if text.contains(w):
+			return "onkill"
+	for w in ["Second Chance", "Graze", "Follow-Through", "Steady Hand"]:
+		if text.begins_with(w):
+			return "pity"
+	return ""
+
+
+## Keystone casts with no element of their own.
+const KEYSTONE_EL := { "flash_freeze": "ice", "tidal_release": "water", "glacier_shatter": "ice", "wind_wall": "wind" }
+const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "light", "dark"]
+
+
+## A big cast: a caster (staff, a Being, a cast-clip keystone) whose skill
+## covers an area (aoe, or 3+ hexes) -> its element; else "".
+static func big_cast_element(e: Dictionary, caster: BWUnit) -> String:
+	var key := str(e.get("skill", ""))
+	var row := BWSkillRegistry.row(key) if BWSkillRegistry.has(key) else {}
+	var clip := str(row.get("clip", ""))
+	var spell := caster != null and str(caster.weapon().get("damage_type", "")) == "spell"
+	if not BWClipRoute.casts(caster, spell or str(row.get("weapon", "")) == "staff", clip):
+		return ""
+	var hexes: Variant = e.get("hexes", [])
+	if not bool(row.get("aoe", false)) and not (hexes is Array and (hexes as Array).size() >= 3) and clip != "cast":
+		return ""
+	var el := str(e.get("element", ""))
+	if el == "":
+		el = str(KEYSTONE_EL.get(key, caster.attuned if caster and caster.attuned != "" else (caster.element if caster else "")))
+	return el if el in ELEMENTS else ""
+
+
+func _big_cast(e: Dictionary) -> void:
+	var v := _view(e.get("unit"))
+	if v == null:
+		return
+	if str(e.get("skill", "")) == "fan_of_knives":
+		BWUnitAudio.expect_cast(v, { "kind": "fan" })
+		return
+	var el := big_cast_element(e, v.unit)
+	if el != "":
+		BWUnitAudio.expect_cast(v, { "kind": "cast", "element": el })
+
+
+## One quiet shuffle loop while any Horde grunt walks, at the first walker.
+func _horde_shuffle() -> void:
+	var vs: Variant = screen.get("_views")
+	var walker: BWUnitView = null
+	if vs is Dictionary:
+		for v in (vs as Dictionary).values():
+			if v is BWUnitView and is_instance_valid(v) and v.unit and str(v.unit.encounter) == "grunt" and v.unit.alive() 					and v.character and v.character.animator 					and Vector2(v.character.animator.velocity.x, v.character.animator.velocity.z).length() > BWUnitAudio.MOVING:
+				walker = v
+				break
+	if walker and (_shuffle == null or not is_instance_valid(_shuffle)):
+		_shuffle = BWSfx.loop_start("ph_horde_shuffle", walker, { "tag": "horde_shuffle", "stack": true })
+	elif walker == null and _shuffle != null:
+		BWSfx.loop_stop(_shuffle, 0.4)
+		_shuffle = null
+
+
+func _exit_tree() -> void:
+	BWSfx.loop_stop(_shuffle, 0.05)
+	_shuffle = null
 
 
 ## Each target's BWUnitAudio learns what is about to hit it.

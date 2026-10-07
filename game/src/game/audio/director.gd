@@ -49,7 +49,7 @@ func _on_node(n: Node) -> void:
 		_attach(n, func(): return BWUnitAudio.new(), BWUnitAudio)
 	elif n is BWCombatScreen:
 		_attach(n, func(): return BWCombatAudio.new(), BWCombatAudio)
-	elif n is BWTitleScreen or n is BWRosterScreen or n is BWDowntimeScreen or n is BWResultsScreen or n is BWLoadingScreen 			or n is BWPrebattleScreen or n is BWRoomScreen:
+	elif n is BWTitleScreen or n is BWRosterScreen or n is BWDowntimeScreen or n is BWResultsScreen 			or n is BWPrebattleScreen or n is BWRoomScreen:
 		_attach(n, func(): return BWScreenAudio.new(), BWScreenAudio)
 	elif n is BWPicker:
 		_hook_picker(n as BWPicker)

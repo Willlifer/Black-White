@@ -193,12 +193,12 @@ func test_enemies_use_rolled_rows(t) -> void:
 	for n in [1, 4, 9]:                     # D327: 8 and 10 are 6v6 modes (grunts, castle units)
 		for e in run.enemies_for(n):
 			var base: String = e.id.split("_f")[0]
-			var r := BWRosterGen.row_by_id(rows, base)
-			t.ok(not r.is_empty(), "fight %d: %s is a roster character outside the squad" % [n, base])
+			var r := run.roster_row(base)           # D379: a seat or the reserve
+			t.ok(not r.is_empty() and run.unit(base) == null, "fight %d: %s is a roster character outside the squad" % [n, base])
 			t.ok(e.weapon_model == str(r.weapon_model) and e.element == str(r.element), "fight %d: %s fights with its rolled kit" % [n, base])
 			t.eq(str(e.cosmetics.get("top", "")), str(r.top), "fight %d: %s wears its rolled clothes" % [n, base])
 			var dflt := BWData.row("roster", base)
-			if str(dflt.weapon_model) != str(r.weapon_model) or str(dflt.element) != str(r.element):
+			if dflt.is_empty() or str(dflt.weapon_model) != str(r.weapon_model) or str(dflt.element) != str(r.element):
 				differs = true
 	t.ok(differs, "the run's roll, not the default table")
 
@@ -208,3 +208,96 @@ func test_default_roster(t) -> void:
 	t.eq(rows.size(), 20, "BWData.table(roster) is the active 20")
 	t.ok(rows[0].has("weapon_class") and rows[0].has("top"), "rolled columns present")
 	t.eq(BWData.row("roster", "rem").element, "ice", "row() reads the active roll")
+
+
+# ---------------------------------------------------------------- D379: the rolling pool
+
+func test_pool_identities(t) -> void:
+	var pool := BWData.pool_identities()
+	t.eq(pool.size(), 27, "27 pool identities (17 pre-D149 names + the author's 10)")
+	t.eq(BWData.all_identities().size(), 47, "47 identities in all")
+	var names := pool.map(func(r): return str(r.name))
+	for n in ["Picasso", "Irelia", "Despacito", "Quinn", "Shyvana", "Cain", "Abel", "Lyn", "Micaiah", "Mushu",
+			"Bartholomew", "Kyla", "Picassa", "Thaddeus", "Leopold", "Gus", "Henrietta", "Marguerite", "Zoe",
+			"Pip", "Ottilie", "Nova", "Rory", "Montgomery", "Jet", "Hugo", "Ambrose"]:
+		t.ok(n in names, "%s is in the pool" % n)
+	for n in ["Alexandra", "Aureli", "Will"]:
+		t.ok(not n in names, "%s stays core only" % n)
+	var hairs := {}
+	for r in pool:
+		hairs[str(r.hair_style)] = true
+		t.ok(str(r.gender) in ["f", "m", "a"] and str(r.friendliness) in ["unfriendly", "neutral", "friendly"]
+			and float(r.voice_pitch) >= 0.75 and float(r.voice_pitch) <= 1.35, "%s: gender, friendliness, voice" % r.name)
+	t.eq(hairs.size(), 10, "the pool uses all 10 hair styles")
+	t.eq(str(BWRosterGen.row_by_id(pool, "shyvana").element_lock), "fire", "Shyvana is always fire")
+	t.eq(str(BWRosterGen.row_by_id(pool, "shyvana").gender), "f", "Shyvana is f")
+
+
+func test_pool_swap(t) -> void:
+	var core := _ids()
+	var pool := BWData.pool_identities()
+	var seen_pool := {}
+	for s in SEEDS + range(600, 640):
+		var rows := BWRosterGen.roll(core, s, pool)
+		t.eq(rows.size(), 20, "seed %d: twenty seats" % s)
+		var swapped := 0
+		var front_ok := true
+		for i in rows.size():
+			if int(rows[i].seat) != i + 1:
+				t.eq(int(rows[i].seat), i + 1, "seed %d: seat %d numbered" % [s, i + 1])
+			if i < 10 and str(rows[i].id) != str(core[i].id):
+				front_ok = false
+			if int(rows[i].get("pool", 0)) == 1:
+				swapped += 1
+				seen_pool[str(rows[i].id)] = true
+				if i < 10:
+					t.ok(false, "seed %d: a pool member sits in the front row" % s)
+		t.ok(front_ok, "seed %d: the front row is the core ten" % s)
+		t.ok(swapped >= BWRosterGen.POOL_MIN and swapped <= BWRosterGen.POOL_MAX, "seed %d: %d back seats from the pool (3-5)" % [s, swapped])
+		t.eq(str(BWRosterGen.row_by_id(rows, "aureli").element), "light", "seed %d: Aureli light" % s)
+		t.eq(str(BWRosterGen.row_by_id(rows, "rem").element), "ice", "seed %d: Rem keeps her seat, ice" % s)
+		var sh := BWRosterGen.row_by_id(rows, "shyvana")
+		if not sh.is_empty():
+			t.eq(str(sh.element), "fire", "seed %d: Shyvana fire" % s)
+		var ids := {}
+		for r in rows:
+			ids[str(r.id)] = true
+		t.eq(ids.size(), 20, "seed %d: twenty different characters" % s)
+	t.ok(seen_pool.size() >= 20, "the pool rotates (%d of 27 seen)" % seen_pool.size())
+	t.eq(BWRosterGen.roll(core, 5, pool), BWRosterGen.roll(core, 5, pool), "the swap is seeded")
+	t.eq(BWRosterGen.roll(core, 5).map(func(r): return r.id), core.map(func(r): return r.id), "without the pool: the core twenty")
+
+
+func test_pool_reserve_and_save(t) -> void:
+	var rows := BWRosterGen.roll(_ids(), 777, BWData.pool_identities())
+	var run := BWRun.start(rows.slice(0, 6).map(func(r): return str(r.id)), 3, rows, 777)
+	t.eq(run.roster_rows.size() + run.reserve_rows.size(), 47, "seats + reserve = every identity")
+	for r in run.reserve_rows:
+		if str(r.id) == "shyvana":
+			t.eq(str(r.element), "fire", "Shyvana in the reserve is fire too")
+	var back := BWRun.from_dict(JSON.parse_string(JSON.stringify(run.to_dict())))
+	t.eq(back.roster_rows, run.roster_rows, "load: the seated pool members come back")
+	t.eq(back.reserve_rows, run.reserve_rows, "load: the reserve comes back")
+	t.eq(back.enemies_for(3).map(func(e): return e.id), run.enemies_for(3).map(func(e): return e.id), "load: same enemies")
+
+
+func test_enemy_supply(t) -> void:
+	var run := BWRun.start(["aureli", "della", "jericho", "will", "gail", "kira"], 21)
+	t.ok(run.enemy_ids().size() >= 40, "41 identities outside a squad of six (%d)" % run.enemy_ids().size())
+	# a squad that took nearly everyone: the enemy side still fields six
+	for id in run.enemy_ids().slice(0, run.enemy_ids().size() - 2):
+		var u := BWUnit.from_roster(run.roster_row(id))
+		run.squad.append(u)
+	t.ok(not run.can_recruit(), "no recruit once a 6v6 side couldn't be spared")
+	var ids := BWRooms._draw_ids(run, 8, [], false, 6)
+	t.eq(ids.size(), 6, "six drawn with only two left outside")
+	var uniq := {}
+	for id in ids:
+		uniq[id] = true
+		t.ok(not run.roster_row(id).is_empty(), "%s has a row" % id)
+	t.eq(uniq.size(), 6, "duplicates get their own ids (%s)" % [ids])
+	var dup := ids.filter(func(i): return "~" in i)
+	t.ok(not dup.is_empty(), "duplicates were needed")
+	if not dup.is_empty():
+		var base := str(dup[0]).get_slice("~", 0)
+		t.eq(str(run.roster_row(dup[0]).name), str(run.roster_row(base).name), "a duplicate keeps the identity")

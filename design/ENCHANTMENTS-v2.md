@@ -274,6 +274,17 @@ rolled row.
 
 The scrolls are re-rolled after every battle. Re-imbue is gone (D202).
 
+**The Featured scroll (D380).** One unsold scroll is marked FEATURED, a suggestion for this
+squad, with a one-line reason under the row ("Featured: completes Will's Wind set (2-piece)").
+`BWRun.featured_scroll` scores each: 10 × the row's `strength` (enchantments.csv, 1-3,
+Claude's tiers from the D308 keystone/sim notes: area makers, detonators and rule-changers 3,
+plain +% or narrow rows 1); +25 (×1.4 for a 3-piece) when it would bring a squad member's
+learned element to a 2- or 3-piece set (a head / chest / legs / drawn weapon not yet that
+colour, BWSets); +8 per member whose most-used element (auto-equip's profile, D315) is the
+scroll's; +1.5 per owned item the row fits (its `applies_to`, any weapon), up to 6. Ties go
+in element order. The reason is the strongest term: a set completion, then the users, then a
+strong row, then the item count. Knobs `BWRun.FEAT_*`.
+
 ---
 
 ## 6. The consolidation (D243–D247)

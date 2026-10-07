@@ -41,7 +41,13 @@ static func run() -> Dictionary:
 	var started := Time.get_ticks_msec()
 	var suites: Array = []
 	var failed := 0
-	var files := Array(DirAccess.get_files_at(TEST_DIR))
+	var files: Array = []
+	for raw in DirAccess.get_files_at(TEST_DIR):       # D396: an exported pack lists x.gd.remap + x.gdc
+		var n := str(raw).trim_suffix(".remap")
+		if n.ends_with(".gdc"):
+			n = n.trim_suffix("c")
+		if not n in files:
+			files.append(n)
 	files.sort()
 	for f in files:
 		if not (f.begins_with("test_") and f.ends_with(".gd")):

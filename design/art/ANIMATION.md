@@ -1,5 +1,11 @@
 # Animation (Phase 4: the clip matrix)
 
+> **Names (D379, L-10):** this doc predates the D149 rename, so some examples
+> name pre-D149 characters (Pip, Hugo, Kyla). Since D379 those are members of
+> the rolling roster pool (design/ROSTER.md), so the names still exist in the
+> game; their quoted taglines are gone (D153), and their kits are rolled now,
+> not the ones described here.
+
 The style bar (Alexandra: idle, walk, strike, stricken) was approved at
 Gate 4 (D62). This phase builds the full matrix to the same standard:
 **every weapon style has a clip for every pose**, and the combat cutscene,

@@ -707,3 +707,34 @@ func test_save_v11_migration(t) -> void:
 	t.eq(back.squad[0].perks, ["water_guard", "wind_tail"], "Flow State -> Tidal Guard (deduped), Frost Ward -> the Ice set, Slipstream -> Tailwind")
 	t.eq(back.squad[0].keystones, [], "no keystones in an old save")
 	t.ok(int(back.to_dict().version) >= 11, "saves as v11 or later (D358: v12)")
+
+
+# ---------------------------------------------------------------- D380: the featured scroll
+
+func test_strength_column(t) -> void:
+	for r in BWData.table("enchantments"):
+		t.ok(int(r.get("strength", 0)) >= 1 and int(r.get("strength", 0)) <= 3, "%s: strength 1-3" % r.id)
+
+
+func test_featured_scroll(t) -> void:
+	var run := BWRun.start(["aureli", "della", "jericho", "will", "gail", "kira"], 44)
+	var u: BWUnit = run.squad[3]
+	for v in run.squad:
+		v.affinity.clear()
+	u.affinity["wind"] = 10
+	u.equipment["head"] = run.make_item("baseball_cap", "E", "gusting")
+	u.equipment["chest"] = run.make_item("vest", "E", "kindled")
+	run.scrolls.clear()
+	for el in BWFormulas.ELEMENTS:
+		var ench: String = { "fire": "explosive", "water": "geyser", "ice": "glacial", "thunder": "thundering", "wind": "howling", "dark": "collapsing", "light": "radiant" }[el]
+		run.scrolls.append({ "uid": "sc_" + el, "kind": "scroll", "element": el, "enchant": ench, "tier": "E", "sold": false })
+	var f := run.featured_scroll()
+	t.eq(str(f.scroll.element), "wind", "a 2-piece completion beats stronger rows")
+	t.ok(str(f.reason).begins_with("Featured: completes %s's Wind set" % u.name), "the reason names it (%s)" % f.reason)
+	f.scroll.sold = true
+	var g := run.featured_scroll()
+	t.ok(str(g.scroll.element) != "wind", "a used scroll is never featured")
+	t.eq(int(BWData.row("enchantments", str(g.scroll.enchant)).strength), 3, "without a fit, a strength-3 row leads")
+	for sc in run.scrolls:
+		sc.sold = true
+	t.ok(run.featured_scroll().is_empty(), "nothing to feature when all are spent")

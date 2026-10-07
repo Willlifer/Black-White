@@ -1,13 +1,81 @@
 # Black | White roster
 
-20 side characters. No story, no lead, no personality lines (D153): element and weapon are the
+20 seats, filled from **47 identities**: the 20 core characters below and a rolling
+**pool** of 27 (D379). No story, no lead, no personality lines (D153): element and weapon are the
 personality. **Identity is fixed** (`game/data/roster.csv`); **weapon, element and clothes are
 rolled** each new game, and again whenever the player presses Randomize [R] on the select screen
 (`BWRosterGen.roll(identities, seed)`, D150). The seed is stored in the run, never shown.
 
+## The rolling pool (D379)
+
+The author: "I never expected roster to be limiting… On randomize, they can replace some of the
+back row units." The roster screen still shows 20 seats:
+
+- **Front row (seats 1-10):** always the core ten.
+- **Back row (seats 11-20):** 3-5 seats (seeded, `BWRosterGen.POOL_MIN`/`POOL_MAX`) go to pool
+  identities, at the game's start and on every **Randomize [R]**. A locked core character
+  (Rem) keeps the seat. The swap has its own seeded stream (`BWRosterGen.seated`), so the kits
+  per seat roll exactly as before; the incoming character takes the seat's number.
+- **Enemies** draw from **every identity outside the squad**: the seats plus the **reserve**
+  (`BWRun.reserve_rows`: the unseated identities, each rolled on its own stream,
+  `BWRosterGen.reserve`). A 6v6 always has 6; if a squad ever recruited nearly everyone, the
+  draw adds duplicates with their own roll (`"<id>~2"`, `BWRun.roster_row`).
+  `can_recruit` keeps a full side of 6 outside.
+- **Saves** keep both the seated rows and the reserve (a save without a reserve re-rolls it
+  from `roster_seed`).
+- Tests, tools and sims roll the core twenty (`roll(identities, seed)` without the pool);
+  only the roster screen passes `BWData.pool_identities()`.
+
+### The pool (data/roster.csv, `pool` = 1)
+
+The 17 pre-D149 names (the first roster, as `design/FORECAST-L1.txt` lists it, minus
+Alexandra, Aureli and Will, who stayed) and the author's 10 new ones. Gender per the D149
+rule: historically gendered names follow it, the rest are ambiguous.
+
+| Name | G | Friendliness | Hair | Voice | Lock | From |
+|---|---|---|---|---|---|---|
+| Bartholomew | m | friendly | buzzed | 0.78 | | pre-D149 |
+| Kyla | f | unfriendly | long_ponytail | 1.18 | | pre-D149 |
+| Picassa | f | neutral | ringlets | 1.22 | | pre-D149 |
+| Thaddeus | m | unfriendly | long_hair | 0.80 | | pre-D149 |
+| Leopold | m | neutral | mullet | 0.92 | | pre-D149 |
+| Gus | m | friendly | buzzed | 0.76 | | pre-D149 |
+| Henrietta | f | neutral | long_hair | 1.06 | | pre-D149 |
+| Marguerite | f | unfriendly | ringlets | 1.12 | | pre-D149 |
+| Zoe | f | friendly | short_mohawk | 1.26 | | pre-D149 |
+| Pip | a | friendly | ringlets | 1.12 | | pre-D149 |
+| Ottilie | f | neutral | bob | 1.28 | | pre-D149 |
+| Nova | a | unfriendly | bob | 1.04 | | pre-D149 |
+| Rory | a | friendly | mullet | 0.98 | | pre-D149 |
+| Montgomery | m | unfriendly | high_and_tight | 0.86 | | pre-D149 |
+| Jet | a | unfriendly | high_and_tight | 1.08 | | pre-D149 |
+| Hugo | m | neutral | ponytail | 0.88 | | pre-D149 |
+| Ambrose | m | neutral | waterfall | 0.96 | | pre-D149 |
+| Picasso | m | friendly | mullet | 0.94 | | author |
+| Irelia | a | unfriendly | ponytail | 1.06 | | author |
+| Despacito | a | friendly | buzzed | 1.00 | | author |
+| Quinn | a | neutral | ponytail | 1.02 | | author |
+| Shyvana | f | unfriendly | long_ponytail | 1.14 | **fire** | author |
+| Cain | m | unfriendly | high_and_tight | 0.82 | | author |
+| Abel | m | friendly | short_mohawk | 1.00 | | author |
+| Lyn | a | neutral | long_ponytail | 1.10 | | author |
+| Micaiah | a | neutral | waterfall | 0.98 | | author |
+| Mushu | a | friendly | short_mohawk | 1.10 | | author |
+
+Calls (Claude, D379; overturn freely): m = the historically male names (Bartholomew,
+Thaddeus, Leopold, Gus, Montgomery, Hugo, Ambrose, Picasso, Cain, Abel); f = the historically
+female ones (Kyla, Picassa, Henrietta, Marguerite, Zoe, Ottilie) and Shyvana (the author);
+ambiguous: Pip, Nova, Rory, Jet, Despacito, Quinn, Irelia, Lyn, Mushu, and Micaiah (a male
+prophet and a queen mother share it). Picasso and Picassa are both kept (the author named
+Picasso; Picassa was the old roster's). Hair: all 10 styles, 2-3 each, a few outliers (Zoe's
+mohawk, Thaddeus's long hair, Ambrose's waterfall). Friendliness 9 / 9 / 9; voices m 0.76-0.94,
+f 1.06-1.28, a 0.98-1.12. The art docs' old examples (Pip, Hugo, Kyla in ANIMATION.md) now
+name pool members (L-10).
+
 ## Identity (fixed)
 
-Seat order is front row left→right, then rear row left→right. G: f / m / a (ambiguous).
+The 20 core seats (`pool` = 0). Seat order is front row left→right, then rear row
+left→right. G: f / m / a (ambiguous).
 
 | Seat | Name | G | Friendliness | Hair | Voice | Lock |
 |---|---|---|---|---|---|---|

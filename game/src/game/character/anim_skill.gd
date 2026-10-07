@@ -26,6 +26,11 @@ extends RefCounted
 ##                  her left ("throw": the foe leaves her hands), slam down
 ##   strike_hundred fists: six blows, left-right, "hit" .. "hit6", the last
 ##                  one a full cross (Hundred Fists)
+##   strike_haymaker fists (D389): a long wind-up, a full-body turn into a
+##                  big right hook, a follow-through across (Haymaker)
+##   strike_chamber pistol (D389): fanning the hammer, four recoils on
+##                  "release" .. "release4", swept her right to her left
+##                  (Empty the Chamber; the tracers meet each one)
 ## Routes (pose names) live in actions(); BWClipRoute picks them per skill.
 
 const BODY := ["root", "hips", "spine", "chest", "neck", "head", "squash", "head_sq"]
@@ -46,6 +51,9 @@ static func clips(st: String) -> Array:
 	if st == "fists":
 		out.append(_grapple())
 		out.append(_hundred())
+		out.append(_haymaker())
+	if st == "pistol":
+		out.append(_chamber())
 	return out
 
 
@@ -72,7 +80,9 @@ static func actions(st: String, strike: String) -> Dictionary:
 	if st == "pair":
 		skills.merge({ "throw": "strike_throw", "throw_l": "strike_throw_l" })
 	if st == "fists":
-		skills.merge({ "grapple": "strike_grapple", "hundred": "strike_hundred" })
+		skills.merge({ "grapple": "strike_grapple", "hundred": "strike_hundred", "haymaker": "strike_haymaker" })
+	if st == "pistol":
+		skills["chamber"] = "strike_chamber"
 	if st == "pistol":
 		out["reload"] = { "clip": "act_check" }          # the pan / chamber check (BWAnimHandling)
 	for k in skills:
@@ -525,4 +535,143 @@ static func _hundred() -> BWAnimClips.Clip:
 	c.key("chest", 28.0, ch0 + Vector3(0.0, 0.1, 0.0))
 	c.key("arm_stretch", 25.5, 0.07).key("arm_stretch", 28.0, 0.0)
 	c.meta["hits"] = 6
+	return c
+
+
+# ------------------------------------------------------------------ haymaker
+
+## HAYMAKER (fists, 48 f; D389, it borrowed the uppercut). The long wind-up
+## (f0-f13, coil held by "windup"): she sits back on the rear foot and turns
+## the whole body away, the right fist drawn far back behind the shoulder,
+## elbow up, the lead hand out at the target to measure it. The dash, and
+## the hook: a wide horizontal arc at head height, the hips leading, then
+## the chest, then the fist (f16-f19, smear), the whole body turning through
+## to her left on the hit; the follow-through carries the fist on across
+## her front and over-rotates the shoulders, the lead arm flung back; a
+## beat, the hop home, the guard.
+static func _haymaker() -> BWAnimClips.Clip:
+	var beats := [0, 6, 13, 15, 18, 19, 25, 30, 35, 38, 44, 48]
+	var A := BWAnimAction
+	var hk := func(pos: Vector3, punch: Vector3, extra: Dictionary = {}) -> Dictionary:
+		return A._fk("r", pos, punch, Vector3(-0.15, 1.0, -0.2), extra)
+	var hands := {
+		4.0: A._m(hk.call(Vector3(-0.28, 0.24, 0.08), Vector3(0.2, 0.4, 0.9)), A._fist_guard("l")),
+		8.0: A._m(hk.call(Vector3(-0.46, 0.34, -0.26), Vector3(0.45, 0.15, 0.88), { "_mode": "f" }),
+			A._fk("l", Vector3(0.14, 0.34, 0.52), Vector3(-0.05, 0.2, 1), Vector3(0.7, 0.7, 0), { "_mode": "f" })),
+		10.0: A._m(hk.call(Vector3(-0.47, 0.35, -0.2), Vector3(0.5, 0.1, 0.86)),
+			A._fk("l", Vector3(0.15, 0.33, 0.46), Vector3(-0.05, 0.2, 1), Vector3(0.7, 0.7, 0))),
+		12.0: hk.call(Vector3(-0.4, 0.37, 0.18), Vector3(0.75, 0.0, 0.66), { "_mode": "l", "smear": 1.0 }),
+		13.0: hk.call(Vector3(-0.22, 0.38, 0.48), Vector3(0.92, 0.0, 0.4), { "_mode": "l", "smear": 1.0, "arm_stretch": 0.04 }),
+		14.0: A._m(hk.call(Vector3(0.04, 0.37, 0.6), Vector3(1.0, -0.05, 0.1), { "smear": 1.0, "arm_stretch": 0.09 }),
+			A._fk("l", Vector3(0.26, 0.24, 0.02), Vector3(0.2, 0.3, 1), Vector3(0.7, 0.7, 0))),
+		15.0: hk.call(Vector3(0.24, 0.34, 0.5), Vector3(0.9, -0.1, -0.3), { "smear": 0.6, "arm_stretch": 0.06 }),
+		17.0: A._m(hk.call(Vector3(0.4, 0.26, 0.24), Vector3(0.6, -0.2, -0.75), { "smear": 0.0, "arm_stretch": 0.0, "_mode": "f" }),
+			A._fk("l", Vector3(0.3, 0.2, -0.1), Vector3(0.2, 0.3, 1), Vector3(0.7, 0.7, 0), { "_mode": "f" })),
+		20.0: hk.call(Vector3(0.24, 0.24, 0.3), Vector3(0.4, 0.2, 0.9)),
+		23.0: A._m(hk.call(Vector3(-0.08, 0.26, 0.3), Vector3(0.2, 0.3, 0.95)), A._fist_guard("l")),
+		27.0: A._m(A._fist_guard("r"), A._fist_guard("l")),
+	}
+	var c := A._melee("strike_haymaker", "fists", beats, 0.0, hands, 0.85)
+	# the body is keyed whole here: the reference cut's twist is dropped
+	var body := {
+		4.0: { "hips": Vector3(0.0, -0.25, 0.0), "chest": Vector3(0.0, -0.35, 0.0), "head": Vector3(0.04, 0.3, 0.0) },
+		8.0: { "root": Vector3(0, -0.2, -0.12), "hips": Vector3(-0.04, -0.62, 0.02), "spine": Vector3(-0.04, -0.12, 0.0),
+			"chest": Vector3(-0.1, -0.95, 0.06), "head": Vector3(0.06, 0.95, -0.04), "squash": -0.02, "_mode": "f" },
+		10.0: { "root": Vector3(0, -0.16, -0.08), "hips": Vector3(-0.02, -0.55, 0.0), "chest": Vector3(-0.08, -0.9, 0.05), "head": Vector3(0.04, 0.85, -0.03) },
+		12.0: { "hips": Vector3(0.04, 0.1, 0.0), "spine": Vector3(0.0, 0.0, 0.0), "chest": Vector3(0.0, -0.45, 0.0), "head": Vector3(0.0, 0.45, 0.0), "_mode": "l" },
+		14.0: { "root": Vector3(0, -0.15, 0.12), "hips": Vector3(0.08, 0.6, -0.02), "spine": Vector3(0.06, 0.1, 0.0),
+			"chest": Vector3(0.16, 0.75, -0.06), "head": Vector3(-0.02, -0.5, 0.03), "squash": -0.05, "head_sq": 0.04 },
+		17.0: { "root": Vector3(0, -0.17, 0.13), "hips": Vector3(0.1, 0.8, -0.03), "spine": Vector3(0.08, 0.14, 0.0),
+			"chest": Vector3(0.22, 1.05, -0.08), "head": Vector3(0.06, -0.62, 0.03), "squash": -0.02, "head_sq": 0.0, "_mode": "f" },
+		22.0: { "hips": Vector3(0.04, 0.35, 0.0), "spine": Vector3(0.02, 0.05, 0.0), "chest": Vector3(0.08, 0.4, -0.02), "head": Vector3(0.0, -0.25, 0.0) },
+		27.0: { "hips": Vector3.ZERO, "spine": Vector3.ZERO, "chest": Vector3.ZERO, "head": Vector3.ZERO },
+	}
+	for ch in ["hips", "spine", "chest", "head"]:
+		var b0: Variant = c.base.get(ch, Vector3.ZERO)
+		c.keys[ch] = []
+		c.key(ch, 0.0, b0, "f")
+		c.key(ch, float(beats[11]), b0, "f")
+	for f in body:
+		var d: Dictionary = body[f]
+		var mode := str(d.get("_mode", "a"))
+		for ch in d:
+			if ch != "_mode":
+				c.key(ch, A._warp(float(f), beats), d[ch], mode)
+	return c
+
+
+# ------------------------------------------------------------------- chamber
+
+## EMPTY THE CHAMBER (pistol, 40 f; D389, it was one recoil under four
+## tracers). The gun comes down to the hip on the line, half side-on, the
+## free palm cocked over the hammer (coil f8). Four shots fanned off the
+## hammer on f9, f12, f15, f18 ("release" .. "release4"): each one kicks the
+## muzzle up and the shoulders back with a squash, the free palm slaps the
+## hammer down for the next, and the body turns a step further across the
+## fan, from her right to her left (the tracers sweep the same way). The
+## last kick is held, then she lowers the gun and comes back to the guard.
+const CHAMBER_SHOTS := [9.0, 12.0, 15.0, 18.0]
+const CHAMBER_SWEEP := [-0.42, -0.14, 0.14, 0.42]   # the gun's azimuth per shot (rad, + = her left)
+
+
+static func _chamber_gun(az: float, kick: float) -> Dictionary:
+	var e := Vector3(sin(az), 0.0, cos(az))
+	var barrel := (e * cos(kick) + Vector3.UP * sin(kick)).normalized()
+	var up := (Vector3.UP * cos(kick) - e * sin(kick)).normalized()
+	var p := Vector3(-0.1 + 0.5 * sin(az), 0.1 + 0.06 * kick, 0.46 * cos(az) - 0.04 * kick)
+	return { "hand_r_pos": p, "hand_r_aim": up, "hand_r_edge": barrel }
+
+
+## The free palm over the hammer (behind the muzzle), raised by `up`.
+static func _chamber_palm(az: float, up: float) -> Vector3:
+	return Vector3(-0.06 + 0.42 * sin(az), 0.16 + up, 0.34 * cos(az) - 0.02)
+
+
+static func _chamber() -> BWAnimClips.Clip:
+	var c := BWAnimClips.new_clip("strike_chamber", 40, false, "pistol")
+	c.marker("coil", 8).marker("release", 9).marker("hit", 10)
+	c.marker("release2", 12).marker("release3", 15).marker("release4", 18).marker("recovered", 34).marker("pose", 9)
+	c.meta = { "hand_frame": "root", "kind": "shot", "shots": 4 }
+	c.at_base(0, BODY + _hand_chans())
+	c.at_base(40, BODY + _hand_chans())
+	BWAnimAction._feet_cast(c)
+	c.pose(2, { "head": Vector3(0.0, 0.25, 0.0) })
+	c.pose(5, { "root": Vector3(0, -0.07, 0), "hips": Vector3(0, -0.28, 0), "chest": Vector3(0.02, -0.3, 0), "head": Vector3(0.02, 0.36, 0) })
+	c.pose(5, _chamber_gun(-0.5, 0.25))
+	c.key("hand_l_pos", 5, _chamber_palm(-0.5, 0.1))
+	c.pose(8, { "root": Vector3(0, -0.1, 0), "hips": Vector3(0, -0.3, 0), "chest": Vector3(0.04, -0.34, 0), "head": Vector3(0.02, 0.4, 0),
+		"squash": 0.0 }, "f")
+	c.pose(8, _chamber_gun(float(CHAMBER_SWEEP[0]), 0.0), "f")
+	c.key("hand_l_pos", 8, _chamber_palm(float(CHAMBER_SWEEP[0]), 0.14), "f")
+	c.key("smear", 0, 0.0)
+	for i in CHAMBER_SHOTS.size():
+		var f: float = CHAMBER_SHOTS[i]
+		var az: float = CHAMBER_SWEEP[i]
+		var turn := -0.34 + 0.85 * az
+		# the shot: the kick, the shoulders thrown back, the palm down on the hammer
+		c.pose(f, { "chest": Vector3(-0.15, turn, 0.03), "head": Vector3(-0.1, -turn * 0.6 + 0.2, 0.03), "root": Vector3(0, -0.08, -0.04),
+			"hips": Vector3(0, -0.3 + 0.5 * az, 0), "squash": 0.025, "head_sq": -0.04 }, "l")
+		c.pose(f, _chamber_gun(az, 0.62), "l")
+		c.key("hand_l_pos", f, _chamber_palm(az, 0.0), "l")
+		c.pose(f + 1.0, { "chest": Vector3(-0.09, turn, 0.02), "root": Vector3(0, -0.1, -0.03), "squash": -0.02, "head_sq": 0.03 })
+		c.pose(f + 1.0, _chamber_gun(az, 0.4))
+		if i < CHAMBER_SHOTS.size() - 1:
+			# rides back down onto the next line, the palm cocked again
+			var nx: float = CHAMBER_SWEEP[i + 1]
+			c.pose(f + 2.4, { "chest": Vector3(0.03, -0.34 + 0.85 * nx, 0.0), "root": Vector3(0, -0.1, 0.0), "squash": 0.0, "head_sq": 0.0 })
+			c.pose(f + 2.4, _chamber_gun(nx, 0.05))
+			c.key("hand_l_pos", f + 1.8, _chamber_palm(lerpf(az, nx, 0.5), 0.16))
+			c.key("hand_l_pos", f + 2.6, _chamber_palm(nx, 0.12))
+	# the last kick held, then lowered
+	var last: float = CHAMBER_SWEEP[3]
+	c.pose(22, { "chest": Vector3(-0.06, -0.34 + 0.85 * last, 0.02), "head": Vector3(-0.06, 0.1, 0.03), "root": Vector3(0, -0.09, -0.02),
+		"squash": 0.0, "head_sq": 0.0 }, "f")
+	c.pose(22, _chamber_gun(last, 0.35), "f")
+	c.key("hand_l_pos", 22, Vector3(0.24, 0.0, 0.24), "f")
+	c.pose(28, { "hips": Vector3(0, -0.12, 0), "chest": Vector3(0, -0.06, 0), "head": Vector3(0.0, 0.12, 0.0), "root": Vector3(0, -0.05, 0) })
+	c.key("hand_r_pos", 28, Vector3(-0.22, -0.08, 0.34)).key("hand_r_aim", 28, Vector3(0, 0.95, 0.3).normalized())
+	c.key("hand_r_edge", 28, Vector3(0, -0.3, 0.95).normalized())
+	c.key("hand_r_pole", 7, Vector3(-1, -0.6, -0.2)).key("hand_r_pole", 26, Vector3(-1, -0.6, -0.2))
+	c.key("hand_l_pole", 7, Vector3(1, -0.4, -0.3)).key("hand_l_pole", 26, Vector3(1, -0.6, -0.2))
+	c.key("flat", 6, 0.3).key("flat", 26, 0.3)
 	return c

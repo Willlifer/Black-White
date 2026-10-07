@@ -23,6 +23,10 @@ extends Node3D
 ##   pin       Pinning Shot: into the ground at the target's feet; it stays
 ##             there while the target is Pinned
 ##   blade     Dualthrow: the dagger spins end over end into the target
+##   fan       Fan of Knives (D387): a ring of spinning daggers flung out
+##             through the user's spin, each released as the blade sweeps
+##             past its hex, into a foe's chest (or skittering past on a
+##             miss) or point-first into the ground, stuck briefly
 ## Stuck arrows fade (sink and shrink) STUCK_LIFE seconds after they land.
 ##
 ## The combat screen hooks in at three points (marked "D165"): it creates
@@ -41,6 +45,14 @@ const RAIN_FALL := 0.24            # each falling arrow is seen this long
 const SKY_RISE := 0.55             # a volley arrow climbing out of frame
 const AREA_SKILLS := ["arcing_shot", "rain_of_arrows"]
 const THROWN := ["dualthrow", "dualthrow_second"]
+const FAN_SPEED := 11.0            # Fan of Knives' blades: slow enough to see the ring open
+const FAN_HOLD := 0.7              # how long a fan blade stays stuck
+## The spin clip's blade (strike_spin, BWAnimAction): its world azimuth from
+## the facing (rad, CCW from above = +yaw) at authoring frames, through the
+## turn. A knife leaves as the blade sweeps past its bearing.
+const SPIN_SWEEP := [[13.0, -1.57], [15.0, 0.44], [16.0, 1.83], [17.0, 3.22], [18.0, 4.88], [19.0, 6.28]]
+const SPIN_LAUNCH_F := 11.0
+const SPIN_HIT_F := 19.0
 
 var screen: Node                   # BWCombatScreen
 ## The skill event being played ({} = a basic shot). Setting it loads the
@@ -344,6 +356,132 @@ func _throw_blade(a: BWUnitView, d: Node3D, hit: bool) -> float:
 	return float(rec.dur) * (1.0 if hit else 0.8)
 
 
+# ------------------------------------------------------------ Fan of Knives
+
+## D387 (the author: "Definitely make some knives"): Fan of Knives flings a
+## dagger at every hex of the ring round its user, timed to the spin clip:
+## each one leaves as the blade sweeps past its bearing (SPIN_SWEEP), the
+## front one last, on the clip's hit. Call right after the spin starts.
+## Returns, per result, the seconds from now to its knife's arrival ([] when
+## this isn't Fan of Knives).
+func fan(a: BWUnitView, results: Array) -> Array:
+	var e: Dictionary = context
+	if str(e.get("skill", "")) != "fan_of_knives" or a == null or screen == null:
+		return []
+	var el := str(e.get("element", ""))
+	var t_launch: float = a.time_to_marker("launch")
+	var t_hit: float = a.time_to_marker("hit")
+	if t_hit < 0.0:
+		t_hit = 0.45
+	if t_launch < 0.0 or t_launch >= t_hit:
+		t_launch = maxf(t_hit - 0.33, 0.0)
+	var per_f := (t_hit - t_launch) / (SPIN_HIT_F - SPIN_LAUNCH_F)
+	var fwd: Vector3 = a.global_basis.z
+	var yaw0 := atan2(fwd.x, fwd.z)
+	var home: Vector3 = a.global_position
+	var by_hex := {}                       # hex -> [result index, view, hit]
+	for k in results.size():
+		var r: Dictionary = results[k]
+		var v: Variant = screen._views.get(str(r.get("target", "")))
+		if v is BWUnitView:
+			by_hex[(v as BWUnitView).unit.pos] = [k, v, bool((r.get("result", {}) as Dictionary).get("hit", true))]
+	var hexes: Array = e.get("hexes", [])
+	if hexes.is_empty():
+		hexes = BWHex.neighbors(a.unit.pos)
+	for h in by_hex:                       # every victim gets a knife, even off the listed ring
+		if not h in hexes:
+			hexes.append(h)
+	var out: Array = []
+	out.resize(results.size())
+	out.fill(-1.0)
+	for h in hexes:
+		if not screen.board_view.board.exists(h):
+			continue
+		var to: Vector3 = screen.board_view.top_center(h)
+		var d := to - home
+		d.y = 0.0
+		if d.length() < 0.05:
+			continue
+		var bearing := wrapf(atan2(d.x, d.z) - yaw0, 0.0, TAU)
+		var f := _sweep_frame(bearing)
+		var t_rel := t_launch + (f - SPIN_LAUNCH_F) * per_f
+		var victim: Array = by_hex.get(h, [])
+		var flight := (d.length() - 0.3) / FAN_SPEED
+		if not victim.is_empty():
+			out[int(victim[0])] = t_rel + flight * (1.0 if bool(victim[2]) else 0.8)
+		get_tree().create_timer(maxf(t_rel, 0.0)).timeout.connect(_fan_knife.bind(a, h, victim, el, flight))
+	return out
+
+
+## The spin frame at which the blade's world azimuth reaches `bearing`
+## (0..TAU from the facing). The front (just past 0) goes last, on the hit.
+static func _sweep_frame(bearing: float) -> float:
+	var b := bearing
+	if b < float(SPIN_SWEEP[1][1]):
+		b += TAU                           # the front: the blade comes round to it on the hit
+	for i in range(1, SPIN_SWEEP.size()):
+		var a0: Array = SPIN_SWEEP[i - 1]
+		var a1: Array = SPIN_SWEEP[i]
+		if b <= float(a1[1]):
+			return lerpf(float(a0[0]), float(a1[0]), clampf((b - float(a0[1])) / (float(a1[1]) - float(a0[1])), 0.0, 1.0))
+	return SPIN_HIT_F + minf((b - float(SPIN_SWEEP[-1][1])) / 1.4, 0.4)
+
+
+func _fan_knife(a: BWUnitView, h: Vector2i, victim: Array, el: String, flight: float) -> void:
+	if not is_instance_valid(a):
+		return
+	var b := _blade_for(a)
+	if b == null:
+		return
+	var to_g: Vector3 = screen.board_view.top_center(h)
+	var dir := to_g - a.global_position
+	dir.y = 0.0
+	dir = dir.normalized()
+	var p0: Vector3 = a.global_position + Vector3(0, 1.15 * a.scale.y, 0) + dir * 0.35
+	var opts := { "speed": FAN_SPEED, "dur": maxf(flight, 0.06), "blade": true, "spin_rate": 30.0, "hold": FAN_HOLD,
+		"on_land": func(_p): _fan_land(h, el) }
+	var pts: Array
+	if not victim.is_empty():
+		var v: BWUnitView = victim[1]
+		if bool(victim[2]):
+			pts = [p0, _chest(v)]
+			opts["stick"] = "unit"
+			opts["target"] = v
+		else:
+			pts = _miss_path(p0, _chest(v), v)
+			opts["stick"] = "skitter"
+			opts["dur"] = maxf(flight, 0.06) * 1.6
+	else:
+		var land := to_g + dir * 0.15 + Vector3(0, 0.02, 0)
+		pts = [p0, land]
+		opts["stick"] = "ground"
+	b.visible = true
+	b.scale = Vector3.ONE
+	_rec(b, pts, Basis(), opts)
+
+
+func _fan_land(h: Vector2i, el: String) -> void:
+	var at: Vector3 = screen.board_view.top_center(h)
+	_flash(at + Vector3(0, 0.5, 0), 0.7, 0.14, el)
+	var vfx = screen.get("vfx")
+	if vfx and el != "" and str(BWSettings.value("cutscenes")) != "minimal":
+		vfx.call("_disc", 4, el, at + Vector3(0, 0.04, 0), 1.0, 0.7)    # the ring takes the element
+
+
+## A pooled dagger of the thrower's own model.
+func _blade_for(a: BWUnitView) -> BWWeaponView:
+	var id := BWCharacter.weapon_id_for(a.unit, "dagger")
+	if _blades.has(id) and not (_blades[id] as Array).is_empty():
+		return (_blades[id] as Array).pop_back()
+	var b := BWWeaponView.create(id)
+	if b == null:
+		return null
+	b.set_meta("blade_id", id)
+	add_child(b)
+	stats.created += 1
+	return b
+
+
 # ------------------------------------------------------------ flights
 
 ## Fly an arrow along a polyline (or a ballistic arc: opts.arc = apex height
@@ -367,7 +505,8 @@ func _rec(v: Node3D, pts: Array, b0: Basis, opts: Dictionary) -> Dictionary:
 		"arc": float(opts.get("arc", 0.0)), "b0": b0, "stick": str(opts.get("stick", "ground")),
 		"target": opts.get("target"), "unit": opts.get("unit"), "trail": bool(opts.get("trail", false)),
 		"blade": bool(opts.get("blade", false)), "life": 0.0, "spin": 0.0, "anchor": Transform3D(),
-		"on_land": opts.get("on_land"), "dir": Vector3.BACK, "vel": Vector3.ZERO, "hold": float(opts.get("hold", STUCK_LIFE)) }
+		"on_land": opts.get("on_land"), "dir": Vector3.BACK, "vel": Vector3.ZERO, "hold": float(opts.get("hold", STUCK_LIFE)),
+		"spin_rate": float(opts.get("spin_rate", 22.0)) }
 	_live.append(r)
 	stats.max_live = maxi(int(stats.max_live), _live.size())
 	_place(r, 0.0)
@@ -426,7 +565,7 @@ func _process(delta: float) -> void:
 					var pts: Array = r.pts
 					pts[pts.size() - 1] = _chest(r.target)
 				if bool(r.blade):
-					r.spin = float(r.spin) + delta * 22.0
+					r.spin = float(r.spin) + delta * float(r.get("spin_rate", 22.0))
 				_place(r, u)
 				if r.trail and v is BWProjectileView:
 					var tr := v.get_node("trail") as Node3D
@@ -499,8 +638,17 @@ func _land(r: Dictionary) -> void:
 				r.anchor = base.affine_inverse() * v.global_transform
 			r.mode = "stuck"
 			r.life = 0.0
-			r.hold = 0.9 if bool(r.blade) else STUCK_LIFE
+			r.hold = minf(float(r.hold), 0.9) if bool(r.blade) else STUCK_LIFE
 		"ground", "pin":
+			if bool(r.blade):                  # D387: a thrown blade lands point-first, tilted
+				var fd := Vector3(dir.x, -0.9, dir.z).normalized()
+				v.global_transform = Transform3D(_look(fd) * Basis(Vector3.RIGHT, -PI / 2.0), v.global_position)
+				v.global_position += fd * 0.12
+				_dust(v.global_position, 0.25)
+				r.dir = fd
+				r.mode = "stuck"
+				r.life = 0.0
+				return
 			v.global_position += dir * SINK_GROUND
 			_dust(v.global_position - dir * SINK_GROUND, 0.35)
 			r.mode = "stuck"

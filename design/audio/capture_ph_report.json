@@ -1,0 +1,229 @@
+{
+ "sample_rate": 48000,
+ "seconds": 51.39,
+ "output_path_latency_ms": 0.2,
+ "clipped": 0,
+ "peak_dbfs": -3.0,
+ "sounds": [
+  {
+   "name": "sting_pick_short",
+   "asked_s": 4.004,
+   "found": true,
+   "match": 0.84,
+   "start_vs_asked_ms": 10.0,
+   "music_before_momentary": -14.3,
+   "with_sound_momentary": -24.2,
+   "peak_dbfs": -11.0
+  },
+  {
+   "name": "ph_swap_holster",
+   "asked_s": 12.002,
+   "found": true,
+   "match": 0.51,
+   "start_vs_asked_ms": 1.0,
+   "music_before_momentary": -15.8,
+   "with_sound_momentary": -18.1,
+   "peak_dbfs": -7.0
+  },
+  {
+   "name": "ph_swap_draw",
+   "asked_s": 13.602,
+   "found": true,
+   "match": 0.62,
+   "start_vs_asked_ms": 1.0,
+   "music_before_momentary": -16.6,
+   "with_sound_momentary": -17.5,
+   "peak_dbfs": -7.5
+  },
+  {
+   "name": "ph_proc_onkill",
+   "asked_s": 15.202,
+   "found": true,
+   "match": 0.52,
+   "start_vs_asked_ms": 1.0,
+   "music_before_momentary": -16.4,
+   "with_sound_momentary": -15.6,
+   "peak_dbfs": -4.6
+  },
+  {
+   "name": "ph_proc_heal",
+   "asked_s": 16.803,
+   "found": true,
+   "match": 0.62,
+   "start_vs_asked_ms": 0.3,
+   "music_before_momentary": -16.2,
+   "with_sound_momentary": -16.2,
+   "peak_dbfs": -6.1
+  },
+  {
+   "name": "ph_proc_pity",
+   "asked_s": 18.402,
+   "found": true,
+   "match": 0.38,
+   "start_vs_asked_ms": 1.1,
+   "music_before_momentary": -17.6,
+   "with_sound_momentary": -15.8,
+   "peak_dbfs": -5.3
+  },
+  {
+   "name": "ph_immune",
+   "asked_s": 20.003,
+   "found": true,
+   "match": 0.63,
+   "start_vs_asked_ms": 0.7,
+   "music_before_momentary": -17.8,
+   "with_sound_momentary": -15.5,
+   "peak_dbfs": -6.7
+  },
+  {
+   "name": "ph_obelisk_push",
+   "asked_s": 21.603,
+   "found": true,
+   "match": 0.66,
+   "start_vs_asked_ms": 0.6,
+   "music_before_momentary": -18.1,
+   "with_sound_momentary": -15.3,
+   "peak_dbfs": -4.3
+  },
+  {
+   "name": "ph_obelisk_pull",
+   "asked_s": 23.203,
+   "found": true,
+   "match": 0.88,
+   "start_vs_asked_ms": 0.5,
+   "music_before_momentary": -19.5,
+   "with_sound_momentary": -16.3,
+   "peak_dbfs": -6.3
+  },
+  {
+   "name": "ph_colossus_step",
+   "asked_s": 24.803,
+   "found": true,
+   "match": 0.38,
+   "start_vs_asked_ms": 0.3,
+   "music_before_momentary": -16.4,
+   "with_sound_momentary": -16.6,
+   "peak_dbfs": -5.8
+  },
+  {
+   "name": "ph_colossus_thrust",
+   "asked_s": 26.403,
+   "found": true,
+   "match": 0.79,
+   "start_vs_asked_ms": 0.2,
+   "music_before_momentary": -18.1,
+   "with_sound_momentary": -16.3,
+   "peak_dbfs": -7.2
+  },
+  {
+   "name": "ph_blank_step",
+   "asked_s": 28.003,
+   "found": true,
+   "match": 0.39,
+   "start_vs_asked_ms": -0.1,
+   "music_before_momentary": -17.1,
+   "with_sound_momentary": -21.7,
+   "peak_dbfs": -8.9
+  },
+  {
+   "name": "ph_fan_knives",
+   "asked_s": 29.603,
+   "found": true,
+   "match": 0.74,
+   "start_vs_asked_ms": -0.0,
+   "music_before_momentary": -15.8,
+   "with_sound_momentary": -19.3,
+   "peak_dbfs": -7.9
+  },
+  {
+   "name": "ph_cast_fire",
+   "asked_s": 31.204,
+   "found": true,
+   "match": 0.91,
+   "start_vs_asked_ms": -0.4,
+   "music_before_momentary": -16.4,
+   "with_sound_momentary": -16.1,
+   "peak_dbfs": -6.8
+  },
+  {
+   "name": "ph_cast_water",
+   "asked_s": 32.804,
+   "found": true,
+   "match": 0.72,
+   "start_vs_asked_ms": 10.1,
+   "music_before_momentary": -16.1,
+   "with_sound_momentary": -15.6,
+   "peak_dbfs": -5.4
+  },
+  {
+   "name": "ph_cast_ice",
+   "asked_s": 34.404,
+   "found": true,
+   "match": 0.72,
+   "start_vs_asked_ms": 10.1,
+   "music_before_momentary": -15.7,
+   "with_sound_momentary": -16.3,
+   "peak_dbfs": -6.3
+  },
+  {
+   "name": "ph_cast_thunder",
+   "asked_s": 36.004,
+   "found": true,
+   "match": 0.57,
+   "start_vs_asked_ms": 9.5,
+   "music_before_momentary": -16.4,
+   "with_sound_momentary": -15.8,
+   "peak_dbfs": -5.8
+  },
+  {
+   "name": "ph_cast_wind",
+   "asked_s": 37.604,
+   "found": true,
+   "match": 0.57,
+   "start_vs_asked_ms": 9.7,
+   "music_before_momentary": -16.5,
+   "with_sound_momentary": -14.6,
+   "peak_dbfs": -6.5
+  },
+  {
+   "name": "ph_cast_light",
+   "asked_s": 39.204,
+   "found": true,
+   "match": 0.58,
+   "start_vs_asked_ms": -1.2,
+   "music_before_momentary": -16.3,
+   "with_sound_momentary": -16.1,
+   "peak_dbfs": -5.7
+  },
+  {
+   "name": "ph_cast_dark",
+   "asked_s": 40.805,
+   "found": true,
+   "match": 0.7,
+   "start_vs_asked_ms": 9.1,
+   "music_before_momentary": -18.2,
+   "with_sound_momentary": -15.5,
+   "peak_dbfs": -5.7
+  },
+  {
+   "name": "ph_horde_shuffle",
+   "asked_s": 42.405,
+   "found": false,
+   "match": 0.19,
+   "start_vs_asked_ms": 9.1,
+   "music_before_momentary": -15.7,
+   "with_sound_momentary": -17.0,
+   "peak_dbfs": -6.2
+  },
+  {
+   "name": "ph_being_hum",
+   "asked_s": 46.405,
+   "found": true,
+   "match": 0.35,
+   "start_vs_asked_ms": 867.9,
+   "music_before_momentary": -15.8,
+   "with_sound_momentary": -16.4,
+   "peak_dbfs": -6.1
+  }
+ ]
+}

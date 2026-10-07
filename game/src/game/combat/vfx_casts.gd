@@ -15,8 +15,11 @@ extends Node3D
 ##                         Tempest) -> seconds to impact, or -1 = the default
 ##                         projectile
 ##   strike_windup(a)      strike branch, on "windup" (Triumph's held gleam)
-##   on_strike(a, ts)      strike branch, on "strike" (the spin trail ring)
-##   at_release(a, ts)     strike branch, on "release" (Empty the Chamber's fan)
+##   on_strike(a, ts)      strike branch, on "strike" (the spin trail: a ribbon
+##                         behind the blade, D389, and the ground crescents)
+##   at_release(a, ts, rs) strike branch, on "release": Empty the Chamber's
+##                         four tracers, one per recoil (D389) -> per-result
+##                         impact times (the screen's reactions meet them)
 ##   impact(a, ts, rs)     every blow's impact frame (Elemental Truth's double
 ##                         burst, Hundred Fists' afterimages and flashes)
 ##   setup(a)              a setup beat (no blows): Ley Line, War Cry, Siphon
@@ -74,6 +77,7 @@ var _track_tip := Vector3.ZERO
 
 var _free := {}                     # "quad" / "disc" / "ribbon" -> [MeshInstance3D]
 var _recs: Array = []               # live one-shots { node, kind, t, dur, delay, fn }
+var _trails: Array = []             # D389 spin trails { a, el, t, from, to, pts, mi }
 var _live_nodes := 0
 
 static var _mats := {}
@@ -231,13 +235,17 @@ func release(a: Node3D, d: Node3D, hit: bool) -> float:
 
 
 ## One element's release at a ground point; returns the seconds to its hit.
-func release_at(el: String, at: Vector3, s: float = 1.0, delay: float = 0.0) -> float:
+## `engulf` (D388, Surge): the release wraps the unit standing on `at`
+## instead of standing behind it (_shell); dark keeps its sphere.
+func release_at(el: String, at: Vector3, s: float = 1.0, delay: float = 0.0, engulf: bool = false) -> float:
 	if not REL_MODE.has(el):
 		el = "light" if el == "" else el
 	if not REL_MODE.has(el):
 		_quad(8, el, at + Vector3(0, 1.0, 0), Vector2(2, 2) * s, 0.4, delay)
 		return 0.06 + delay
 	var ring := func(r: float, dur: float, dl: float): _disc(1, el, at + Vector3(0, 0.06, 0), r * s, dur, delay + dl)
+	if engulf and el != "dark":
+		return _engulf(el, at, s, delay, ring)
 	match el:
 		"fire":
 			_quad(0, el, at, Vector2(1.9, 3.6) * s, 1.0, delay)
@@ -276,6 +284,62 @@ func release_at(el: String, at: Vector3, s: float = 1.0, delay: float = 0.0) -> 
 					_spawn(c + dir * 2.0 * s, Vector3.ZERO, { "home": c, "k": 14.0, "drag": 1.5, "life": 0.5, "s0": 0.16, "s1": 0.04, "col": _col(el), "shape": 0, "core": 0.2 }))
 			ring.call(2.3, 0.6, 0.72)
 	return float(REL_IMPACT[el]) + delay
+
+
+## D388 (the author: "Surge column should encompass target"): the release
+## centred on the target's hex and wider than a unit, drawn as two shells: a
+## back one behind the unit and a front one before it, its fills thinned to a
+## veil and its ink kept, so the unit stands inside a translucent column with
+## inked edges. Each element keeps its own column shape.
+const ENGULF_R := 0.85          # the shells' distance from the hex centre (a unit is ~0.4 wide)
+const ENGULF_VEIL := 0.7        # how much of the front shell's fill is cut
+
+
+func _engulf(el: String, at: Vector3, s: float, delay: float, ring: Callable) -> float:
+	match el:
+		"fire":
+			_shell(0, el, at, Vector2(2.3, 3.6) * s, 1.05, delay)
+			ring.call(1.9, 0.6, 0.08)
+			_burst_parts(at + Vector3(0, 0.6, 0), el, int(14 * s), delay + 0.1, { "up": 4.5, "spread": 1.8, "g": -2.0, "shape": 2, "life": 0.9, "s0": 0.14 })
+		"water":
+			_shell(1, el, at, Vector2(3.4, 3.8) * s, 1.1, delay)
+			ring.call(2.0, 0.7, 0.1)
+			_burst_parts(at + Vector3(0, 3.2 * s, 0), el, int(18 * s), delay + 0.3, { "up": 2.0, "spread": 2.6, "g": 9.0, "shape": 0, "life": 0.9, "s0": 0.16, "core": 0.5 })
+		"ice":
+			_shell(2, el, at, Vector2(3.0, 3.0) * s, 1.0, delay)
+			ring.call(1.8, 0.5, 0.0)
+			_burst_parts(at + Vector3(0, 1.0, 0), el, int(16 * s), delay + 0.72, { "up": 2.5, "spread": 3.0, "g": 9.0, "shape": 1, "life": 0.7, "s0": 0.2, "spin": 9.0 })
+		"thunder":
+			# the bolt comes down through the unit inside a crackling column
+			_shell(5, el, at, Vector2(1.9, 4.2) * s, 0.75, delay)
+			_shell(3, el, at, Vector2(1.6, 10.0) * s, 0.6, delay, 0.25)
+			_quad(8, el, at + Vector3(0, 0.6, 0), Vector2(2.2, 2.2) * s, 0.4, delay + 0.06)
+			ring.call(2.1, 0.5, 0.06)
+			_burst_parts(at + Vector3(0, 0.4, 0), el, int(14 * s), delay + 0.06, { "up": 3.0, "spread": 4.0, "g": 6.0, "shape": 2, "life": 0.45, "s0": 0.12 })
+		"wind":
+			_shell(4, el, at, Vector2(2.8, 3.6) * s, 1.1, delay)
+			_disc(5, el, at + Vector3(0, 0.15, 0), 1.6 * s, 0.8, delay)
+			for i in int(12 * s):
+				var dl := delay + 0.05 * i
+				_later(dl, func(): _swirl_mote(at, el, s))
+		_:
+			_shell(5, el, at, Vector2(2.0, 8.0) * s, 1.1, delay)
+			ring.call(1.8, 0.6, 0.05)
+			_burst_parts(at + Vector3(0, 0.3, 0), el, int(14 * s), delay + 0.1, { "up": 3.2, "spread": 1.0, "g": -0.5, "shape": 0, "life": 1.0, "s0": 0.13, "core": 0.8 })
+	return float(REL_IMPACT[el]) + delay
+
+
+## One column as a back shell (behind the unit on `at`) and a veiled front
+## shell (before it), both facing the camera. `r_mul` scales the gap (a thin
+## bolt sits closer in).
+func _shell(mode: int, el: String, at: Vector3, size: Vector2, dur: float, delay: float, r_mul: float = 1.0) -> void:
+	var back := _quad(mode, el, at, size, dur, delay)
+	back.set_instance_shader_parameter("push", -ENGULF_R * r_mul)
+	var front := _quad(mode, el, at, size, dur, delay)
+	front.set_instance_shader_parameter("push", ENGULF_R * r_mul)
+	front.set_instance_shader_parameter("veil", ENGULF_VEIL)
+	front.set_instance_shader_parameter("seed", back.get_instance_shader_parameter("seed"))
+	front.sorting_offset = 7.0                 # drawn after the back shell and the unit
 
 
 func _swirl_mote(at: Vector3, el: String, s: float) -> void:
@@ -327,7 +391,7 @@ func _surge(el: String, w: int) -> float:
 					{ "home": c + Vector3(0, 0.9, 0), "k": 40.0, "drag": 3.0, "life": rush + 0.05, "s0": 0.2, "s1": 0.08, "col": _col(el), "shape": 2, "core": 0.5 }))
 	_disc(1, el, c + Vector3(0, 0.06, 0), 3.0, 0.8, rush + 0.05)
 	_quad(8, el, c + Vector3(0, 1.0, 0), Vector2(3.0, 3.0), 0.45, rush)
-	return release_at(el, c, 1.4 if w == FULL else 1.1, rush)
+	return release_at(el, c, 1.4 if w == FULL else 1.1, rush, true)
 
 
 ## Saturate: the element pours from above onto the hex and splashes out.
@@ -393,7 +457,9 @@ func strike_windup(a: Node3D) -> float:
 
 
 ## The strike begins (clip branch): Whirlwind Blade / Fan of Knives draw
-## their spin trail ring for the turn.
+## their spin trail for the turn: a ribbon swept behind the blade tip (D389:
+## the old ground crescents alone read faint) over two ground crescents. Fan
+## of Knives' knives are real blades now (BWRangedVFX.fan, D387).
 func on_strike(a: Node3D, targets: Array) -> void:
 	if int(ctx.get("weight", NONE)) == NONE:
 		return
@@ -401,52 +467,132 @@ func on_strike(a: Node3D, targets: Array) -> void:
 	match str(ctx.key):
 		"whirlwind_blade", "fan_of_knives":
 			var hit: float = maxf(float(a.call("time_to_marker", "hit")), 0.2)
+			var launch: float = maxf(float(a.call("time_to_marker", "launch")), 0.0)
 			var at: Vector3 = a.global_position
 			var dur := hit + 0.3
 			var r1 := _disc(5, el, at + Vector3(0, 1.0, 0), 1.75, dur)
 			r1.set_instance_shader_parameter("seed", 0.2)
 			var r2 := _disc(5, el, at + Vector3(0, 0.45, 0), 1.45, dur, 0.05)
 			r2.set_instance_shader_parameter("seed", 0.2)
-			if str(ctx.key) == "fan_of_knives":
-				_later(hit, func():
-					for i in 12:
-						var ang := TAU * i / 12.0
-						var dir := Vector3(cos(ang), 0.05, sin(ang))
-						_spawn(at + Vector3(0, 1.0, 0) + dir * 0.5, dir * 12.0, { "life": 0.22, "s0": 0.22, "s1": 0.16, "col": _col(el), "shape": 2, "core": 0.6, "stretch": 2.2, "rot": -ang }))
+			_trails.append({ "a": a, "el": el, "t": 0.0, "from": maxf(launch - 0.04, 0.0), "to": hit + 0.12, "pts": [], "mi": null })
 
 
-## On the strike's release frame: Empty the Chamber sweeps a fan of muzzle
-## flashes and tracers across its targets, in angle order.
-func at_release(a: Node3D, targets: Array) -> void:
-	if int(ctx.get("weight", NONE)) == NONE or str(ctx.key) != "empty_the_chamber":
-		return
+## The spin trail's ribbon: the blade tip sampled every frame between
+## `from` and `to`, the last TRAIL_LIFE seconds of it drawn as a camera-
+## facing strip, widest at the blade and tapering to nothing (white body,
+## ink rims, the element along it), then it fades.
+const TRAIL_LIFE := 0.26
+const TRAIL_W := 0.34
+
+
+func _tick_trails(dt: float) -> void:
+	var i := 0
+	while i < _trails.size():
+		var tr: Dictionary = _trails[i]
+		tr.t = float(tr.t) + dt
+		var a: Node3D = tr.a
+		var pts: Array = tr.pts
+		if is_instance_valid(a) and float(tr.t) >= float(tr.from) and float(tr.t) <= float(tr.to):
+			var tip := _tip(a)
+			# the tip at arm's length: push it out from the body a little so
+			# the ribbon sweeps a circle rather than the hand's path
+			var flat := tip - a.global_position
+			flat.y = 0.0
+			if flat.length() > 0.05:
+				tip += flat.normalized() * 0.18
+			pts.append([tip, float(tr.t)])
+		while not pts.is_empty() and float(tr.t) - float(pts[0][1]) > TRAIL_LIFE:
+			pts.pop_front()
+		var mi: MeshInstance3D = tr.mi
+		if pts.size() < 2:
+			if float(tr.t) > float(tr.to):
+				if mi != null:
+					_give(mi)
+				_trails.remove_at(i)
+				continue
+			i += 1
+			continue
+		if mi == null:
+			mi = _take("ribbon")
+			mi.material_override = _mat("ribbon", 0, "")
+			mi.set_instance_shader_parameter("tier", 1.0)
+			mi.visible = true
+			tr.mi = mi
+		mi.mesh = _taper(pts, float(tr.t), _col(str(tr.el)))
+		i += 1
+
+
+func _taper(pts: Array, now: float, col: Color) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cam := get_viewport().get_camera_3d()
+	var eye := cam.global_position if cam else Vector3(0, 10, 10)
+	for k in pts.size() - 1:
+		var p0: Vector3 = pts[k][0]
+		var p1: Vector3 = pts[k + 1][0]
+		var d := p1 - p0
+		if d.length() < 0.001:
+			continue
+		var side := d.cross(eye - (p0 + p1) * 0.5).normalized()
+		var w0 := TRAIL_W * 0.5 * clampf(1.0 - (now - float(pts[k][1])) / TRAIL_LIFE, 0.0, 1.0)
+		var w1 := TRAIL_W * 0.5 * clampf(1.0 - (now - float(pts[k + 1][1])) / TRAIL_LIFE, 0.0, 1.0)
+		var tint := Color(col.r, col.g, col.b, 0.55)
+		var quad := [[p0 - side * w0, Vector2(0, 0)], [p0 + side * w0, Vector2(0, 1)], [p1 + side * w1, Vector2(1, 1)],
+			[p0 - side * w0, Vector2(0, 0)], [p1 + side * w1, Vector2(1, 1)], [p1 - side * w1, Vector2(1, 0)]]
+		for v in quad:
+			st.set_color(tint)
+			st.set_uv(v[1])
+			st.add_vertex(v[0])
+	return st.commit()
+
+
+## On the strike's release frame: Empty the Chamber's four shots, one per
+## recoil of its clip (strike_chamber: "release" .. "release4", D389), swept
+## in bearing order across the targets (her right to her left, the way the
+## clip turns), a muzzle flash and a tracer each. Returns each result's
+## impact time from now (the screen's reactions meet them), [] when nothing
+## plays here (the screen's own bullet flies).
+func at_release(a: Node3D, targets: Array, results: Array = []) -> Array:
+	if str(ctx.get("key", "")) != "empty_the_chamber" or targets.is_empty():
+		return []
+	var w := int(ctx.get("weight", NONE))
 	var el := _el(a)
 	var c: Vector3 = a.global_position
-	var fwd := -a.global_basis.z
-	var order := targets.duplicate()
-	order.sort_custom(func(x, y): return _bearing(c, fwd, x.global_position) < _bearing(c, fwd, y.global_position))
-	var shots: Array = []
+	var fwd: Vector3 = a.global_basis.z                 # a unit view faces +Z (BWUnitView.face)
+	var order: Array = range(targets.size())
+	order.sort_custom(func(x, y):
+		var bx := _bearing(c, fwd, (targets[x] as Node3D).global_position)
+		var by := _bearing(c, fwd, (targets[y] as Node3D).global_position)
+		return bx < by if not is_equal_approx(bx, by) else x < y)
+	var out: Array = []
+	out.resize(targets.size())
 	for i in order.size():
-		shots.append(order[i])
-		if i < order.size() - 1:
-			shots.append(null)           # a stray between targets: the fan reads as a sweep
-	for i in shots.size():
-		var tv: Node3D = shots[i]
-		var dl := 0.065 * i
+		var k: int = order[i]
+		var tv: Node3D = targets[k]
+		var dl := 0.0
+		if i > 0 and a.has_method("time_to_marker"):
+			dl = maxf(float(a.call("time_to_marker", "release%d" % mini(i + 1, 4))), 0.0)
+		if dl <= 0.0 and i > 0:
+			dl = 0.125 * i                              # no clip markers: the clip's own spacing
+		var hit := true
+		if k < results.size():
+			hit = bool(((results[k] as Dictionary).get("result", {}) as Dictionary).get("hit", true))
+		out[k] = dl + 0.05
 		_later(dl, func():
+			if not is_instance_valid(tv):
+				return
 			var from := _tip(a)
-			var to: Vector3
-			if tv != null and is_instance_valid(tv):
-				to = tv.global_position + Vector3(0, 1.2, 0)
-			else:
-				var p0: Vector3 = shots[maxi(i - 1, 0)].global_position if shots[maxi(i - 1, 0)] != null else c + fwd * 3.0
-				var p1: Vector3 = shots[mini(i + 1, shots.size() - 1)].global_position if shots[mini(i + 1, shots.size() - 1)] != null else c + fwd * 3.0
-				to = (p0 + p1) * 0.5 + Vector3(randf_range(-0.6, 0.6), 0.1, randf_range(-0.6, 0.6))
-			_quad(8, el, from, Vector2(0.85, 0.85), 0.16)
+			var to: Vector3 = tv.global_position + Vector3(0, 1.2 * tv.scale.y, 0)
+			if not hit:
+				var past := (to - from)
+				past.y = 0.0
+				to += past.normalized() * 1.6 + past.normalized().cross(Vector3.UP) * 0.5 + Vector3(0, 0.25, 0)
+			_quad(8, el, from, Vector2(0.95, 0.95), 0.16)
 			_tracer(from, to, el)
-			if tv != null:
+			if hit and w != NONE:
 				_quad(8, el, to, Vector2(0.9, 0.9), 0.22, 0.04)
 				_burst_parts(to, el, 5, 0.04, { "up": 1.0, "spread": 2.5, "g": 6.0, "shape": 2, "life": 0.3, "s0": 0.1 }))
+	return out
 
 
 static func _bearing(c: Vector3, fwd: Vector3, p: Vector3) -> float:
@@ -470,6 +616,15 @@ func impact(a: Node3D, targets: Array, results: Array) -> void:
 		for k in 3:
 			var off := Vector3(randf_range(-0.35, 0.35), 0.9 + randf_range(0.0, 0.7), randf_range(-0.35, 0.35))
 			_quad(8, el, d.global_position + off, Vector2(0.75, 0.75), 0.18, 0.03 * k)
+		return
+	if key == "" and a.get("unit") != null and str(a.unit.weapon_class) == "fists" and BWSettings.value("cutscenes") != "minimal":
+		# D389: the jab's impact, a star at the chin (it read small)
+		var res0: Dictionary = (results[0] as Dictionary).get("result", {}) if not results.is_empty() and results[0] is Dictionary else {}
+		if bool(res0.get("hit", true)):
+			var to: Vector3 = d.global_position + Vector3(0, 1.45 * d.scale.y, 0)
+			to += (a.global_position - d.global_position).normalized() * 0.25
+			_quad(8, _el(a), to, Vector2(1.15, 1.15), 0.2)
+			_burst_parts(to, "", 6, 0.0, { "up": 1.2, "spread": 2.6, "g": 5.0, "shape": 2, "life": 0.25, "s0": 0.1, "grey": true })
 		return
 	if int(ctx.get("weight", NONE)) == NONE:
 		return
@@ -797,8 +952,12 @@ func _take(kind: String) -> MeshInstance3D:
 		add_child(mi)
 	mi.visible = false
 	mi.scale = Vector3.ONE
+	mi.sorting_offset = 5.0
 	mi.set_instance_shader_parameter("age", 0.0)
 	mi.set_instance_shader_parameter("seed", randf())
+	if kind == "quad":
+		mi.set_instance_shader_parameter("push", 0.0)
+		mi.set_instance_shader_parameter("veil", 0.0)
 	return mi
 
 
@@ -941,6 +1100,7 @@ func _kill(i: int) -> void:
 
 
 func _process(dt: float) -> void:
+	_tick_trails(dt)
 	# one-shots and scheduled calls
 	var i := 0
 	var live := 0

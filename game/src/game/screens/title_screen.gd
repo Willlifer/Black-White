@@ -4,7 +4,7 @@ extends Node3D
 ## characters; big lettering "Black | White"; press any button. (D83)
 ##
 ## Up from black over ~2 s; the camera orbits the arena's true middle
-## (BWLoadingScreen's framing: the mean of the tiles, back far enough for its
+## (the old loading screen's framing: the mean of the tiles, back far enough for its
 ## widest extent) with a slow breathing bob in height, pitch and distance;
 ## a near shell of stars in front of the sky's, so the orbit has parallax.
 ## The mark: a white bar, then two plates wiping out from it — "Black" in

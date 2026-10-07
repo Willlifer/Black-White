@@ -72,6 +72,8 @@ func test_hard_is_tougher_and_pays_more(t) -> void:
 	var r := _run()
 	for n in [3, 5, 6, 9, 10]:
 		var rooms: Array = BWRooms.roll(r, n)
+		if rooms.size() < 2 or str(rooms[1].get("kind", "")) != BWRooms.HARD:
+			continue                     # D353 schedule: 5, 9, 10 offer 6v6 cards, not a Hard room (D382 changed their draws)
 		var se := r.enemies_for(n, rooms[0])
 		var he := r.enemies_for(n, rooms[1])
 		var sl := se.map(func(u): return u.level)

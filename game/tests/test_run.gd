@@ -90,11 +90,13 @@ func test_recruit(t) -> void:
 	r.last_enemies.clear()
 	t.ok(r.recruit() == null, "nobody left: no recruit")
 	var r2 := _run()
-	for row in BWData.table("roster"):
-		if r2.unit(str(row.id)) == null and r2.squad.size() < BWData.table("roster").size() - BWRun.DEPLOY:
-			r2.squad.append(BWUnit.from_roster(row))
+	# D382: the enemy side draws from every identity (seats + reserve); a full 6v6 side stays outside
+	for id in r2.enemy_ids():
+		if r2.enemy_ids().size() > BWRun.ENEMY_SIDE_MAX:
+			r2.squad.append(BWUnit.from_roster(r2.roster_row(id)))
 	r2.last_enemies = e.map(func(x): return x.to_dict())
-	t.ok(not r2.can_recruit() and r2.recruit() == null, "the roster keeps three outside the squad for the enemies")
+	t.eq(r2.enemy_ids().size(), BWRun.ENEMY_SIDE_MAX, "six left outside")
+	t.ok(not r2.can_recruit() and r2.recruit() == null, "the roster keeps a 6v6 side outside the squad for the enemies")
 
 
 func test_weapon_rank_gate(t) -> void:

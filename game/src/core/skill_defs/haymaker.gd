@@ -9,7 +9,7 @@ const CRIT := 25
 
 func _init() -> void:
 	define({
-		"key": "haymaker", "name": "Haymaker", "weapon": "fists", "clip": "uppercut",
+		"key": "haymaker", "name": "Haymaker", "weapon": "fists", "clip": "haymaker",
 		"desc": "A wound-up haymaker at an adjacent enemy: +25 crit if you haven't moved",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER,

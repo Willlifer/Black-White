@@ -21,6 +21,7 @@ const SECTIONS_DROP2 := [["sync", 0.0], ["title", 1.5], ["rest", 10.0], ["rooms"
 	["shop", 38.0], ["tutorial", 48.0], ["combat", 57.0], ["boss", 67.0], ["stings", 75.0], ["end", 87.0]]
 
 var drop2 := false
+var placeholders := false            # D394: `--placeholders`: the ph_* sounds and the short pick reveal
 var out_dir := ""
 var _rec: AudioEffectRecord
 var _rec_sfx: AudioEffectRecord      # the SFX bus alone: a clean signal for the marker-sync check
@@ -56,6 +57,9 @@ func _swap(next: Node) -> void:
 
 
 func _run() -> void:
+	if placeholders:
+		await _run_placeholders()
+		return
 	if drop2:
 		await _run_drop2()
 		return
@@ -303,6 +307,52 @@ func _run_drop2() -> void:
 
 	await _until(87.0)
 	_finish("capture_drop2", SECTIONS_DROP2)
+
+
+## D394: the placeholder run. The short pick reveal through a real picker
+## (the director's hook, faded when it closes), then every ph_* sound's
+## first variation over the combat bed, 1.6 s apart (the loops for 3 s,
+## then stopped), at its in-game mix level (2D: the file and mix, not the
+## 3D distance). tools/audio/analyse_placeholders.py finds each one.
+const PH_ORDER := ["ph_swap_holster", "ph_swap_draw", "ph_proc_onkill", "ph_proc_heal", "ph_proc_pity", "ph_immune",
+	"ph_obelisk_push", "ph_obelisk_pull", "ph_colossus_step", "ph_colossus_thrust", "ph_blank_step", "ph_fan_knives",
+	"ph_cast_fire", "ph_cast_water", "ph_cast_ice", "ph_cast_thunder", "ph_cast_wind", "ph_cast_light", "ph_cast_dark",
+	"ph_horde_shuffle", "ph_being_hum"]
+
+func _run_placeholders() -> void:
+	await _begin()
+	var ids := BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+	var run := BWRun.start(ids, 99)
+	var blank := Control.new()
+	await _swap(blank)
+	BWMusic.play("rest")
+	_mark("rest")
+	await _until(4.0)
+	var u: BWUnit = run.squad[0]
+	var picker := BWPicker.new(u, { "kind": "perk", "element": u.element, "rank": 2 }, "capture")
+	blank.add_child(picker)
+	_mark("picker_open")
+	await _until(8.0)
+	picker.queue_free()
+	_mark("picker_close")
+	await _until(9.0)
+	BWMusic.play("combat")
+	_mark("combat")
+	var t := 12.0
+	for n in PH_ORDER:
+		await _until(t)
+		if BWSfx.info(n).get("loop", false):
+			var p := BWSfx.play(n, null, { "variant": 1, "stack": true, "tag": "ph", "loop": true })
+			_mark(n)
+			await _until(t + 3.0)
+			BWSfx.loop_stop(p, 0.15)
+			t += 4.0
+		else:
+			BWSfx.play(n, null, { "variant": 1, "stack": true, "tag": "ph" })
+			_mark(n)
+			t += 1.6
+	await _until(t + 1.0)
+	_finish("capture_ph", [["sync", 0.0], ["rest", 1.5], ["combat", 9.0], ["end", t + 1.0]])
 
 
 ## BWMusic's log, made JSON-safe (decks are objects).

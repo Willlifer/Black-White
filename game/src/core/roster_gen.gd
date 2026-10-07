@@ -1,7 +1,7 @@
 class_name BWRosterGen
 extends RefCounted
-## D150–D152: the roster's randomized facets. data/roster.csv holds the 20
-## identities only (name, gender, seat, element lock, friendliness, hair,
+## D150–D152: the roster's randomized facets. data/roster.csv holds the
+## identities only (the 20 core seats and, D379, the rolling pool) (name, gender, seat, element lock, friendliness, hair,
 ## voice); every new game rolls the rest from a seed:
 ##
 ##   BWRosterGen.roll(identities, seed) -> Array of full roster rows
@@ -73,12 +73,24 @@ const SHADE_DECK := { "dark": 7, "mid": 7, "light": 6 }
 static var fixed_seed := -1
 
 
-## The 20 rows for `seed`. `identities`: roster.csv's rows (BWData.identities()).
-static func roll(identities: Array, p_seed: int) -> Array:
+## D379: the rolling pool. With `pool` given (BWData.pool_identities(): the
+## game's start and every Randomize), POOL_MIN..POOL_MAX of the back row's
+## seats (11-20) are handed to pool identities first, seeded on their own
+## stream so the kits per seat roll as before. The front row is always the
+## core ten; a locked core character (Rem) keeps the seat. The incoming
+## identity takes the seat's number.
+const BACK_ROW_FROM := 11
+const POOL_MIN := 3
+const POOL_MAX := 5
+
+
+## The 20 rows for `seed`. `identities`: roster.csv's core rows
+## (BWData.identities()); `pool`: the pool rows to rotate in (D379; empty =
+## the core twenty, as tests, tools and sims roll).
+static func roll(identities: Array, p_seed: int, pool: Array = []) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("bw-roster:%d" % p_seed)
-	var ids: Array = identities.duplicate()
-	ids.sort_custom(func(a, b): return int(a.get("seat", 0)) < int(b.get("seat", 0)))
+	var ids: Array = seated(identities, p_seed, pool)
 	var n := ids.size()
 	var classes := _deck(CLASSES, 2, n, rng)
 	var free := ids.filter(func(r): return str(r.get("element_lock", "")) == "").size()
@@ -110,6 +122,70 @@ static func roll(identities: Array, p_seed: int) -> Array:
 	_cover(out, "top", TOPS, rng)
 	_cover(out, "bottom", BOTTOMS, rng)
 	return out
+
+
+## D379: the twenty identities for `seed`, in seat order: the core rows with
+## POOL_MIN..POOL_MAX unlocked back-row seats given to pool rows (none when
+## `pool` is empty). Pure.
+static func seated(identities: Array, p_seed: int, pool: Array = []) -> Array:
+	var ids: Array = identities.duplicate()
+	ids.sort_custom(func(a, b): return int(a.get("seat", 0)) < int(b.get("seat", 0)))
+	if pool.is_empty():
+		return ids
+	var prng := RandomNumberGenerator.new()
+	prng.seed = hash("bw-pool:%d" % p_seed)
+	var open: Array = []
+	for i in ids.size():
+		if int(ids[i].get("seat", 0)) >= BACK_ROW_FROM and str(ids[i].get("element_lock", "")) == "":
+			open.append(i)
+	var incoming: Array = pool.duplicate()
+	incoming.sort_custom(func(a, b): return str(a.id) < str(b.id))
+	_shuffle(open, prng)
+	_shuffle(incoming, prng)
+	var k := mini(POOL_MIN + prng.randi() % (POOL_MAX - POOL_MIN + 1), mini(open.size(), incoming.size()))
+	for j in k:
+		var i: int = open[j]
+		var row: Dictionary = Dictionary(incoming[j]).duplicate()
+		row["seat"] = int(ids[i].seat)
+		ids[i] = row
+	return ids
+
+
+## D379: rolled rows for every identity of `all` not seated in `rows` (the
+## swapped-out core and the unseated pool): the enemy side's reserve
+## (BWRun.reserve_rows). Each rolls on its own seeded stream: a class at
+## random, the lock or a random element, the class profile, gendered clothes.
+static func reserve(all: Array, rows: Array, p_seed: int) -> Array:
+	var seated_ids := {}
+	for r in rows:
+		seated_ids[str(r.id)] = true
+	var out: Array = []
+	for idr in all:
+		if seated_ids.has(str(idr.id)):
+			continue
+		out.append(roll_one(idr, hash("bw-reserve:%d:%s" % [p_seed, str(idr.id)])))
+	return out
+
+
+## D379: one identity's kit on its own stream (the reserve, and a duplicate
+## enemy's different roll when the side runs short).
+static func roll_one(identity: Dictionary, stream: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = stream
+	var row: Dictionary = identity.duplicate()
+	var wc: String = CLASSES[rng.randi() % CLASSES.size()]
+	row["weapon_class"] = wc
+	row["weapon_model"] = _next_model(wc, {}, rng)
+	var lock := str(row.get("element_lock", ""))
+	row["element"] = lock if lock != "" else ELEMENTS[rng.randi() % ELEMENTS.size()]
+	var st := stats_for(wc, rng)
+	for k in STATS.size():
+		row[STATS[k]] = st[k]
+	var g := _gender(row)
+	row["top"] = _weighted(POOLS[g].top, rng)
+	row["bottom"] = _weighted(POOLS[g].bottom, rng)
+	row["clothing_shade"] = SHADE_DECK.keys()[rng.randi() % SHADE_DECK.size()]
+	return row
 
 
 ## The class's profile with the seeded variance (see the header).

@@ -139,7 +139,7 @@ func _go() -> void:
 		_place(enemies[2], ring2[7])                # beside the area: Draw in pulls it in
 		await _settle()
 		_turn(bow)
-		BWWindShape.set_choice(bow, "rain_of_arrows", "draw")
+		bow.wind_shapes.erase("rain_of_arrows")      # D383: unset, so the frame shows the default (Draw in)
 		s._skill = { "key": "rain_of_arrows", "element": "wind", "row": BWSkills.get_skill("rain_of_arrows") }
 		s._aim_skill(bow, c)
 		_look(c, c, 19.0)

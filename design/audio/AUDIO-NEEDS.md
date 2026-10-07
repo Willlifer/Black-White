@@ -26,8 +26,35 @@ Covered (details and measurements: AUDIO.md, "Drop 2"):
 
 Still missing (short):
 - `music_picks` (optional; the reveal sting covers the moment), `music_encounter` (optional)
-- Combat: weapon swap (holster/draw), the three proc sounds (on-kill, heal, pity), `sfx_immune`, obelisk push/pull, Colossus step/thrust, Horde shuffle, Being hum, Blank step, the seven big-cast element releases
-- Nice to have: a shorter pick-reveal take (this one is a 7 s phrase), and stings in the loop's key (F# minor / A major); the drop's stings centre on C
+- The stings' key: they centre on C, and the loop is in F# minor / A major.
+  **This is your call, and it's left as is.** A retune was briefed and
+  withdrawn on 2026-10-07.
+
+## Placeholders in the game now: replace me (2026-10-07, D392–D393)
+
+These all play, but they're ours: procedural, or cut from your drop-2 files,
+the no-snare kick and the Low fish takes. Each one is named `ph_*` in
+`game/audio/sfx/`. Send a WAV under the name on the left (any length) and
+I'll trim it, level it and move the hook over. Details are in AUDIO.md,
+"Drop 2 cuts + placeholders".
+
+- [ ] **replace me**: `sfx_swap_holster` / `sfx_swap_draw` (now `ph_swap_holster`, `ph_swap_draw`)
+- [ ] **replace me**: `sfx_proc_onkill` (now `ph_proc_onkill`: your "cursed or bad" hit, a kick and a low bell)
+- [ ] **replace me**: `sfx_proc_heal` (now `ph_proc_heal`: your level-up's first two notes, an octave up)
+- [ ] **replace me**: `sfx_proc_pity` (now `ph_proc_pity`: your shop purchase's first pluck)
+- [ ] **replace me**: `sfx_immune` (now `ph_immune`, a dull clank)
+- [ ] **replace me**: `sfx_obelisk_push` / `sfx_obelisk_pull` (now `ph_obelisk_push`, `ph_obelisk_pull`)
+- [ ] **replace me**: `sfx_colossus_step` / `sfx_colossus_thrust` (now `ph_colossus_step`, `ph_colossus_thrust`)
+- [ ] **replace me**: `sfx_horde_shuffle` (now `ph_horde_shuffle`, a 3 s loop; send a loop that meets itself)
+- [ ] **replace me**: `sfx_being_hum` (now `ph_being_hum`, a 4 s loop from your Low fish takes)
+- [ ] **replace me**: `sfx_blank_step` (now `ph_blank_step`)
+- [ ] **replace me**: `sfx_cast_fire|water|ice|thunder|wind|light|dark` (now `ph_cast_*`, the big-cast releases)
+- [ ] **replace me**: `sfx_fan_knives`, Fan of Knives' whoosh (now `ph_fan_knives`; a new ask)
+- [x] A shorter pick-reveal take: **cut from yours** (`sting_pick_short`, 2.27 s, faded out).
+  A purpose-made 1–2 s take would still beat a cut. The 7 s one stays available.
+
+Tonight's best order, by how often they're heard: the 7 cast releases, the
+swap draw, on-kill and immune, then the encounter sounds.
 
 ## Music cues (loops)
 - `music_rooms.wav`: the room-choice screen. A short, tense "choose your door" loop that can sit on top of the hall's tempo.

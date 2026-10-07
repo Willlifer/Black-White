@@ -33,7 +33,7 @@ extends RefCounted
 ## Bump ANIM_VERSION when the source changes; test_animation checks that the
 ## saved library matches a fresh bake of this file.
 
-const ANIM_VERSION := 8
+const ANIM_VERSION := 9                # D389: strike_haymaker, strike_chamber, the bigger jab
 const FPS := 24.0
 const BAKE_HZ := 60.0
 const DIR := "res://art/animations/"

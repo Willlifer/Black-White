@@ -22,6 +22,7 @@ extends SceneTree
 ## SHADOW=1: under "standard", every choice fight is also played in its Hard
 ## room on a copy of the run (same squad, same day), printed "hard (paired)".
 ## HARD="stages,levels,mult,armor" overrides the BWRooms Hard knobs (tuning).
+## THREE="s1,...,s10" (D385) overrides the 3v3 scales (ENEMY_CURVE column 5).
 ## CURVE="m1,...,m10" overrides ENEMY_CURVE's multipliers, ELVL the enemy
 ## levels per stage (BWRooms.LEVELS_PER_STAGE) (tuning).
 ## ENC=1 (D212): every choice fight (3-10) is also played as each special
@@ -108,6 +109,13 @@ func _init() -> void:
 			var row: Array = BWRun.ENEMY_CURVE[i].duplicate()
 			row[1] = float(m[i])
 			BWRun.curve_override.append(row)
+	if OS.get_environment("THREE") != "":                  # D385 tuning: the ten 3v3 scales (column 5)
+		var th := OS.get_environment("THREE").split(",")
+		if BWRun.curve_override.is_empty():
+			for i in BWRun.ENEMY_CURVE.size():
+				BWRun.curve_override.append(BWRun.ENEMY_CURVE[i].duplicate())
+		for i in BWRun.curve_override.size():
+			BWRun.curve_override[i][4] = float(th[i])
 	if OS.get_environment("ENC_TUNE") != "":               # D212 tuning
 		var e := OS.get_environment("ENC_TUNE").split(",")
 		BWEncounters.HORDE_MULT = float(e[0]); BWEncounters.HORDE_HP = float(e[1])
@@ -122,7 +130,8 @@ func _init() -> void:
 			BWTwins.TWINS_MULT = float(tw[1])
 	if OS.get_environment("ELVL") != "":                   # tuning: enemy levels per stage
 		BWRooms.LEVELS_PER_STAGE = float(OS.get_environment("ELVL"))
-	print("Curve: %s, levels per stage %.2f" % [str((BWRun.curve_override if not BWRun.curve_override.is_empty() else BWRun.ENEMY_CURVE).map(func(r): return r[1])), BWRooms.LEVELS_PER_STAGE])
+	print("Curve: %s, 3v3 scale %s, levels per stage %.2f" % [str((BWRun.curve_override if not BWRun.curve_override.is_empty() else BWRun.ENEMY_CURVE).map(func(r): return r[1])),
+		str((BWRun.curve_override if not BWRun.curve_override.is_empty() else BWRun.ENEMY_CURVE).map(func(r): return r[4] if r.size() > 4 else 1.0)), BWRooms.LEVELS_PER_STAGE])
 	print("Hard: stages +%d, levels +%d, mult x%.2f, armour +%d" % [BWRooms.HARD_STAGES, BWRooms.HARD_LEVELS, BWRooms.HARD_MULT, BWRooms.HARD_ARMOR])
 	for combo in _combos(room_pols, only):
 		_sim(combo[0], combo[1], runs, ids)

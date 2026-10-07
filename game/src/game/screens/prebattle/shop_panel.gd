@@ -30,6 +30,7 @@ var scroll: Dictionary = {}       # scroll: the chosen scroll
 var _sort_btns := {}              # D235
 var _title: Label
 var _scroll_row: HBoxContainer
+var _feat_reason: Label            ## D380: "Featured: completes Will's Wind set"
 var _left_title: Label
 var _right_title: Label
 var _left: GridContainer
@@ -89,9 +90,16 @@ imbuement scrolls")
 	fl.tooltip_text = "One per element, free, new ones after every battle."
 	fl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	feat.add_child(fl)
+	var mid := VBoxContainer.new()
+	mid.add_theme_constant_override("separation", 2)
+	feat.add_child(mid)
 	_scroll_row = HBoxContainer.new()
 	_scroll_row.add_theme_constant_override("separation", 8)
-	feat.add_child(_scroll_row)
+	mid.add_child(_scroll_row)
+	_feat_reason = Label.new()                       # D380: why the featured one
+	_feat_reason.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
+	_feat_reason.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+	mid.add_child(_feat_reason)
 	var fn := Label.new()
 	fn.text = "one per element · free
 new scrolls after every battle"
@@ -237,7 +245,17 @@ func refresh() -> void:
 func _fill_scrolls() -> void:
 	for c in _scroll_row.get_children():
 		c.queue_free()
+	var feat := run.featured_scroll()            # D380: one scroll marked for this squad
+	_feat_reason.text = str(feat.get("reason", ""))
 	for s in run.scrolls:
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 0)
+		var tag := Label.new()
+		tag.text = "FEATURED" if not feat.is_empty() and feat.scroll == s else " "
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 4)
+		tag.add_theme_color_override("font_color", BWStyle.TEXT)
+		box.add_child(tag)
 		var t := BWItemTile.new(s, 60.0)
 		t.draggable = false
 		t.source = "shop"
@@ -246,7 +264,8 @@ func _fill_scrolls() -> void:
 		t.picked.connect(func(tile): pick_scroll(tile.item))
 		t.hovered.connect(func(tile): _hover_scroll(tile.item))
 		t.unhovered.connect(func(_tile): _cards())
-		_scroll_row.add_child(t)
+		box.add_child(t)
+		_scroll_row.add_child(box)
 
 
 ## Every item the squad wears or carries (D180: the second weapon too).

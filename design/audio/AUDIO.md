@@ -29,6 +29,8 @@ game/tools/audio/make_music.py       16 layer WAVs in 3 tempo sets + audio/music
 game/tools/audio/analyse_capture.py  capture analysis + PNGs
 game/tools/audio/make_drop2.py       the author's drop 2: trims, levels, merges into both manifests ("Drop 2" below)
 game/tools/audio/analyse_drop2.py    the drop-2 capture analysis -> capture_drop2_report.json
+game/tools/audio/make_placeholders.py    ph_* placeholder SFX + the short pick reveal ("Drop 2 cuts + placeholders")
+game/tools/audio/analyse_placeholders.py the placeholder capture analysis -> capture_ph_report.json
 game/src/game/music.gd               BWMusic: layered, beat-synced, cue/intensity/sting
 game/src/game/voice.gd               BWVoice: barks and grunts (start offset + level per clip, Voice bus)
 game/src/game/audio/audio.gd         BWAudio: buses, effects, per-bus volume settings
@@ -38,7 +40,7 @@ game/src/game/audio/unit_audio.gd    BWUnitAudio: animation markers / clips / fo
 game/src/game/audio/combat_audio.gd  BWCombatAudio: battle events (timed to their replay) → SFX, intensity, stings
 game/src/game/audio/screen_audio.gd  BWScreenAudio: title / roster / downtime moments
 game/src/game/audio/audio_capture.gd BWAudioCapture: the --audio-capture run
-game/tests/test_audio.gd             7 tests, ~1200 checks (test_drop2: drop-2 trims, cues, hooks)
+game/tests/test_audio.gd             8 tests, ~1600 checks (test_drop2: drop-2 trims, cues, hooks; test_placeholders)
 ```
 
 ## SFX
@@ -340,6 +342,88 @@ momentary max is level with the others.
 - **The shop sound** (not ducked) peaks at −14.8 over −16.2 of music. Under
   the music its match score is only 0.5, so its measured offset (+97 ms)
   isn't reliable; the log has it starting on the frame of the trade.
+
+## Drop 2 cuts + placeholders (2026-10-07, D391–D394)
+
+**The stings stay in C, the author's key, for now (D391).** A retune into
+the loop's key (A major / F# minor) was briefed and withdrawn the same day.
+Nothing is pitch-shifted; every sting that plays is the author's file,
+trimmed and levelled as in Drop 2.
+
+What was added fills gaps by length and shape only, plus placeholders for
+AUDIO-NEEDS' "Still missing" list. Every placeholder is named `ph_*` so
+it's plain what to replace: a recording dropped over
+`game/audio/sfx/ph_<name>_<n>.wav` plays instead. Rebuild:
+`python game/tools/audio/make_placeholders.py` (≈4 s; `make_sfx.py` and
+`make_drop2.py` also run it at their end), then `--import`.
+
+**Processing:** like every SFX. The onset is trimmed to 3 ms before the
+first sample within 40 dB of the peak (the two inward swells, pull and dark,
+rise from quiet by design). Levels are −16 LUFS-ish momentary with peaks
+≤ −1 dBFS: all 43 files are within 0.9 dB of the target. The two loops wrap
+their filters, grains and noise bed across the seam (seam step 0.033 / 0.004,
+under each loop's 99th-percentile sample step). Mono, 44.1 kHz 16-bit, SFX
+bus, 3D at the unit. The mix is in `BWSfx.MIX`, set against the sound each
+one replaces.
+
+| File (variations) | Source / method | Where it plays | Mix dB |
+|---|---|---|---|
+| `sting_pick_short` (1) | **sting pick reveal**: the Drop 2 trim, then its first 2.27 s (cut 20 ms before the onset of its third phrase), the last 0.8 s faded cos² | **every picker** (`BWMusic.STINGS.pick`); fades when the pick is taken. The 7 s take stays mapped as `pick_long` (nothing calls it yet); `"pick": "sting_pick_reveal"` switches back | −7 |
+| `ph_swap_holster` (2) | procedural: a cloth swish, a stick-slip scrape (180 → 90 Hz over 3–8 kHz noise), and a leather/wood seat clack at 0.34 s | a weapon swap starts (`combat_screen._animate_swap`) | −12 |
+| `ph_swap_draw` (2) | procedural: a short scrape out, the blade's ring (metal modes from 2.15 kHz) and a grip thump | the other weapon reaches the hand (the swap's callback) | −12 |
+| `ph_proc_onkill` (2) | the opening hit of **cursed or bad**, the **no snare beat** kick (×0.8 / ×0.72), and a low bell (F#2 / C3) | `enchant`: Death Knell, Relentless, a kill's spread (Wake of Ash) | −7 |
+| `ph_proc_heal` (2) | the first two notes of **sting level up** (C → G), an octave up over the original, plus sparkle | a `heal` caused by an enchantment or Mend-Link (instead of the heal shimmer) | −8 |
+| `ph_proc_pity` (2) | the first pluck of **shop purchase** (v2 up a fifth) and a wood tick | `enchant`: Second Chance, Graze, Follow-Through, Steady Hand | −10 |
+| `ph_immune` (3) | procedural: low, heavily damped inharmonic modes (f0 ≈ 240 Hz), a muffled thud, low-passed at 2.4 kHz | `immune` (a blow on a Blank or a Being) | −5 |
+| `ph_obelisk_push` (2) | the kick a fourth down, a 45 Hz sub, and a falling outward rush (1.1 kHz → 160 Hz) in a short room | the Lantern's pulse (`combat_screen._pulse`) | −3 |
+| `ph_obelisk_pull` (2) | a rising inward rush (150 Hz → 1.3 kHz) swelling into the same kick at 0.8 s | the Well's pulse | −3 |
+| `ph_colossus_step` (3) | the kick a fifth down, a 55 → 32 Hz thump and gravel grit, saturated | the Colossus's foot locks; its arrival `stomp` (+4 dB) | −9 |
+| `ph_colossus_thrust` (2) | procedural: a slow heavy whoosh (150 → 750 → 220 Hz), an armour rattle and a low push; peak at 0.25 s | `strike_colossus` `launch`, its peak lined up on `hit` | −4 |
+| `ph_horde_shuffle` (1, 3 s loop) | procedural: ~16 small scuffs and heel taps a second at random levels, over a grit bed | one loop while any Horde grunt walks | −20 |
+| `ph_being_hum` (1, 4 s loop) | a granular drone from the **Low fish** voice takes (like `voice_pad`), A2 + E3, over a 55/110/165 Hz core with a 0.5 Hz swell | on each living Elemental Being, pitched by its element (×0.84–1.19) so three don't merge | −23 |
+| `ph_blank_step` (3) | procedural: a dry heel tick, a muted knock and a faint glass ping (A6 / E6 / F#6) | a Blank's foot locks | −16 |
+| `ph_cast_fire` (2) | a whoomph, a 1.2 s roaring band (11 Hz flutter), dense crackle and a sub | a **big cast**'s `release` (instead of the bolt fizz). A big cast is a caster's skill (staff, Being, or a cast-clip keystone) that is AoE or covers 3+ hexes. Keystones with no element map: Flash Freeze → ice, Tidal Release → water | −5 |
+| `ph_cast_water` (2) | a rush rising 200 Hz → 1.6 kHz with bubbling AM, cresting into a splash at 0.14 s, then droplets | a big water cast | −5 |
+| `ph_cast_ice` (2) | a hard split, a spreading 95 Hz groan and ~45 glass shards | a big ice cast | −5 |
+| `ph_cast_thunder` (2) | `elem_thunder`, an N-wave snap and a rolling 1.2 s rumble | a big thunder cast | −6 |
+| `ph_cast_wind` (2) | a wide stereo gust (300 Hz → 2 kHz → 500 Hz, peak 0.2 s), a 6 Hz flutter and a whistle | a big wind cast | −5 |
+| `ph_cast_light` (2) | an A-major bell cluster rolled (A5 C#6 E6 A6), a bright sparkle and a soft A/E swell | a big light cast | −6 |
+| `ph_cast_dark` (2) | an inward swell drawn tight, then the implosion (120 → 38 Hz, a 31 Hz shiver) at ~0.52 s, near the dark release's 0.7 s impact | a big dark cast | −4 |
+| `ph_fan_knives` (2) | procedural: three thin blade whooshes 70 ms apart, rising, with a knife tick on each; peak at 0.22 s | Fan of Knives: `strike_spin` `launch`, its peak on `hit` | −7 |
+
+The author's sources are read from `design/audio/` and the Low fish
+folder, never written.
+
+**Wiring (D393):**
+- `BWCombatAudio`: the `enchant` text, the heal cause, `immune`, a skill → `BWUnitAudio.expect_cast`, and the Horde loop.
+- `BWUnitAudio`: the cast release, the spin, the Colossus clips, steps by `unit.encounter`, and the Being hum.
+- Two marked edits in `combat_screen.gd`: the obelisk pulse and the weapon swap, which already called `BWSfx` there.
+
+A big cast with no animator (stand-ins) sounds at once. Under Minimal
+cutscenes no cast clip plays, so the release sound doesn't either.
+
+**Verified (D394).** `test_audio`'s `test_placeholders` covers the manifest,
+mix, onsets, loop seams, the proc text map, the big-cast rule, the pick
+mapping, and the stings still being the author's files.
+
+The capture: `godot --path game -- --placeholders --audio-capture <dir>`,
+then `python game/tools/audio/analyse_placeholders.py <dir>`. It plays the
+short pick reveal through a real picker over the hall, then every `ph_*`
+over the combat bed, 2D at its mix level. The run was 51 s at 48 kHz: 0
+clipped samples, highest peak −3.0 dBFS.
+
+- **Timing:** all 20 one-shots and the pick cut were found by
+  cross-correlation with their file (match 0.38–0.91), starting −1.2 …
+  +10.1 ms from the frame they were asked for, so within a frame.
+- **Levels:** the one-shots' 400 ms momentary max with the music sits at
+  −15.3 … −19.3 over a −15.7 … −19.5 bed. The quiet ones are by design:
+  the Blank step (−21.7) and the Fan whoosh (−19.3).
+- **Loops:** the loops are noise and drone, so a match score says nothing
+  about them; they read as levels only. The shuffle is at −17.0 and the
+  hum at −16.4, 2D at full level; in game they're 3D and quieter.
+- **The pick cut** sits at −24.2 momentary under the ducked hall music,
+  the same as the 7 s take. Their gains differ by 0.7 dB, and both play at
+  −7 because they "run under the cards".
 
 ## Swapping in real recordings
 

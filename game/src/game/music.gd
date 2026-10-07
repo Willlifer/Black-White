@@ -78,8 +78,10 @@ const CUES := {
 const MAX_DB := 8.0
 ## D240: the author's stings. One at a time: a new one fades out the last.
 ## The procedural sting_victory / sting_defeat stay in the manifest unused.
+## D392: the pick cards get the 2.3 s cut ("pick": "sting_pick_reveal" switches back);
+## the full 7 s take stays mapped as "pick_long". The stings stay in the author's key (C).
 const STINGS := { "victory": "sting_good", "defeat": "sting_bad", "jackpot": "sting_good", "cursed": "sting_bad",
-	"level_up": "sting_level_up", "pick": "sting_pick_reveal", "room_hard": "sting_room_hard" }
+	"level_up": "sting_level_up", "pick": "sting_pick_short", "pick_long": "sting_pick_reveal", "room_hard": "sting_room_hard" }
 const FADE_IN := 0.08          # a layer coming in (on the beat)
 const FADE_OUT := 0.45         # a layer leaving
 const DECK_IN := 0.1           # a tempo set entering on the bar line

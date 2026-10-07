@@ -39,15 +39,15 @@ Chamber, Fan of Knives, Haymaker, the fists' jab: L-13).
 | **Second Dagger** (daggers) | same | **no** | `strike_throw_l`: the other hand throws |
 | **Earthsplitter** (axe) | free-hand cast at range | **no** | The overhead chop; the bolt runs out on the hit |
 | Elemental Truth (sword) | strike | yes | — |
-| ~ Empty the Chamber (pistols) | one recoil under a 4-tracer sweep | ~ | Left: the VFX sweep carries the fan (a 4-shot clip at 0.065 s spacing is under 2 frames a shot) |
+| **Empty the Chamber** (pistols) | one recoil under a 4-tracer sweep | **no** | `strike_chamber` (D389): fanning the hammer, four recoils swept right to left, a tracer on each |
 | Energized Shot (bow) | strike (full draw) | yes | — |
-| ~ Fan of Knives (daggers) | spin | ~ | Left: the spin fits; the missing thrown knives are VFX (L-8) |
+| Fan of Knives (daggers) | spin | yes | The spin fits; the knives fly from it since D387 |
 | Flash Round (pistols) | pistol shot | yes | (+ Blinded flinch, below) |
 | **Flurry** (fists) | 3-punch clip, then a jab per later strike (5 punches) | **no** | Strikes 2–3 land on the clip's `hit2`/`hit3` in one cutscene |
 | **Grapple Throw** (fists) | uppercut; the foe then *walks* to its tile | **no**: no grab | `strike_grapple`: reach, seize, heave over, slam; the foe flies on `throw` and lands on a knee |
 | **Guardrush** (lance) | free-hand cast at reach 2 | **no** | The thrust; bolt on the hit |
 | Hamstring (daggers) | pair low cut | yes | — |
-| ~ Haymaker (fists) | uppercut | ~ (a hook, not a rising blow) | Left: a wound-up heavy blow from the hip reads; the setup crit rule is about the wind-up |
+| **Haymaker** (fists) | uppercut | **no** (a hook, not a rising blow) | `strike_haymaker` (D389): long wind-up, full-body hook, follow-through |
 | **Heart Seeker** (sword) | forehand cut | **no**: "a precise thrust" | `strike_thrust` |
 | **Hook** (axe) | free-hand cast at range 3 | **no** | `strike_hook`: sidearm cast on the line, then two hauls |
 | **Hundred Fists** (fists) | the 3-punch flurry, then 5 jab replays | **no** | `strike_hundred`: six blows on `hit`..`hit6`, one cutscene |
@@ -93,7 +93,7 @@ Inversion and Aegis are the ones named in the request; all are covered above.)
 | Action | Current clip | Fits? | Fix |
 |---|---|---|---|
 | Basic attack: one, heavy, polearm, spear, staff, pair, bow, pistol | the style's strike / cast / shot | yes | — |
-| Basic attack: fists | the jab | ~ (reads small, L-13) | Left (L-13) |
+| Basic attack: fists | the jab | yes | D389: a wider arc, longer reach, a deeper lunge, an impact star |
 | Second weapon swap | holster and draw (D191) | yes | — |
 | Counters, Riposte answers, overwatch shots | the class strike / shot | yes | — |
 | Reactions (dodge, block, fumble, kneel, five hit variants, fall) | BWReactionPick | yes | — |

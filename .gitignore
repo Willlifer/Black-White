@@ -10,3 +10,5 @@ desktop.ini
 .DS_Store
 # Windows shortcuts
 *.lnk
+# Windows builds (build_windows.bat, D395)
+dist/

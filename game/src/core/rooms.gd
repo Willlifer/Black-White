@@ -427,17 +427,23 @@ static func _slot(n: int) -> int:
 ## outside `avoid` while the pool allows), drawn on fight n's enemy rng (Hard:
 ## its own stream). The first three draws are the same at any count.
 static func _draw_ids(run: BWRun, n: int, avoid: Array, hard: bool, count: int = BWRun.DEPLOY) -> Array:
-	var pool: Array = []
-	for row in run.roster_rows:
-		if run.unit(str(row.id)) == null:
-			pool.append(str(row.id))
-	pool.sort()
+	var pool: Array = run.enemy_ids()           # D379: seats and reserve, outside the squad
 	var fresh: Array = pool.filter(func(id): return not id in avoid)
 	if fresh.size() >= count:
 		pool = fresh
 	var erng := RandomNumberGenerator.new()
 	erng.seed = hash("hard|%d|%d" % [run.seed_value, n]) if hard else run.seed_value * 7919 + n
 	var out: Array = []
+	var all: Array = pool.duplicate()
 	for i in mini(count, pool.size()):
 		out.append(pool.pop_at(erng.randi() % pool.size()))
+	# D379: still short (a squad that recruited nearly everyone): duplicates
+	# with their own roll ("<id>~k", BWRun.roster_row)
+	var k := 2
+	while out.size() < count and not all.is_empty():
+		for id in all:
+			if out.size() >= count:
+				break
+			out.append("%s~%d" % [id, k])
+		k += 1
 	return out

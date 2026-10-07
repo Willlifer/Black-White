@@ -24,6 +24,15 @@ extends Node
 ##   fall                 grounded KO thud
 ##   gaits                a foot lock engaging while the root moves: a step
 ##
+## D393 placeholders (ph_*, tools/audio/make_placeholders.py):
+##   cast (a big cast)    release  ph_cast_<element> instead of the bolt fizz
+##                                 (combat_audio flags it with expect_cast)
+##   strike_spin (Fan of Knives)  launch  ph_fan_knives, peak on `hit`
+##   strike_colossus      launch   ph_colossus_thrust, peak on `hit`
+##   stomp_colossus       stomp    ph_colossus_step, louder
+##   gaits by encounter   Colossus ph_colossus_step, Blank ph_blank_step
+##   an Elemental Being   alive    ph_being_hum, a quiet loop on the view
+##
 ## Grunts: hits make the defender grunt ("Oof", "Ouch grunt", "Oogh") at its
 ## voice_pitch, and strikes sometimes get a "Hiyah"/"Yah", with a per-unit
 ## cooldown and a global gap so it never chatters.
@@ -72,6 +81,8 @@ var _last_grunt := -10.0
 var _rng := RandomNumberGenerator.new()
 var _layer: Variant = null           # the animator's top layer (identity: a new play of a clip)
 var _serial := 0
+var _cast := {}                      # D393: the big cast / fan this unit is about to make
+var _hum: Node                       # D393: an Elemental Being's idle hum
 var _led := {}                       # "serial:marker" already played ahead of its report
 
 
@@ -88,6 +99,33 @@ static func expect(v: Node, info: Dictionary) -> void:
 		var e := info.duplicate()
 		e["at"] = Time.get_ticks_msec() / 1000.0
 		ua._expect = e
+
+
+## D393: the caster's next cast release (or spin) is a big one: { kind
+## "cast", element } or { kind "fan" }. Consumed by the marker; a unit with
+## no animator sounds it at once.
+static func expect_cast(v: Node, info: Dictionary) -> void:
+	var ua := of(v)
+	if ua == null:
+		return
+	if ua._an == null or (v is BWUnitView and (v as BWUnitView).character == null):
+		ua._sfx(cast_sound(info), { "tag": "big_cast_now" })
+		return
+	var e := info.duplicate()
+	e["at"] = Time.get_ticks_msec() / 1000.0
+	ua._cast = e
+
+
+static func cast_sound(info: Dictionary) -> String:
+	return "ph_fan_knives" if str(info.get("kind", "")) == "fan" else "ph_cast_" + str(info.get("element", "fire"))
+
+
+func _take_cast(kind: String) -> Dictionary:
+	var c := _cast
+	if c.is_empty() or str(c.get("kind", "")) != kind or Time.get_ticks_msec() / 1000.0 - float(c.get("at", 0.0)) > EXPECT_TTL:
+		return {}
+	_cast = {}
+	return c
 
 
 static func of(v: Node) -> BWUnitAudio:
@@ -114,6 +152,7 @@ func _set_id() -> String:
 func _process(_delta: float) -> void:
 	if view == null:
 		return
+	_being_hum()
 	var an: BWAnimator = view.character.animator if view.character else null
 	if an != _an:
 		if _an and _an.marker.is_connected(_on_marker):
@@ -159,6 +198,24 @@ func _lead(delta: float) -> void:
 func _exit_tree() -> void:
 	BWSfx.loop_stop(_channel, 0.05)
 	_channel = null
+	BWSfx.loop_stop(_hum, 0.05)
+	_hum = null
+
+
+## D393: an Elemental Being hums while it lives (pitched by its element so
+## three don't phase into one tone).
+const HUM_PITCH := { "fire": 1.0, "water": 0.89, "ice": 1.12, "thunder": 1.06, "wind": 0.94, "light": 1.19, "dark": 0.84 }
+
+func _being_hum() -> void:
+	if view.unit == null or str(view.unit.encounter) != "being":
+		return
+	var on := view.unit.alive() and view.is_inside_tree() and view.visible
+	if on and (_hum == null or not is_instance_valid(_hum)):
+		_hum = BWSfx.loop_start("ph_being_hum", view, { "tag": "being_hum", "stack": true,
+			"pitch": float(HUM_PITCH.get(str(view.unit.element), 1.0)) })
+	elif not on and _hum != null:
+		BWSfx.loop_stop(_hum, 0.6)
+		_hum = null
 
 
 # ---------------------------------------------------------------- clips
@@ -222,7 +279,21 @@ func _handle(clip: String, m: String, true_usec: int, led: bool) -> void:
 		return
 	if clip == "cast":
 		if m == "release":
-			_sfx("bolt_fizz", { "tag": "release" })
+			var big := _take_cast("cast")
+			if big.is_empty():
+				_sfx("bolt_fizz", { "tag": "release" })
+			else:
+				_sfx(cast_sound(big), { "tag": "big_cast" })      # D393
+		return
+	# ---- D393 placeholders: Fan of Knives, the Colossus ----
+	if clip == "strike_spin" and m == "launch" and not _take_cast("fan").is_empty():
+		_aligned("ph_fan_knives", "hit", "fan_knives")
+		return
+	if clip == "strike_colossus" and m == "launch":
+		_aligned("ph_colossus_thrust", "hit", "colossus_thrust")
+		return
+	if clip == "stomp_colossus" and m == "stomp":
+		_sfx("ph_colossus_step", { "gain_db": 4.0, "stack": true, "tag": "colossus_stomp" })
 		return
 	if clip == "fall":
 		if m == "grounded":
@@ -339,5 +410,8 @@ func _footsteps() -> void:
 		if on and not bool(_locked[s]) and moving and now - float(_step_at[s]) > STEP_MIN:
 			_step_at[s] = now
 			var big := view.unit.size > 1
-			_sfx("step_stone", { "stack": true, "tag": "step", "pitch": 0.55 if big else 1.0, "gain_db": 9.0 if big else 0.0 })
+			match str(view.unit.encounter):            # D393 placeholders
+				"colossus": _sfx("ph_colossus_step", { "stack": true, "tag": "step" })
+				"blank": _sfx("ph_blank_step", { "stack": true, "tag": "step" })
+				_: _sfx("step_stone", { "stack": true, "tag": "step", "pitch": 0.55 if big else 1.0, "gain_db": 9.0 if big else 0.0 })
 		_locked[s] = on

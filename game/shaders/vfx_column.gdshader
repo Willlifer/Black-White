@@ -14,6 +14,10 @@
 //   9 shout     concentric shout rings (War Cry)
 //  10 pour      a thin falling stream (Saturate)
 // Alpha-blended white / ink / element only, never additive (white tiles).
+// D388 engulf: `push` slides the quad toward (+) or away from (-) the camera
+// (world units), so a release can stand as a back shell behind its target
+// and a front shell before it; `veil` thins the front shell's fills while
+// its ink stays, so the unit reads inside the column.
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_mix, depth_draw_never, shadows_disabled, skip_vertex_transform;
 
@@ -23,6 +27,9 @@ uniform int mode = 0;
 uniform bool sphere = false;
 uniform vec4 glow : source_color = vec4(1.0, 0.35, 0.18, 1.0);
 
+instance uniform float push : instance_index(8) = 0.0;
+instance uniform float veil : instance_index(9) = 0.0;
+
 varying vec2 q;
 
 void vertex() {
@@ -30,6 +37,11 @@ void vertex() {
 	float sx = length(MODEL_MATRIX[0].xyz);
 	float sy = length(MODEL_MATRIX[1].xyz);
 	vec3 w;
+	if (push != 0.0) {
+		vec3 tc = CAMERA_POSITION_WORLD - c;
+		tc.y = 0.0;
+		c += (length(tc) > 0.001 ? normalize(tc) : vec3(0.0)) * push;
+	}
 	if (sphere) {
 		w = c + INV_VIEW_MATRIX[0].xyz * VERTEX.x * sx + INV_VIEW_MATRIX[1].xyz * VERTEX.y * sy;
 	} else {
@@ -223,5 +235,10 @@ void fragment() {
 		over(acc, ink, inside * smoothstep(w - 0.13, w - 0.12, abs(x)));
 	}
 	ALBEDO = acc.a > 0.0001 ? acc.rgb / acc.a : vec3(0.0);
-	ALPHA = clamp(acc.a, 0.0, 1.0);
+	float alpha = acc.a;
+	if (veil > 0.0) {
+		float inkness = 1.0 - smoothstep(0.03, 0.2, max(max(ALBEDO.r, ALBEDO.g), ALBEDO.b));
+		alpha *= mix(1.0 - veil, 1.0, inkness);
+	}
+	ALPHA = clamp(alpha, 0.0, 1.0);
 }

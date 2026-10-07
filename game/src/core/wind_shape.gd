@@ -30,8 +30,8 @@ extends RefCounted
 ##
 ## The choice is remembered per unit and skill (`BWUnit.wind_shapes[key] =
 ## {opt, rel}`); with nothing stored it follows the unit's basic wind mode
-## (gust → burst / blast / push away, vortex → draw / blast / pull in,
-## becalm → hold). A gale the skill lays takes the shaping's equivalent mode
+## (gust → blast / push away, vortex → blast / pull in, becalm → hold;
+## an area draws in under gust and vortex alike, D383). A gale the skill lays takes the shaping's equivalent mode
 ## (field_mode). Basic attacks keep the three modes (BWWind).
 
 const LINE := "line"
@@ -106,7 +106,7 @@ static func default_choice(u: BWUnit, kind: String) -> Dictionary:
 		return { "opt": HOLD, "rel": 0 }
 	match kind:
 		AREA:
-			return { "opt": DRAW if m == BWWind.VORTEX else BURST, "rel": 0 }
+			return { "opt": DRAW, "rel": 0 }                # D383: areas default to Draw in (was Burst out under Gust, D365)
 		LINE:
 			return { "opt": BLAST, "rel": 0 }
 		SINGLE:

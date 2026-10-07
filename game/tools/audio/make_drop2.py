@@ -266,6 +266,8 @@ def sfx() -> dict:
 def main() -> int:
     print("drop 2 stings:")
     sfx()
+    import make_placeholders              # D393: keeps sting_pick_short + ph_* in sfx.json
+    make_placeholders.build()
     music()
     return 0
 

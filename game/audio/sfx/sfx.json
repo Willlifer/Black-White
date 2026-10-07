@@ -1158,6 +1158,521 @@
     "fade_out_s": 0.15,
     "gain_db": 13.41
    }
+  },
+  "ph_swap_holster": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.42,
+     "loudness": -16.0,
+     "rms_db": -19.23,
+     "seconds": 0.49,
+     "peak_s": 0.337
+    },
+    {
+     "peak_db": -3.4,
+     "loudness": -16.0,
+     "rms_db": -19.07,
+     "seconds": 0.487,
+     "peak_s": 0.333
+    }
+   ],
+   "placeholder": true,
+   "for": "weapon swap: the hand weapon goes to its carry spot"
+  },
+  "ph_swap_draw": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.18,
+     "rms_db": -20.41,
+     "seconds": 0.591,
+     "peak_s": 0.072
+    },
+    {
+     "peak_db": -1.44,
+     "loudness": -16.0,
+     "rms_db": -20.26,
+     "seconds": 0.592,
+     "peak_s": 0.073
+    }
+   ],
+   "placeholder": true,
+   "for": "weapon swap: the other weapon reaches the hand"
+  },
+  "ph_proc_onkill": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.89,
+     "loudness": -16.0,
+     "rms_db": -19.28,
+     "seconds": 1.598,
+     "peak_s": 0.023
+    },
+    {
+     "peak_db": -4.86,
+     "loudness": -16.0,
+     "rms_db": -19.38,
+     "seconds": 1.598,
+     "peak_s": 0.026
+    }
+   ],
+   "placeholder": true,
+   "for": "on-kill enchantments (Death Knell, Relentless, Wake of Ash)"
+  },
+  "ph_proc_heal": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.71,
+     "loudness": -16.0,
+     "rms_db": -20.87,
+     "seconds": 0.9,
+     "peak_s": 0.23
+    },
+    {
+     "peak_db": -2.2,
+     "loudness": -16.0,
+     "rms_db": -20.61,
+     "seconds": 0.9,
+     "peak_s": 0.021
+    }
+   ],
+   "placeholder": true,
+   "for": "lifesteal / recovery procs (an enchantment's heal, Mend-Link)"
+  },
+  "ph_proc_pity": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.92,
+     "loudness": -16.0,
+     "rms_db": -17.89,
+     "seconds": 0.6,
+     "peak_s": 0.02
+    },
+    {
+     "peak_db": -2.76,
+     "loudness": -16.0,
+     "rms_db": -18.39,
+     "seconds": 0.6,
+     "peak_s": 0.015
+    }
+   ],
+   "placeholder": true,
+   "for": "RNG forgiveness (Second Chance, Graze, Follow-Through, Steady Hand)"
+  },
+  "ph_immune": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.12,
+     "loudness": -16.0,
+     "rms_db": -15.9,
+     "seconds": 0.4,
+     "peak_s": 0.008
+    },
+    {
+     "peak_db": -1.36,
+     "loudness": -16.0,
+     "rms_db": -15.85,
+     "seconds": 0.4,
+     "peak_s": 0.01
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.27,
+     "rms_db": -16.11,
+     "seconds": 0.4,
+     "peak_s": 0.01
+    }
+   ],
+   "placeholder": true,
+   "for": "a blow on an immune Blank / Elemental Being"
+  },
+  "ph_obelisk_push": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -5.78,
+     "loudness": -16.0,
+     "rms_db": -21.14,
+     "seconds": 1.7,
+     "peak_s": 0.032
+    },
+    {
+     "peak_db": -5.06,
+     "loudness": -16.0,
+     "rms_db": -21.03,
+     "seconds": 1.7,
+     "peak_s": 0.154
+    }
+   ],
+   "placeholder": true,
+   "for": "the Lantern's pulse (push)"
+  },
+  "ph_obelisk_pull": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -6.39,
+     "loudness": -16.0,
+     "rms_db": -21.75,
+     "seconds": 1.361,
+     "peak_s": 0.794
+    },
+    {
+     "peak_db": -4.96,
+     "loudness": -16.0,
+     "rms_db": -21.62,
+     "seconds": 1.348,
+     "peak_s": 0.781
+    }
+   ],
+   "placeholder": true,
+   "for": "the Well's pulse (pull)"
+  },
+  "ph_colossus_step": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.3,
+     "rms_db": -12.14,
+     "seconds": 0.8,
+     "peak_s": 0.007
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.43,
+     "rms_db": -12.2,
+     "seconds": 0.8,
+     "peak_s": 0.013
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.35,
+     "rms_db": -12.1,
+     "seconds": 0.8,
+     "peak_s": 0.028
+    }
+   ],
+   "placeholder": true,
+   "for": "the Colossus's footfalls and arrival stomp"
+  },
+  "ph_colossus_thrust": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.9,
+     "loudness": -16.0,
+     "rms_db": -20.24,
+     "seconds": 0.85,
+     "peak_s": 0.25
+    },
+    {
+     "peak_db": -3.21,
+     "loudness": -16.0,
+     "rms_db": -20.31,
+     "seconds": 0.848,
+     "peak_s": 0.244
+    }
+   ],
+   "placeholder": true,
+   "for": "the Colossus's line thrust"
+  },
+  "ph_horde_shuffle": {
+   "variants": 1,
+   "bus": "SFX",
+   "loop": true,
+   "levels": [
+    {
+     "peak_db": -3.58,
+     "loudness": -16.0,
+     "rms_db": -21.13,
+     "seconds": 3.0,
+     "peak_s": 2.288
+    }
+   ],
+   "placeholder": true,
+   "for": "loop while any Horde grunt walks"
+  },
+  "ph_being_hum": {
+   "variants": 1,
+   "bus": "SFX",
+   "loop": true,
+   "levels": [
+    {
+     "peak_db": -6.19,
+     "loudness": -16.0,
+     "rms_db": -17.89,
+     "seconds": 4.0,
+     "peak_s": 2.489
+    }
+   ],
+   "placeholder": true,
+   "for": "loop on each living Elemental Being"
+  },
+  "ph_blank_step": {
+   "variants": 3,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.73,
+     "rms_db": -18.76,
+     "seconds": 0.45,
+     "peak_s": 0.005
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.46,
+     "rms_db": -18.47,
+     "seconds": 0.45,
+     "peak_s": 0.01
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.84,
+     "rms_db": -18.66,
+     "seconds": 0.45,
+     "peak_s": 0.005
+    }
+   ],
+   "placeholder": true,
+   "for": "a Blank's footsteps"
+  },
+  "ph_cast_fire": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.62,
+     "loudness": -16.0,
+     "rms_db": -21.43,
+     "seconds": 1.5,
+     "peak_s": 0.131
+    },
+    {
+     "peak_db": -8.78,
+     "loudness": -16.0,
+     "rms_db": -21.07,
+     "seconds": 1.5,
+     "peak_s": 0.159
+    }
+   ],
+   "placeholder": true,
+   "for": "big fire cast release"
+  },
+  "ph_cast_water": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -3.68,
+     "loudness": -16.0,
+     "rms_db": -23.11,
+     "seconds": 1.393,
+     "peak_s": 0.143
+    },
+    {
+     "peak_db": -3.35,
+     "loudness": -16.0,
+     "rms_db": -23.09,
+     "seconds": 1.393,
+     "peak_s": 0.129
+    }
+   ],
+   "placeholder": true,
+   "for": "big water cast release"
+  },
+  "ph_cast_ice": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.12,
+     "rms_db": -23.95,
+     "seconds": 1.303,
+     "peak_s": 0.008
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.15,
+     "rms_db": -23.66,
+     "seconds": 1.303,
+     "peak_s": 0.008
+    }
+   ],
+   "placeholder": true,
+   "for": "big ice cast release"
+  },
+  "ph_cast_thunder": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -2.93,
+     "loudness": -16.0,
+     "rms_db": -22.1,
+     "seconds": 1.598,
+     "peak_s": 0.063
+    },
+    {
+     "peak_db": -3.87,
+     "loudness": -16.0,
+     "rms_db": -22.45,
+     "seconds": 1.6,
+     "peak_s": 0.046
+    }
+   ],
+   "placeholder": true,
+   "for": "big thunder cast release"
+  },
+  "ph_cast_wind": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.03,
+     "rms_db": -20.19,
+     "seconds": 1.29,
+     "peak_s": 0.203
+    },
+    {
+     "peak_db": -1.04,
+     "loudness": -16.01,
+     "rms_db": -20.1,
+     "seconds": 1.288,
+     "peak_s": 0.204
+    }
+   ],
+   "placeholder": true,
+   "for": "big wind cast release"
+  },
+  "ph_cast_light": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -7.62,
+     "loudness": -16.0,
+     "rms_db": -22.01,
+     "seconds": 1.797,
+     "peak_s": 0.182
+    },
+    {
+     "peak_db": -6.59,
+     "loudness": -16.0,
+     "rms_db": -22.11,
+     "seconds": 1.798,
+     "peak_s": 0.168
+    }
+   ],
+   "placeholder": true,
+   "for": "big light cast release"
+  },
+  "ph_cast_dark": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.41,
+     "loudness": -16.0,
+     "rms_db": -20.24,
+     "seconds": 1.433,
+     "peak_s": 0.519
+    },
+    {
+     "peak_db": -6.1,
+     "loudness": -16.0,
+     "rms_db": -20.47,
+     "seconds": 1.445,
+     "peak_s": 0.534
+    }
+   ],
+   "placeholder": true,
+   "for": "big dark cast release"
+  },
+  "ph_fan_knives": {
+   "variants": 2,
+   "bus": "SFX",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -4.66,
+     "loudness": -16.0,
+     "rms_db": -20.77,
+     "seconds": 0.532,
+     "peak_s": 0.23
+    },
+    {
+     "peak_db": -3.24,
+     "loudness": -16.0,
+     "rms_db": -20.74,
+     "seconds": 0.529,
+     "peak_s": 0.205
+    }
+   ],
+   "placeholder": true,
+   "for": "Fan of Knives' spin"
+  },
+  "sting_pick_short": {
+   "variants": 1,
+   "bus": "UI",
+   "loop": false,
+   "levels": [
+    {
+     "peak_db": -1.04,
+     "loudness": -16.0,
+     "rms_db": -18.68,
+     "seconds": 2.27,
+     "peak_s": 0.02,
+     "body_s": 2.09
+    }
+   ],
+   "drop": 2,
+   "cut_of": "sting_pick_reveal",
+   "source": "design/audio/sting pick reveal.wav",
+   "for": "the pick cards (D392)",
+   "trim": {
+    "lead_cut_s": 0.615,
+    "cut_s": 2.27,
+    "fade_out_s": 0.8,
+    "gain_db": 8.9
+   }
   }
  },
  "format": "44.1 kHz 16-bit PCM; <name>_<n>.wav, n from 1",

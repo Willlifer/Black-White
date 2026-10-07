@@ -79,7 +79,7 @@ func test_kinds_and_options(t) -> void:
 
 func test_memory_and_defaults(t) -> void:
 	var u := _u("w", "staff", "wind")
-	t.eq(str(BWWindShape.choice(u, "surge").opt), "burst", "unset: Gust's area equivalent is Burst out")
+	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "unset: an area defaults to Draw in, under Gust too (D383)")
 	u.wind_mode = "vortex"
 	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "Vortex → Draw in")
 	t.eq(int(BWWindShape.choice(u, "bolt").rel), 3, "Vortex → a single push straight back toward the caster")

@@ -19,12 +19,18 @@ const SIZE := Vector2i(192, 192)
 
 static var done := false
 static var last_ms := 0.0
+## D381: the boot screen (BWBootScreen) reads these: a pass is queued or
+## running, and how far it is (0-1: built, then each frame drawn).
+static var pending := false
+static var progress := 0.0
 
 
 static func start(host: Node) -> void:
 	if done or DisplayServer.get_name() == "headless" or OS.get_environment("BW_PREWARM") == "0":
 		return
 	done = true
+	pending = true
+	progress = 0.0
 	warm.call_deferred(host)
 
 
@@ -137,6 +143,7 @@ static func _particles() -> MultiMeshInstance3D:
 ## wall time spent (ms), also kept in last_ms.
 static func warm(host: Node) -> float:
 	if host == null or not host.is_inside_tree():
+		pending = false
 		return 0.0
 	var t0 := Time.get_ticks_usec()
 	var tree := host.get_tree()
@@ -163,9 +170,12 @@ static func warm(host: Node) -> float:
 	host.add_child(vp)
 	cam.current = true
 	_instance_params(vp)
+	progress = 0.25
 	for f in FRAMES:
 		await RenderingServer.frame_post_draw
+		progress = 0.25 + 0.75 * float(f + 1) / FRAMES
 	vp.queue_free()
+	pending = false
 	last_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	if OS.has_environment("BW_PREWARM_LOG"):
 		print("shader warm: %d objects, %d frames, %.1f ms" % [n, FRAMES, last_ms])

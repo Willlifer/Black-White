@@ -714,6 +714,8 @@ def main() -> int:
     print(f"{len(rows)} files, {bad} outside target (peak > {CEIL} dBFS or loudness off {TARGET} by > 1.5)")
     import make_drop2                     # D240: the author's drop-2 stings, merged back into sfx.json
     make_drop2.sfx()
+    import make_placeholders              # D393: ph_* placeholders + the short pick reveal, merged back too
+    make_placeholders.build()
     return 0
 
 

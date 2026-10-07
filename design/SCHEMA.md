@@ -94,7 +94,8 @@ Every piece has stats plus one built-in enchantment. Armour enchantments
 change how an element behaves; weapon enchantments change how the weapon
 attacks. `enchantments.csv` (D196–D205) adds `tier` (E–A, the lowest tier a
 row drops at), `family`, `cursed` (0/1), `cost_text`, `also` (extra records,
-`key(a=1;b=2) | ...`) and `drawback` (the cost's params); see
+`key(a=1;b=2) | ...`), `drawback` (the cost's params) and `strength` (D380: 1-3,
+an internal tier weight; it only ranks the shop's Featured scroll, never shown); see
 ENCHANTMENTS-v2.md §0. The shop's imbuement scrolls are run state
 (`BWRun.scrolls`, save v8), not a table.
 
@@ -111,7 +112,11 @@ ENCHANTMENTS-v2.md §0. The shop's imbuement scrolls are run state
 
 ## Roster (`roster.csv`)
 
-`id,name,gender,seat,element_lock,friendliness,hair_style,voice_pitch` (D150: identity only)
+`id,name,gender,seat,element_lock,friendliness,hair_style,voice_pitch,pool` (D150: identity only)
+
+- `pool` (D379): 0 = one of the 20 core seats (`BWData.identities()`), 1 = the rolling pool
+  (`BWData.pool_identities()`; seat 21+ is only its csv order, a seated pool member takes
+  the seat it fills). See design/ROSTER.md.
 
 - The rest of a roster row (`weapon_class,weapon_model,element,con..spd,top,bottom,clothing_shade`)
   is rolled per game by `BWRosterGen.roll(identities, seed)`; see design/ROSTER.md. No `tagline` (D153).

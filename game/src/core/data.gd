@@ -24,8 +24,20 @@ static func table(name: String) -> Array:
 	return _raw(name)
 
 
-## The 20 identity rows of roster.csv (fixed facets only), in seat order.
+## The 20 core identity rows of roster.csv (fixed facets only), in seat order.
+## D379: the csv also holds the rolling POOL (`pool` 1): pool_identities().
 static func identities() -> Array:
+	return _raw("roster").filter(func(r): return int(r.get("pool", 0)) == 0)
+
+
+## D379: the pool identities (`pool` 1) that rotate into the back row on a
+## Randomize and fill the enemy side.
+static func pool_identities() -> Array:
+	return _raw("roster").filter(func(r): return int(r.get("pool", 0)) == 1)
+
+
+## D379: every identity, core and pool.
+static func all_identities() -> Array:
 	return _raw("roster")
 
 

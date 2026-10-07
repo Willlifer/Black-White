@@ -32,6 +32,18 @@ const MIX := {
 	# levelled in the drop-2 capture: a sting's body ~ the music it ducks (momentary max)
 	"sting_good": 0.5, "sting_bad": 0.5, "sting_level_up": 1.0, "sting_room_hard": 0.0,
 	"sting_pick_reveal": -7.0, "shop_purchase": -6.0,
+	# D392: the pick reveal's first 2.3 s (the pick cards); the 7 s take stays as "pick_long"
+	"sting_pick_short": -7.0,
+	# D393: placeholders (ph_*, tools/audio/make_placeholders.py), files at -16 like the rest;
+	# each set against the sound it replaces (swap: the old whoosh / clink; pulse: the old
+	# detonation; Colossus step: the Giant's step; casts a little over the element hits)
+	"ph_swap_holster": -12.0, "ph_swap_draw": -12.0,
+	"ph_proc_onkill": -7.0, "ph_proc_heal": -8.0, "ph_proc_pity": -10.0, "ph_immune": -5.0,
+	"ph_obelisk_push": -3.0, "ph_obelisk_pull": -3.0,
+	"ph_colossus_step": -9.0, "ph_colossus_thrust": -4.0, "ph_horde_shuffle": -20.0, "ph_being_hum": -23.0,
+	"ph_blank_step": -16.0, "ph_fan_knives": -7.0,
+	"ph_cast_fire": -5.0, "ph_cast_water": -5.0, "ph_cast_ice": -5.0, "ph_cast_thunder": -6.0,
+	"ph_cast_wind": -5.0, "ph_cast_light": -6.0, "ph_cast_dark": -4.0,
 }
 ## Pitch jitter per play (± fraction) so repeats don't machine-gun. 0 in captures.
 static var jitter := 0.035

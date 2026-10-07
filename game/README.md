@@ -16,7 +16,7 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Save frames | add `--shot <dir> --every 1.0 --count 8` to any windowed run |
 | Input probe | `godot --path . -- --ui-probe` (clicks/keys through combat, the pause menu + settings, F, hold-to-skip, a glossary hover; exit 0 = ok) |
 | Battle / run summary frames (D119–D121) | `[SHOTS=<dir>] godot --path . --script res://tools/summary_shots.gd` (a real AI-played run → `design/art/summary_win\|loss\|run.png`) |
-| UI review frames | `godot --path . -- --ui-shots` (roster 0/3/6 picks, codex tabs, loading, results → `design/art/ui_*.png`) |
+| UI review frames | `godot --path . -- --ui-shots` (roster 0/3/6 picks, codex tabs, the boot screen (D381), results → `design/art/ui_*.png`) |
 | Flow probe | `godot --path . -- --flow-probe` (every screen transition, the drawn first perks (D233), the hall prep's equip and give, the discard pile and sorting (D234/D235), a free scroll (D236), the downtime choices, the day, the per-unit result cards and their pickers; exit 0 = ok) |
 | Downtime review (D127–D132) | `[SHOTS=<dir>] [MODE=hall\|cards] godot --path . --script res://tools/downtime2_shots.gd` (→ `design/art/downtime2_*.png`) |
 | Two-choice review (D174–D176) | `[SHOTS=<dir>] godot --path . --script res://tools/choice2_shots.gd` (→ `design/art/choice2_*.png`: the hall's 2 tiles with the Branch out cards, a 2-card perk and skill pick) |
@@ -63,6 +63,23 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
 | Bow shots and arrows (D164–D166) | `godot --path . --resolution 1600x900 -s res://tools/ranged_preview.gd` (→ `design/art/ranged_bow_sheet.png`) · `SHOTS=<dir> MODE=flat\|arcing\|rain\|split\|pierce\|pin\|throw\|perf godot --path . --script res://tools/ranged_shots.gd`, then `python tools/ranged_strip.py <dir>/<mode>_frames ../design/art/ranged_<mode> 12` |
 | Rebuild rig | `blender -b --python tools/blender/build_base_rig.py` (see design/art/RIG.md) |
 | Obelisks (D140–D145) | `godot --path . -- --combat obelisks --autoplay` · balance and the fight-4 damage scale: `[RUNS=n TRIES=n POLICY=mixed OB_HP= PULSE_L= PULSE_W= ENEMIES= TRACE=1] godot --headless --path . --script res://tools/obelisk_sim.gd` · D378 shared pool (`BWBattle.stone_pool`, `_stones_sync`; tune with `OB_HP`): review frames `RES=1920x1080 ONLY=obelisks godot --path . --script res://tools/updraft_shots.gd` (→ `obelisk_shared_plate|card.png`) · review frames: `godot --path . --script res://tools/obelisk_shots.gd` (→ `design/art/obelisks_*.png`) · models: `blender -b --factory-startup --python tools/blender/build_obelisks.py` |
+
+## Building a Windows release (D395, D396)
+
+- Once: Godot 4.7 stable export templates in `%APPDATA%\Godot\export_templates\4.7.stable\`
+  (`windows_release_x86_64.exe` etc., from the official `Godot_v4.7-stable_export_templates.tpz`; installed 2026-10-07).
+- From the repo root: `build_windows.bat` (or `./build_windows.sh` in Git Bash; `GODOT` overrides the binary).
+  It imports, exports preset **"Windows Desktop"** to `dist/BlackWhite-<date>/` (`BlackWhite.exe`,
+  `BlackWhite.pck`, `BlackWhite.console.exe`, `README.txt` from `packaging/README.txt`) and zips it to
+  `dist/BlackWhite-<date>.zip` (~72 MB). Send the zip; the exe needs the pck beside it. `dist/` is git-ignored.
+- Check it: `dist\BlackWhite-<date>\BlackWhite.console.exe -- --combat obelisks --autoplay` (0 `SCRIPT ERROR`),
+  or `-- --shot <dir> --count 4` for title frames.
+- Self-test on an export: `build_windows.bat tests` → a debug export with `tests/` in `dist/selftest/`, then
+  `dist\selftest\BlackWhite.console.exe --headless -- --self-test`. Raw-file suites fail there by design (D396).
+- Filters: FileAccess-loaded files (`*.csv`, `*.json`, `*.txt`) are included explicitly; `tools/`, test suites,
+  `art/source/`, `art/icon/` are left out. A new data file of another extension loaded by path needs adding to the
+  preset's include filter. Saves: `%APPDATA%\Godot\app_userdata\Black - White\`.
+- Before the final build: bake animations (`tools/build_anims.gd`) if the game warns "BWAnimClips … stale".
 
 ## Controls (combat)
 
@@ -133,7 +150,7 @@ src/game/      Presentation. Reads core, never the reverse.
   game.gd        BWGame — the run's screen flow and autosave
   combat/        board view, unit views (BWCharacter; use_rig=false = primitives), HUD, combat screen + cutscene
   screens/       title, roster, prep (the hall before fight 1, D84), room select (D190; rooms/map_thumbs.gd = BWMapThumbs), pre-battle, results,
-                 downtime, end card; loading (the old map-orbit intro, unused since D84);
+                 downtime, end card; boot (D381: over the shader pre-warm, fades onto the title);
     downtime/    BWHall (the marble hall: floor + reflection, columns, windows, spotlights,
                  time of day) and the downtime widgets (the three choice tiles, chips, the arrow), D83/D127;
                  codex.gd = BWCodex, the rules overlay: `BWCodex.summon(self, "weapons")`, Esc closes

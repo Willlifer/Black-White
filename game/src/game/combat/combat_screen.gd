@@ -625,6 +625,7 @@ func _after_events() -> void:
 	ranges.clear()
 	board_view.clear_highlights()
 	while true:
+		_queue = BWWindOrder.hoist(_queue)          # ---- D390: wind draws in before its blow, pushes after
 		while not _queue.is_empty():
 			var ev: Dictionary = _queue.pop_front()
 			if str(ev.type) == "group_turn":
@@ -1350,6 +1351,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	var use_cast := BWClipRoute.casts(a.unit, spell, skill_clip)   # D221: a weapon skill at range strikes (bolt on the hit); D220: a Being casts
 	var clip := a.has_clip("cast") if use_cast else a.has_clip("strike")
 	var to_impact := 0.0
+	var impacts: Array = []                                        # ---- D387/D389: per-result impact times (Fan, Chamber)
 	if use_cast and clip:
 		var wind: float = vfx.windup(a) if vfx else 0.0              # ---- D167: casting circle + converge
 		if skill_name != "" and a.has_clip("channel"):
@@ -1372,6 +1374,8 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		a.pose_named("strike")
 		if vfx:
 			vfx.on_strike(a, targets)                           # ---- D169: spin trail ring
+		if ranged:
+			impacts = ranged.fan(a, results)                    # ---- D387: Fan of Knives' thrown ring
 		var launch := a.time_to_marker("launch")
 		if melee and launch >= 0.0:
 			var land := maxf(a.time_to_marker("land"), launch + 0.05)
@@ -1383,9 +1387,10 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		var rel := a.time_to_marker("release")
 		if rel >= 0.0:
 			await get_tree().create_timer(rel).timeout
-			to_impact = _projectile(a, d, element != "", element if element != "" else a.unit.attuned, bool(results[0].result.hit))
 			if vfx:
-				vfx.at_release(a, targets)                      # ---- D169: Empty the Chamber's fan
+				impacts = vfx.at_release(a, targets, results)   # ---- D169/D389: Empty the Chamber, a tracer per recoil
+			if impacts.is_empty():
+				to_impact = _projectile(a, d, element != "", element if element != "" else a.unit.attuned, bool(results[0].result.hit))
 		elif not melee and str(a.unit.encounter) != "colossus":
 			# a reach weapon or a skill at range: the bolt leaves on the hit frame
 			await get_tree().create_timer(maxf(a.time_to_marker("hit"), 0.0)).timeout
@@ -1411,8 +1416,8 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	# (a clean hit picks by context: BWReactionPick, design/art/ANIMATION.md)
 	var reacts: Array = []
 	for k in results.size():
-		reacts.append(_pick_reaction(targets[k], results[k], melee, "%s|%d" % [attacker_id, k]))
-	await _react_at(a, targets, reacts, to_impact, results, str(tc.get("flash", "full")))
+		reacts.append(_pick_reaction(targets[k], results[k], melee, "%s|%d" % [attacker_id, k], results.slice(k + 1) + extra))
+	await _react_at(a, targets, reacts, to_impact, results, str(tc.get("flash", "full")), impacts)
 	ui.odds_result(results[0].result)                # ---- D113: light what happened
 	var lines: PackedStringArray = []
 	var biggest := 0
@@ -1530,7 +1535,7 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	var melee := BWHex.distance(a.unit.pos, d.unit.pos) <= 1
 	var reacts: Array = []
 	for k in results.size():
-		reacts.append(_pick_reaction(targets[k], results[k], melee, "%s|%s|%d" % [attacker_id, label_text, k]))
+		reacts.append(_pick_reaction(targets[k], results[k], melee, "%s|%s|%d" % [attacker_id, label_text, k], results.slice(k + 1) + extra))
 	ui.cinematic(true)                               # ---- D111
 	if BWSettings.value("show_odds"):
 		_odds_in(results, element)                   # ---- D113
@@ -1539,12 +1544,16 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	a.pose_named("cast" if spell else "strike")
 	var rel := a.time_to_marker("release")
 	var tint := element if element != "" else a.unit.attuned
+	var impacts: Array = ranged.fan(a, results) if ranged else []   # ---- D387: Fan of Knives' knives fly in place too
 	if rel >= 0.0 or (not melee and a.time_to_marker("hit") >= 0.0):
 		await get_tree().create_timer(rel if rel >= 0.0 else a.time_to_marker("hit")).timeout
-		to_impact = _projectile(a, d, spell or element != "", tint, bool(res.hit))
+		if vfx:
+			impacts = vfx.at_release(a, targets, results)  # ---- D389: Empty the Chamber's tracers, one per recoil
+		if impacts.is_empty():
+			to_impact = _projectile(a, d, spell or element != "", tint, bool(res.hit))
 	else:
 		to_impact = maxf(a.time_to_marker("hit"), 0.0)
-	await _react_at(a, targets, reacts, to_impact, results, str(tc.get("flash", "tiny")))
+	await _react_at(a, targets, reacts, to_impact, results, str(tc.get("flash", "tiny")), impacts)
 	ui.odds_result(res)                              # ---- D113
 	var lines: PackedStringArray = []
 	for k in results.size():
@@ -1672,7 +1681,8 @@ func _next_skill(uid: String) -> Dictionary:
 ## reaction meets its own hitN marker; numbers and tags as usual.
 func _play_extras(a: BWUnitView, extra: Array, melee: bool, flash: String) -> PackedStringArray:
 	var lines: PackedStringArray = []
-	for q in extra:
+	for qi in extra.size():
+		var q: Dictionary = extra[qi]
 		var tv: BWUnitView = _views.get(str(q.target))
 		if tv == null or not is_instance_valid(tv):
 			continue
@@ -1681,7 +1691,7 @@ func _play_extras(a: BWUnitView, extra: Array, melee: bool, flash: String) -> Pa
 		var at := a.time_to_marker("hit%d" % (int(q.strike) + 1))
 		if at < 0.0:
 			at = 0.12
-		var react := _pick_reaction(tv, rx, melee, "%s|x%d" % [a.unit.id, int(q.strike)])
+		var react := _pick_reaction(tv, rx, melee, "%s|x%d" % [a.unit.id, int(q.strike)], extra.slice(qi + 1))
 		await _react_at(a, [tv], [react], at, [rx], "tiny" if flash != "none" else "none")
 		var rk: Dictionary = rx.result
 		var num := ("IMMUNE" if rk.get("immune", false) else "MISS") if not rk.hit else str(rk.damage)
@@ -1716,12 +1726,21 @@ func _toss_in_cutscene(a: BWUnitView, d: BWUnitView) -> void:
 ## (damage as a share of max HP, crit / glance, HP left, the target's
 ## friendliness and vibe), seeded per blow. Stores the pick on the result
 ## dict ("pick") and on the view (last_reaction) for the audio lane.
-func _pick_reaction(t: BWUnitView, r: Dictionary, melee: bool, salt: String) -> String:
+## D390 (LEDGER L-13, "knockback rarely fires early"): the knockback throws
+## the body back half a hex, so on a blow that more blows on the same target
+## follow (a multi-hit clip's later strikes, a pair's second basic strike,
+## a second Chamber shot) it fired before the sequence was over and the
+## later blows hit air; there it plays the flinch, and the last blow keeps
+## the knockback. `later`: the blows still to play in this cutscene.
+func _pick_reaction(t: BWUnitView, r: Dictionary, melee: bool, salt: String, later: Array = []) -> String:
 	var res: Dictionary = r.result
 	var hp_after := int(r.get("target_hp", -1))
 	if hp_after < 0:
 		hp_after = t.unit.hp
 	var p := BWReactionPick.pick(t.unit, res, { "ko": bool(r.get("ko", false)), "melee": melee, "hp_after": hp_after, "salt": salt })
+	if str(p.reaction) == "stricken_knockback" and _more_blows(str(t.unit.id), later):
+		p.reaction = "stricken_flinch"
+		p.why = str(p.why) + ", more blows follow: flinch (D390)"
 	var info := { "tier": p.tier, "why": p.why, "damage": int(res.get("damage", 0)), "crit": bool(res.get("crit", false)),
 		"glance": bool(res.get("glance", false)) }
 	r["pick"] = info
@@ -1729,13 +1748,34 @@ func _pick_reaction(t: BWUnitView, r: Dictionary, melee: bool, salt: String) -> 
 	return str(p.reaction)
 
 
+## D390: does another blow land on `uid` before this action is over? The
+## cutscene's own later blows, else the queued strikes of the same attack.
+func _more_blows(uid: String, later: Array) -> bool:
+	for q in later:
+		if q is Dictionary and str((q as Dictionary).get("target", "")) == uid:
+			return true
+	for q in _queue:
+		var ty := str(q.get("type", ""))
+		if ty in ["turn", "skill", "cycle", "battle_end"]:
+			break
+		if ty == "attack" and int(q.get("strike", 0)) > 0 and str(q.get("target", "")) == uid:
+			return true
+	return false
+
+
 ## Start each target's reaction so its "impact" frame meets the blow in
 ## `to_impact` seconds (a block is up, a dodge already moving), move a
 ## dodger by its clip's shift while it is airborne, and return at impact.
-func _react_at(a: BWUnitView, targets: Array, reacts: Array, to_impact: float, results: Array = [], flash: String = "full") -> void:
+func _react_at(a: BWUnitView, targets: Array, reacts: Array, to_impact: float, results: Array = [], flash: String = "full", impacts: Array = []) -> void:
 	var order: Array = []
+	var latest := to_impact
 	for k in targets.size():
-		order.append([maxf(0.0, to_impact - (targets[k] as BWUnitView).lead_to_impact(reacts[k])), k])
+		var at_k := to_impact                      # ---- D387/D389: a per-result impact (a knife, a shot) when given
+		if k < impacts.size() and float(impacts[k]) >= 0.0:
+			at_k = float(impacts[k])
+		latest = maxf(latest, at_k)
+		order.append([maxf(0.0, at_k - (targets[k] as BWUnitView).lead_to_impact(reacts[k])), k])
+	to_impact = latest
 	order.sort_custom(func(x, y): return x[0] < y[0])
 	var t := 0.0
 	for o in order:
@@ -2060,13 +2100,8 @@ func _pulse(e: Dictionary) -> void:
 	rig.follow(v.global_position)
 	await get_tree().create_timer(0.25).timeout
 	var dur := v.pulse(str(e.get("kind", "push")))
-	# existing SFX, pitched: a slow low detonation for the push, a dark swell for the pull
-	if push:
-		BWSfx.play("tile_detonate", v, { "pitch": 0.55, "gain_db": -2.0, "stack": true, "tag": "pulse" })
-		BWSfx.play("cast_whoom", v, { "pitch": 0.6, "gain_db": -4.0, "stack": true, "delay": 0.05, "tag": "pulse" })
-	else:
-		BWSfx.play("elem_dark", v, { "pitch": 0.5, "gain_db": -1.0, "stack": true, "tag": "pulse" })
-		BWSfx.play("cast_whoom", v, { "pitch": 0.45, "gain_db": -5.0, "stack": true, "delay": 0.3, "tag": "pulse" })
+	# D393: placeholder pulse sounds (ph_*, tools/audio/make_placeholders.py)
+	BWSfx.play("ph_obelisk_push" if push else "ph_obelisk_pull", v, { "stack": true, "tag": "pulse" })
 	_shake(0.08)
 	await get_tree().create_timer(dur * 0.7).timeout
 	_shake(0.12)
@@ -2085,8 +2120,8 @@ func _animate_swap(v: BWUnitView, e: Dictionary) -> void:
 	if ch == null or quick:
 		v.refresh_equipment()
 	else:
-		BWSfx.play("swing_light", v, { "pitch": 1.35, "gain_db": -8.0, "tag": "swap" })
-		await ch.animate_swap(func(): BWSfx.play("hit_block", v, { "pitch": 1.7, "gain_db": -12.0, "tag": "swap" }))
+		BWSfx.play("ph_swap_holster", v, { "tag": "swap" })        # D393 placeholders
+		await ch.animate_swap(func(): BWSfx.play("ph_swap_draw", v, { "tag": "swap" }))
 		v.refresh_equipment()
 	_float_swap(v, BWText.weapon(str(e.get("weapon_class", ""))))   # D191: small and white, like a status tag
 	if u:

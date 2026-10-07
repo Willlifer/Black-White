@@ -1,23 +1,22 @@
-# Handoff — 2026-10-07 (the Element Overhaul has landed)
+# Handoff — 2026-10-07 (the Element Overhaul has landed; the roster pool)
 
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
 **Git:**
-- `main` is the full internal history; everything through `9c9117d` (schedule, Horde rework, weapon movement, wind shaping) is committed. D375-D378 (below) are **uncommitted** on top.
+- `main` is the full internal history; everything through `9c9117d` (schedule, Horde rework, weapon movement, wind shaping) is committed. D379-D386 (below) are **uncommitted** on top.
 - The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github` (no `design/art/` renders, references, raw audio, `archive/`, the concept docx). Re-export in the `../bw-export` worktree, never by switching branches here: `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, `git rm` anything deleted on main, commit, `git push origin github:main`. Last export: internal `aa5ef11` → `cc156eb` (2026-10-06).
 
-**Green as of 2026-10-07 (late):** `--self-test` 744/744 in 65 suites, `--ui-probe` (99/99), `--flow-probe` (exit 0), autoplay obelisks and ravine with zero `SCRIPT ERROR`.
+**Green as of 2026-10-07 (D379-D386):** `--self-test` 755/755 in 66 suites, `--ui-probe`, `--flow-probe`, `--tutorial-probe` exit 0 (the tutorial probe's save check fails if another process writes `user://run.json` mid-run; re-run alone).
 
-## Latest (uncommitted): free climbs, Updraft, the stones' shared life (D375-D378)
-- **D375** climbing within your jump costs no extra move (forced moves keep the cap of 2). **D376/D377 Updraft**, part of the wind perk **Tailwind** (not automatic): holder +1 jump after all modifiers; its team starting a turn on its gale +1 (stacks to +2). Breakdown "Updraft +1 (Tailwind)". Renders `design/art/updraft_ally|holder.png`.
-- **D378** the Obelisks share one HP pool of **220** (`obelisk_sim` 71%, was ~50%); one plate bar "The Stones 150 / 220", both stone bars mirror it; L-18 closed (S-16). Renders `obelisk_shared_plate|card.png`.
-
+## Latest (uncommitted): rolling pool, featured scroll, boot screen, wind default, 3v3 ease (D379-D386, LEDGER L-43)
+- **Pool (D379/D382/D386):** 27 more identities (17 pre-D149 names + the author's 10; Shyvana fire) in `roster.csv` (`pool` 1). Randomize / game start hands 3-5 back-row seats to them (front row core, Rem kept); enemies draw from all 47 outside the squad (`BWRun.reserve_rows`, duplicates `"id~2"` if short); saves keep both. Tests/tools/sims roll the core 20. design/ROSTER.md.
+- **Featured scroll (D380/D384):** `BWRun.featured_scroll` (strength column, set completion, used element, items) marks one scroll + a reason line. **Boot screen (D381):** `BWBootScreen` over the shader warm; `BWLoadingScreen` deleted (L-15, L-10 closed).
+- **D383** areas default to Draw in. **D385** 3v3 rooms ×0.93 at 1/2/3/6/9: Standard 71 → 75% (24 runs). Renders `pool_*.png`, `featured_shop.png`, `wind2_rain_default.png`. D375-D378 are committed (`5e2df32`).
 ## What landed: the Element Overhaul (design/ELEMENTS-v3.md, the author's rulings at its top)
 - **Spine (D261–D268):** ice slides and pillars, pools, steam, rinks, electrified water. ELEMENTS.md §14.
 - **Wind and dark (D269–D276):** wind modes (Gust/Vortex/Becalm) on every weapon, fields, caps, Wind Wall; dark's Rot (curse) and gravity (void).
 - **C1 (D277–D284):** the rank ladder (keystones at ranks 3 and 6, max 2), 21 keystones in `data/keystones.csv`, enemy keystones by stage, 28 perks, 2/3-piece element sets, save v11.
-- **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15.
-- **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
+- **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15. **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
 - **Final pass (D301–D308):** no BBCode leaks on cards (D301), the keystone cap (D302), summed recap lines and the banner fix (D303), AI Wind Walls (D304), docs (D305), Self-detonate (D306), the L-30 riders (D307).
 - **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, rink, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
 - **Auto-equip (D315-D318, L-35):** gear panel **Optimize all [O]** / **Optimize** with a diff preview, Apply / Cancel and one-step Undo (`BWAutoEquip`, `test_auto_equip`, renders `autoequip_*.png`).
@@ -31,10 +30,9 @@
 ## Also landed: wind shaping (D365-D370, ELEMENTS.md §18, LEDGER L-40; 6v6 infra D319-D324 is L-36)
 - A wind skill's confirm box shows **WIND SHAPING**: lines Part left/right (mouse side or the arrow toward it) / Blast out, areas Draw in / Burst out, single targets a push heading (mouse round the target, ←/→), Hold on all; Tab/wheel cycle; Enter fires. Live arrows, ghosts, SLAM, INTO FIRE. AI simulates ≤ 4. Basics keep Gust/Vortex/Becalm. Wind Wall kept (D370: not spammable). Renders `design/art/wind2_*.png`; ui-probe parts a Ley Line right with →. Self-test fails only in the schedule / movement lanes' files.
 ## Do this first
-1. **Commit** D375-D378 (see Git above).
+1. **Commit** D379-D386 (see Git above).
 2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team. Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34, L-41 (climbs, Updraft), L-42 (fight 4: the shared-pool stones).
-3. Cheap OWED items while waiting: L-10 (art docs name pass), L-8 / L-13 (VFX and animation nits).
-4. Keep `HANDOFF.md` ≤ 40 lines, and rewrite it at the end of each session.
+3. Cheap OWED items while waiting: L-13 (the bow sling yoke, the planted staff); the author looks at `vfx2_*.png` (L-43). Keep `HANDOFF.md` ≤ 40 lines; rewrite it each session.
 ## Known exposures
 - Review renders (`design/art/*.png|gif`, ~250 MB+) are only in the local repo and on this disk. Back up `.git` (`git bundle create D:\backup\bw.bundle --all`).
 - The sim's 16–24-run rates move about ±10 points per fight; read trends, not single cells. A stray long-running `--self-test` Godot process (not started by this pass) was using CPU on 2026-10-07; check Task Manager if sims run slow.

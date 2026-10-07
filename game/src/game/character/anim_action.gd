@@ -571,15 +571,24 @@ static func _strike_fists() -> BWAnimClips.Clip:
 		4.0: _m(_fist_guard("r"), _fk("l", Vector3(0.17, 0.32, 0.32), Vector3(-0.05, 0.3, 1), Vector3(0.7, 0.7, 0))),
 		8.0: _m(_fk("r", Vector3(-0.17, 0.32, 0.22), Vector3(0.1, 0.35, 1), Vector3(-0.7, 0.7, 0)),
 			_fk("l", Vector3(0.16, 0.30, 0.26), Vector3(-0.05, 0.3, 1), Vector3(0.6, 0.8, 0), { "_mode": "f" })),
-		12.0: _m(_fk("l", Vector3(0.12, 0.32, 0.5), Vector3(-0.06, 0.1, 1), Vector3(0.4, 0.9, 0), { "_mode": "l", "smear": 0.6 }), {}),
-		14.0: _m(_jab_l(), { "smear": 0.4 }),
-		16.0: _m(_jab_l(0.92), { "smear": 0.0 }),
+		# D389 (it read small): the fist dips and drives out on a wider arc,
+		# rising into a longer, stretched punch; the shoulders turn harder
+		11.0: _fk("l", Vector3(0.2, 0.24, 0.34), Vector3(-0.1, 0.2, 1), Vector3(0.5, 0.85, 0), { "_mode": "l", "smear": 0.5 }),
+		12.5: _fk("l", Vector3(0.12, 0.27, 0.58), Vector3(-0.08, 0.12, 1), Vector3(0.4, 0.9, 0), { "_mode": "l", "smear": 1.0 }),
+		14.0: _m(_jab_l(1.22), { "smear": 0.7, "arm_stretch": 0.1 }),
+		15.0: _m(_jab_l(1.18), { "smear": 0.2, "arm_stretch": 0.09 }),
+		17.0: _m(_jab_l(0.95), { "smear": 0.0, "arm_stretch": 0.03 }),
 		20.0: _fk("l", Vector3(0.15, 0.33, 0.4), Vector3(-0.05, 0.3, 1), Vector3(0.6, 0.8, 0), { "arm_stretch": 0.0 }),
 		27.0: _m(_fist_guard("r"), _fist_guard("l")),
 	}
 	# (twist reversed: a lead-hand jab turns the left shoulder in, the
 	# chest to her right, where the reference cut turns it left)
-	var c := _melee("strike", "fists", beats, -0.6, hands, 0.85)
+	var c := _melee("strike", "fists", beats, -0.95, hands, 0.85)
+	# the weight goes in behind it: a deeper lunge and a squash on the hit
+	var fh := _warp(14.0, beats)
+	c.key("root", fh, (c.value("root", fh) as Vector3) + Vector3(0, -0.035, 0.1))
+	c.key("squash", fh, -0.045).key("head_sq", fh, 0.035)
+	c.key("squash", _warp(16.0, beats), 0.0).key("head_sq", _warp(16.0, beats), 0.0)
 	return c
 
 

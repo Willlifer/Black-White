@@ -30,9 +30,9 @@ func _ready() -> void:
 	screen = get_parent()
 	if screen is BWTitleScreen and screen.has_signal("done"):
 		screen.connect("done", func(_c): BWSfx.ui("ui_confirm", { "tag": "title" }))
-	# Results and the loading screen have no buttons (D75): their "any key"
-	# is the confirm the old Continue button made.
-	if (screen is BWResultsScreen or screen is BWLoadingScreen) and screen.has_signal("done"):
+	# Results has no buttons (D75): its "any key" is the confirm the old
+	# Continue button made. (The loading screen went with D381.)
+	if screen is BWResultsScreen and screen.has_signal("done"):
 		screen.connect("done", func(): BWSfx.ui("ui_confirm", { "tag": "continue" }))
 	# D240: every fight levels the squad; one level-up sting per results
 	# screen (not one per unit), once it has faded in

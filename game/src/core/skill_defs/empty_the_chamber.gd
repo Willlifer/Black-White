@@ -15,7 +15,7 @@ const ONCE_CD := 999
 
 func _init() -> void:
 	define({
-		"key": "empty_the_chamber", "name": "Empty the Chamber", "weapon": "pistols", "clip": "",
+		"key": "empty_the_chamber", "name": "Empty the Chamber", "weapon": "pistols", "clip": "chamber",
 		"desc": "Once per battle: 4 shots at 35% spread over up to 4 enemies within 5, each rolled; a seated round lays its trail along every shot",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": 0, "once_per_battle": true,
 		"power": POWER,

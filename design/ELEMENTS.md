@@ -1457,9 +1457,10 @@ box shows **WIND SHAPING**, whose options follow the skill's shape. Code:
   8% slams on both when a push is blocked by rock, a unit, a pillar or a wall.
   Pulls never slam.
 - **Memory:** the last choice per unit and skill (`BWUnit.wind_shapes`, not
-  saved). Unset, it follows the unit's basic mode: Gust → Burst out / Blast
-  out / push straight away; Vortex → Draw in / Blast out / pull straight in;
-  Becalm → Hold.
+  saved). Unset, an area **draws in** (D383, the author: was Burst out under
+  Gust); lines and single targets follow the unit's basic mode: Gust → Blast
+  out / push straight away; Vortex → Blast out / pull straight in; Becalm →
+  Hold on every shape.
 - **Gales:** a gale the skill lays stores the equivalent mode: Draw in →
   Vortex field, Hold → Becalm field, the rest → Gust field (Part: heading to
   the parting side; Push: the push heading; else away from the caster).

@@ -6,7 +6,7 @@ extends RefCounted
 
 const SRC_DIRS := ["res://src/game/", "res://src/game/audio/", "res://src/game/combat/", "res://src/game/screens/"]
 const SFX_PREFIXES := ["swing_", "hit_", "bow_", "arrow_", "pistol_", "flintlock_", "cast_", "bolt_", "channel_",
-	"elem_", "heal", "tile_", "step_", "ko_", "ui_", "sting_", "progress_", "shop_"]
+	"elem_", "heal", "tile_", "step_", "ko_", "ui_", "sting_", "progress_", "shop_", "ph_"]
 const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "dark", "light"]
 const CEIL := 0.8913          # -1 dBFS
 
@@ -111,7 +111,7 @@ func test_every_referenced_sfx_exists(c) -> void:
 				c.ok(false, "%s (used in %s) is in sfx.json" % [n, refs[n]])
 			continue
 		var count := int(manifest[n].variants)
-		c.ok(count >= 2 or int(manifest[n].get("drop", 0)) > 0, "%s has 2+ variations, or is an author drop (%d)" % [n, count])
+		c.ok(count >= 2 or int(manifest[n].get("drop", 0)) > 0 or bool(manifest[n].get("placeholder", false)), "%s has 2+ variations, or is an author drop / a placeholder loop (%d)" % [n, count])
 		for v in range(1, count + 1):
 			var p := BWSfx.path_of(n, v)
 			c.ok(FileAccess.file_exists(p), "file %s" % p)
@@ -266,7 +266,7 @@ func test_drop2(c) -> void:
 	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
 	var drops := 0
 	for n in manifest:
-		if int(manifest[n].get("drop", 0)) != 2:
+		if int(manifest[n].get("drop", 0)) != 2 or manifest[n].has("cut_of"):
 			continue
 		drops += 1
 		var lv: Dictionary = (manifest[n].levels as Array)[0]
@@ -297,6 +297,59 @@ func test_drop2(c) -> void:
 	u.equipment["head"] = it
 	c.eq(BWAudioDirector.worn_cursed(run), before + (0 if was_cursed else 1), "a cursed piece put on counts")
 	c.eq(BWAudioDirector.worn_cursed(null), 0, "no run, no count")
+
+
+## D392/D393: the short pick reveal and the ph_* placeholders for AUDIO-NEEDS'
+## "still missing" list: present, levelled, trimmed, looped cleanly, and wired.
+const PLACEHOLDERS := ["ph_swap_holster", "ph_swap_draw", "ph_proc_onkill", "ph_proc_heal", "ph_proc_pity", "ph_immune",
+	"ph_obelisk_push", "ph_obelisk_pull", "ph_colossus_step", "ph_colossus_thrust", "ph_horde_shuffle", "ph_being_hum",
+	"ph_blank_step", "ph_cast_fire", "ph_cast_water", "ph_cast_ice", "ph_cast_thunder", "ph_cast_wind", "ph_cast_light",
+	"ph_cast_dark", "ph_fan_knives"]
+
+func test_placeholders(c) -> void:
+	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
+	for n in PLACEHOLDERS:
+		c.ok(manifest.has(n) and bool(manifest[n].get("placeholder", false)), "%s is in sfx.json, marked a placeholder" % n)
+		c.ok(BWSfx.MIX.has(n), "%s has a mix level" % n)
+		if not manifest.has(n):
+			continue
+		for v in range(1, int(manifest[n].variants) + 1):
+			var p := ProjectSettings.globalize_path(BWSfx.path_of(n, v))
+			if bool(manifest[n].loop):
+				var fl := _first_last(p)
+				c.ok(absf(fl[0] - fl[1]) < 0.05, "%s_%d loop meets itself (%.4f)" % [n, v, absf(fl[0] - fl[1])])
+			else:
+				# the inward swells (pull, dark collapse) rise from quiet by design: sound, not silence, at the head
+				var floor := 0.0005 if n in ["ph_obelisk_pull", "ph_cast_dark"] else 0.01
+				c.ok(head_peak(p, 0.03) > floor, "%s_%d: onset trimmed" % [n, v])
+	for n in manifest:
+		if str(n).begins_with("ph_"):
+			c.ok(n in PLACEHOLDERS, "%s is a listed placeholder" % n)
+	# the pick cards get the short cut, the long take stays mapped
+	c.eq(str(BWMusic.STINGS.pick), "sting_pick_short", "pick cards: the short pick reveal (D392)")
+	c.eq(str(BWMusic.STINGS.pick_long), "sting_pick_reveal", "the 7 s pick reveal stays mapped")
+	var lv: Dictionary = (manifest.sting_pick_short.levels as Array)[0]
+	c.ok(float(lv.seconds) <= 2.5 and float(lv.seconds) >= 1.5, "short pick reveal %.2f s (<= 2.5)" % float(lv.seconds))
+	# the stings stay the author's originals, in C (author, 2026-10-07)
+	for k in ["victory", "defeat", "jackpot", "cursed", "level_up", "room_hard"]:
+		c.ok(not manifest[BWMusic.STINGS[k]].has("cut_of") and int(manifest[BWMusic.STINGS[k]].get("drop", 0)) == 2, "sting %s is the author's file" % k)
+	# hooks
+	c.eq(BWCombatAudio.proc_kind("Death Knell: 10% burst around X"), "onkill", "Death Knell -> on-kill")
+	c.eq(BWCombatAudio.proc_kind("Relentless: attack again"), "onkill", "Relentless -> on-kill")
+	c.eq(BWCombatAudio.proc_kind("Fire spreads"), "onkill", "Wake of Ash -> on-kill")
+	c.eq(BWCombatAudio.proc_kind("Graze: 3"), "pity", "Graze -> pity")
+	c.eq(BWCombatAudio.proc_kind("Steady Hand: next attack can't miss"), "pity", "Steady Hand -> pity")
+	c.eq(BWCombatAudio.proc_kind("Follow-Through: next strike x2"), "pity", "Follow-Through -> pity")
+	c.eq(BWCombatAudio.proc_kind("Bulwark: 9 → 6"), "", "other enchant text -> no proc sound")
+	var caster := BWUnit.new()
+	caster.element = "fire"
+	c.eq(BWCombatAudio.big_cast_element({ "skill": "flash_freeze", "element": "", "hexes": [] }, caster), "ice", "Flash Freeze: a big ice cast")
+	c.eq(BWCombatAudio.big_cast_element({ "skill": "lunge", "element": "fire", "hexes": [Vector2i(0, 0)] }, caster), "", "a sword lunge is no cast")
+	for e in BWCombatAudio.ELEMENTS:
+		c.ok(manifest.has("ph_cast_" + e), "a big-cast release for %s" % e)
+	for src in ["res://src/game/combat/combat_screen.gd", "res://src/game/audio/unit_audio.gd"]:
+		var t := FileAccess.get_file_as_string(src)
+		c.ok(t.contains("ph_"), "%s plays placeholders" % src.get_file())
 
 
 ## Peak |sample| over the first `sec` seconds of a 16-bit WAV.
