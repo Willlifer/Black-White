@@ -39,7 +39,8 @@ static var _exact_stops := {}      # exact-case surface -> true (skill names tha
 
 ## D227: colour and weight words that share a surface with a term.
 const STOP_PHRASES := ["light grey", "light gray", "dark grey", "dark gray", "light greys", "dark greys",
-	"light enough", "light, quick", "light, throwable", "light armour", "light armor"]
+	"light enough", "light, quick", "light, throwable", "light armour", "light armor",
+	"hold enemies", "hold their", "hold the"]   # D369: Hold (wind) is a term; these are plain verbs
 
 
 static func _ensure() -> void:

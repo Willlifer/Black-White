@@ -34,7 +34,7 @@ skill lays its element on its shape unless the hook says otherwise.
 | Skill | cd | Shape | Power | Hook | Improve rider |
 |---|---|---|---|---|---|
 | Cleave *(starter)* | 2 | heading, 3-hex arc | 13 | +10% to everyone per foe beyond the first; the element already there carries the swing a ring further | **+** +15% per extra foe |
-| Charge *(starter)* | 2 | heading, run 3 | basic follow-up | Shoves one foe ahead; a foe that can't be shoved slams for 8% (it and what it hits) | **+** Reach 4, slam 12% |
+| Charge *(starter)* | 2 | heading, run 3 | basic follow-up | Shoves one foe ahead; a foe that can't be shoved slams for 8% (it and what it hits). **High ground (D362):** from 1+ level above the first hex, reach +1 and the shove carries 2 hexes | **+** Reach 4, slam 12% |
 | Reckless Swing | 1 | adjacent foe | 14 | You are Scorched (attacks on you +10%) through your next turn | — |
 | Hook | 2 | foe within 3 | 9 | Pulls it straight in until it's next to you (secondary) | — |
 | Sunder | 3 | adjacent foe | 13 | Ignores 30% DEF, can't glance | — |
@@ -46,12 +46,12 @@ skill lays its element on its shape unless the hook says otherwise.
 | Skill | cd | Shape | Power | Hook | Improve rider |
 |---|---|---|---|---|---|
 | Tridentpierce *(starter)* | 2 | heading, 2 + sides | 10 | A foe right behind the first in line is pierced +20% | **+** The pierce carries on to a third foe in line |
-| Vault *(starter; D105 rework)* | 2 | foe 2–3 away | weapon basic | One click: pole-vault over anything (units, rock, height) to the free hex beside it nearest you, paint the takeoff hex, and strike at once with the basic attack +25% momentum. No follow-up menu | **+** Range 4, momentum +35% |
+| Vault *(starter; D105 rework)* | 2 | foe 2–3 away | weapon basic | One click: pole-vault over anything (units, rock, height) to the free hex beside it nearest you, paint the takeoff hex, and strike at once with the basic attack +25% momentum. No follow-up menu. **High ground (D362):** +1 range onto a foe 1+ level below | **+** Range 4, momentum +35% |
 | Guardrush *(drafted as Skewer)* | 2 | foe within reach 2 | 12 | Shove it back 1; blocked by rock or a unit: slam 8% (it and what it hits) | — |
 | Sweep | 3 | heading, the 3 front hexes adjacent to you | 9 each | Each foe shoved 1 straight away from you (slam 8% if blocked); paints the arc. The crowd-spacing tool (Tridentpierce pierces a line) | — |
 | Set Spear | 3 | self, free | — | Until your next turn every hex within your reach is a zone: an enemy entering one stops there and can't path past. No strike | — |
 | Phalanx | 4 | self + adjacent allies | — | −15% damage taken until each one's next turn; you can't be displaced until yours | — |
-| Dragoon Dive | once | leap ≤ 4 | 13 to the landing ring | Paints the landing ring | — |
+| Dragoon Dive | once | leap ≤ 4 | 13 to the landing ring | Paints the landing ring. **High ground (D362):** onto a hex 1+ level below, reach 5 and the ring radius 2 | — |
 
 ## Bow — distance, height, picking targets
 
@@ -64,6 +64,11 @@ skill lays its element on its shape unless the hook says otherwise.
 | Retreating Shot | 2 | foe within 5 | 10 | Then +2 move (a second move if you'd moved, else on top of yours) | — |
 | Pinning Shot | 3 | foe within 6 | 10 | Pinned (−2 move), secondary | — |
 | Rain of Arrows | once | hex within 6, radius 2 | 9 each | Paints all 19 hexes | — |
+
+**Passive pick (D372): HighGrounder.** Offered in the bow's expertise picks
+like a skill to learn, but a passive: it takes no skill slot. While a bow is
+drawn the jump doubles, 2 → 4 (ELEMENTS.md §6.6). Shown on the unit card once
+owned; enemy bows may roll it.
 
 ## Staff — depth, rewriting the ground (spells)
 
@@ -84,7 +89,7 @@ skill lays its element on its shape unless the hook says otherwise.
 | Skill | cd | Shape | Power | Hook | Improve rider |
 |---|---|---|---|---|---|
 | Consume *(starter)* | 2 | adjacent foe on your element | 14 + 2/point | Eats the tile; heals 5% per point eaten | **+** 7% per point |
-| Daggerleap *(starter)* | 2 | leap 3 (or any tile with the element) | 8 to the ring | Foes you land behind take +50% | **+** Backstab +75% |
+| Daggerleap *(starter)* | 2 | leap 3 (or any tile with the element) | 8 to the ring | Foes you land behind take +50%. **High ground (D362):** onto a hex 1+ level below, reach 4 and the landing ring radius 2 | **+** Backstab +75% |
 | Dualthrow *(starter)* | 2 | foe within 4 | 9, then the Second Dagger | Lays the trail; the Second Dagger bounces to a foe within 2 at 75% | **+** Bounces twice: 75%, then 50% |
 | Tumble | 1 | self, free | — | After you attack this turn, +2 move (set before: waits for the attack) | — |
 | Manipulate *(drafted as Twist the Knife)* | 2 | adjacent foe | 9 | +10% per status on it, +10% if it stands on charge, up to +60% | — |

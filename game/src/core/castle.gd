@@ -35,6 +35,14 @@ const SHATTER_GATE := 1.5
 ## enemy multipliers (BWCastleDefend / BWCastleStorm ENEMY_MULT, ENEMY_HP).
 static var ENEMY_MULT := 1.0
 static var ENEMY_HP := 1.0
+## D357: per mode and fight, a factor on the soldiers' stats and HP (absent =
+## 1). D353 puts castle cards at fights 7-10; D341 tuned 8 and 10, and 7 and 9
+## measured ~25-40 points harder on campaign squads (castle_sim CFIGHT).
+static var FIGHT_MULT := { "defend": { 7: 0.85, 9: 0.87 }, "storm": { 7: 0.8, 9: 0.6 } }
+
+
+static func fight_mult(mode: String, n: int) -> float:
+	return float(FIGHT_MULT.get(mode, {}).get(n, 1.0))
 
 const HAIR := ["buzzed", "bob", "mullet", "ponytail", "short_mohawk"]
 
@@ -189,7 +197,7 @@ static func walk_field(b: BWBattle, goal: Variant) -> Dictionary:
 		if c > int(dist.get(h, 1 << 20)):
 			continue
 		for n in b.board.neighbors(h):
-			var sc := b.board.step_cost(n, h)
+			var sc := b.board.step_cost(n, h, BWBoard.WALK)
 			if sc < 0:
 				continue
 			if c + sc < int(dist.get(n, 1 << 20)):
@@ -206,7 +214,7 @@ static func walk_field(b: BWBattle, goal: Variant) -> Dictionary:
 ## curve held near 1 (as an encounter), x `mult` stats, `hp_share` x their own
 ## HP (each times the ENEMY_* tuning factor). Seeded per run, fight and `key`.
 static func soldiers(run: BWRun, n: int, key: String, label: String, count: int, classes: Array,
-		hp_share: float, mult: float) -> Array:
+		hp_share: float, mult: float, mode: String = "") -> Array:
 	var bld := BWRooms.enemy_build(n, BWRooms.STANDARD)
 	bld.mult = clampf(BWRun.enemy_curve(n).mult, BWEncounters.CURVE_MIN, BWEncounters.CURVE_MAX)
 	var lvl := run.squad_level()
@@ -220,7 +228,7 @@ static func soldiers(run: BWRun, n: int, key: String, label: String, count: int,
 		var wc: String = pool[erng.randi() % pool.size()]
 		var el: String = BWFormulas.ELEMENTS[erng.randi() % BWFormulas.ELEMENTS.size()]
 		var u := BWEncounters._unit(run, n, "%s%d" % [key, i + 1], "%s %d" % [label, i + 1], BWEncounters._model(wc, erng), el,
-			lvl, tier, ranks, bld, mult * ENEMY_MULT, hp_share * ENEMY_HP, erng)
+			lvl, tier, ranks, bld, mult * ENEMY_MULT * fight_mult(mode, n), hp_share * ENEMY_HP * fight_mult(mode, n), erng)
 		u.cosmetics = { "hair_style": HAIR[erng.randi() % HAIR.size()], "top": BWRosterGen.TOPS[erng.randi() % BWRosterGen.TOPS.size()],
 			"bottom": BWRosterGen.BOTTOMS[erng.randi() % BWRosterGen.BOTTOMS.size()],
 			"clothing_shade": ["dark", "mid", "light"][erng.randi() % 3], "voice_pitch": 0.85 + 0.3 * erng.randf() }

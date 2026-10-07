@@ -15,8 +15,11 @@ class_name BWPicks
 ## Weapon-skill picks: every expertise letter gained (E→D, D→C, C→B, B→A) in
 ## a weapon class owes one pick: improve a skill the unit knows for that
 ## class (BWUnit.skill_ranks = 2, BWSkillDef.upgraded) or learn a new one
-## from the class's pool (BWSkillRegistry.pool). A pick with nothing left to
-## choose is spent empty.
+## from the class's pool (BWSkillRegistry.pool), or (D372) take one of the
+## class's pickable passives (weapons.csv `passives`: the bow's HighGrounder;
+## BWWeaponMove.PASSIVES). A passive takes no loadout slot: its id goes in
+## BWUnit.known_skills, which has no def for it, so no loadout or kit ever
+## lists it. A pick with nothing left to choose is spent empty.
 ##
 ## No banking (author): a pick is made as soon as it is owed. The state says
 ## what is owed (ranks against picks already made), so nothing can be carried
@@ -33,7 +36,8 @@ class_name BWPicks
 ##
 ## A request is { kind: "perk", element }, { kind: "keystone", element }
 ## (D277) or { kind: "skill", weapon }.
-## A choice id is a perk id, or "improve:<skill>" / "learn:<skill>".
+## A choice id is a perk id, or "improve:<skill>" / "learn:<skill>" /
+## "passive:<id>" (D372).
 
 const TABLE := "perks"
 ## D277: perks the ladder allows by affinity rank (index = rank, 6+ = the last).
@@ -107,11 +111,14 @@ static func skill_picks_owed(u: BWUnit, wc: String) -> int:
 	return maxi(0, u.expertise_rank(wc) + int(u.bonus_skills.get(wc, 0)) - int(u.skill_picks.get(wc, 0)))   # D128: + free picks
 
 
-## Choice ids for one skill pick: improve each known skill not yet improved
-## (loadout first, then the rest it knows), then learn each pool skill it
-## doesn't know yet (pool order).
+## Choice ids for one skill pick: the class's passives not yet owned (D372),
+## then improve each known skill not yet improved (loadout first, then the
+## rest it knows), then learn each pool skill it doesn't know yet (pool order).
 static func skill_choices(u: BWUnit, wc: String) -> Array:
 	var out: Array = []
+	for k in BWWeaponMove.passives_of(wc):
+		if not BWWeaponMove.owns(u, str(k)):
+			out.append("passive:" + str(k))
 	var known := u.known(wc)
 	var order: Array = u.loadout(wc) + known.filter(func(k): return not k in u.loadout(wc))
 	for k in order:
@@ -215,6 +222,10 @@ static func all_options(u: BWUnit, req: Dictionary) -> Array:
 	elif req.get("kind", "") == "skill":
 		var wc := str(req.weapon)
 		var free := skill_choices(u, wc)
+		for k in BWWeaponMove.passives_of(wc):     # D372: a passive card, owned ones greyed
+			out.append({ "id": "passive:" + str(k), "name": BWWeaponMove.passive_name(str(k)),
+				"text": BWWeaponMove.passive_text(str(k)), "element": "",
+				"owned": not ("passive:" + str(k)) in free, "kind": "passive", "skill": str(k) })
 		var listed: Array = []
 		# known skills in loadout-then-known order: improvable, or already improved (greyed)
 		for k in u.loadout(wc) + u.known(wc).filter(func(x): return not x in u.loadout(wc)):
@@ -267,7 +278,9 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 				return {}                        # D174: only one of the two offered
 			var parts: PackedStringArray = choice.split(":")
 			var key := parts[1]
-			if parts[0] == "improve":
+			if parts[0] == "passive":            # D372: no slot; known_skills holds it
+				u.known_skills.append(key)
+			elif parts[0] == "improve":
 				u.skill_ranks[key] = 2
 			else:
 				u.known_skills.append(key)
@@ -279,7 +292,8 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 
 
 ## The AI's answer: the first of the offered options (D174), data order, so
-## it is deterministic: perks in CSV order, skills improve-before-learn.
+## it is deterministic: perks in CSV order, skills passive (D372), then
+## improve, then learn, so an enemy bow offered HighGrounder takes it.
 static func auto_choice(u: BWUnit, req: Dictionary) -> String:
 	for o in options(u, req):
 		if not o.owned:
@@ -328,5 +342,7 @@ static func describe(u: BWUnit, rec: Dictionary) -> String:
 	if str(rec.id) == "":
 		return "%s had nothing left to learn in %s" % [u.name, str(rec.weapon)]
 	var parts: PackedStringArray = str(rec.id).split(":")
+	if parts[0] == "passive":
+		return "%s took the passive %s" % [u.name, BWWeaponMove.passive_name(parts[1])]
 	var nm := str(BWSkills.get_skill(parts[1]).get("name", parts[1]))
 	return "%s %s %s" % [u.name, "improved" if parts[0] == "improve" else "learned", nm]

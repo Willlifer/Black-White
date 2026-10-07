@@ -64,10 +64,29 @@ static func controls(u: BWUnit, autoplay: bool = false) -> bool:
 
 
 ## Play the current unit's whole turn on `b`. Returns nothing; read b.history.
+## D347: a GROUP TURN plays every member of the open block here, one after
+## another in the block's order (each an ordinary turn), so one call covers
+## the whole group and the view replays its events together.
 static func take_turn(b: BWBattle) -> void:
 	var u := b.current()
 	if u == null or b.over:
 		return
+	if b.in_group_turn():
+		var serial := int(b.group_live.serial)
+		var guard := 0
+		while not b.over and b.current() != null and not b.group_live.is_empty() 				and int(b.group_live.serial) == serial and guard < 64:
+			_take_one(b)
+			guard += 1
+		return
+	_take_one(b)
+
+
+static func _take_one(b: BWBattle) -> void:
+	var u := b.current()
+	if u == null or b.over:
+		return
+	if BWObjective.is_object(u) and BWObjectives.ai_turn(b, u):
+		return                                        # D348: an acting objective object (the Lil Fella)
 	if BWObelisk.is_objective(u):
 		b.obelisk_turn(u)                             # D140: the pulse, then the turn passes
 		return
@@ -97,7 +116,7 @@ static func take_turn(b: BWBattle) -> void:
 		if not sup.is_empty() and (sk.is_empty() or sup.score > sk.score) and (best.is_empty() or sup.score > best.score):
 			sk = sup
 		if not sk.is_empty() and (best.is_empty() or sk.score > best.score):
-			BWWind.ai_refine(b, u, sk.key, str(sk.element), sk.target)   # D274: ≤ 3 mode sims for a wind skill
+			BWWindShape.ai_refine(b, u, sk.key, str(sk.element), sk.target)   # D368: ≤ 4 shaping sims for a wind skill
 			if sk.has("choice"):
 				b.use_skill(u, sk.key, sk.element, sk.target, sk.choice)
 			else:
@@ -439,7 +458,7 @@ static func walk_field(b: BWBattle, o: BWUnit) -> Dictionary:
 		if c > int(dist.get(h, 1 << 20)):
 			continue
 		for n in b.board.neighbors(h):
-			var sc := b.board.step_cost(n, h)              # walking n -> h, toward the stone
+			var sc := b.board.step_cost(n, h, BWBoard.WALK)              # walking n -> h, toward the stone
 			if sc < 0 or n == o.pos:
 				continue
 			if c + sc < int(dist.get(n, 1 << 20)):

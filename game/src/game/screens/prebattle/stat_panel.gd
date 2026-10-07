@@ -72,7 +72,7 @@ func refresh() -> void:
 	var mv := BWFormulas.move(u)
 	var sp := BWFormulas.speed(u)
 	der.add_child(_Derived.new("hp", "HP", BWFormulas.hp(u), BWFormulas.HP_TEXT))
-	der.add_child(_Derived.new("move", "Move", mv, "hexes per turn"))
+	der.add_child(_Derived.new("move", "Move", mv, "hexes per turn" + (" · jump %d" % BWWeaponMove.jump(u) if BWWeaponMove.jump(u) > 1 else "")))   # D359/D360
 	der.add_child(_Derived.new("speed", "Speed", sp, "turn order"))
 	# ---- affinity
 	add_child(_section("Affinity", "rank · 10 points each"))

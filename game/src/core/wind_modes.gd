@@ -271,13 +271,21 @@ static func skill_origin(u: BWUnit, s: Dictionary, target_hex: Vector2i) -> Vect
 	return target_hex if str(s.get("targeting", "")) in ["hex", "leap"] else u.pos
 
 
-## A wind skill's mode, BEFORE its hits: once, on the foes in or beside its
-## shape. Foes that end in the shape join the victims. `dry` (skill_preview):
-## positions only; the caller restores them with restore(). Returns
-## { moves, becalm, restore: [[unit, pos]], origin, mode }.
+## D365: a wind skill's SHAPING (BWWindShape, src/core/wind_shape.gd) picks
+## what its wind does; only Draw in acts here, before the hits (pre_mode with
+## Vortex); the rest land after them (BWWindShape.post). Returns {} or
+## { moves, becalm, restore: [[unit, pos]], origin, mode, shaping }.
 static func pre_hit(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, target_hex: Vector2i, dry: bool = false) -> Dictionary:
 	if str(p.get("element", "")) != "wind" or not u.alive():
 		return {}
+	return BWWindShape.pre(b, u, s, p, target_hex, dry)
+
+
+## Mode `m` BEFORE a skill's hits: once, on the foes in or beside its
+## shape. Foes that end in the shape join the victims. `dry` (skill_preview):
+## positions only; the caller restores them with restore(). (D271; since D365
+## only Draw in, with Vortex.)
+static func pre_mode(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, target_hex: Vector2i, m: String, dry: bool = false) -> Dictionary:
 	var origin := skill_origin(u, s, target_hex)
 	var shape: Array = (p.hexes as Array) + (p.get("ring", []) as Array)
 	for v in p.victims:
@@ -303,7 +311,6 @@ static func pre_hit(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, target
 	var restore: Array = []
 	for f in cand:
 		restore.append([f, f.pos])
-	var m := mode(u)
 	var res := apply_mode(b, u, m, cand, origin, false, -1, reserved, dry)
 	res["restore"] = restore
 	res["origin"] = origin
@@ -318,7 +325,7 @@ static func pre_hit(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, target
 		if hit_hexes.has(f.pos):
 			p.victims.append(f)
 	if not res.moves.is_empty() or not res.becalm.is_empty():
-		var nm := str(NAMES[m])
+		var nm := "Draw in" if m == VORTEX else str(NAMES[m])   # D365: only Draw in comes here
 		(p.notes as Array).append("%s first: %s" % [nm, _summary(res)])
 	return res
 
@@ -399,11 +406,13 @@ static func after_paint(b: BWBattle, by: BWUnit, element: String, r: Dictionary,
 		for h in r.get("changed", []):
 			var e: Dictionary = b.tiles.entries.get(h, {})
 			if str(e.get("marker", "")) == "gale" and str(e.get("source", "")) == by.id:
-				e["mode"] = mode(by)
+				e["mode"] = BWWindShape.field_mode(b, by)   # D367: a skill's gale keeps its shaping's mode
 				b.wind["serial"] = int(b.wind.get("serial", 0)) + 1
 				e["born"] = b.wind.serial                  # D293: Eye of the Vortex acts with the newest
 				if e.mode == GUST:
-					var dir := BWBattle.pulse_heading(by.pos, h, true) if by.pos != h else by.facing
+					var dir := BWWindShape.field_heading(b, by, h)
+					if dir < 0:
+						dir = BWBattle.pulse_heading(by.pos, h, true) if by.pos != h else by.facing
 					if dir < 0:
 						dir = BWHex.direction_index(by.pos, h)
 					e["heading"] = maxi(dir, 0)

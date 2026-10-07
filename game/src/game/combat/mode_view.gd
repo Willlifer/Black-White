@@ -5,10 +5,10 @@ extends Node3D
 ##   intro()       the banner names the mode and its objective; the feed says
 ##                 the rules (the divider's element and counter; the waves)
 ##   the plate     top left (the obelisks' corner): the mode's title and its
-##                 hud_lines (Wave 2 of 4 · next in 1 round / Escaped 3 / 8 /
+##                 hud_lines (Wave 2 of 4 · next in 1 round / Lil Fella 31 / 62 /
 ##                 Ice Wall: 3 of 3 standing), refreshed after every event
-##   exit          Stop the Horde: the exit row washed and ringed in ink, an
-##                 EXIT tag at each end
+##   exit          a mode's exit row (BWObjectives.set_exit) washed and ringed
+##                 in ink, EXIT tags (no shipped mode uses one since D349)
 ##   telegraphs    a wave_incoming event rings its hexes (pulsing) with a WAVE
 ##                 n tag until the wave lands
 ##   events        spawn (the unit view drops in), escape (it walks off,
@@ -53,7 +53,7 @@ func intro() -> void:
 			screen.ui.feed("[b]Divider: %s.[/b] %s. The enemy may break through at round %d if it is losing a front." % [
 				BWSplitFront.NAMES.get(el, "Wall"), BWSplitFront.counter_text(el), BWSplitFront.ENEMY_BREAK_ROUND])
 		"horde":
-			screen.ui.feed("[b]Waves[/b] land on the north edge, rung a round ahead. Grunts walk for the EXIT (the south row) and hit only what is in their way; elites hunt you.")
+			screen.ui.feed("[b]Keep the little one alive.[/b] The Lil Fella (the ringed one with the lantern) is not yours to command, and nothing of yours can hurt it. It runs from the horde on its own turn. Waves land on the north edge, rung a round ahead; the grunts all move at once (one group turn) and go for the little one, striking whoever is in their way. Elites hunt you too.")
 		"defend", "storm":
 			for line in BWCastleView.intro_lines(battle):     # D340
 				screen.ui.feed(line)
@@ -65,7 +65,7 @@ func _short_goal() -> String:
 			var nm := str(BWSplitFront.NAMES.get(BWSplitFront.element(battle), "wall")).to_lower()
 			return "two fronts, %s %s between" % ["an" if nm.begins_with("i") else "a", nm]
 		"horde":
-			return "hold the road: %d waves, %d may escape" % [BWHordeMode.total_waves(battle), BWObjectives.escape_limit(battle) - 1]
+			return "Keep the little one alive"
 	return BWObjectives.objective_text(battle)
 
 
@@ -232,9 +232,10 @@ func end_text(winner: String) -> String:
 	match BWObjectives.mode_of(battle):
 		"horde":
 			if winner == "player":
-				return "Victory: the road holds (%d escaped)" % BWObjectives.escaped(battle)
-			if BWObjectives.escaped(battle) >= BWObjectives.escape_limit(battle):
-				return "Defeat: the horde breaks through"
+				return "Victory: the little one is safe"
+			var lf := BWHordeMode.fella(battle)
+			if lf != null and not lf.alive():
+				return "Defeat: the Lil Fella fell"
 		"splitfront":
 			if winner == "player":
 				return "Victory: both fronts won"

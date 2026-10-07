@@ -1,6 +1,6 @@
 extends RefCounted
-## D186-D189: the room choice before each fight (not the Obelisks, not the
-## Giant): two rooms, each its own map and enemies; Hard is tougher and pays
+## D186-D189: the room choice before each fight (D353: the cards per fight
+## are BWSchedule.TABLE; test_schedule.gd covers the boss and 6v6 cards): two rooms, each its own map and enemies; Hard is tougher and pays
 ## more; the chosen room reaches combat; saves keep the offer.
 ## D208: fights 1-2 have no choice (one battle, the queue's front map); the
 ## choice starts at fight 3. These tests hold the encounter rate at 0 (the
@@ -50,24 +50,20 @@ func test_deterministic_per_seed(t) -> void:
 
 
 func test_no_choice_at_obelisks_or_giant(t) -> void:
-	t.ok(not BWRooms.has_choice(4), "fight 4 (Obelisks): no choice")
+	# D353: fight 4 is now a choice (the Obelisks or the Twins); only the Giant is fixed
 	t.ok(not BWRooms.has_choice(BWRun.BOSS_FIGHT), "the Giant: no choice")
-	t.ok(not BWRooms.has_choice(BWRun.TWINS_FIGHT), "fight 7 (the Twins): no choice (D256)")
-	for n in [3, 6, 9]:
-		t.ok(BWRooms.has_choice(n), "fight %d offers rooms" % n)
-	for n in [5, 8, 10]:
-		t.ok(not BWRooms.has_choice(n), "fight %d is a fixed 6v6 (D325)" % n)
+	for n in range(3, BWRun.FIGHTS + 1):
+		t.ok(BWRooms.has_choice(n), "fight %d offers cards" % n)
 	var r := _run()
 	for n in 3:
 		_play(r)
 	t.eq(r.fight, 4, "at fight 4")
-	t.eq(BWRooms.offer(r), [], "no rooms offered at fight 4")
-	t.ok(not BWRooms.choose(r, 1), "and none can be chosen")
-	t.eq(r.map_for(4), "obelisks", "fight 4 stays the Obelisks")
+	t.eq(BWRooms.offer(r).map(func(c): return str(c.kind)), ["boss", "boss"], "fight 4: two boss cards")
+	t.eq(r.map_for(4), "obelisks", "untaken, fight 4 plays card 0: the Obelisks")
 	t.eq(r.map_for(BWRun.BOSS_FIGHT), "arena", "the Giant stays on the arena")
 	var rep := _play(r)
-	t.eq(rep.room, "standard", "fight 4 plays as a standard room")
-	t.eq(BWRooms.offer(r).size(), 0, "fight 5 is Split Front: no rooms (D325)")
+	t.eq(rep.room, "boss", "fight 4 plays as a boss card")
+	t.eq(BWRooms.offer(r).map(func(c): return str(c.get("mode", ""))), ["splitfront", "splitfront"], "fight 5: two Split Fronts (D353)")
 	_play(r)
 	t.eq(BWRooms.offer(r).size(), 2, "fight 6 offers rooms again")
 
@@ -121,9 +117,10 @@ func test_chosen_room_reaches_combat(t) -> void:
 	t.ok(BWRooms.offer(r).all(func(x): return x.map != rooms[1].map), "the next offer doesn't repeat it")
 
 
-## D187/D208: nine queued fights (two openers, seven choices), nine pool
-## maps: always Standard plays each once; always Hard too (the last Hard room
-## may replay a map, it can't always be fresh).
+## D187/D208/D353: the 3v3 queue fights (two openers; 3 and 6 Standard vs
+## Hard; 7 and 9 a 3v3 card against a 6v6): always card 0 plays six pool maps
+## once each; always card 1 plays four, no repeat; no offer shows a played
+## map while fresh ones remain.
 func test_maps_over_a_run(t) -> void:
 	for pick in [0, 1]:
 		var r := _run(4242 + pick)
@@ -131,27 +128,30 @@ func test_maps_over_a_run(t) -> void:
 		var offered: Array = []
 		var before: Array = []
 		while r.fight <= BWRun.FIGHTS:
-			if BWRooms.has_choice(r.fight):
+			var n := r.fight
+			if BWRooms.has_choice(n):
 				var rooms := BWRooms.offer(r)
-				t.ok(rooms[0].map != rooms[1].map, "fight %d: two different maps" % r.fight)
-				offered.append(rooms.map(func(x): return x.map))
-				before.append(played.duplicate())
+				var q3: Array = []
+				for i in rooms.size():
+					if BWSchedule.slots(n)[i] in BWSchedule.QUEUE_SLOTS:
+						q3.append(str(rooms[i].map))
+				if q3.size() == 2:
+					t.ok(q3[0] != q3[1], "fight %d: two different maps" % n)
+				if not q3.is_empty():
+					offered.append(q3)
+					before.append(played.duplicate())
 				BWRooms.choose(r, pick)
-			if BWRooms.queued(r.fight):
-				played.append(r.map_for(r.fight))
+			if BWRooms.room_for(r, n).kind in [BWRooms.STANDARD, BWRooms.HARD]:
+				played.append(r.map_for(n))
 			_play(r)
 		var uniq: Dictionary = {}
 		for m in played:
 			uniq[m] = true
-		t.eq(played.size(), 5, "five queued fights (D256, D327: 4, 5, 7, 8, 10 are fixed)")
-		t.eq(offered.size(), 3, "three choice fights (3, 6, 9)")
-		if pick == 0:
-			t.eq(uniq.size(), 5, "always Standard: five pool maps, no repeats (%s)" % [played])
-		else:
-			t.ok(uniq.size() >= 5, "always Hard: no replay (%s)" % [played])
-		for i in 3:
-			t.ok(not offered[i][0] in before[i] and not offered[i][1] in before[i],
-				"offer %d: no played map while fresh ones remain" % (i + 1))
+		t.eq(played.size(), 6 if pick == 0 else 4, "%s: 3v3 fights played (%s)" % ["card 0" if pick == 0 else "card 1", played])
+		t.eq(offered.size(), 4, "four offers show a 3v3 map (3, 6, 7, 9)")
+		t.eq(uniq.size(), played.size(), "no 3v3 map played twice (%s)" % [played])
+		for i in offered.size():
+			t.ok(offered[i].all(func(m): return not m in before[i]), "offer %d: no played map while fresh ones remain" % (i + 1))
 
 
 func test_save_load_mid_choice(t) -> void:

@@ -158,7 +158,8 @@ func _subtitle() -> String:
 		return ("A keystone breaks one of %s's rules. %s A unit holds at most %d." % [kel,
 			"Your first: one of two drawn from three." if BWPicks.keystones_owned(unit, kel).is_empty() else "Your second: the two left.",
 			BWKeystones.MAX_PER_UNIT])
-	return "A new expertise letter: two ways to grow, drawn for you. You equip up to %d." % BWUnit.loadout_cap(str(request.get("weapon", "")))
+	var tail := " A passive takes no slot." if not BWWeaponMove.passives_of(str(request.get("weapon", ""))).is_empty() else ""   # D372
+	return "A new expertise letter: two ways to grow, drawn for you. You equip up to %d.%s" % [BWUnit.loadout_cap(str(request.get("weapon", ""))), tail]
 
 
 ## Mid-fight: keep the top of the screen (the unit, its marked tile) clear.
@@ -316,7 +317,7 @@ class Card:
 				Color(BWStyle.TEXT_DIM, fade))
 			y += BWStyle.F_SMALL + 3
 		if owned:
-			var tag := "OWNED" if kind in ["perk", "keystone"] else "IMPROVED"
+			var tag := "OWNED" if kind in ["perk", "keystone", "passive"] else "IMPROVED"
 			draw_string(font, Vector2(14, s.y - 14), tag, HORIZONTAL_ALIGNMENT_CENTER, s.x - 28, BWStyle.F_MENU_TITLE,
 				Color(1, 1, 1, 0.55))
 		elif sel:
@@ -442,10 +443,24 @@ static func _flame(base: Vector2, tall: float, w: float, lean: float) -> PackedV
 	return pts
 
 
-## Improve: a double chevron up. Learn: a four-point star.
+## Improve: a double chevron up. Learn: a four-point star. Passive (D372):
+## a climber's stair, three rising steps under an up arrow.
 static func draw_skill_glyph(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:
 	var c := r.get_center()
 	var h := r.size.y / 2.0
+	if kind == "passive":
+		var st := PackedVector2Array([c + Vector2(-h * 0.85, h * 0.8)])
+		for i in 3:
+			var x := -h * 0.85 + h * 0.57 * i
+			var y := h * 0.8 - h * 0.45 * (i + 1)
+			st.append(c + Vector2(x, y))
+			st.append(c + Vector2(x + h * 0.57, y))
+		st.append(c + Vector2(h * 0.86, h * 0.8))
+		ci.draw_colored_polygon(st, col)
+		ci.draw_line(c + Vector2(-h * 0.5, -h * 0.2), c + Vector2(-h * 0.5, -h * 0.95), col, 5.0, true)
+		ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-h * 0.5, -h * 1.15), c + Vector2(-h * 0.78, -h * 0.78),
+			c + Vector2(-h * 0.22, -h * 0.78)]), col)
+		return
 	if kind == "learn":
 		var pts := PackedVector2Array()
 		for i in 8:

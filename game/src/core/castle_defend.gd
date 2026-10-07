@@ -35,9 +35,9 @@ func objective_text(_b: BWBattle) -> String:
 
 ## The enemies for fight n (BWRun): six raiders, then each wave's, marked.
 static func build(run: BWRun, n: int) -> Array:
-	var out: Array = BWCastle.soldiers(run, n, "raider", "Raider", 6, [], ENEMY_HP, ENEMY_MULT)
+	var out: Array = BWCastle.soldiers(run, n, "raider", "Raider", 6, [], ENEMY_HP, ENEMY_MULT, "defend")
 	for k in WAVES.size():
-		out += BWCastle.as_wave(BWCastle.soldiers(run, n, "raider_w%d" % (k + 1), "Raider", int(WAVES[k][1]), [], ENEMY_HP, ENEMY_MULT), k + 1)
+		out += BWCastle.as_wave(BWCastle.soldiers(run, n, "raider_w%d" % (k + 1), "Raider", int(WAVES[k][1]), [], ENEMY_HP, ENEMY_MULT, "defend"), k + 1)
 	return out
 
 

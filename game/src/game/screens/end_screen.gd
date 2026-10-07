@@ -200,6 +200,8 @@ static func picks_text(u: BWUnit) -> String:
 
 
 static func _sname(k: String) -> String:
+	if BWWeaponMove.is_passive(k):                 # D372: HighGrounder
+		return BWWeaponMove.passive_name(k)
 	var row := BWSkills.get_skill(k)
 	return str(row.get("name", k.capitalize())) if not row.is_empty() else k.capitalize()
 

@@ -134,6 +134,7 @@ func go_combat(plan: Dictionary) -> void:
 	s.trust_fn = run.trust_stage
 	s.picks_live = true                            # D91: rank-ups pick mid-fight
 	s.weather_kind = BWWeather.for_fight(run, run.fight)   # D249: the chosen room's weather
+	s.mode_opts = BWRooms.battle_opts(run, run.fight)      # D354: the chosen Split Front card's divider
 	await _swap(s)
 	BWMusic.play("boss" if run.is_boss() or run.is_twins() else "combat")   # D256: the Twins use the boss set
 	var result: Array = await s.finished           # [winner, battle]

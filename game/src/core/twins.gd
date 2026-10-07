@@ -1,7 +1,8 @@
 class_name BWTwins
 extends RefCounted
-## D256-D258: the mid-run boss, the Twins (Noon and Dusk), fight 7 (fixed,
-## no room choice, no weather; design/EXPANSION.md §3). Two tall figures, one
+## D256-D258: the mid-run boss, the Twins (Noon and Dusk). D353/D355: a boss
+## card at fight 4, the other card the Obelisks; never weather (design/
+## EXPANSION.md §3). Two tall figures, one
 ## hex each, built at the squad's level. Their phases are data for the phase
 ## framework (BWPhases, D255); this file owns their mechanics and their AI.
 ##
@@ -33,8 +34,8 @@ const TITLE := "The Twins: Noon and Dusk"
 const MODEL := "glaive"
 
 ## Tuning (tools/campaign_sim.gd, env TWINS="hp,mult").
-static var TWINS_HP := 2.6          # x the unit's own D137 HP (D259; D308: 2.2 -> 2.6 with the overhaul on)
-static var TWINS_MULT := 1.25       # base-stat multiplier (D259; D308: 1.15 -> 1.25)
+static var TWINS_HP := 2.6          # x the unit's own D137 HP (D259; D308: 2.6 at fight 7; D355: 2.6 at fight 4, whole-run 58%)
+static var TWINS_MULT := 1.1        # base-stat multiplier (D259; D308: 1.25 at fight 7; D355: 1.1 at fight 4)
 const PAINT_STEPS := 2
 const PAINT_RADIUS := 1
 const HEAL_PCT := 2.0               # % max HP per point of own colour

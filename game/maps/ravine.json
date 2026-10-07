@@ -493,7 +493,7 @@
    "q": 9,
    "r": 6,
    "terrain": "neutral",
-   "elevation": 2
+   "elevation": 1
   },
   {
    "q": 10,
@@ -571,7 +571,7 @@
    "q": 10,
    "r": 7,
    "terrain": "grassy",
-   "elevation": 4
+   "elevation": 3
   },
   {
    "q": 11,
@@ -1072,7 +1072,7 @@
    ]
   ]
  },
- "notes": "Asymmetric. The player climbs a grassy hill (elev 0 to a crest of 4) that overlooks a muddy ravine (elev 0); the enemy holds a flat plateau (elev 3) on the far lip. Both ravine walls are too steep to climb (3 and 4); one ramp leaves the ravine on each side, at opposite ends, so crossing is a diagonal.",
+ "notes": "Asymmetric. The player climbs a grassy hill (elev 0 to a crest of 4) that overlooks a muddy ravine (elev 0); the enemy holds a flat plateau (elev 3) on the far lip. Both ravine walls are too steep to climb (3 and 4); one ramp leaves the ravine on each side, at opposite ends, so crossing is a diagonal. D360: the south ramp is a 1-level stair (mud 0, (9,6) 1, (10,6) 2, (10,7) 3, the crest 4) so jump-1 walkers can leave the ravine; (10,6) still steps straight up from the mud for a jump-2 lance or bow.",
  "camera": {
   "focus": [
    6,

@@ -44,8 +44,8 @@ extends SceneTree
 ## SIX=1 (D333): at fights 8 and 10 the same squad, same day, also plays each
 ## 6v6 mode with a shipped map on a copy of the run (paired, off the record);
 ## printed per mode. STOP_AT=n ends each run after fight n (tuning the early
-## fights fast). SPLIT="mult,wind_hp" and HORDE="grunt_mult,grunt_hp,elite_mult,limit"
-## override the Split Front and Horde knobs (D334).
+## fights fast). SPLIT="mult,wind_hp" and HORDE="grunt_mult,grunt_hp,elite_mult[,fella_pct]"
+## override the Split Front and Horde knobs (D334, D351).
 ## MAP=<name> (D319, tools only) plays every fight on that map at its deploy
 ## count, e.g. MAP=commons for 6v6 (the enemies drawn six to a room).
 ## TRACE_SIM=1 prints each fight's turns, cycles and time; TRACE_FIGHT="run:fight"
@@ -95,10 +95,12 @@ func _init() -> void:
 		BWSplitFront.ENEMY_MULT = float(sp[0])
 		if sp.size() > 1:
 			BWSplitFront.WIND_HP = int(sp[1])
-	if OS.get_environment("HORDE") != "":                  # D334 tuning: "grunt_mult,grunt_hp,elite_mult,limit"
+	if OS.get_environment("HORDE") != "":                  # D334/D351 tuning: "grunt_mult,grunt_hp,elite_mult[,fella_pct]"
 		var hp := OS.get_environment("HORDE").split(",")
 		BWHordeMode.GRUNT_MULT = float(hp[0]); BWHordeMode.GRUNT_HP = float(hp[1])
-		BWHordeMode.ELITE_MULT = float(hp[2]); BWHordeMode.ESCAPE_LIMIT = int(hp[3])
+		BWHordeMode.ELITE_MULT = float(hp[2])
+		if hp.size() > 3:
+			BWHordeMode.FELLA_PCT = float(hp[3])
 	if OS.get_environment("CURVE") != "":                  # tuning: the ten base-stat multipliers
 		var m := OS.get_environment("CURVE").split(",")
 		BWRun.curve_override = []
@@ -150,25 +152,31 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 		var ks_fights := {}     # D308: keystone -> [wins, fights a deployed holder fought]
 		for s in runs:
 			var rng := RandomNumberGenerator.new()
-			rng.seed = 9000 + s
+			var base := int(OS.get_environment("SEED0")) if OS.get_environment("SEED0") != "" else 9000   # D353: shards
+			rng.seed = base + s
 			var pick := ids.duplicate()
 			for i in range(pick.size() - 1, 0, -1):
 				var j := rng.randi() % (i + 1)
 				var t = pick[i]; pick[i] = pick[j]; pick[j] = t
-			var run := BWRun.start(pick.slice(0, BWRun.SQUAD), 9000 + s)
+			var run := BWRun.start(pick.slice(0, BWRun.SQUAD), base + s)
 			run.force_map = OS.get_environment("MAP")         # D319: MAP=commons plays every fight there (6v6)
 			for u in run.squad:
 				BWPicks.auto_resolve(u)
 			var healthy := true
+			var hurt := false                           # D353: lost, or under half the deployed standing
+			var alt := { "six": 0, "mix": 0 }          # D353: the sim's alternation over 6v6 cards
 			while not run.is_over() and run.fight <= BWRun.BOSS_FIGHT:
 				var n := run.fight
 				var kind := "standard"
 				if BWRooms.has_choice(n):                      # D188: the room policy
-					BWRooms.offer(run)
+					var offered := BWRooms.offer(run)
 					var hard := room_pol == "hard" or (room_pol == "mixed" and healthy)
-					BWRooms.choose(run, 1 if hard else 0)
-					kind = "hard" if hard else "standard"
-					if shadow and not hard:
+					var ci := _pick_card(offered, hard, not hurt, s, alt)   # D353: boss, 6v6 and mixed offers
+					BWRooms.choose(run, ci)
+					kind = _card_key(offered[ci])
+					hard = str(offered[ci].kind) == BWRooms.HARD
+					var std_hard: bool = offered.size() == 2 and str(offered[1].kind) == BWRooms.HARD
+					if shadow and not hard and std_hard:
 						# D188 SHADOW=1: the same squad, same day, also tries the Hard
 						# room on a copy of the run (off the record): a paired rate.
 						var sr := BWRun.from_dict(JSON.parse_string(JSON.stringify(run.to_dict())))
@@ -180,7 +188,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 						var sk := "%d|shadow" % n
 						var swp: Array = by_room.get(sk, [0, 0])
 						by_room[sk] = [swp[0] + (1 if _fight(sr, n) else 0), swp[1] + 1]
-					if OS.get_environment("ENC") == "1":
+					if OS.get_environment("ENC") == "1" and std_hard:
 						# D212: the same squad, same day, against each special encounter
 						for ek in BWEncounters.KINDS:
 							var er := BWRun.from_dict(JSON.parse_string(JSON.stringify(run.to_dict())))
@@ -212,7 +220,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				var deployed := _deploy(run)
 				_gear(run, deployed)
 				if OS.get_environment("SNAPSHOT") != "" and n in BWRun.SIX_FIGHTS:   # D341: squads for tools/castle_sim.gd CAMPAIGN=dir
-					var sf := FileAccess.open("%s/%s_r%d_f%d.json" % [OS.get_environment("SNAPSHOT"), pol, s, n], FileAccess.WRITE)
+					var sf := FileAccess.open("%s/%s_r%d_f%d.json" % [OS.get_environment("SNAPSHOT"), pol, base + s, n], FileAccess.WRITE)
 					sf.store_string(JSON.stringify({ "run": run.to_dict(), "deployed": deployed.map(func(u): return u.id), "fight": n }))
 					sf.close()
 				var enemies := run.enemies_for(n)
@@ -221,6 +229,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				played[n - 1][mname] = int(played[n - 1].get(mname, 0)) + 1
 				var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % mname), run.seed_value * 31 + n)
 				b.set_weather(BWWeather.for_fight(run, n))          # D249: the room's weather
+				BWObjectives.configure(b, BWRooms.battle_opts(run, n))   # D354: the card's divider
 				b.setup(deployed, enemies, [])
 				var guard := 0
 				var t0 := Time.get_ticks_msec()
@@ -243,6 +252,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				rounds[n - 1].append(b.cycle)
 				alive[n - 1] += deployed.filter(func(u): return u.alive()).size()
 				healthy = won and deployed.all(func(u): return u.alive())
+				hurt = not won or deployed.filter(func(u): return u.alive()).size() * 2 < deployed.size()
 				if n < BWRun.BOSS_FIGHT:
 					var seen := {}
 					for u in deployed:
@@ -274,9 +284,10 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 			var r: Array = rounds[f]
 			r.sort()
 			out.append("  fight %2d %-9s  win %3d%%  rounds med %2d  survivors %.1f%s" % [f + 1,
-				"(Giant)" if f + 1 == BWRun.BOSS_FIGHT else "(Twins)" if f + 1 == BWRun.TWINS_FIGHT else "(%s)" % _maps_label(played[f]),
+				"(Giant)" if f + 1 == BWRun.BOSS_FIGHT else "(%s)" % _maps_label(played[f]),
 				100 * wins[f] / maxi(r.size(), 1), r[r.size() / 2] if r.size() > 0 else 0,
 				float(alive[f]) / maxf(r.size(), 1), _room_rates(by_room, f + 1)])
+		out.append("  by card (fights 1-10, as played): " + _card_rates(by_room))   # D353
 		if OS.get_environment("ENC") == "1":
 			for ek in ["shadow"] + BWEncounters.KINDS.map(func(k): return "enc:" + k):
 				var row: PackedStringArray = []
@@ -344,6 +355,7 @@ func _fight(r: BWRun, n: int, weather: String = "?") -> bool:
 	r.prepare_for_battle(deployed)
 	var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % r.map_for(n)), r.seed_value * 31 + n)
 	b.set_weather(BWWeather.for_fight(r, n) if weather == "?" else weather)   # D254
+	BWObjectives.configure(b, BWRooms.battle_opts(r, n))   # D354
 	b.setup(deployed, enemies, [])
 	var guard := 0
 	while not b.over and guard < 1500:
@@ -352,13 +364,69 @@ func _fight(r: BWRun, n: int, weather: String = "?") -> bool:
 	return b.winner == "player"
 
 
+## D353 the sim's card policy: Standard / Hard offers keep the ROOMS policy
+## (`hard`); a boss offer alternates by run (env BOSS=obelisks|twins pins it);
+## two 6v6 cards alternate within the run (offset by run); a 3v3 card against a
+## 6v6 card: the 3v3 when hurt (the last fight lost or a unit down), else
+## alternate (offset by run).
+func _pick_card(offered: Array, hard: bool, healthy: bool, s: int, alt: Dictionary) -> int:
+	var kinds: Array = offered.map(func(c): return str(c.kind))
+	if kinds == [BWRooms.STANDARD, BWRooms.HARD]:
+		return 1 if hard else 0
+	if BWRooms.BOSS in kinds:
+		var pin := OS.get_environment("BOSS")
+		if pin != "":
+			return maxi(0, offered.map(func(c): return str(c.get("boss", ""))).find(pin))
+		return s % 2
+	var six: Array = []
+	for i in offered.size():
+		if kinds[i] == BWRooms.SIX:
+			six.append(i)
+	if six.size() == offered.size():
+		alt.six = int(alt.six) + 1
+		return (s + int(alt.six)) % offered.size()
+	if not healthy:
+		return kinds.find(BWRooms.STANDARD)
+	alt.mix = int(alt.mix) + 1
+	return int(six[0]) if (s + int(alt.mix)) % 2 == 1 else kinds.find(BWRooms.STANDARD)
+
+
+## D353 card keys: standard / hard, the boss (obelisks / twins), or a 6v6
+## card's mode (a Split Front card its map: splitfront / fords).
+const CARD_KEYS := ["obelisks", "twins", "splitfront", "fords", "defend", "storm", "horde"]
+
+
+static func _card_key(c: Dictionary) -> String:
+	match str(c.kind):
+		BWRooms.BOSS:
+			return str(c.boss)
+		BWRooms.SIX:
+			return str(c.map) if str(c.mode) == "splitfront" else str(c.mode)
+	return str(c.kind)
+
+
+## Win rate per card key over every fight it was played at.
+static func _card_rates(by_room: Dictionary) -> String:
+	var parts: PackedStringArray = []
+	for key in ["standard", "hard"] + CARD_KEYS:
+		var w := 0
+		var p := 0
+		for f in range(1, BWRun.FIGHTS + 1):
+			var wp: Array = by_room.get("%d|%s" % [f, key], [0, 0])
+			w += int(wp[0])
+			p += int(wp[1])
+		if p > 0:
+			parts.append("%s %d%% (%d)" % [key, 100 * w / p, p])
+	return " · ".join(parts)
+
+
 ## " · std 80% (10) · hard 50% (2)": the win rate per room kind played at fight n.
 static func _room_rates(by_room: Dictionary, n: int) -> String:
 	var parts: PackedStringArray = []
-	for kind in ["standard", "hard", "shadow"] + BWEncounters.KINDS.map(func(k): return "enc:" + k):
+	for kind in ["standard", "hard", "shadow"] + CARD_KEYS + BWEncounters.KINDS.map(func(k): return "enc:" + k):
 		var wp: Array = by_room.get("%d|%s" % [n, kind], [0, 0])
 		if wp[1] > 0:
-			parts.append("%s %3d%% (%d)" % [{ "standard": "std", "hard": "hard", "shadow": "hard (paired)" }.get(kind, kind.substr(4)), 100 * wp[0] / wp[1], wp[1]])
+			parts.append("%s %3d%% (%d)" % [{ "standard": "std", "hard": "hard", "shadow": "hard (paired)" }.get(kind, kind.substr(4) if kind.begins_with("enc:") else kind), 100 * wp[0] / wp[1], wp[1]])
 	return "   " + " · ".join(parts)
 
 

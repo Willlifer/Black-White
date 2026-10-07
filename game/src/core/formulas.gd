@@ -509,11 +509,14 @@ static func resolve(fc: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 ## D93: turn-start move perks (Coal Engine, Sunpath, Skate, Tailwind,
 ## Slipstream), after-action move (Bolt Step, Tailwind) and the move
 ## statuses are listed by name from BWUnit.move_notes().
+## D359: the base is the class drawn at turn start ("Move 5 (Daggers) +1
+## Tailwind"); D360/D371: the jump after it ("· Climb 2", "· Climb 4 (Lance)").
 static func move(u: BWUnit) -> Dictionary:
-	var wm := int(u.weapon().get("move_mod", 0))
-	var fx := u.move_range() - BWUnit.BASE_MOVE - wm
-	var f := "%d + weapon move" % BWUnit.BASE_MOVE
-	var v := "%d %+d" % [BWUnit.BASE_MOVE, wm]
+	var wc := BWWeaponMove.move_class(u)
+	var base := BWWeaponMove.base_move(wc)
+	var fx := u.move_range() - base
+	var f := "%s move" % BWWeaponMove.class_name_of(wc)
+	var v := "%d" % base
 	for n in u.move_notes():
 		f += " + " + str(n[0])
 		v += " %+d" % int(n[1])
@@ -521,7 +524,29 @@ static func move(u: BWUnit) -> Dictionary:
 	if fx != 0:
 		f += " + passives"
 		v += " %+d" % fx
-	return calc("Move", u.move_range(), f, v)
+	var c := calc("Move", u.move_range(), f, v)
+	c["text"] = move_text(u)
+	return c
+
+
+## D359/D360/D371: the one-line move breakdown: "Move 5 (Daggers) +1 Tailwind ·
+## Climb 2", "Move 4 (Lance) · Climb 4 (Lance)", "Climb 4 (HighGrounder)". Statuses and perks by name, unnamed passives summed.
+static func move_text(u: BWUnit) -> String:
+	var wc := BWWeaponMove.move_class(u)
+	var base := BWWeaponMove.base_move(wc)
+	var t := "Move %d (%s)" % [base, BWWeaponMove.class_name_of(wc)]
+	var rest := u.move_range() - base
+	for n in u.move_notes():
+		t += " %+d %s" % [int(n[1]), str(n[0])]
+		rest -= int(n[1])
+	if rest != 0:
+		t += " %+d passives" % rest
+	var j := BWWeaponMove.jump(u)                # D371: always named; the source when above 2
+	var src := BWWeaponMove.jump_source(u)
+	t += " · Climb %d" % j + (" (%s)" % src if src != "" else "")
+	if BWWeaponMove.ignores_mud(u):
+		t += " · no mud penalty"
+	return t
 
 
 static func speed(u: BWUnit) -> Dictionary:

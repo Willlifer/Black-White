@@ -13,6 +13,9 @@ extends Control
 ## card, or 1 / 2, to take it (Left / Right + Enter also work). Esc goes back
 ## when the flow allows (before fight 1: to the hall); after a day it can't.
 ## Emits done(index) with 0 = Standard, 1 = Hard, or -1 = back.
+## D353: the cards follow BWSchedule.TABLE: a boss card (the Obelisks, the
+## Twins: their title, the map, the boss, two lines on how they fight) and a
+## 6v6 card ("6v6", the mode's name, its goal line, the map, its first wave).
 
 signal done(choice: int)
 
@@ -44,7 +47,7 @@ func _ready() -> void:
 		enemies.append(es)
 	var warm: Array = []
 	for es in enemies:
-		warm.append_array(es.slice(0, 3))
+		warm.append_array(_groups(es, es.size() > BWRun.DEPLOY).map(func(g): return g[0]))
 	BWPortraits.prewarm(warm)
 	var mt := BWMapThumbs.ensure(self)
 	mt.thumb_ready.connect(_on_thumb)
@@ -108,6 +111,9 @@ func _build() -> void:
 func _card(i: int) -> PanelContainer:
 	var room: Dictionary = rooms[i]
 	var hard: bool = room.kind == BWRooms.HARD
+	var boss := str(room.get("boss", ""))          # D353: the Obelisks / the Twins
+	var mode := str(room.get("mode", ""))          # D353: a 6v6 card
+	var heavy: bool = hard or boss != ""
 	var enc := str(room.get("encounter", ""))      # D208: a special encounter in the Hard room's place
 	var c := PanelContainer.new()
 	c.custom_minimum_size = Vector2(CARD_W, 0)
@@ -126,14 +132,18 @@ func _card(i: int) -> PanelContainer:
 	head.add_theme_constant_override("separation", 14)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(head)
-	head.add_child(_tag(BWRooms.NAMES[room.kind], hard))
+	head.add_child(_tag(str(BWRooms.NAMES.get(room.kind, room.kind)), heavy))
 	var title := Label.new()
 	var map_name := str(BWBoard.load_file("res://maps/%s.json" % room.map).name)
 	title.text = BWEncounters.NAMES[enc] if enc != "" else map_name
+	if boss != "":
+		title.text = str(BWSchedule.BOSS_TITLES.get(boss, map_name))
+	elif mode != "":
+		title.text = str(BWRun.MODE_NAMES.get(mode, mode))
 	title.add_theme_font_size_override("font_size", BWStyle.F_NAME)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
-	if enc != "":
+	if enc != "" or boss != "" or mode != "":
 		var on := Label.new()
 		on.text = "on " + map_name
 		on.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
@@ -146,6 +156,13 @@ func _card(i: int) -> PanelContainer:
 	key.add_theme_font_size_override("font_size", BWStyle.F_SUB)
 	key.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	head.add_child(key)
+	var lines: Array = []                          # D353: the goal / the boss's description, under the title
+	if mode != "":
+		lines.append(BWSchedule.goal_line(room))
+	elif boss != "":
+		lines.append(str(BWSchedule.BOSS_LINES[boss][0]))
+	for ln in lines:
+		v.add_child(_wrapped(ln, BWStyle.F_SMALL, BWStyle.TEXT))
 	if str(room.get("weather", "")) != "":         # D252: the weather tag
 		v.add_child(BWWeatherIcon.strip(str(room.weather)))
 	# the map
@@ -158,7 +175,10 @@ func _card(i: int) -> PanelContainer:
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(frame)
 	var tr := TextureRect.new()
-	tr.custom_minimum_size = Vector2(CARD_W - 30, THUMB_H - (60.0 if str(room.get("weather", "")) != "" else 0.0))   # D252: room for the weather line
+	var th := THUMB_H - (60.0 if str(room.get("weather", "")) != "" else 0.0)   # D252: room for the weather line
+	if boss != "" or mode != "":
+		th -= 130.0                                # D353: the goal line and the two-line note
+	tr.custom_minimum_size = Vector2(CARD_W - 30, th)
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -167,17 +187,15 @@ func _card(i: int) -> PanelContainer:
 	# the enemies
 	v.add_child(BWStyle.section_label("You face"))
 	var er := HBoxContainer.new()
-	er.add_theme_constant_override("separation", 12)
+	er.add_theme_constant_override("separation", 12 if mode == "" else 6)
 	er.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(er)
 	var det: Array = []
-	var shown: Array = enemies[i]
-	if shown.size() > BWRun.DEPLOY:                # D208: a crowd shows one of its kind, counted
-		shown = [shown[0]]
-	for e in shown:
-		var col := _enemy(e, i, det, enemies[i].size() if shown.size() < enemies[i].size() else 1)
-		er.add_child(col)
-	if shown.size() == 1:
+	var groups := _groups(enemies[i], mode != "")
+	var per := maxi(3, groups.size())
+	for g in groups:
+		er.add_child(_enemy(g[0], i, det, int(g[1]), (CARD_W - 60) / float(per), PORTRAIT if per <= 3 else 64.0))
+	if groups.size() == 1:
 		er.alignment = BoxContainer.ALIGNMENT_CENTER
 	_details.append(det)
 	v.add_child(HSeparator.new())
@@ -185,18 +203,57 @@ func _card(i: int) -> PanelContainer:
 	var rw := Label.new()
 	rw.text = BWRooms.reward_text(run, room)
 	rw.add_theme_font_size_override("font_size", BWStyle.F_BODY)
-	rw.add_theme_color_override("font_color", BWStyle.TEXT if hard else BWStyle.TEXT_DIM)
+	rw.add_theme_color_override("font_color", BWStyle.TEXT if heavy or mode != "" else BWStyle.TEXT_DIM)
 	v.add_child(rw)
 	var note := Label.new()
 	note.text = BWRooms.hard_note() if hard else "The usual squad for this fight"
 	if enc != "":
 		note.text = BWEncounters.HINTS[enc]          # D208: the counter hint
+	elif boss != "":
+		note.text = str(BWSchedule.BOSS_LINES[boss][1])
+	elif mode == "splitfront":
+		note.text = "%s: %s." % [BWSplitFront.NAMES.get(str(room.get("divider", "")), "Divider"), BWSplitFront.counter_text(str(room.get("divider", "")))]
+	elif mode != "":
+		note.text = "Six a side: your whole squad deploys"
+	if enc != "" or boss != "" or mode != "":
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		note.custom_minimum_size = Vector2(CARD_W - 40, 0)
 	note.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-	note.add_theme_color_override("font_color", BWStyle.TEXT if enc != "" else BWStyle.FAINT)
+	note.add_theme_color_override("font_color", BWStyle.TEXT if enc != "" or boss != "" else BWStyle.FAINT)
 	v.add_child(note)
 	return c
+
+
+## D353: a wrapped line under the card's title (a 6v6 goal, a boss line).
+func _wrapped(text: String, fs: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(CARD_W - 40, 0)
+	l.add_theme_font_size_override("font_size", fs)
+	l.add_theme_color_override("font_color", col)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+## The enemies a card shows, as [unit, count]: a 3v3 card its squad (a crowd,
+## D208, one of its kind counted); a 6v6 card (D353) its first wave grouped by
+## kind (a mode's soldiers and grunts share a portrait, counted).
+func _groups(es: Array, six: bool) -> Array:
+	if not six:
+		if es.size() > BWRun.DEPLOY:
+			return [[es[0], es.size()]]
+		return es.map(func(e): return [e, 1])
+	var out: Array = []
+	var at := {}
+	for e in BWModePrebattle.visible_enemies(es):
+		var k: String = ("enc:" + str(e.encounter)) if str(e.encounter) != "" else str(e.id)
+		if at.has(k):
+			out[at[k]][1] = int(out[at[k]][1]) + 1
+		else:
+			at[k] = out.size()
+			out.append([e, 1])
+	return out.slice(0, 6)
 
 
 ## The difficulty tag: Standard an outline, Hard solid white with black text.
@@ -222,17 +279,17 @@ func _tag(text: String, hard: bool) -> PanelContainer:
 	return p
 
 
-func _enemy(e: BWUnit, i: int, det: Array, count: int = 1) -> Control:
+func _enemy(e: BWUnit, i: int, det: Array, count: int = 1, w: float = (CARD_W - 60) / 3.0, ps: float = PORTRAIT) -> Control:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
-	col.custom_minimum_size = Vector2((CARD_W - 60) / 3.0, 0)
+	col.custom_minimum_size = Vector2(w, 0)
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.mouse_entered.connect(func(): _show_unit(e, col, i))
 	col.mouse_exited.connect(func(): _hide_unit(e))
 	var cc := CenterContainer.new()
 	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(cc)
-	var p := BWWidgets.Portrait.new(e, PORTRAIT, true)
+	var p := BWWidgets.Portrait.new(e, ps, true)
 	cc.add_child(p)
 	var n := _small(e.name if count <= 1 else "%s  ×%d" % [e.name.rstrip("0123456789 "), count], BWStyle.F_BODY, BWStyle.TEXT)
 	col.add_child(n)
@@ -240,9 +297,12 @@ func _enemy(e: BWUnit, i: int, det: Array, count: int = 1) -> Control:
 	var el := _small("◆ " + BWKanji.prefix(e.element) + BWText.label(e.element) if e.element != "" else "No element", BWStyle.F_SMALL, ec)
 	BWKanji.fallback(el)                                   # D231: the kanji, when on
 	col.add_child(el)
-	col.add_child(_small(("Melee weapons" if count > 1 else "%s (%s)" % [BWText.weapon(e.weapon_class), e.expertise_letter(e.weapon_class)]) + "  ·  Lv %d" % e.level,
+	var wline: String = ("Mixed weapons" if count > 1 and str(e.encounter) != "grunt" else "Melee weapons" if count > 1 else "%s (%s)" % [BWText.weapon(e.weapon_class), e.expertise_letter(e.weapon_class)])
+	var compact := ps < PORTRAIT                    # D353: six to a row: the level here, the weapon in the detail
+	col.add_child(_small(("Lv %d" % e.level) if compact else wline + "  ·  Lv %d" % e.level,
 		BWStyle.F_SMALL, BWStyle.LABEL))
-	var d := _small("HP %d  ·  Move %d  ·  Spd %d" % [e.max_hp(), e.move_range(), e.speed()], BWStyle.F_SMALL - 1, BWStyle.TEXT_DIM)
+	var d := _small(((wline + "
+") if compact else "") + "HP %d  ·  Move %d  ·  Spd %d" % [e.max_hp(), e.move_range(), e.speed()], BWStyle.F_SMALL - 1, BWStyle.TEXT_DIM)
 	d.visible = false
 	col.add_child(d)
 	det.append(d)
@@ -297,7 +357,7 @@ func _unhover(i: int) -> void:
 ## open); the other dims a little. Hard always carries the heavier edge.
 func _restyle() -> void:
 	for i in cards.size():
-		var hard: bool = rooms[i].kind == BWRooms.HARD
+		var hard: bool = rooms[i].kind == BWRooms.HARD or str(rooms[i].get("boss", "")) != ""   # D353: a boss card is heavy too
 		var on := i == hover
 		var sb := BWStyle.box_style()
 		sb.border_color = Color.WHITE if on else Color(1, 1, 1, 0.85 if hard else 0.5)

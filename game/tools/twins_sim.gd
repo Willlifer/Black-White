@@ -39,8 +39,8 @@ func _init() -> void:
 		run.fight = n
 		var players := run.squad.slice(0, 3)
 		run.prepare_for_battle(players)
-		var enemies := run.enemies_for(n)
-		var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % run.map_for(n)), run.seed_value * 31 + n)
+		var enemies := run.enemies_for(n, { "kind": BWRooms.BOSS, "boss": BWSchedule.TWINS, "map": BWRun.TWINS_MAP, "fight": n, "enemies": [] })   # D355
+		var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % BWRun.TWINS_MAP), run.seed_value * 31 + n)
 		b.setup(players, enemies, [])
 		var guard := 0
 		while not b.over and guard < 2000 and b.cycle <= 60:   # a stalemate past 60 cycles counts as a loss

@@ -417,9 +417,9 @@ func _fists(u: BWUnit, base: String = "hand_wraps", ench: String = "") -> BWUnit
 
 func test_fists_shapes(t) -> void:
 	var w := BWData.row("weapons", "fists")
-	t.eq([int(w.base_dmg), int(w.range), int(w.speed_mod), int(w.move_mod), str(w.levels), str(w.damage_type)],
-		[8, 1, 2, 1, "str", "martial"], "fists: jab 8, range 1, speed +2, move +1, levels str, martial")
-	t.eq(_u("me", "fists", "fire").move_range(), 5, "fists move 4 + 1")
+	t.eq([int(w.base_dmg), int(w.range), int(w.speed_mod), int(w.move), str(w.levels), str(w.damage_type)],
+		[8, 1, 2, 5, "str", "martial"], "fists: jab 8, range 1, speed +2, move 5 (D359), levels str, martial")
+	t.eq(_u("me", "fists", "fire").move_range(), 5, "fists move 5 (D359)")
 	var s := _shape("fists", "flurry", "fire", E, [E])
 	t.eq(s.pv.hexes, [E], "flurry lays on the target's hex")
 	t.eq(s.pv.units, ["f0"], "flurry: the one adjacent target")

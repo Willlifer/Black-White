@@ -17,7 +17,9 @@ the spawns, then the free zone hexes nearest the first spawn (D320).
 |---|---|---|---|
 | Arena … Court (§1–§11) | 3 (absent) | 9×17 to 17×13 | yes (Commons excepted) |
 | Commons (§12) | 6 | 17×15 | no: a test map (`--combat commons`) |
-| Keep, Stronghold (§13–§14) | 6 | 19×17 | fixed: Defend / Storm the Castle at fight 8 or 10 |
+| Keep, Stronghold (§13–§14) | 6 | 19×17 | the 6v6 pool: Defend / Storm the Castle cards, fights 7–10 (D353) |
+| Split Front, The Fords (§15, §17) | 6 | 19×15 | fight 5's two cards; the 6v6 pool, fights 7–10 (D353, D354) |
+| The Horde Road (§16) | 6 | 19×15 | the 6v6 pool: Stop the Horde cards, fights 7–10 (D353) |
 
 ## Reading the pictures
 
@@ -658,7 +660,8 @@ Renders: `design/art/obelisks_map.png`, `obelisks_lantern.png`,
 
 ## 11. The Court (`court.json`, 13×13, 127 cells, 80 seeded), the Twins' map (D256)
 
-Fight 7 is always the Twins (no room choice, no weather). A disc of radius 6
+The Twins' card at fight 4, against the Obelisks' card (D353/D355; never
+weather). A disc of radius 6
 round the centre hex (6, 6): the rim (radius 6) and a one-hex dais at the
 centre are elevation 1, the rest 0. **Seeded** (D134): radius 2–5 west of the
 centre column is light 1, east is dark 1 (40 each); the centre column and the
@@ -711,22 +714,42 @@ rotation, played with `--combat commons` or `campaign_sim` MAP=commons. The
   (symmetry checked); edit the JSON by hand.
 
 
-## The fixed 6v6 fights (D325, D327)
+## The schedule (D353–D358; supersedes D325's fixed 6v6 fights)
 
-The author's schedule: **6v6 fights are fixed** (no room choice, no map off
-the queue, no weather, no encounter). **Fight 5 is Split Front.** **Fights 8
-and 10** play two of Defend the Castle, Storm the Castle and Stop the Horde,
-drawn per run from the run seed on their own rng, no repeat
-(`BWRun.six_modes_for`). **Fight 9 stays a 3v3 room choice.** With fights 4
-(the Obelisks), 5, 7 (the Twins), 8 and 10 fixed, the map queue feeds fights
-1-3, 6 and 9 (five of the nine pool maps). `BWRun.mode_for(n)` names a fight's
-mode, `BWRun.MODE_MAPS` its map (`splitfront`, `horde`, the castle lane's
-`keep` and `stronghold`); a mode whose map isn't shipped yet plays
-`MODE_PLACEHOLDER` (Commons, a plain wipe-out). The room log, the save and the
-results name the mode (`room_log[n].mode`, report `mode`). A mode fight pays
-`MODE_DROPS` (5) on a win (D334: a horde's head count would flood the bag).
-The rules live in `BWObjectives` (src/core/objectives.gd: objective objects,
-verdicts, the wave spawner, exits) and one `BWObjectiveMode` file per mode.
+The run's schedule is data: `BWSchedule.TABLE` (src/core/schedule.gd), fight
+→ the cards it offers. One card is no choice (no room screen); two are a
+choice on the room screen (`BWRoomScreen`).
+
+| Fight | Cards |
+|---|---|
+| 1–2 | one 3v3 battle, the queue's front map (no choice) |
+| 3, 6 | 3v3 Standard vs Hard (a third of the Hard rooms are special encounters, D208) |
+| 4 | **the Obelisks vs the Twins** (boss cards: boss art, two lines on how they fight) |
+| 5 | **two Split Fronts**: Split Front (§15) and The Fords (§17), two different dividers (seeded) |
+| 7, 9 | a 3v3 Standard room vs a 6v6 card from the pool |
+| 8, 10 | two 6v6 cards from the pool, two different maps |
+| 11 | the Giant |
+
+**The 6v6 pool** (`BWSchedule.SIX_POOL`): Split Front, The Fords, Defend the
+Castle (Keep), Storm the Castle (Stronghold), Stop the Horde (the Horde Road).
+A card draws (seeded per run, fight and card; `BWSchedule.draw_six`) a mode
+not yet played this run, else a map not yet played, else anything; never the
+other card's map. Hard rooms and special encounters stay on 3v3 cards. A
+**weather** tag can fall on 3v3 cards and the Split Front and Horde cards
+(from fight 5), **never in a castle** (D357: the castle maps' gate, walls and
+high ground already carry the fight) and never on a boss card.
+
+**The 3v3 map queue** feeds fights 1–3, 6, and the 3v3 cards of 7 and 9:
+taking every card 0 plays six pool maps once; an unchosen 3v3 card's map goes
+to the back of the queue (D187). `map_for(n)` / `mode_for(n)` read the chosen
+card for the current fight and a projection (every choice card 0) for later
+ones. The room log, the save (v12, D358) and the results name the card
+(`room_log[n]`: kind, map, and `mode`, `boss`, `divider`, `encounter`,
+`weather` as they apply). A 6v6 card pays `MODE_DROPS` (5) on a win (D334);
+the Twins pay a pick for every unit (D258). The pre-battle fields the chosen
+card's deploy count (3 or 6). The rules live in `BWObjectives` and one
+`BWObjectiveMode` file per mode; a Split Front card's divider reaches the
+battle through `BWRooms.battle_opts` (game, sim and pre-battle plate alike).
 
 ## 13. The Keep (`keep.json`, 19×17, 273 cells, 32 static), Defend the Castle (D335-D339)
 
@@ -825,7 +848,7 @@ parity, so the flip is exact in odd-r); the squad attacks from the south.
   `mode_storm_overview.png`, `mode_storm_break.png`, `mode_storm_throne.png`
   (`tools/castle_shots.gd`).
 
-## 15. Split Front (`splitfront.json`, 19×15, 285 cells, 6 seeded), fight 5 (D328-D330)
+## 15. Split Front (`splitfront.json`, 19×15, 285 cells, 6 seeded), fight 5 and the pool (D328-D330, D353)
 
 ```
      (j = rock, D = the divider, P / E = spawns, w / l / d = seeded water 2 / light 1 / dark 1)
@@ -879,10 +902,11 @@ squads of 3."
 - Win: every enemy down. Renders `design/art/mode_split_fire|ice|wind.png`,
   `mode_split_prebattle.png`, `mode_split_merge.png` (`tools/mode_shots.gd`).
 
-## 16. The Horde Road (`horde.json`, 19×15, 285 cells, 29 seeded), Stop the Horde (D331-D333)
+## 16. The Horde Road (`horde.json`, 19×15, 285 cells, 29 seeded), Stop the Horde (D331, D347-D352)
 
 ```
-     (x = the exit row, w = seeded water 2-3, P / E = spawns of the first wave)
+     (w = seeded water 2-3, P / E = spawns of the first wave, L = where the Lil Fella
+      usually starts: a row behind the squad's centre, BWHordeMode.fella_start)
      0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
   0 n0 n0 n0 n0 n0 E0 n0 n0 n0 E0 n0 n0 n0 E0 n0 n0 n0 n0 n0
   1  n0 n0 n0 n0 n0 n0 n0 E0 n0 E0 n0 E0 n0 n0 n0 n0 n0 n0 n0
@@ -898,29 +922,91 @@ squads of 3."
  11  n0 n0 n0 n0 n0 n0 n0 n0 n0 n1 n0 n0 n0 n0 n0 n0 n0 n0 n0
  12 n0 n0 n0 n0 n0 P0 n0 n0 n1 P1 n1 n0 n0 P0 n0 n0 n0 n0 n0
  13  n0 n0 n0 n0 n0 n0 n0 P0 n0 P0 n0 P0 n0 n0 n0 n0 n0 n0 n0
- 14 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0
+ 14 n0 n0 n0 n0 n0 n0 n0 n0 n0 L0 n0 n0 n0 n0 n0 n0 n0 n0 n0
 ```
 
-**Intent.** The squad holds a road in front of the **EXIT**, the whole south
-row (`objective.exit`; washed dark and ringed, EXIT tags). Horde grunts walk
-for it in **waves** from the north edge (`objective.spawn_edge`, rows 0-1).
-- **Waves** (`BWHordeMode.WAVES`, [round, grunts, elites]): 5 on the board at
-  the start; 6 at round 3; 6 + 1 elite at round 5; 7 + 2 elites at round 7.
-  Each wave is **rung on its hexes a round before it lands** (BWObjectives'
-  telegraph) with a WAVE n tag. Grunts are the D208 Horde's (elementless
-  melee, 42% HP), built at the squad's level; **elites** are ordinary roster
-  enemies on the fight's curve.
-- **Grunts walk for the exit** (walking cost, around rocks and through the
-  fords) and strike only a foe in reach where they stop; penned in, they
-  fight their way. Elites hunt the squad (the usual AI).
-- **Lose** when 8 have escaped (`escape_limit`) or the squad is down. **Win**
-  when every wave has landed and no enemy is left. An escaped unit is gone:
-  no KO, no XP. The plate reads "Wave n of 4 · next in r rounds" and
-  "Escaped x / 8".
+**Intent.** Keep the little one alive. The squad guards the **Lil Fella**
+(`BWLilFella`, D348): a small neutral figure with a pointed hat and a lantern,
+ringed in ink on its hex, placed a row behind the squad's centre. Horde grunts
+come in **waves** from the north edge (`objective.spawn_edge`, rows 0-1) and
+hunt it. There is no exit any more (D349 replaced D331's exit and escape counter).
+- **The Lil Fella:** HP = **half the highest max HP in the deployed squad** at
+  battle start. Not player-controlled: on its own turn (the squad's median
+  speed, move 3) it runs to the safest reachable hex (far from the enemy and
+  out of its next reach, close to the squad, off the map's edge), never onto
+  or across fire, a dark 3 drain, a shock field, a fuse or a slide. On the
+  squad's side for damage: **nothing of the squad's** hurts, moves or
+  statuses it (blows, areas, ground, blasts, beams, chain arcs). **Enemy**
+  blows and ground an enemy laid hurt it; map-seeded ground doesn't (and it
+  never stands on any). No statuses or displacement from anyone.
+- **Waves** (`BWHordeMode.WAVES`, [round, grunts, elites]): 4 on the board at
+  the start; 4 at round 2; 4 + 1 elite at round 4; 4 + 1 elite at round 5
+  (D351). Each wave is **rung on its hexes a round before it lands** with a
+  WAVE n tag. Grunts are the D208 Horde's (elementless melee, stats x0.9, 42% HP), built
+  at the squad's level; **elites** are roster enemies on the fight's curve
+  x1.15.
+- **One group turn** (D347): every living grunt acts in one slot of the turn
+  order ("Horde ×N", at the fastest grunt's place). The rules resolve them one
+  by one, nearest the Lil Fella first (walking cost, ties by id); the screen
+  plays every walk at once, then every blow at once (Minimal), each number on
+  its own target. Elites take their own turns.
+- **Grunts go for the Lil Fella:** a stop they can strike it from, else the
+  stop nearest it; then they strike it, or a squad unit in reach if it isn't.
+  Elites use the usual AI and weigh a blow on it x1.5.
+- **Lose** when the Lil Fella falls or the squad is down. **Win** when every
+  wave has landed and no enemy is left. The plate reads "Wave n of 4 · next in
+  r rounds" and "Lil Fella hp / max".
 - Built for the area combos: two **water channels** (row 4 across the field
   with fords at q 4 and 14; row 8 on the flanks, water 3 pools at q 4-5 and
   13-14, a dry ford in the middle) for electrified pools and rinks; **grass**
   on the far bank and the flanks for fire and Overheat; open lanes between
-  seven rocks for squalls and Vortex pulls. A low rise behind the line.
-- Renders `design/art/mode_horde_prebattle.png`, `mode_horde_waves.png`,
-  `mode_horde_exit.png`.
+  seven rocks for squalls and Vortex pulls. A low rise behind the line. (Mind
+  the little one: your ground can't hurt it, but it won't walk through it.)
+- Renders `design/art/mode_horde_prebattle.png`, `horde2_group_move.png`,
+  `horde2_fella_flee.png`, `horde2_fella_close.png`, `horde2_plate.png`
+  (`tools/mode_shots.gd ONLY=horde`); the D331 frames `mode_horde_waves.png`
+  and `mode_horde_exit.png` show the old exit.
+
+## 17. The Fords (`fords.json`, 19×15, 273 cells, 9 seeded), the second Split Front (D354)
+
+Split Front's second map (fight 5's other card, and the 6v6 pool). A river
+gorge (no hexes: impassable, nothing sees a way across) runs down column 9;
+**three single-hex fords** cross it at rows 4, 7 and 10, and the divider
+stands on all three (fire 3, an ice pillar on water 3, or a wind wall segment
+on each; the element is seeded per card, D354). Break **any one** ford and the
+fronts can meet, at the north, the middle or the south: where Split Front's
+one 3-hex gap makes a single meeting point, the Fords make three. The enemy's
+round-4 break-through (D330) opens all three.
+
+- **West, the reed marsh:** mud banks along the river (2× move), reeds
+  (grass, fire spreads), a raised grassy hummock mid-arena (elevation 1),
+  marsh pools seeded water 1–2 (Undertow, thunder in the shallows), two stumps.
+- **East, the stony bank:** the bank sits a level up (elevation 1) over the
+  fords, so crossing east is a climb; a cairn hill (2) seeded light 1, rocks
+  (2–3), a hollow seeded dark 1 on mud.
+- Each arena is mirrored north–south (rows r and 14 − r), so each front is
+  fair; west and east differ on purpose. Spawns and deploy zones as Split
+  Front (spawns 1–3 west, 4–6 east; the three edge rows).
+- Built by `python tools/split_maps.py` (edit the script, not the JSON).
+  Render: `design/art/sched_fight5.png` (the card). `--combat fords --mode
+  splitfront [--divider ice]`.
+
+```
+     (j = rock, D = a ford (the divider), P / E = spawns, w / l / d = seeded water / light 1 / dark 1, blank = the gorge)
+      0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
+  0 n0 n0 n0 n0 n0 n0 n0 n0 m0    n1 n1 n0 n0 n0 n0 n0 n0 n0
+  1  n0 n0 n0 n0 E0 n0 g0 g0 m0    n1 n1 n0 n0 E0 n0 n0 n0 n0
+  2 n0 n0 n0 E0 n0 E0 n0 g0 m0    n1 n1 n0 E0 n0 E0 n0 n0 n0
+  3  n0 n0 j1 n0 n0 n0 n0 n0 m0    n1 n1 j2 n0 n0 n0 m0 n0 n0
+  4 n0 g0 n0 n0 n0 n0 w0 n0 n0 D0 n1 n1 n0 n0 n0 d0 j2 n0 n0
+  5  n0 g0 g0 w0 n0 n0 n0 g0 g0    n1 n1 n0 n0 n0 n0 n0 n0 n0
+  6 n0 n0 w0 n0 g1 n0 n0 n0 m0    n1 n1 n0 n1 n1 n0 n0 j3 n0
+  7  n0 n0 n0 g1 g1 g1 n0 n0 n0 D0 n1 n1 n0 n2 l2 n2 n0 n0 n0
+  8 n0 n0 w0 n0 g1 n0 n0 n0 m0    n1 n1 n0 n1 n1 n0 n0 j3 n0
+  9  n0 g0 g0 w0 n0 n0 n0 g0 g0    n1 n1 n0 n0 n0 n0 n0 n0 n0
+ 10 n0 g0 n0 n0 n0 n0 w0 n0 n0 D0 n1 n1 n0 n0 n0 d0 j2 n0 n0
+ 11  n0 n0 j1 n0 n0 n0 n0 n0 m0    n1 n1 j2 n0 n0 n0 m0 n0 n0
+ 12 n0 n0 n0 P0 n0 P0 n0 g0 m0    n1 n1 n0 P0 n0 P0 n0 n0 n0
+ 13  n0 n0 n0 n0 P0 n0 g0 g0 m0    n1 n1 n0 n0 P0 n0 n0 n0 n0
+ 14 n0 n0 n0 n0 n0 n0 n0 n0 m0    n1 n1 n0 n0 n0 n0 n0 n0 n0
+```

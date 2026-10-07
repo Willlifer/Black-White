@@ -17,7 +17,8 @@ func test_ten_maps(t) -> void:
 	for m in ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "commons.json", "court.json", "forge.json", "lake.json",
 		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json", "splitfront.json", "horde.json"]:
 		t.ok(m in _maps(), "%s ships" % m)
-	t.ok(_maps().all(func(m): return m.get_basename() in BWRun.MAPS + BWRun.MAP_POOL + [BWRun.TWINS_MAP, "commons"] + BWRun.MODE_MAPS.values()),
+	var six_maps: Array = BWSchedule.SIX_POOL.map(func(e): return str(e.map))   # D354: the Fords too
+	t.ok(_maps().all(func(m): return m.get_basename() in BWRun.MAPS + BWRun.MAP_POOL + [BWRun.TWINS_MAP, "commons"] + BWRun.MODE_MAPS.values() + six_maps),
 		"every map is in the rotation, fixed, a mode's map or Commons (%s)" % [_maps()])
 	t.ok(true, "the maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court; D319: Commons, 6v6, not in the rotation)")
 	for m in BWRun.MAPS:
@@ -25,31 +26,27 @@ func test_ten_maps(t) -> void:
 	t.ok(not "commons" in BWRun.MAPS and not "commons" in BWRun.MAP_POOL, "D319: Commons is a test map, not in the rotation yet")
 
 
-## D145: fight 4 is always the Obelisks, the boss is on the arena, and the
-## other nine fights play the nine pool maps once each in a seeded shuffle,
-## the same after a save and load.
+## D145/D353: the 3v3 queue fights (1-3, 6, and 7 and 9's 3v3 cards) play
+## pool maps in the seeded shuffle with no repeat; fight 4's cards are the
+## Obelisks and the court; the Giant is on the arena; a save keeps it all.
 func test_rotation(t) -> void:
 	var ids: Array = BWData.table("roster").map(func(row): return str(row.id)).slice(0, BWRun.SQUAD)
 	var r := BWRun.start(ids, 4242)
 	var seen: Array = []
 	for n in range(1, BWRun.FIGHTS + 1):
-		if not BWRun.is_fixed(n):                  # D327: the 6v6 modes are fixed too
+		if BWSchedule.slots(n)[0] in BWSchedule.QUEUE_SLOTS:   # card 0 is a 3v3 room
 			seen.append(r.map_for(n))
-	t.eq(r.map_for(4), "obelisks", "fight 4 is the Obelisks")
-	t.eq(r.map_for(BWRun.TWINS_FIGHT), "court", "fight 7 is the Twins' court (D256)")
+	t.eq(r.map_for(4), "obelisks", "fight 4's first card: the Obelisks")
+	t.eq(BWRooms.roll(r, 4).map(func(c): return str(c.map)), ["obelisks", "court"], "fight 4: the Obelisks or the court (D353)")
 	t.eq(r.map_for(BWRun.BOSS_FIGHT), "arena", "the boss on the arena")
-	var sorted := seen.duplicate()
-	sorted.sort()
-	var uniq: Array = []
-	for m in sorted:
-		if not m in uniq:
-			uniq.append(m)
-	t.eq(uniq.size(), sorted.size(), "fights 1-3, 6, 9: five pool maps, no repeats (D256, D327: 4, 5, 7, 8, 10 are fixed)")
-	t.ok(sorted.all(func(m): return m in BWRun.MAP_POOL), "all from the pool")
-	# D187/D208: fights 1-2 take the front map; rooms take the front two from fight 3; always Standard plays the first,
-	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6 (D256, D327: the fixed fights take none).
+	var uniq := {}
+	for m in seen:
+		uniq[m] = true
+	t.eq(uniq.size(), seen.size(), "fights 1-3, 6, 7, 9 (card 0): six pool maps, no repeats (%s)" % [seen])
+	t.ok(seen.all(func(m): return m in BWRun.MAP_POOL), "all from the pool")
+	# D187/D208: openers take the front map; rooms the front two, the unchosen to the back
 	var sh := BWRun.shuffled_maps(4242)
-	t.eq(seen, [0, 1, 2, 4, 6].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
+	t.eq(seen, [0, 1, 2, 4, 6, 7].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
 	var again := BWRun.start(ids, 4242)
 	t.eq(range(1, 11).map(func(n): return again.map_for(n)), range(1, 11).map(func(n): return r.map_for(n)), "same seed, same order")
 	var other := BWRun.start(ids, 4243)

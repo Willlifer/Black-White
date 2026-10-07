@@ -130,7 +130,7 @@ func test_tidal_guard(t) -> void:
 
 
 func test_undertow(t) -> void:
-	var me := _u("me", "sword", "fire")
+	var me := _u("me", "staff", "fire")             # D359: a move-4 class (the sword is 5)
 	var holder := _foe("h", {}, ["water_undertow"])
 	var b := _fight([me], [holder], [C], [Vector2i(10, 10)])
 	_turn(b, me)
@@ -217,7 +217,7 @@ func test_heat_rush_moves_allies_on_fire(t) -> void:
 	var b := _fight([me, mate], [_foe()], [C, Vector2i(8, 8)], [Vector2i(10, 0)])
 	b.tiles.apply([Vector2i(8, 8)], "fire", "x", 2)
 	_turn(b, mate)
-	t.eq(mate.move_range(), 4 + 2, "an ally starting on fire 2: +2 move")
+	t.eq(mate.move_range(), 5 + 2, "an ally starting on fire 2: +2 move (sword 5)")
 	t.ok(mate.move_notes().any(func(n): return str(n[0]).begins_with("Heat Rush")), "named on the Move hover")
 
 
@@ -233,7 +233,7 @@ func test_skate(t) -> void:
 	b.tiles.apply([C], "ice", "x")                     # a stasis marker under me
 	_turn(b, me)
 	t.eq(int(b.reachable(me)[E].cost), 1, "glazed: 1, even on mud")
-	t.eq(me.move_range(), 5, "+1 move starting on stasis")
+	t.eq(me.move_range(), 6, "+1 move starting on stasis")
 
 
 func test_rime_armour(t) -> void:
@@ -455,11 +455,11 @@ func test_slipstream(t) -> void:
 	var far := _u("x", "sword", "fire")
 	var b := _fight([me, near, far], [_foe()], [C, Vector2i(4, 6), Vector2i(4, 9)], [Vector2i(10, 10)])
 	_turn(b, near)
-	t.eq(near.move_range(), 5, "an ally within 2: +1")
+	t.eq(near.move_range(), 6, "an ally within 2: +1")
 	_turn(b, far)
-	t.eq(far.move_range(), 4, "farther: nothing")
+	t.eq(far.move_range(), 5, "farther: nothing")
 	_turn(b, me)
-	t.eq(me.move_range(), 4, "not the holder")
+	t.eq(me.move_range(), 5, "not the holder (sword 5)")
 
 
 # ------------------------------------------------------------------ dark
@@ -555,10 +555,10 @@ func test_sunpath(t) -> void:
 	var b := _fight([me], [_foe()], [C], [Vector2i(10, 10)])
 	b.tiles.apply([C], "light", "x")
 	_turn(b, me)
-	t.eq(me.move_range(), 5, "light 1: +1")
+	t.eq(me.move_range(), 6, "light 1: +1")
 	b.tiles.apply([C], "light", "x", 2)
 	_turn(b, me)
-	t.eq(me.move_range(), 6, "light 3: +2")
+	t.eq(me.move_range(), 7, "light 3: +2")
 
 
 func test_radiant_guard(t) -> void:

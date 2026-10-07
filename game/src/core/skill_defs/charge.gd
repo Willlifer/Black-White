@@ -21,8 +21,12 @@ func _init() -> void:
 
 
 func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Dictionary) -> void:
-	rush(b, u, target, p, PLUS_LEN if upgraded(u) else BWSkills.CHARGE_LEN)
+	var high := BWWeaponMove.above(b, u, target)     # D362: charging down off high ground
+	var reach := (PLUS_LEN if upgraded(u) else BWSkills.CHARGE_LEN) + (1 if high else 0)
+	rush(b, u, target, p, reach, 2 if high else 1)
 	p.hexes = p.walk.duplicate()
+	if high:
+		p.notes.append("High ground: charging downhill, reach %d and the shove 2 hexes" % reach)
 	if upgraded(u):
 		p.notes.append("Charge+: reach %d, slam %d%%" % [PLUS_LEN, PLUS_SLAM_PCT])
 	var sl: Dictionary = p.get("slam", {})
@@ -60,7 +64,9 @@ func relocate(b: BWBattle, u: BWUnit, p: Dictionary, _target_hex: Vector2i) -> v
 ## enemy, and shove one enemy to the hex beyond where it ends; if that hex is
 ## blocked the charge stops short of it (and it slams, D87). A multi-hex
 ## enemy stops the charge at its edge; immune displace stops it short.
-static func rush(b: BWBattle, u: BWUnit, toward: Vector2i, p: Dictionary, dist: int) -> void:
+## D362 `shove` > 1 (high ground): the shoved foe goes on past the first
+## landing while the ground allows, up to `shove` hexes.
+static func rush(b: BWBattle, u: BWUnit, toward: Vector2i, p: Dictionary, dist: int, shove: int = 1) -> void:
 	var prev := u.pos
 	var walk: Array = []
 	var caught: BWUnit = null
@@ -86,6 +92,12 @@ static func rush(b: BWBattle, u: BWUnit, toward: Vector2i, p: Dictionary, dist: 
 		var ok := not b._immune(caught, "displace") and b.board.step_cost(from, landing) >= 0 \
 			and b.can_stand(caught, landing) and not dest in caught.footprint(landing)
 		if ok:
+			var dir := BWHex.direction_index(u.pos, toward)
+			for _i in shove - 1:                         # D362: on down the line
+				var nxt: Vector2i = BWHex.neighbors(landing)[dir]
+				if caught.size > 1 or not b.board.exists(nxt) or b.board.step_cost(landing, nxt) < 0 or not b.can_stand(caught, nxt):
+					break
+				landing = nxt
 			p.shove = { "unit": caught, "from": caught.pos, "to": landing }
 		else:
 			walk = walk.slice(0, caught_at)

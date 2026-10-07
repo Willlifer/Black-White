@@ -26,8 +26,12 @@ func _init() -> void:
 	}, 40)
 
 
-func reach(u: BWUnit) -> int:
-	return PLUS_RANGE if upgraded(u) else RANGE
+## D362: +1 vaulting down onto a foe 1+ level below (`f`, when given).
+func reach(u: BWUnit, b: BWBattle = null, f: BWUnit = null) -> int:
+	var r := PLUS_RANGE if upgraded(u) else RANGE
+	if b != null and f != null and BWWeaponMove.above(b, u, f.pos):
+		r += 1
+	return r
 
 
 func momentum_pct(u: BWUnit) -> int:
@@ -42,7 +46,7 @@ func targets(b: BWBattle, u: BWUnit, _element: String) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for f in b.foes_of(u):
 		var d := b.gap(u, f)
-		if d < 2 or d > reach(u) or landing(b, u, f) == NOWHERE:
+		if d < 2 or d > reach(u, b, f) or landing(b, u, f) == NOWHERE:
 			continue
 		for h in f.footprint():
 			out.append(h)
@@ -78,6 +82,8 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 	p.hexes = [u.pos]                      # the takeoff hex takes the element
 	p["vault_foe"] = f
 	var fc := strike_forecast(b, u, f)
+	if BWWeaponMove.above(b, u, f.pos):
+		p.notes.append("High ground: vaulting down, reach %d" % reach(u, b, f))
 	p.notes.append("Vault beside %s and strike at once: %d%% hit, %d damage (momentum +%d%%)" % [
 		f.name, roundi(fc.hit.value), int(fc.damage.value), momentum_pct(u)])
 

@@ -69,6 +69,10 @@ var wind := {}
 ## D327 objective modes (BWObjectives, src/core/objectives.gd): the mode's
 ## state (waves, reserve, escapes, the divider ...). {} = none.
 var objective_state := {}
+## D347 group turns: the block playing now ({} = none): group key, cycle,
+## the queue slots [from, to), a serial, the member ids (ids only: clones copy it).
+var group_live := {}
+var group_serial := 0
 
 
 func _init(p_board: BWBoard, seed_value: int = 1) -> void:
@@ -433,8 +437,9 @@ func reachable(u: BWUnit) -> Dictionary:
 				blocked[f] = true
 	var opts := {
 		"footprint": maxi(u.size, 1) - 1,
-		"no_muddy": _immune(u, "muddy"),
+		"no_muddy": _immune(u, "muddy") or BWWeaponMove.ignores_mud(u),   # D361: axe / daggers on mud
 		"no_water": _immune(u, "water_wading"),
+		"jump": BWWeaponMove.jump(u),                                     # D360/D371: 2; lance / HighGrounder 4
 	}
 	# D93/D97: perk movement (Waterwalking, Skate, Heat Rush, Shadowstep) and
 	# enemy zones need the battle's own search; plain units keep the board's.
@@ -1197,6 +1202,8 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 	BWKeystoneFx.after_skill(self, u, p)       # D294 Glacier Wall: a shape on your pillar shatters it
 	if not over and u.alive():
 		d.after_paint(self, u, el, target_hex, p, results, stripped)
+	if el == "wind":
+		BWWindShape.post(self, u, s, p)        # D366: the wind shaping lands after the hits and the paint
 	if el == "wind" and not over and u.alive():
 		_gust(u, blows)                        # D93 Gust
 	if not over and u.alive():
@@ -1986,11 +1993,18 @@ func end_turn() -> void:
 		u.fx["start_move"] = 0                     # D93: turn-start move is spent with the turn
 		u.fx["extra_move"] = 0
 		u.fx["move_notes"] = []
+		u.fx.erase("move_class")                   # D359: between turns the sheet follows the drawn weapon
 		BWEnchant.turn_end(self, u)                # v2 hook: Tending, empowerments, Planted
 		_emit({ "type": "turn_end", "unit": u.id })
 	turn_index += 1
 	while turn_index < queue.size() and not queue[turn_index].alive():
 		turn_index += 1
+	if not group_live.is_empty() and turn_index >= int(group_live.to):   # D347: the group's last turn ended
+		var g := group_live
+		group_live = {}
+		_emit({ "type": "group_end", "group": g.group, "units": g.units })
+		if over:
+			return
 	if turn_index >= queue.size():
 		_new_cycle()
 	else:
@@ -2031,6 +2045,7 @@ func _new_cycle() -> void:
 
 
 func _begin_turn() -> void:
+	_group_open()                                  # D347: a group's block settles its order first
 	var u := current()
 	if u == null:
 		return
@@ -2056,6 +2071,8 @@ func _begin_turn() -> void:
 	_expire_holds(u)                               # D97: zone / overwatch end at the holder's turn
 	_emit({ "type": "turn", "unit": u.id, "team": u.team })
 	if BWObelisk.is_objective(u):
+		if u is BWLilFella:
+			_fella_turn_start(u)                   # D348: the enemy's ground under it bites
 		return                                     # D140: no ground, perks or statuses; BWAI pulses it
 	_perk_turn_start(u)                            # D93: Frost Ward, Frostbite, Glare, move perks
 	BWEnchant.turn_start(self, u)                  # v2 hook: Hearthbound, Sheltering, Beacon, banked move
@@ -2089,6 +2106,58 @@ func _begin_turn() -> void:
 		return
 	if not u.alive():
 		end_turn()
+
+
+## D348: the Lil Fella's turn start: standing fire and dark drain, only from
+## ground an enemy laid (_tile_hurt checks the source), and a live shock field.
+func _fella_turn_start(u: BWUnit) -> void:
+	var st := tiles.standing(u.pos)
+	if st.fire > 0 and u.alive():
+		_tile_hurt(u, _tile_dmg(u, st.fire, "fire"), "fire", str(st.source))
+	if u.alive() and not over:
+		BWPools.turn_shock(self, u)
+	if st.drain > 0 and u.alive() and not over:
+		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", str(st.source))
+
+
+## D347 GROUP TURNS. When the current unit carries a `group_turn` key and
+## no block of it is open, open one: the contiguous run of its group in the
+## queue (BWTurnQueue.build put them together) is re-ordered by the mode's
+## group_order (lower first; ties by id; the fallen last), so the rules
+## resolve one member after another in a fixed, reproducible order, and a
+## `group_turn` event names the block. Each member then takes an ordinary
+## turn (turn start, its action, turn end); the last one's end emits
+## `group_end`. The view plays the block's events together (BWCombatScreen);
+## BWAI.take_turn plays the whole block in one call.
+func _group_open() -> void:
+	var u := current()
+	if u == null or u.group_turn == "":
+		return
+	if not group_live.is_empty() and int(group_live.cycle) == cycle and turn_index < int(group_live.to):
+		return
+	var to := turn_index
+	while to < queue.size() and queue[to].group_turn == u.group_turn:
+		to += 1
+	var block: Array = queue.slice(turn_index, to)
+	var key := {}
+	for m in block:
+		key[m.id] = BWObjectives.group_order(self, m) if m.alive() else INF
+	block.sort_custom(func(a: BWUnit, b: BWUnit) -> bool:
+		if key[a.id] != key[b.id]:
+			return key[a.id] < key[b.id]
+		return a.id < b.id)
+	for i in block.size():
+		queue[turn_index + i] = block[i]
+	group_serial += 1
+	var ids: Array = block.filter(func(m): return m.alive()).map(func(m): return m.id)
+	group_live = { "group": u.group_turn, "cycle": cycle, "from": turn_index, "to": to, "serial": group_serial, "units": ids }
+	_emit({ "type": "group_turn", "group": u.group_turn, "units": ids.duplicate(), "label": BWObjectives.group_label(self, u.group_turn) })
+
+
+## D347: is a group block open right now (the current unit is in it)?
+func in_group_turn() -> bool:
+	var u := current()
+	return u != null and u.group_turn != "" and not group_live.is_empty() and int(group_live.cycle) == cycle 		and turn_index >= int(group_live.from) and turn_index < int(group_live.to)
 
 
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
@@ -2265,8 +2334,10 @@ func _class_immune(u: BWUnit, cls: String) -> bool:
 
 
 func _tile_hurt(u: BWUnit, amount: int, cause: String, source: String) -> void:
-	if amount <= 0 or not u.alive() or BWObelisk.is_objective(u):
-		return                                 # D141: ground, blasts and slams never hurt an obelisk
+	if amount <= 0 or not u.alive():
+		return
+	if BWObelisk.is_objective(u) and not (u is BWLilFella and (u as BWLilFella).hurt_by_ground(self, source)):
+		return                                 # D141: ground, blasts and slams never hurt an obelisk; D348: the Lil Fella only the enemy's
 	if _class_immune(u, BWFormulas.damage_class({ "source": "tile" if cause in ELEMENTAL_CAUSES else cause })):
 		return                                 # D209: a Blank shrugs off the ground, a Being a slam
 	amount = BWOverheat.filter_hurt(self, u, amount, cause, source)   # D285-D291: Phoenix, Blast Rider, Ward of Light
@@ -2800,6 +2871,7 @@ func _gale_force(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 func _perk_turn_start(u: BWUnit) -> void:
 	for k in ["heat_rush_used", "shadowstep_used", "detonated", "free_water_used"]:
 		u.fx.erase(k)
+	u.fx["move_class"] = u.weapon_class           # D359: this turn's move is the weapon drawn now
 	u.fx["extra_move"] = 0
 	u.fx["start_move"] = 0
 	u.fx["move_notes"] = []

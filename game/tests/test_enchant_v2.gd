@@ -706,4 +706,4 @@ func test_save_v11_migration(t) -> void:
 	t.ok(BWRun.of_element(BWData.row("enchantments", str(by[w.uid].imbue_enchant)), "ice"), "an imbue's held row re-rolls in its element")
 	t.eq(back.squad[0].perks, ["water_guard", "wind_tail"], "Flow State -> Tidal Guard (deduped), Frost Ward -> the Ice set, Slipstream -> Tailwind")
 	t.eq(back.squad[0].keystones, [], "no keystones in an old save")
-	t.eq(int(back.to_dict().version), 11, "saves as v11")
+	t.ok(int(back.to_dict().version) >= 11, "saves as v11 or later (D358: v12)")

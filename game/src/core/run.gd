@@ -20,17 +20,18 @@ const DEPLOY := 3
 ## in `map_order` and saved, so a loaded run plays the same maps.
 const OBJECTIVE_FIGHT := 4
 const OBJECTIVE_MAP := "obelisks"
-## D256: fight 7 is always the Twins (BWTwins) on their round court: no room
-## choice, no weather, the boss music; a win gives every squad unit a pick.
-const TWINS_FIGHT := 7
+## D256/D355: the Twins (BWTwins) on their round court: no weather, the boss
+## music; a win gives every squad unit a pick. D353: a card at fight 4, the
+## other card the Obelisks (BWSchedule.TABLE holds the whole schedule).
+const TWINS_FIGHT := 4
 const TWINS_MAP := "court"
-## D325/D327: the fixed 6v6 fights (no room choice). Fight 5 is always Split
-## Front; fights 8 and 10 play two of SIX_MODES, seeded per run, no repeat
-## (six_modes_for). Fight 9 stays a 3v3 room choice. A mode whose map isn't
-## shipped yet plays MODE_PLACEHOLDER (Commons, a plain 6v6 wipe-out).
+## D353 (supersedes D325): fight 5 is a choice of two Split Front maps;
+## fights 7-10 offer 6v6 cards drawn from BWSchedule.SIX_POOL (7 and 9 against
+## a 3v3 room, 8 and 10 two of them). A mode whose map isn't shipped yet
+## plays MODE_PLACEHOLDER (Commons, a plain 6v6 wipe-out).
 const SPLIT_FIGHT := 5
-const SIX_FIGHTS := [8, 10]
-const SIX_MODES := ["defend", "storm", "horde"]
+const SIX_FIGHTS := [7, 8, 9, 10]
+const SIX_MODES := ["splitfront", "defend", "storm", "horde"]
 const MODE_MAPS := { "splitfront": "splitfront", "horde": "horde", "defend": "keep", "storm": "stronghold" }
 const MODE_NAMES := { "splitfront": "Split Front", "horde": "Stop the Horde", "defend": "Defend the Castle", "storm": "Storm the Castle" }
 const MODE_PLACEHOLDER := "commons"
@@ -126,7 +127,10 @@ var _branch_day := -1
 ## 11 (D283): the Element Overhaul re-cut. Units save `keystones`; the 14
 ## held enchantment rows left for perks and sets re-roll within their element
 ## (migrate_v11); removed perks map to the perk they joined (PERK_MERGED).
-const SAVE_VERSION := 11
+## 12 (D358): the D353 schedule. Cards carry `boss` / `mode` / `divider`; a
+## stored offer that doesn't fit its fight's new slots is dropped and re-rolled
+## (BWRooms.load_state); the room log and the queue carry over.
+const SAVE_VERSION := 12
 const OLDEST_LOADABLE := 5
 
 var rng := RandomNumberGenerator.new()
@@ -252,18 +256,14 @@ func map_for(n: int) -> String:
 		return force_map
 	if n >= BOSS_FIGHT:
 		return "arena"
-	if mode_for(n) != "":
-		return mode_map(mode_for(n))               # D327: the fixed 6v6 fights
-	if n == OBJECTIVE_FIGHT:
-		return OBJECTIVE_MAP
-	if n == TWINS_FIGHT:
-		return TWINS_MAP
+	if mode_override.has(n):
+		return mode_map(str(mode_override[n]))     # tools only (campaign_sim SIX=1)
 	if map_order.is_empty():
 		map_order = shuffled_maps(seed_value)
 		if map_queue.is_empty() and room_log.is_empty():
 			map_queue = map_order.duplicate()
-	# D187: the chosen room's map (the Standard room's until a choice; later
-	# fights: as if every room from here on were Standard).
+	# D187/D353: the chosen card's map (card 0's until a choice; later
+	# fights: as if every choice from here on took card 0).
 	return BWRooms.projected_map(self, n)
 
 
@@ -288,26 +288,14 @@ func objective_for(n: int) -> Dictionary:
 	return BWBoard.load_file("res://maps/%s.json" % map_for(n)).objective
 
 
-## D327: fight n's fixed 6v6 mode ("" = none): Split Front at SPLIT_FIGHT,
-## the run's seeded pair at SIX_FIGHTS.
+## D327/D353: fight n's 6v6 mode ("" = none): the chosen card's mode (card
+## 0's until a choice; a later fight as BWRooms projects it).
 func mode_for(n: int) -> String:
 	if mode_override.has(n):
 		return str(mode_override[n])               # tools only (campaign_sim SIX=1)
-	if n == SPLIT_FIGHT:
-		return "splitfront"
-	var i := SIX_FIGHTS.find(n)
-	return str(six_modes_for(seed_value)[i]) if i >= 0 else ""
-
-
-## D325: two of SIX_MODES for fights 8 and 10, no repeat, from the run seed
-## on its own rng (loot and maps don't move).
-static func six_modes_for(p_seed: int) -> Array:
-	var pool: Array = SIX_MODES.duplicate()
-	var mrng := RandomNumberGenerator.new()
-	mrng.seed = hash("sixes|%d" % p_seed)
-	var a: String = pool.pop_at(mrng.randi() % pool.size())
-	var b: String = pool[mrng.randi() % pool.size()]
-	return [a, b]
+	if n >= BOSS_FIGHT:
+		return ""
+	return str(BWRooms.room_for(self, n).get("mode", ""))
 
 
 ## The map a mode plays on (MODE_PLACEHOLDER until the mode's map ships).
@@ -316,15 +304,14 @@ static func mode_map(mode: String) -> String:
 	return m if FileAccess.file_exists("res://maps/%s.json" % m) else MODE_PLACEHOLDER
 
 
-## A fight with no room choice and no map off the queue: the Obelisks, the
-## Twins, the 6v6 modes (D327).
+## A fight with no choice and no map off the queue (D353: only the Giant).
 static func is_fixed(n: int) -> bool:
-	return n == OBJECTIVE_FIGHT or n == TWINS_FIGHT or n == SPLIT_FIGHT or n in SIX_FIGHTS
+	return not BWRooms.has_choice(n) and not BWRooms.queued(n)
 
 
-## D256: the current fight is the Twins.
+## D256/D355: the current fight is the Twins (their card was taken).
 func is_twins() -> bool:
-	return fight == TWINS_FIGHT
+	return fight < BOSS_FIGHT and str(BWRooms.room_for(self, fight).get("boss", "")) == BWSchedule.TWINS
 
 
 func is_boss() -> bool:
@@ -960,8 +947,8 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 	# the Standard one until a choice is made)
 	if room.is_empty() and n < BOSS_FIGHT:
 		room = BWRooms.room_for(self, n)
-	if n == TWINS_FIGHT:
-		return BWTwins.build(self, n)                  # D256: the mid-run boss
+	if str(room.get("boss", "")) == BWSchedule.TWINS:
+		return BWTwins.build(self, n)                  # D256/D355: the mid-run boss
 	if str(room.get("mode", "")) == "horde":
 		return BWHordeMode.build(self, n)              # D331: the waves
 	if str(room.get("mode", "")) == "defend":
@@ -1091,7 +1078,7 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 			add_trust(deployed[i].id, deployed[j].id, 1)
 	last_enemies = enemies.filter(func(e): return e.encounter == "").map(func(e): return e.to_dict())   # D208: encounter bodies don't join
 	# D179/D194: every fight, won or lost, levels every squad unit, deployed or benched (no XP).
-	if won and fight == TWINS_FIGHT:
+	if won and str(room.get("boss", "")) == BWSchedule.TWINS:
 		report["twins_reward"] = BWTwins.reward(self)  # D258: a pick each (two cards, D174)
 	report["levels"] = {}
 	if won or BWProgression.LEVEL_ON_LOSS:

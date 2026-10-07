@@ -206,7 +206,7 @@ func test_static_fire_burns(t) -> void:
 # ------------------------------------------------------------------ perks
 
 func test_undertow_on_static_water(t) -> void:
-	var me := _u("me", "sword", "fire")
+	var me := _u("me", "staff", "fire")             # D359: a move-4 class
 	var holder := _u("h", "axe", "water", ["water_undertow"], { "con": 300 })
 	var b := _fight(_board({ Vector2i(10, 4): { "h": -3 } }), [me], [holder], [C], [Vector2i(10, 10)])
 	_turn(b, me)

@@ -239,7 +239,8 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 		BWText.weapon(u.weapon_class), BWGlossary.hint_text("expertise"), u.expertise_letter(u.weapon_class), el, BWStyle.LABEL.to_html(false),
 		BWKanji.bb(u.element) + BWGlossary.markup(u.element.capitalize()) + BWPicker.sigil_bb(u)])     # D231: the kanji, when on; D278: the keystone sigil
 	lines.append_array(badge_lines(u, BWStyle.F_SMALL))      # D129/D130
-	lines.append("[font_size=%d]HP %d / %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.hp, u.max_hp(), u.move_range(), u.speed()])
+	lines.append("[font_size=%d]HP %d / %d    %s    Speed %d[/font_size]" % [BWStyle.F_BODY, u.hp, u.max_hp(), BWWeaponMove.card_bb(u), u.speed()])   # D359/D360
+	lines.append_array(BWCombatUI.trait_lines(u, BWStyle.F_SMALL))           # D360/D361/D372: Jump 4, Rough-Footed, HighGrounder
 	lines.append("[font_size=%d][color=#%s]CON %d   STR %d   DEX %d   WIL %d
 DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 		BWStyle.F_SMALL, BWStyle.TEXT_DIM.to_html(false), u.stat("con"), u.stat("str"), u.stat("dex"),
@@ -263,6 +264,16 @@ DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 	lines.append_array(BWWindView.card_lines(u, BWStyle.F_SMALL))      # D275: Rot marks
 	lines.append_array(BWElementsView.card_lines(u, BWStyle.F_SMALL))  # D287/D288: Empowered, Ward of Light
 	_set_rich(c.text, "\n".join(lines))          # D153: no personality line          # D102: glyph slots become images
+
+
+## D360/D361/D372: the class jump above 2 (Jump 4), movement traits (Rough-Footed) and owned passives (HighGrounder),
+## one dim line, like a weapon passive.
+static func trait_lines(u: BWUnit, fs: int) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for l in BWWeaponMove.card_lines(u):
+		out.append("[font_size=%d][color=#%s]■ [b]%s[/b] %s[/color][/font_size]" % [fs, BWStyle.TEXT_DIM.to_html(false),
+			BWGlossary.markup(str(l[0])), l[1]])
+	return out
 
 
 ## D130: what Wander left on a unit, for every card that shows one:
@@ -324,19 +335,23 @@ func _ground_text(e: Dictionary) -> String:
 ## turn order"): who is still to act this round, then — after a NEXT divider —
 ## next round's order (BWTurnQueue on the living units, so deaths and speed
 ## changes show up as soon as they happen). Every icon carries a mini HP bar.
+var group_shown := {}          # D347: probes / review: group key -> members shown in its slot
+
+
 func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
+	group_shown.clear()
 	for c in _order.get_children():
 		_order.remove_child(c)
 		c.queue_free()
-	var now: Array = queue.filter(func(u): return u.alive())
-	var nxt: Array = upcoming.filter(func(u): return u.alive())
+	var now: Array = BWTurnQueue.slots(queue.filter(func(u): return u.alive()))      # D347: a group is one slot
+	var nxt: Array = BWTurnQueue.slots(upcoming.filter(func(u): return u.alive()))
 	var fit := order_fit(_root.get_viewport_rect().size.x if _root else 1600.0, now.size(), nxt.size())   # D324
 	var shown := 0
 	for u in now:
 		if shown >= fit.now:
 			break
 		shown += 1
-		_order.add_child(_order_icon(u, u == current, false))
+		_order.add_child(_slot_icon(u, current, false))
 	# D211/D324: past what fits, say how many more act this round
 	var left: int = now.size() - shown
 	if left > 0:
@@ -363,7 +378,7 @@ func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
 		sep.add_child(nl)
 		_order.add_child(sep)
 		for i in mini(fit.next, nxt.size()):
-			_order.add_child(_order_icon(nxt[i], false, true))
+			_order.add_child(_slot_icon(nxt[i], null, true))
 
 
 ## D324: how many turn-order icons fit in ORDER_FRAC of the HUD width (the
@@ -396,6 +411,49 @@ static func order_fit(width: float, n_now: int, n_next: int) -> Dictionary:
 			nxt += 1
 		nxt = mini(n_next, maxi(nxt, 13 - now)) if now < 13 else nxt
 	return { "now": now, "next": nxt }
+
+
+## D347: one turn-order slot: a unit, or a group block ({ group, units })
+## shown as its first member's portrait with a "×N" badge ("Horde ×6").
+func _slot_icon(slot: Variant, current: BWUnit, next_round: bool) -> Control:
+	if not slot is Dictionary:
+		return _order_icon(slot, slot == current, next_round)
+	var us: Array = slot.units
+	var cur: bool = current != null and current in us
+	var box := _order_icon(us[0], cur, next_round)
+	var label := "%s ×%d" % [str(slot.group).capitalize(), us.size()]
+	var icon: Control = box.get_child(0)
+	icon.tooltip_text = "%s: they all move at once, one group turn
+%s" % [label,
+		", ".join(us.map(func(x): return "%s %d/%d" % [x.name, x.hp, x.max_hp()]))]
+	var badge := Label.new()                         # the count, on the portrait's corner
+	badge.text = "×%d" % us.size()
+	badge.add_theme_font_size_override("font_size", 16 if not next_round else 13)
+	badge.add_theme_color_override("font_color", Color.WHITE)
+	badge.add_theme_color_override("font_outline_color", Color.BLACK)
+	badge.add_theme_constant_override("outline_size", 7)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	badge.anchor_right = 1.0
+	badge.anchor_bottom = 1.0
+	badge.offset_left = 0
+	badge.offset_top = 0
+	badge.offset_right = -2
+	badge.offset_bottom = 3
+	icon.add_child(badge)
+	var bar: Control = box.get_child(1)
+	if bar.has_method("set_hp"):
+		var hp := 0
+		var mx := 0
+		for x in us:
+			hp += x.hp
+			mx += x.max_hp()
+		bar.set_hp(hp, mx)
+	group_shown[str(slot.group)] = us.size()
+	if cur and box.get_child_count() > 2:
+		(box.get_child(2) as Label).text = label
+	return box
 
 
 func _order_icon(u: BWUnit, current: bool, next_round: bool) -> Control:
@@ -656,6 +714,7 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 ## it with the new mode. Consumed once (the next forecast must set it again).
 var wind_action := false
 var wind_changed: Callable
+var wind_strip: Callable           # D365: BWWindShapeView.strip, the WIND SHAPING strip of a wind skill
 
 
 func _wind_toggle(att: BWUnit) -> void:
@@ -663,6 +722,10 @@ func _wind_toggle(att: BWUnit) -> void:
 		return
 	wind_action = false
 	if att == null or att.team != "player":
+		return
+	var shaping: Control = wind_strip.call() if wind_strip.is_valid() else null
+	if shaping != null:
+		_fc_rows.add_child(shaping)              # D365: a skill shapes its wind; the mode toggle is for basics
 		return
 	_fc_rows.add_child(BWWindView.toggle_row(att, wind_changed))
 
@@ -1460,6 +1523,15 @@ func _fill_obelisk_card(c: Dictionary, o: BWObelisk) -> void:
 	c.bar.set_hp(o.hp, o.max_hp())
 	var dim := BWStyle.TEXT_DIM.to_html(false)
 	var lines: PackedStringArray = []
+	if o is BWLilFella:                             # ---- D348: the little one's own card
+		c.bar.enemy = false
+		lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]keep it alive[/color]" % [BWStyle.F_NAME, o.name, dim])
+		lines.append("[font_size=%d]HP %d / %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, o.hp, o.max_hp(), o.move_range(), o.speed()])
+		lines.append("[font_size=%d]%s[/font_size]" % [BWStyle.F_SMALL, o.rule_text()])
+		lines.append("[font_size=%d][color=#%s]Not yours to command: on its turn it runs from the horde, toward your squad, never onto fire, dark or a shock. Nothing of yours can hurt, move or status it. If it falls, the fight is lost.[/color][/font_size]" % [BWStyle.F_SMALL, dim])
+		lines.append("[font_size=%d][color=#%s][i]“%s”[/i][/color][/font_size]" % [BWStyle.F_SMALL, BWStyle.FAINT.to_html(false), o.codex_line()])
+		_set_rich(c.text, "\n".join(lines))
+		return
 	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]obelisk · objective[/color]" % [BWStyle.F_NAME, o.name, dim])
 	lines.append("[font_size=%d]HP %d / %d    Speed %d    never moves[/font_size]" % [BWStyle.F_BODY, o.hp, o.max_hp(), o.speed()])
 	lines.append("[font_size=%d]%s[/font_size]" % [BWStyle.F_SMALL, o.rule_text()])

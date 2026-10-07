@@ -5,7 +5,7 @@ extends RefCounted
 
 const STATS := ["con", "str", "dex", "wil", "def", "res", "spd"]
 const STAT_CAP := 1000
-const BASE_MOVE := 4                 # D17
+const BASE_MOVE := 4                 # D17; D359: the fallback, a class's own `move` (weapons.csv) wins
 const EXPERTISE_RANKS := ["E", "D", "C", "B", "A"]
 const POINTS_PER_RANK := 10          # affinity (brief) and expertise (D21)
 const MAX_AFFINITY_RANK := 10
@@ -78,6 +78,10 @@ var fixed_hp := 0
 ## "colossus", "blank" (immune to elements, x2 from melee), "being" (immune
 ## to physical damage); "" = an ordinary unit. Never saved (enemies only).
 var encounter := ""
+## D347: a GROUP TURN key ("" = a normal turn). Every living unit sharing a
+## key takes its turn together, in one slot of the speed order where the
+## fastest of them stands (BWTurnQueue.build, BWBattle group turns). Never saved.
+var group_turn := ""
 var attuned := ""                    # last element used this battle (ELEMENTS §7.1)
 var follow_up: Array = []            # while non-empty: the only actions allowed ("basic" or skill keys)
 var follow_up_element := ""          # element of the skill that granted the follow-up
@@ -98,6 +102,9 @@ var facing := -1
 ## D269: the mode its wind actions carry (BWWind: gust | vortex | becalm),
 ## chosen on the forecast, remembered (not reset per battle).
 var wind_mode := "gust"
+## D365: a wind SKILL's shaping, per skill key: { opt, rel } (BWWindShape),
+## the last one chosen; remembered like wind_mode (not in the save).
+var wind_shapes := {}
 ## D97 engine hooks for weapon skills (BWSkillDef.zone / overwatch):
 ## zone = { hexes: [Vector2i], skill } — enemy movement entering one of these
 ## hexes stops there; overwatch = { radius, skill } — the first enemy attack
@@ -164,11 +171,12 @@ func speed() -> int:
 func move_range() -> int:
 	if statuses.has("becalmed"):                   # D270: Becalmed, move 0 (it can still act)
 		return 0
-	var m := BASE_MOVE + int(weapon().get("move_mod", 0))
+	var m := BWWeaponMove.base_move(BWWeaponMove.move_class(self))   # D359: the weapon drawn at turn start
 	if fx_hook.is_valid():
 		m += int(fx_hook.call(self, "move"))       # FX hook: aura_mod move (Leap Ready, Flutter)
 	else:
 		m += int(BWEffects.self_aura(self, "move"))
+		m += BWEnchant.move_mod(self)              # D363: a cursed row's move cost (Leaden) on the sheet too, as in battle
 	if statuses.has("swift"):                      # D87: Ley Line
 		m += 1
 	if statuses.has("drenched"):                   # D87: Saturate water to 3
@@ -185,6 +193,9 @@ func move_notes() -> Array:
 	var out: Array = []
 	for n in fx.get("move_notes", []):
 		out.append(n)
+	var cm := BWEnchant.move_mod(self)              # D363: name a cursed row's move cost (Leaden -2)
+	if cm != 0:
+		out.append(["%s (cursed)" % str(BWEnchant._drawback(self, "move").get("name", "Leaden")), cm])
 	if int(fx.get("extra_move", 0)) != 0:
 		out.append(["after-action move", int(fx.extra_move)])
 	if statuses.has("swift"):

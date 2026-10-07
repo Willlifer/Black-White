@@ -79,7 +79,7 @@ class Portrait:
 		unit = u
 		element = u.element if u else ""
 		enemy = bool(is_enemy) if is_enemy != null else (u != null and u.team == "enemy")
-		_obelisk = u != null and BWObelisk.is_objective(u)
+		_obelisk = u != null and BWObelisk.is_objective(u) and not u is BWLilFella   # D348: a figure
 		if _obelisk:
 			_bright = (u as BWObelisk).look() == "bright"
 			element = ""

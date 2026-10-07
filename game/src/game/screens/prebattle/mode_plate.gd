@@ -45,7 +45,7 @@ func _build() -> void:
 	var lines: PackedStringArray = []
 	match mode:
 		"splitfront":
-			element = BWSplitFront.element_for_seed(screen.run.seed_value * 31 + screen.run.fight)
+			element = str(BWRooms.battle_opts(screen.run, screen.run.fight).get("divider", BWSplitFront.element_for_seed(screen.run.seed_value * 31 + screen.run.fight)))   # D354: the card's divider
 			lines.append("Two fronts, one wall: three of your six fight in each arena. Defeat every enemy.")
 			lines.append("Divider: %s. %s." % [BWSplitFront.NAMES[element], BWSplitFront.counter_text(element)])
 			lines.append("The enemy breaks through at round %d if it is losing a front." % BWSplitFront.ENEMY_BREAK_ROUND)
@@ -54,7 +54,7 @@ func _build() -> void:
 			var waves: PackedStringArray = []
 			for w in BWHordeMode.WAVES:
 				waves.append("%d%s" % [int(w[1]), " + %d elite%s" % [int(w[2]), "" if int(w[2]) == 1 else "s"] if int(w[2]) > 0 else ""])
-			lines.append("Hold the road: %d waves walk for the EXIT (the south row). Lose if %d escape." % [BWHordeMode.WAVES.size(), BWHordeMode.ESCAPE_LIMIT])
+			lines.append("Keep the little one alive: %d waves hunt the Lil Fella, who joins behind your line (half your best HP; only the enemy can hurt it)." % BWHordeMode.WAVES.size())
 			lines.append("Waves: %s. Each is rung on the north edge a round before it lands." % ", ".join(waves))
 			_dress_horde()
 	_layer = CanvasLayer.new()

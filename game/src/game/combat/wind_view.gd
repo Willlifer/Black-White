@@ -279,7 +279,7 @@ static func toggle_row(att: BWUnit, changed: Callable) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	var l := Label.new()
-	l.text = "Wind mode"
+	l.text = "Wind mode (basic)"   # D365: skills shape their wind instead (BWWindShapeView)
 	l.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 	l.add_theme_color_override("font_color", BWStyle.LABEL)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL

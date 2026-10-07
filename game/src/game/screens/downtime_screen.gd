@@ -341,7 +341,7 @@ func _fill_card(u: BWUnit) -> void:
 		BWStyle.F_SMALL, lab, wname, u.expertise_letter(u.weapon_class), el.to_html(false),
 		BWGearText.readable(el).to_html(false), u.element.capitalize()])
 	lines.append_array(BWCombatUI.badge_lines(u, BWStyle.F_SMALL - 2))     # D129/D130
-	lines.append("[font_size=%d]HP %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_SMALL + 1, u.max_hp(), u.move_range(), u.speed()])
+	lines.append("[font_size=%d]HP %d    %s    Speed %d[/font_size]" % [BWStyle.F_SMALL + 1, u.max_hp(), BWWeaponMove.card_bb(u), u.speed()])   # D359
 	var st: PackedStringArray = []
 	for s in BWUnit.STATS:
 		st.append("%s [b]%d[/b]" % [s.to_upper(), u.stat(s)])

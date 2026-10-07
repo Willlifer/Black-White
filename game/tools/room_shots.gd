@@ -8,6 +8,8 @@ extends SceneTree
 ## blank|being> puts that encounter in the Hard room's place and saves
 ## encounters_room_<kind>.png (the select only). WEATHER=<kind> (D252, use
 ## FIGHT=5+) tags the Hard room with that weather -> weather_room.png.
+## D353: any fight's cards (FIGHT=4 the boss choice, 5 the Split Fronts, 8 two
+## 6v6s); NAME=<file> saves the select under that name and stops.
 var out := ""
 var scr: BWRoomScreen
 
@@ -76,6 +78,10 @@ func _go() -> void:
 	await _wait(0.4)
 	if enc == "_weather":
 		await _shot("weather_room")
+		quit(0)
+		return
+	if OS.get_environment("NAME") != "":           # D353: NAME=sched_fight4 etc. (the select only)
+		await _shot(OS.get_environment("NAME"))
 		quit(0)
 		return
 	if enc != "":

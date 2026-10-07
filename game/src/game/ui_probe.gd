@@ -101,6 +101,7 @@ func _run() -> void:
 	#    the destination, the forecast, Enter
 	await _readability_probe(u)                  # D160/D161: tile card, blast preview
 	await _transfer_probe(u)
+	await _wind_shape_probe(u)                   # D365-D370: a wind Ley Line parted right with the arrow key
 
 	# 3. Space ends the turn (declines any follow-up)
 	var who := b.current()
@@ -727,6 +728,63 @@ func _transfer_probe(u: BWUnit) -> void:
 	var ev: Array = b.history.slice(before).filter(func(e): return e.type == "skill" and e.skill == "transfer")
 	_check(not ev.is_empty() and dest in ev[0].hexes, "Transfer set the charge down on the picked hex %s" % dest)
 	_check(b.tiles.intensity(dest, "fire") == 2, "the fire is on %s" % dest)
+
+
+## D365-D370: a wind Ley Line: the confirm shows WIND SHAPING; the arrow key
+## pointing at the line's right parts it right (live preview); Enter fires and
+## the foe on the line ends on its right. (Probe scaffolding: the unit gets
+## wind, the skill and its action back.)
+func _wind_shape_probe(u: BWUnit) -> void:
+	var b := screen.battle
+	u.affinity["wind"] = maxi(int(u.affinity.get("wind", 0)), BWUnit.POINTS_PER_RANK)
+	_learn(u, "ley_line")
+	u.acted = false
+	u.follow_up = []
+	u.cooldowns.clear()
+	var f: BWUnit = b.foes_of(u)[0]
+	var dir := -1
+	var on := Vector2i(-1, -1)
+	for d in 6:
+		var a1: Vector2i = BWHex.neighbors(u.pos)[d]
+		var a2: Vector2i = BWHex.neighbors(a1)[d]
+		var fwd := BWWindShape.forward(u.pos, a1)
+		var rh: Vector2i = BWHex.neighbors(a2)[BWWindShape.side_dir(fwd, -1)]
+		if not (_clickable(a1) and b.board.is_passable(a1) and b.board.is_passable(a2) and b.board.is_passable(rh)):
+			continue
+		if b.unit_at(a1) != null or (b.unit_at(a2) != null and b.unit_at(a2) != f) or b.unit_at(rh) != null:
+			continue
+		if not a1 in b.skill_targets(u, "ley_line", "wind"):
+			continue
+		f.pos = a2
+		screen._views[f.id].position = screen._unit_pos(a2)
+		screen.ui.skill_chosen.emit("ley_line", "wind")
+		await get_tree().process_frame
+		BWWindShape.set_choice(u, "ley_line", "part_left")
+		await _click_hex(a1)
+		await get_tree().create_timer(0.2).timeout
+		if screen.ui.forecast_open() and screen.wind_shape.key_for_side(-1) == KEY_RIGHT:
+			dir = d
+			on = a2
+			break
+		await _key(KEY_ESCAPE)
+		await _key(KEY_ESCAPE)
+	_check(dir >= 0, "a Ley Line heading whose right side is the screen's right")
+	if dir < 0:
+		return
+	_check(screen.ui.find_child("WindShaping", true, false) != null, "the confirm box shows WIND SHAPING")
+	await _key(KEY_RIGHT)
+	await get_tree().create_timer(0.3).timeout
+	_check(str(BWWindShape.choice(u, "ley_line").opt) == "part_right", "→ picks Part right")
+	_check(screen.ui.forecast_open(), "the confirm box stays up")
+	_check(str(screen.wind_shape.shown.get("opt", "")) == "part_right" and int(screen.wind_shape.shown.get("arrows", 0)) > 0, "the board shows the parting arrows")
+	var moves: Array = screen.readability.preview.last.get("moves", [])
+	_check(moves.any(func(m): return str(m.unit) == f.id), "the preview shows the foe's push")
+	var n0 := b.history.size()
+	await _key(KEY_ENTER)
+	await _wait_ready()
+	var fwd2 := BWWindShape.forward(u.pos, BWHex.neighbors(u.pos)[dir])
+	_check(b.history.slice(n0).any(func(e): return e.type == "wind_shape" and e.opt == "part_right"), "Enter fires the Ley Line, parted right")
+	_check(not f.alive() or BWWindShape.side_of(u.pos, fwd2, f.pos) == -1, "the foe on the line now stands on its right (%s → %s)" % [on, f.pos])
 
 
 ## D110: Fan of Knives opens its forecast from the menu; Esc backs out,

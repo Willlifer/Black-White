@@ -4,9 +4,11 @@ extends SceneTree
 ## mode_split_fire|ice|wind.png  Split Front's opening, the whole map, one per divider element
 ## mode_split_prebattle.png      the pre-battle: the plate, WEST / EAST FRONT 3 / 3, the divider telegraphed
 ## mode_split_merge.png          the moment the divider opens (the enemy's break-through or the squad's)
-## mode_horde_prebattle.png      the Horde's pre-battle: the plate, the exit, the first wave
-## mode_horde_waves.png          mid-fight: a wave rung on the north edge, the plate (wave n of 4, escaped)
-## mode_horde_exit.png           the exit row with grunts closing on it
+## mode_horde_prebattle.png      the Horde's pre-battle: the plate, the first wave
+## horde2_group_move.png         D347: a group turn mid-move, every grunt walking at once
+## horde2_fella_flee.png         D349: the Lil Fella running from the horde
+## horde2_fella_close.png       the Lil Fella up close: hat, lantern, the tile ring
+## horde2_plate.png              the plate (wave n of 4, the Lil Fella's HP), "Horde ×N" in the turn order
 var out := ""
 var s: BWCombatScreen
 
@@ -102,10 +104,10 @@ func _prebattle(md: String) -> void:
 	var seed_value := 1
 	var n := BWRun.SPLIT_FIGHT
 	if md == "horde":
-		n = BWRun.SIX_FIGHTS[0]
-		while BWRun.six_modes_for(seed_value)[0] != "horde":
-			seed_value += 1
+		n = 8
 	var run := _run_at(n, seed_value)
+	if md == "horde":
+		run.mode_override = { n: "horde" }        # whatever the schedule draws (it is another lane's)
 	var pre := BWPrebattleScreen.new()
 	pre.run = run
 	root.add_child(pre)
@@ -139,33 +141,58 @@ func _split_merge() -> void:
 	await process_frame
 
 
+## D347-D350 (horde2_*): a group turn mid-move, the Lil Fella fleeing, the plate.
 func _horde() -> void:
 	var sd := _sides("horde", 8, 4)
 	s = BWCombatScreen.new()
 	s.configure("res://maps/horde.json", sd[0], sd[1], [], 8)
 	s.autoplay = true
+	var walking := [[]]
+	s.group_walking.connect(func(ids): walking[0] = ids)
 	root.add_child(s)
 	var t0 := Time.get_ticks_msec()
-	# a wave rung on the edge: the telegraph shows, the wave not yet landed
-	while s.mode_view._tele.is_empty() and not s.battle.over and Time.get_ticks_msec() - t0 < 240000:
-		await _wait(0.1)
+	# 1. a group turn mid-move: many grunts walking at once
+	while walking[0].size() < 5 and not s.battle.over and Time.get_ticks_msec() - t0 < 300000:
+		await process_frame
+	var c := Vector2.ZERO
+	for id in walking[0]:
+		var u := s.battle._unit(str(id))
+		c += Vector2(u.pos)
+	c /= maxf(1.0, walking[0].size())
+	_overview(s, Vector2i(roundi(c.x), roundi(c.y) - 2), 24.0, 52.0)
+	await _wait(0.45)
+	await _shot("horde2_group_move")
+	print("horde2 group: %d walking, plays %s" % [walking[0].size(), str(s.group_plays.slice(-1))])
+	# 2. the Lil Fella fleeing (its view on the move)
+	var lv: Node3D = s._views.get("lil_fella")
+	var last: Vector3 = lv.position
+	var caught := false
+	while not caught and not s.battle.over and Time.get_ticks_msec() - t0 < 600000:
+		await process_frame
+		if lv.position.distance_to(last) > 0.004 and s.battle.cycle >= 3:
+			var lf0 := BWHordeMode.fella(s.battle)
+			caught = s.battle.side("enemy").any(func(e): return BWHex.distance(e.pos, lf0.pos) <= 5)
+		last = lv.position
+	var lf := BWHordeMode.fella(s.battle)
+	var nearest: BWUnit = null
+	for e in s.battle.side("enemy"):
+		if nearest == null or BWHex.distance(e.pos, lf.pos) < BWHex.distance(nearest.pos, lf.pos):
+			nearest = e
+	var mid: Vector2i = lf.pos if nearest == null else (lf.pos + nearest.pos) / 2
+	_overview(s, mid + Vector2i(0, 1), 20.0, 50.0)
+	await _wait(0.25)
+	await _shot("horde2_fella_flee")
+	print("horde2 flee: fella at %s hp %d/%d round %d" % [str(lf.pos), lf.hp, lf.max_hp(), s.battle.cycle])
+	# 3. the plate and the turn order, on a quiet frame
 	s.autoplay = false
 	while s._busy:
 		await _wait(0.1)
-	_overview(s, Vector2i(9, 5), 38.0, 62.0)
+	_overview(s, lf.pos + Vector2i(0, -3), 30.0, 58.0)
 	await _wait(0.6)
-	await _shot("mode_horde_waves")
-	print("horde waves: %s" % [s.mode_view.shown])
-	s.autoplay = true
-	s._after_events()
-	while BWObjectives.escaped(s.battle) == 0 and s.battle.cycle < 7 and not s.battle.over and Time.get_ticks_msec() - t0 < 400000:
-		await _wait(0.2)
-	s.autoplay = false
-	while s._busy:
-		await _wait(0.1)
-	_overview(s, Vector2i(9, 11), 27.0, 58.0)
-	await _wait(0.6)
-	await _shot("mode_horde_exit")
-	print("horde exit: %s" % [s.mode_view.shown])
+	await _shot("horde2_plate")
+	print("horde2 plate: %s order %s" % [s.mode_view.shown, s.ui.group_shown])
+	_overview(s, lf.pos, 11.0, 24.0, 20.0)
+	await _wait(0.5)
+	await _shot("horde2_fella_close")
 	s.queue_free()
 	await process_frame

@@ -151,10 +151,25 @@ static func verdict(b: BWBattle) -> String:
 static func ai_turn(b: BWBattle, u: BWUnit) -> bool:
 	if not active(b):
 		return false
+	if handler(b).ai_turn(b, u):
+		return true                          # D348: a mode may play an acting object (the Lil Fella flees)
 	if BWObjective.is_object(u):
 		b.end_turn()                         # an acting object with no rules of its own passes
 		return true
-	return handler(b).ai_turn(b, u)
+	return false
+
+
+## D347: a group block's resolve order (lower first; BWBattle._group_open).
+static func group_order(b: BWBattle, u: BWUnit) -> float:
+	if not active(b):
+		return 0.0
+	return handler(b).group_order(b, u)
+
+
+## D347: the turn order's name for a group ("Horde").
+static func group_label(b: BWBattle, key: String) -> String:
+	var l := handler(b).group_label(b, key) if active(b) else ""
+	return l if l != "" else key.capitalize()
 
 
 static func ai_target_weight(b: BWBattle, u: BWUnit, f: BWUnit) -> float:
@@ -414,7 +429,7 @@ static func walk_field(b: BWBattle, goals: Array) -> Dictionary:
 				if gset.has(h) and b.board.blocked(h):
 					sc = 1 if b.board.is_passable(n) and not b.board.blocked(n) else -1
 				else:
-					sc = b.board.step_cost(n, h)        # walking n -> h, toward the goal
+					sc = b.board.step_cost(n, h, BWBoard.WALK)        # walking n -> h, toward the goal
 				if sc < 0:
 					continue
 				var nc := c + sc

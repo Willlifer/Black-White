@@ -150,12 +150,12 @@ func _refresh_preview() -> void:
 	var cheap := "%s|%s|%s|%s|%s|%s|%s|%d|%s" % [s._hover, s._skill.get("key", ""), s._skill.get("element", ""),
 		s._skill.get("first", ""), var_to_str(s._pending_skill), s._pending_target.id if s._pending_target else "",
 		s.ui.forecast_open(), s.battle.history.size(), s._busy]
-	cheap += "|" + BWWind.mode(s.battle.current())     # D269: a mode flip re-simulates
+	cheap += "|" + BWWindShape.sig(s.battle.current())     # D269/D365: a mode or shaping flip re-simulates
 	if cheap == _cheap:
 		return
 	_cheap = cheap
 	var act := aimed_action()
-	var sig := var_to_str(act) + "|%d|%s|%s" % [s.battle.history.size(), s.ui.forecast_open(), BWWind.mode(s.battle.current())]
+	var sig := var_to_str(act) + "|%d|%s|%s" % [s.battle.history.size(), s.ui.forecast_open(), BWWindShape.sig(s.battle.current())]
 	if sig == _sig:
 		return
 	_sig = sig
@@ -174,7 +174,7 @@ func simulate(act: Dictionary) -> Dictionary:
 	if _cache_at != b.history.size():
 		_cache.clear()
 		_cache_at = b.history.size()
-	var key := var_to_str(act) + "|" + BWWind.mode(b.current())    # D269
+	var key := var_to_str(act) + "|" + BWWindShape.sig(b.current())    # D269/D365
 	if not _cache.has(key):
 		_cache[key] = b.simulate(b.current(), act)
 	return _cache[key]

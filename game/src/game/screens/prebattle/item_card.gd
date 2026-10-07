@@ -200,6 +200,10 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	else:
 		_passive.text = "[color=#%s]■[/color] %s" % [BWGearText.hex(col if not weapon else BWStyle.TEXT), BWGlossary.markup(p)]
 	_passive.text += curse_line(BWGearText.enchant(item))       # D201
+	if weapon:                                   # D359-D361: the class's move, jump and traits
+		var ml := BWWeaponMove.class_line(str(item.weight))
+		if ml != "":
+			_passive.text += "\n[color=#%s]■ %s[/color]" % [BWGearText.hex(BWStyle.LABEL), BWGlossary.markup(ml)]
 	if weapon and el != "":                      # D182: the imbue is the weapon's second enchantment
 		var ec := BWGearText.hex(BWGearText.readable(BWLook.element_color(el)))
 		_passive.text += "\n[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]

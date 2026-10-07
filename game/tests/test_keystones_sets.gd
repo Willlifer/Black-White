@@ -172,7 +172,7 @@ func test_two_piece_records(t) -> void:
 	_piece(w, "head", "gusting")
 	_piece(w, "chest", "gusting")
 	w.refresh_effects()
-	t.eq(w.move_range(), 5, "Wind set (2): +1 move")
+	t.eq(w.move_range(), 6, "Wind set (2): +1 move (sword 5)")
 
 
 # ------------------------------------------------------------------ 3-pieces

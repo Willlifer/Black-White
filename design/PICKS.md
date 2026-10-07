@@ -26,6 +26,7 @@ Draft for review. Powers stay in the existing bands (skill 8–14, spell 9–13)
 **Weapon skills**
 - Each expertise step (E→D, D→C, C→B, B→A) gives 1 pick, so 4 picks per class.
 - A pick either **improves** a skill you know (it gains a "+" rider) or **learns** one of the 5 new skills for that class; 2 of those options are drawn for each pick.
+- A class may also have a **pickable passive** in that pool (D372): the bow's **HighGrounder** (jump 2 → 4 while a bow is drawn). It's drawn like any other option, takes **no skill slot**, and shows on the unit card once owned. AI units and enemies list it first, so they take it whenever their 2 cards offer it.
 - You equip up to 3 skills before the fight. An Improve earned mid-fight works at once. A skill learned mid-fight can be equipped from the next fight on.
 
 New status (one): **Pinned**: −2 move, until the end of the holder's next turn.

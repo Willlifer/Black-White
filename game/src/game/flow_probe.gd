@@ -109,6 +109,19 @@ func _run() -> void:
 	var pre3: BWPrebattleScreen = await _wait_screen(BWPrebattleScreen, 20.0)
 	_check(pre3 != null and game.run.map_for(3) == _room_map, "fight 3 plays the room taken by click")
 	_check(pre3._board.name == BWBoard.load_file("res://maps/%s.json" % _room_map).name, "pre-battle is on the chosen room's map (%s)" % _room_map)
+	# D353: fight 4 is a boss choice: the Obelisks or the Twins; key 2 takes the Twins
+	game.run.fight = 4
+	game.run.room_offer = {}
+	game.go_rooms()
+	var rooms4: BWRoomScreen = await _wait_screen(BWRoomScreen, 20.0)
+	_check(rooms4 != null and rooms4.rooms.map(func(c): return str(c.get("boss", ""))) == ["obelisks", "twins"], "fight 4: two boss cards, the Obelisks and the Twins")
+	_check(rooms4 != null and rooms4.enemies[1].size() == 2 and rooms4.enemies[1].all(func(u): return BWTwins.is_twin(u)), "the Twins' card shows Noon and Dusk")
+	await get_tree().create_timer(0.3).timeout
+	_key(KEY_2)
+	var pre4: BWPrebattleScreen = await _wait_screen(BWPrebattleScreen, 20.0)
+	_check(BWRooms.chosen_index(game.run) == 1 and game.run.is_twins(), "key 2 takes the Twins")
+	_check(pre4 != null and game.run.map_for(4) == "court" and pre4._board.name == BWBoard.load_file("res://maps/court.json").name, "the pre-battle is on the court")
+	_check(pre4 != null and pre4._need == 3, "three deploy against the Twins")
 	_finish()
 
 

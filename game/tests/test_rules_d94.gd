@@ -140,7 +140,7 @@ func test_pinned(t) -> void:
 	var foe := _foe()
 	var b := _fight([me], [foe], [C], [E])
 	b.add_status(me, "pinned", foe)
-	t.eq(me.move_range(), 2, "Pinned: -2 move")
+	t.eq(me.move_range(), 3, "Pinned: -2 move (sword 5)")
 	t.ok(me.move_notes().has(["Pinned", -2]), "named on the Move hover")
 	_turn(b, me)
 	b.end_turn()

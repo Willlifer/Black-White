@@ -1,6 +1,6 @@
 extends RefCounted
-## D255-D260: the phase framework (BWPhases) and the Twins (BWTwins) at
-## fight 7: the fight is fixed (no room choice, no weather, the court), the
+## D255-D260: the phase framework (BWPhases) and the Twins (BWTwins), a card
+## at fight 4 (D353/D355: against the Obelisks; no weather, the court), the
 ## swap at 50%, the beam (crossing, ending a turn, once per turn, thunder
 ## breaks it), the rage two cycles after a fall and its prevention, the
 ## win's reward, and determinism.
@@ -12,6 +12,8 @@ func _run(s: int = 4242) -> BWRun:
 		BWProgression.level_up(u, BWRun.TWINS_FIGHT - u.level)
 		BWPicks.auto_resolve(u)
 	r.fight = BWRun.TWINS_FIGHT
+	BWRooms.offer(r)
+	BWRooms.choose(r, BWSchedule.slots(BWRun.TWINS_FIGHT).find(BWSchedule.TWINS))   # D353: the Twins' card
 	return r
 
 
@@ -33,11 +35,12 @@ func _act(b: BWBattle, u: BWUnit) -> void:
 	u.acted = false
 
 
-func test_fight_7_is_fixed(t) -> void:
+func test_twins_card(t) -> void:
 	var r := _run()
-	t.ok(not BWRooms.has_choice(BWRun.TWINS_FIGHT), "no room choice at fight 7")
-	t.ok(not BWRooms.queued(BWRun.TWINS_FIGHT), "fight 7 takes no map off the queue")
-	t.eq(BWRooms.offer(r), [], "no offer")
+	t.ok(BWRooms.has_choice(BWRun.TWINS_FIGHT), "fight 4 is a choice: the Obelisks or the Twins (D353)")
+	t.ok(not BWRooms.queued(BWRun.TWINS_FIGHT), "fight 4 takes no map off the queue")
+	t.eq(BWRooms.offer(r).map(func(c): return str(c.get("boss", ""))), ["obelisks", "twins"], "two boss cards")
+	t.ok(r.is_twins(), "the Twins' card taken")
 	t.eq(r.map_for(BWRun.TWINS_FIGHT), "court", "the court")
 	t.eq(BWWeather.for_fight(r, BWRun.TWINS_FIGHT), "", "never weather")
 	var e := r.enemies_for(BWRun.TWINS_FIGHT)
@@ -47,8 +50,7 @@ func test_fight_7_is_fixed(t) -> void:
 	t.eq([e[0].element, e[1].element], ["light", "dark"], "light and dark")
 	t.ok(e[0].max_hp() > 2 * BWFormulas.hp_value(e[0].stat("con"), e[0].level) - 1, "a boss's HP (%d)" % e[0].max_hp())
 	for n in range(3, BWRun.FIGHTS + 1):
-		if not BWRun.is_fixed(n):                  # D327: the 6v6 modes are fixed too
-			t.ok(BWRooms.has_choice(n), "fight %d keeps its choice" % n)
+		t.ok(BWRooms.has_choice(n), "fight %d offers a choice (D353)" % n)
 	# the court: half light, half dark, seeded (D134)
 	var bd := BWBoard.load_file("res://maps/court.json")
 	var light := 0

@@ -142,11 +142,14 @@ def build_storm(d):
     }
 
 
+JUMP = 2                                        # D371: the base jump (D360's 1 is superseded)
+
+
 def step_cost(cells, a, b):
     if b not in cells or cells[b][0] == "jagged":
         return -1
     rise = cells[b][1] - cells[a][1]
-    if rise > 2:
+    if rise > JUMP:                             # D371: a walk climbs at most the jump (2; lance 4)
         return -1
     return (2 if cells[b][0] == "muddy" else 1) + max(rise, 0)
 

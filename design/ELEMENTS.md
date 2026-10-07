@@ -518,6 +518,10 @@ Base move cost 2 instead of 1. Water's move penalty is **added** on top:
 muddy + water 3 costs 4. Glazed water removes only the water part (cost back
 to 2). No other element interaction.
 
+**Rough terrain (D361):** axes and daggers are *Rough-Footed* (`weapons.csv`
+`traits`): mud costs them 1, like neutral ground. Only the mud: water's
+penalty and every other cost still apply (muddy water 3 costs them 3).
+
 ### 6.4 Jagged: impassable
 
 Impassable, and it **never holds an entry**: area shapes skip it, gale copies
@@ -527,10 +531,50 @@ Detonation splash simply finds no unit on it.
 ### 6.5 Move cost formula
 
 ```
-cost(hex) = terrain_base(hex)               # 1 neutral/grassy, 2 muddy, ∞ jagged
+cost(hex) = terrain_base(hex)               # 1 neutral/grassy, 2 muddy (1 Rough-Footed), ∞ jagged
           + water_penalty(hex)              # 0/0/1/2 for water 0..3; 0 if glazed
+          + max(rise, 0)                    # +1 per level climbed (D20)
+a step is refused when rise > jump.
 cost is never below 1.
 ```
+
+### 6.6 Move and jump by weapon (D359, D360, D371–D373)
+
+**Move** is the weapon drawn when the unit's turn starts (`weapons.csv`
+`move`): bow, pistols, staff **4**; sword, daggers, fists **5**; axe,
+lance **4**. A mid-turn swap keeps this turn's move (and jump); the next turn
+reads the new weapon. Between turns the sheets show the drawn weapon's.
+Perks, sets, statuses, terrain bonuses and Wander add on top, named in the
+Move hover: "Move 5 (Daggers) +1 Swift · Climb 2", "Move 4 (Lance) · Climb 4
+(Lance)", "Move 4 (Bow) · Climb 4 (HighGrounder)".
+
+**Jump** is the most levels one step may rise (D371, superseding D360's 1):
+**2** for everyone, **4** (double) for the lance (`weapons.csv` `jump`).
+Each level climbed still costs +1 move; dropping down is free and unlimited.
+Forced moves (shoves, charges, pulls) keep D20's cap of 2. The Move hover
+always names the jump ("Climb 2"; "Climb 4 (Lance)").
+
+**HighGrounder (D372)** is a **pickable bow passive**, not an innate trait:
+the bow's expertise picks (D174's two cards) can offer it next to Improve /
+Learn (`weapons.csv` `passives`, `BWWeaponMove.PASSIVES`). Taken, it doubles
+the jump to **4 while a bow is drawn** (the turn-start lock, D359) and **takes
+no skill slot** (its id rides in `known_skills` with no skill def, so no
+loadout lists it). The unit card shows "■ HighGrounder jump 4 with a bow
+drawn" once owned. Enemy bows may roll it at their stage picks (the AI takes
+a passive whenever its two cards offer one).
+
+**Maps (D373):** at jump 2 every map walks as it did under D20: Paintball's
+8 and Tinderbox's 6 perch hexes are open to everyone again. Ravine keeps its
+1-level stair (harmless at jump 2). Jump 4 adds lance / HighGrounder ground:
+Tinderbox's berm (elevation 3, "unclimbable from the ground") and
+Stronghold's north wall walk from inside the yard; no castle wall can be
+climbed from outside, and the castles' 2-turn perch rule holds at jump 2
+(`tools/castle_maps.py` JUMP = 2, `tools/jump_maps.gd`).
+
+**High ground (D362):** Daggerleap, Charge, Vault and Dragoon Dive started 1+
+level above the landing / the charge's first hex / the target reach 1 farther;
+Daggerleap's and the Dive's landing ring widens to radius 2; Charge's shove
+carries 2 hexes. See SKILLS.md.
 
 ---
 
@@ -1376,3 +1420,67 @@ over glazed water scores the bursts on foes minus 1.5x on allies
 front's three rings (dark under foes, light under allies, 3% max HP each,
 +1 per foe on the first ring) from the simulated `squall` event
 (`BWSquall.ai_skill`).
+
+## 18. Wind shaping (D365-D370, the author's "then what?")
+
+Wind as built, for **skills**. A wind-tagged skill no longer carries the
+abstract Gust / Vortex / Becalm mode; once its target is picked, the confirm
+box shows **WIND SHAPING**, whose options follow the skill's shape. Code:
+`src/core/wind_shape.gd` (BWWindShape), hooked from `BWWind.pre_hit` /
+`after_paint` and `BWBattle.use_skill`; view `combat/wind_shape_view.gd`
+(BWWindShapeView). Tests `tests/test_wind_shape.gd`. Renders
+`design/art/wind2_*.png` (`tools/wind_shape_shots.gd`).
+
+| Shape | Skills | Options |
+|---|---|---|
+| Line | Ley Line, Tridentpierce, Energized Shot, Earthsplitter, Shockwave Palm, Lunge | **Part left**, **Part right**: the foes ON the line are pushed 1 to that side (the caster's left / right, looking down the line). **Blast out**: foes beside the line pushed 1 straight away from it (past an end: on along it), foes on it to the open side (left first). **Hold** |
+| Area | every ground-aimed or leap skill (Surge, Tempest, Rain of Arrows, Arcing Shot, Saturate, Daggerleap, Dragoon Dive), self rings (Whirlwind Blade, Fan of Knives), the Cleave and Sweep arcs | **Draw in**: BEFORE the hits, foes in or beside the area pulled 1 toward its centre (so more are caught). **Burst out**: hit first, then the area's foes pushed 1 away from the centre. **Hold** |
+| Single | everything aimed at one unit, and Charge | **Push**: after the hit, the target pushed 1 along a chosen heading. **Hold** |
+
+- **Hold** (every shape, Claude) Becalms the foes the skill touches (the
+  area, the line, the target): move 0 until the end of its next turn, then
+  Restless.
+- **Order:** Draw in is before the hits; everything else lands after the hits
+  and the paint (hit, paint, pushes, slides, slams). Only foes are moved.
+- **Unchanged rules:** every move goes through `BWWind.push`: once per action,
+  2 hexes a cycle (D272), dark 3 gravity (D276), slides onto glaze (D261) and
+  8% slams on both when a push is blocked by rock, a unit, a pillar or a wall.
+  Pulls never slam.
+- **Memory:** the last choice per unit and skill (`BWUnit.wind_shapes`, not
+  saved). Unset, it follows the unit's basic mode: Gust → Burst out / Blast
+  out / push straight away; Vortex → Draw in / Blast out / pull straight in;
+  Becalm → Hold.
+- **Gales:** a gale the skill lays stores the equivalent mode: Draw in →
+  Vortex field, Hold → Becalm field, the rest → Gust field (Part: heading to
+  the parting side; Push: the push heading; else away from the caster).
+- **Basic attacks and plain paints** keep the three modes (§1 of v3,
+  `BWUnit.wind_mode`), on the forecast's "Wind mode (basic)" toggle.
+
+**Controls** (no extra click; the shaping is set while the box is up, Enter
+or a click on the target fires):
+
+- Line: move the mouse to either side of the line, or press the arrow key
+  that points at a side; Tab, the wheel and the other arrows cycle Blast out
+  and Hold.
+- Area: Tab, the wheel or any arrow cycle Draw in / Burst out / Hold.
+- Single: move the mouse around the target to aim the push; ←/→ turn it;
+  Tab or ↑/↓ toggle Hold; the wheel turns it.
+- The mouse acts only when it moves into a new region (dead bands of 16 px
+  round the line and 26 px round the target), so clicking the target again
+  never flips the choice. While shaping, the arrows and the wheel don't move
+  the camera.
+
+**Preview:** fat wind-green arrows (ink-edged) on the line's side, the area's
+rim (inward for Draw in, outward for Burst out) or the target; a tag naming
+the option; a dashed ghost ring where each pushed foe lands; "SLAM 8%" on a
+blocked push; "INTO FIRE n%" / SHOCK / DARK / GUST FIELD where a foe would
+land in a hazard; plus the blast preview's ink move arrows, slide ghosts and
+damage stickers (the action is simulated with the shaping).
+
+**AI (D368):** at most 4 options per skill, each simulated once (single:
+the three best push headings by a cheap slam / hazard look, then Hold);
+score = damage to foes − damage to its side + hazards foes are left on + 3
+per Becalm; ties keep the stored choice.
+
+**Wind Wall (D370):** kept as is. A keystone action, one wall per unit, 3
+hexes, 2 ticks, cooldown 3: not paintable, not spammable.

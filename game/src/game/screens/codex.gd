@@ -370,6 +370,18 @@ func _rules_card() -> void:
 
 # ---------------------------------------------------------------- weapons
 
+## D359-D361, D371/D372: "5", "4 · jump 4", "4 · HighGrounder pick", "4 · mud 1".
+func _move_cell(wc: String) -> String:
+	var t := str(BWWeaponMove.base_move(wc))
+	if BWWeaponMove.class_jump(wc) > BWBoard.DEFAULT_JUMP:
+		t += " · jump %d" % BWWeaponMove.class_jump(wc)
+	for k in BWWeaponMove.passives_of(wc):
+		t += " · %s pick" % BWWeaponMove.passive_name(str(k))
+	if BWWeaponMove.ROUGH_FOOTED in BWWeaponMove.traits(wc):
+		t += " · mud 1"
+	return t
+
+
 func _weapons() -> void:
 	_intro("Every weapon has a basic attack and its own skills. Skills that use an element come in one version per element you know, "
 		+ "and each version has its own cooldown. Skill damage: [b]power + ½ STR + ½ DEX[/b]; staff spells: [b]power + WIL[/b].")
@@ -379,12 +391,12 @@ func _weapons() -> void:
 	for w in rows:
 		tbl += "[cell][b]%s[/b][/cell][cell]%s[/cell][cell]%d[/cell][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell]" % [
 			str(w.get("name", w.id)), _dmg_type(w), int(w.get("base_dmg", 0)), _range(int(w.get("range", 1))),
-			_mod(int(w.get("speed_mod", 0))), _mod(int(w.get("move_mod", 0)))]
+			_mod(int(w.get("speed_mod", 0))), _move_cell(str(w.id))]   # D359-D361
 	tbl += "[/table]"
 	_pending_parent = _body
 	var top := _card("")
 	top.add_child(_rt(tbl))
-	top.add_child(_rt(_faint("Speed adds to SPD for turn order; move adds to everyone's %d hexes." % BWUnit.BASE_MOVE), BWStyle.F_SMALL))
+	top.add_child(_rt(_faint("Speed adds to SPD for turn order. Move is the weapon drawn when the turn starts; jump is the levels one step may rise."), BWStyle.F_SMALL))
 	_pending_parent = _grid(2)
 	for w in rows:
 		_weapon_card(w)
@@ -474,7 +486,7 @@ func _stats() -> void:
 	v2.add_child(_rt(
 		"[b]Hit[/b]  =  %s\n" % _fmt(F.hit_chance(sword, sword, F.WEAPON).formula)
 		+ "Then: glance (×%.1f damage) → crit on a clean hit (×%.1f, chance %s) → resist, magic only (×%.1f, no side effects).\n" % [F.GLANCE_MULT, F.CRIT_MULT, _fmt(F.crit_chance(sword).formula), F.RESIST_MULT]
-		+ "Damage never drops below 1. Move: %d hexes + weapon modifier; climbing costs 1 per level, at most %d up a step." % [BWUnit.BASE_MOVE, BWBoard.MAX_CLIMB],
+		+ "Damage never drops below 1. Move: the drawn weapon's (4 or 5 hexes); climbing costs 1 per level, at most the jump (2; lance 4, a bow with HighGrounder 4) up a step.",
 		BWStyle.F_SMALL))
 
 
@@ -514,17 +526,17 @@ func _terrain() -> void:
 		v.add_child(_rt(_dim(d[1]), BWStyle.F_SMALL))
 	var v2 := _card("")
 	v2.add_child(_rt("[font_size=%d][b]Height[/b][/font_size]" % (BWStyle.F_SUB + 3)))
-	v2.add_child(_rt(_dim("Each level climbed costs one extra move, and a step can rise at most %d levels. Dropping down is free." % BWBoard.MAX_CLIMB), BWStyle.F_SMALL))
+	v2.add_child(_rt(_dim("Each level climbed costs one extra move, and a step can rise at most the walker's jump: 2, or 4 with a lance or with a bow and the HighGrounder pick. Dropping down is free. Leaps and charges from 1+ level above reach 1 farther."), BWStyle.F_SMALL))
 
 
 # ---------------------------------------------------------------- bosses (D260)
 
 ## The fixed fights: the Twins at fight 7 (BWTwins), the Giant at the end.
 func _bosses() -> void:
-	_intro("Two fights are always the same: the Twins at fight %d, the Giant at the end. No room choice, no weather." % BWRun.TWINS_FIGHT)
+	_intro("Fight %d offers a boss: the Obelisks or the Twins, your pick. The Giant ends the run. No weather on a boss." % BWRun.TWINS_FIGHT)   # D353
 	_pending_parent = _body
 	var v := _card("light")
-	v.add_child(_rt("[font_size=%d][b]%s[/b][/font_size]  %s" % [BWStyle.F_SUB + 3, BWTwins.TITLE, _dim("fight %d · the Court" % BWRun.TWINS_FIGHT)]))
+	v.add_child(_rt("[font_size=%d][b]%s[/b][/font_size]  %s" % [BWStyle.F_SUB + 3, BWTwins.TITLE, _dim("a card at fight %d · the Court" % BWRun.TWINS_FIGHT)]))
 	v.add_child(_rt(_dim("Two tall figures, one hex each. Noon is white with a halo-ring head; Dusk is black with a hollow ring for a head. They mirror each other. Their HP follows your squad's level."), BWStyle.F_SMALL))
 	v.add_child(_rt("[b]Phase 1.[/b] At the end of its turn each paints its colour (+%d) on itself and the ring around it: Noon light, Dusk dark. Each heals %d%% max HP per point of its own colour under it at its turn start. More than %d hexes apart, a [b]Beam[/b] joins them: %s" % [
 		BWTwins.PAINT_STEPS, int(BWTwins.HEAL_PCT), BWTwins.BEAM_GAP, BWTwins.beam_text()], BWStyle.F_SMALL))

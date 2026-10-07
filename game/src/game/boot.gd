@@ -188,7 +188,7 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 		trun.fight = tn
 		players = trun.squad.slice(0, 3)
 		trun.prepare_for_battle(players)
-		enemies = trun.enemies_for(tn)
+		enemies = trun.enemies_for(tn, { "kind": BWRooms.BOSS, "boss": BWSchedule.TWINS, "map": BWRun.TWINS_MAP, "fight": tn, "enemies": [] })   # D355
 		map_name = BWRun.TWINS_MAP
 	var enc := _arg(OS.get_cmdline_user_args(), "--encounter", "")
 	if enc in BWEncounters.KINDS:
@@ -222,7 +222,8 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 		mrun.fight = mn
 		players = mrun.squad.slice(0, 6)
 		mrun.prepare_for_battle(players)
-		map_name = BWRun.MODE_MAPS[md]
+		if str(BWBoard.load_file("res://maps/%s.json" % map_name).objective.get("mode", "")) != md:
+			map_name = BWRun.MODE_MAPS[md]             # D354: `--combat fords --mode splitfront` keeps its map
 		var room := { "kind": BWRooms.STANDARD, "map": map_name, "fight": mn, "mode": md,
 			"enemies": BWRooms._draw_ids(mrun, mn, [], false, 6) }
 		enemies = mrun.enemies_for(mn, room)

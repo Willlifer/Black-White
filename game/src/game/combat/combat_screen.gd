@@ -31,6 +31,7 @@ signal ward_broken(unit_id: String)
 const CINE_PITCH := 24.0     # degrees above horizontal for the side-on cutscene shot
 const CINE_FOV := 24.0
 
+signal group_walking(ids: Array)   # D347: a group turn's walks start (review tools)
 var battle: BWBattle
 var board_view: BWBoardView
 var ui: BWCombatUI
@@ -77,6 +78,7 @@ var weather_kind := ""           # BWWeather.KINDS, "" = none
 var weather_view: BWWeatherView
 var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate, intro)
 var wind_view: BWWindView       # ---- D269-D276: fields, walls, gravity, Rot marks
+var wind_shape: BWWindShapeView # ---- D365-D370: the wind shaping step on a wind skill's confirm
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
 var squall_view: BWSquallView       # ---- D309-D313: squall fronts, Overfreeze bursts
@@ -146,6 +148,9 @@ func _ready() -> void:
 	wind_view = BWWindView.new()          # ---- D269-D276: wind fields, walls, gravity, Rot
 	add_child(wind_view)
 	wind_view.setup(self)
+	wind_shape = BWWindShapeView.new()    # ---- D365-D370: wind shaping (the confirm strip, keys, board arrows)
+	add_child(wind_shape)
+	wind_shape.setup(self)
 	ks_view = BWKeystoneView.new()        # ---- D293-D299: wind, ice, water and dark keystones
 	add_child(ks_view)
 	ks_view.setup(self)
@@ -165,11 +170,15 @@ func _ready() -> void:
 	add_child(name_labels)
 	name_labels.setup(self)
 	ui.wind_changed = _wind_mode_changed  # the forecast's mode toggle re-opens the forecast
+	ui.wind_strip = wind_shape.strip      # ---- D365: a wind skill's confirm shows WIND SHAPING instead
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
 		var v: BWUnitView = BWCastleView.make_view(u)   # ---- D340: the castle gate / throne
 		if v == null:
-			v = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
+			if u is BWLilFella:
+				v = BWLilFellaView.new()           # ---- D348: the Lil Fella and its lantern
+			else:
+				v = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
 		add_child(v)
 		v.setup(u)
 		v.position = _unit_pos(u.pos)
@@ -334,6 +343,8 @@ func _on_hover(h: Vector2i) -> void:
 		var rr := battle.reachable(u)
 		_show_options(BWBoard.path_to(rr, h))
 		var sl: Dictionary = rr[h].get("slide", {})     # ---- D266: a walk onto ice slides
+		if sl.is_empty():                                # D360: the walk's cost, and a 2-level climb by name
+			ui.hint(BWWeaponMove.walk_hint(battle, u, rr, h))
 		if not sl.is_empty():
 			board_view.highlight([h], "target")
 			ui.hint("%s — slides on the ice to here%s; the walk ends, then 1 more move" % [u.name,
@@ -509,6 +520,7 @@ func _seconds(u: BWUnit) -> Array[Vector2i]:
 ## words; the shape on the board. Click a highlighted hex or Enter confirms.
 func _open_confirm(u: BWUnit, pv: Dictionary, h: Vector2i, choice: Vector2i = BWBattle.NOWHERE) -> void:
 	var nm := str(_skill.row.get("name", _skill.key))
+	wind_shape.begin(u, _skill, h, pv)                  # ---- D365: wind shaping (before the box is built)
 	ui.wind_action = str(_skill.element) == "wind"      # ---- D269: the mode toggle
 	var ids: Array = pv.forecasts.keys()
 	var at: Array = ids.map(func(id): return battle._unit(str(id)).pos)
@@ -614,7 +626,11 @@ func _after_events() -> void:
 	board_view.clear_highlights()
 	while true:
 		while not _queue.is_empty():
-			await _play(_queue.pop_front())
+			var ev: Dictionary = _queue.pop_front()
+			if str(ev.type) == "group_turn":
+				await _play_group(ev)                  # ---- D347: a group turn plays at once
+			else:
+				await _play(ev)
 			if battle.objective_mode():
 				ui.set_objectives(battle.objectives())   # ---- D145: the stones' HP bars
 		await _resolve_picks()                     # ---- D91 picks (marked edit): pause for owed picks
@@ -900,6 +916,139 @@ func _play(e: Dictionary) -> void:
 			for u in battle.units:
 				if u.alive() and u.team == e.winner and _views.has(u.id):
 					_views[u.id].pose_named("cheer")
+
+
+# ---- D347 group turns ----
+
+var group_plays: Array = []      # probes / review: { units, walks, blows } per group turn played
+
+
+## D347: a GROUP TURN (the Horde's grunts). The rules resolved the members one
+## by one (BWBattle._group_open's order); the view plays the results together:
+## every walk at once, then every blow at once (Minimal, whatever the
+## cutscene mode: a crowd can't take a cutscene each), each target's number
+## popping on its own impact, then the rest (KOs, counters, statuses, ground)
+## in order. Hold-to-skip runs it all at x4 like any playback.
+func _play_group(start: Dictionary) -> void:
+	if not _queue.any(func(x): return str(x.type) == "group_end") and not battle.over 			and battle.in_group_turn() and BWAI.controls(battle.current(), autoplay):
+		var t_ai := Time.get_ticks_usec()
+		BWAI.take_turn(battle)                   # the whole block, now, so it plays as one
+		perf_ai_ms.append((Time.get_ticks_usec() - t_ai) / 1000.0)
+	var evs: Array = []
+	while not _queue.is_empty():
+		var e: Dictionary = _queue.pop_front()
+		if str(e.type) == "group_end":
+			break
+		evs.append(e)
+	var members := {}
+	for id in start.get("units", []):
+		members[str(id)] = true
+	var label := "%s ×%d" % [str(start.get("label", "Group")), members.size()]
+	var at := -1                                  # the block shows as the acting slot while it plays
+	for i in battle.queue.size():
+		if members.has(str(battle.queue[i].id)):
+			at = i
+			break
+	if at >= 0:
+		ui.set_order(battle.queue.slice(at), battle.queue[at], BWTurnQueue.build(battle.units))
+	else:
+		ui.set_order(battle.queue.slice(maxi(battle.turn_index, 0)), battle.current(), BWTurnQueue.build(battle.units))
+	ui.feed("[b]%s[/b] move together" % label)
+	barks.turn_passed()
+	var c := Vector3.ZERO
+	var n := 0
+	for id in members:
+		if _views.has(id):
+			c += (_views[id] as Node3D).global_position
+			n += 1
+	if n > 0:
+		rig.follow(c / n)
+	# A: the walks, all at once
+	var walks: Array = []
+	var blows := {}                               # attacker id -> [attack events], its order
+	var rest: Array = []
+	for e in evs:
+		var t := str(e.type)
+		if t == "turn" or t == "turn_end":
+			continue
+		if t == "move" and members.has(str(e.unit)) and str(e.get("kind", "")) in ["", "flow"] and _views.has(str(e.unit)):
+			walks.append(e)
+		elif t == "attack" and members.has(str(e.unit)) and _views.has(str(e.unit)) and _views.has(str(e.target)):
+			if not blows.has(str(e.unit)):
+				blows[str(e.unit)] = []
+			blows[str(e.unit)].append(e)
+		else:
+			rest.append(e)
+	group_plays.append({ "units": members.size(), "walks": walks.size(), "blows": blows.size() })
+	if group_plays.size() > 32:
+		group_plays.pop_front()
+	group_walking.emit(walks.map(func(e): return str(e.unit)))
+	var left := [walks.size()]
+	for e in walks:
+		_group_walk(_views[str(e.unit)], e.path, left)
+	while left[0] > 0:
+		await get_tree().process_frame
+	# B: the blows, every attacker at once (its own strikes in order)
+	left[0] = blows.size()
+	for id in blows:
+		_group_blows(blows[id], left)
+	while left[0] > 0:
+		await get_tree().process_frame
+	# C: the rest, in order
+	for e in rest:
+		await _play(e)
+	_face_all()
+
+
+func _group_walk(v: BWUnitView, path: Array, left: Array) -> void:
+	await _animate_move(v, path)
+	left[0] -= 1
+
+
+func _group_blows(evs: Array, left: Array) -> void:
+	for e in evs:
+		await _group_hit(e)
+	left[0] -= 1
+
+
+## One grunt's blow in a group turn: the Minimal tier without the shared
+## screen state (no cinematic bars, no odds strip, no freeze).
+func _group_hit(e: Dictionary) -> void:
+	var a: BWUnitView = _views[str(e.unit)]
+	var d: BWUnitView = _views[str(e.target)]
+	var rs := [{ "target": e.target, "result": e.result, "ko": e.ko, "target_hp": e.get("target_hp", -1), "tags": e.get("tags", []), "odds": e.get("odds", {}) }]
+	last_tiers.append(["attack", "group"])
+	if last_tiers.size() > 64:
+		last_tiers.pop_front()
+	a.face(d.global_position)
+	d.face(a.global_position)
+	var res: Dictionary = e.result
+	var spell := BWClipRoute.casts(a.unit, str(a.unit.weapon().get("damage_type", "")) == "spell", "")
+	var melee := BWHex.distance(a.unit.pos, d.unit.pos) <= 1
+	var reacts := [_pick_reaction(d, rs[0], melee, "%s|group|%d" % [str(e.unit), int(e.get("strike", 0))])]
+	a.skill = ""
+	a.pose_named("cast" if spell else "strike")
+	var to_impact := 0.0
+	var rel := a.time_to_marker("release")
+	if rel >= 0.0 or (not melee and a.time_to_marker("hit") >= 0.0):
+		await get_tree().create_timer(rel if rel >= 0.0 else a.time_to_marker("hit")).timeout
+		to_impact = _projectile(a, d, spell, a.unit.attuned, bool(res.hit))
+	else:
+		to_impact = maxf(a.time_to_marker("hit"), 0.0)
+	await _react_at(a, [d], reacts, to_impact, rs, "none")
+	var num := ("IMMUNE" if res.get("immune", false) else "MISS") if not res.hit else str(res.damage)
+	if res.get("crit", false) and res.hit:
+		num += "  CRIT"
+	if BWSettings.value("show_numbers"):
+		feel.float_number(d, num, res, 0.7)
+	_float_tags(d, rs[0])
+	d.refresh()
+	ui.feed("%s → %s %s" % [a.unit.name, d.unit.name, ("miss" if not res.hit else str(res.damage))])
+	await _hold(0.3)
+	if a.unit.alive():
+		a.idle()
+	if d.unit.alive():
+		d.idle()
 
 
 # ---- D91 picks (marked edit) ----

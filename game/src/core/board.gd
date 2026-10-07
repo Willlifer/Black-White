@@ -33,8 +33,14 @@ const TERRAIN_FOLD := {
 
 ## Climbing (DECISIONS D20): a step may rise at most MAX_CLIMB levels, and
 ## every level climbed costs one extra move. Dropping down is free and
-## unlimited.
+## unlimited. D360/D371: a walk's cap is the walker's jump (opts.jump: 2 by
+## default, 4 for a lance or a bow with the HighGrounder pick, BWWeaponMove);
+## MAX_CLIMB stays the cap for forced moves (shoves, charges, pulls) and
+## opt-less calls.
 const MAX_CLIMB := 2
+const DEFAULT_JUMP := 2
+## A plain walker's opts, for the battle-wide distance fields (AI, objectives).
+const WALK := { "jump": DEFAULT_JUMP }
 
 var name := ""
 var cols := 0
@@ -221,11 +227,12 @@ func cells() -> Array:
 ## Cost to step from `a` into adjacent `b`; -1 if the step is not allowed.
 ## FX hook `opts` (immune): no_muddy (Sure Stride) prices mud as neutral,
 ## no_water (Wading, Drift) skips the extra cost the tiles plug in.
+## D360: opts.jump caps the rise (a walk); without it, MAX_CLIMB (forced moves).
 func step_cost(a: Vector2i, b: Vector2i, opts: Dictionary = {}) -> int:
 	if not is_passable(b) or blocked(b):
 		return -1
 	var rise := elevation(b) - elevation(a)
-	if rise > MAX_CLIMB:
+	if rise > int(opts.get("jump", MAX_CLIMB)):
 		return -1
 	var cost := 2 if terrain(b) == MUDDY and not opts.get("no_muddy", false) else 1
 	if extra_cost.is_valid() and not opts.get("no_water", false):

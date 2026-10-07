@@ -23,13 +23,15 @@ const REINFORCE_WAVES := 3
 const REINFORCE_COUNT := 2
 ## D341 tuning: the gate's and the throne's HP as multiples of the squad's mean
 ## max HP; the Warden's HP share and stat multiplier.
-static var GATE_HP := 3.5
+## D357 re-tune for D353's fights 7-10 (castle_sim on 96 campaign squads):
+## gate 3.5 -> 2.9, every guard and the Warden x0.93; 7 and 9 BWCastle.FIGHT_MULT.
+static var GATE_HP := 2.9
 static var THRONE_HP := 2.0
-static var WARDEN_HP := 2.2
-static var WARDEN_MULT := 1.2
+static var WARDEN_HP := 2.05
+static var WARDEN_MULT := 1.12
 ## D341 tuning: the guards' base-stat multiplier and HP share (BWCastle.soldiers).
-static var ENEMY_MULT := 0.86
-static var ENEMY_HP := 0.56
+static var ENEMY_MULT := 0.8
+static var ENEMY_HP := 0.52
 const GATE_WEIGHT := 2.5
 const THRONE_WEIGHT := 3.0
 const WARDEN_WEIGHT := 1.5
@@ -59,15 +61,15 @@ func objective_text(b: BWBattle) -> String:
 ## The enemies for fight n (BWRun): four wall guards (ranged first), a yard
 ## guard, the Warden, then the reinforcement waves, marked.
 static func build(run: BWRun, n: int) -> Array:
-	var out: Array = BWCastle.soldiers(run, n, "guard", "Guard", 4, ["bow", "pistols", "staff", "bow"], ENEMY_HP, ENEMY_MULT)
-	out += BWCastle.soldiers(run, n, "yard", "Guard", 1, ["sword", "axe", "lance"], ENEMY_HP, ENEMY_MULT)
-	var w: BWUnit = BWCastle.soldiers(run, n, "warden", "The Warden", 1, ["lance", "axe", "sword"], WARDEN_HP, WARDEN_MULT)[0]
+	var out: Array = BWCastle.soldiers(run, n, "guard", "Guard", 4, ["bow", "pistols", "staff", "bow"], ENEMY_HP, ENEMY_MULT, "storm")
+	out += BWCastle.soldiers(run, n, "yard", "Guard", 1, ["sword", "axe", "lance"], ENEMY_HP, ENEMY_MULT, "storm")
+	var w: BWUnit = BWCastle.soldiers(run, n, "warden", "The Warden", 1, ["lance", "axe", "sword"], WARDEN_HP, WARDEN_MULT, "storm")[0]
 	w.name = "The Warden"
 	w.cosmetics = { "hair_style": "short_mohawk", "top": "sweater_scarf", "bottom": "tight_pants", "clothing_shade": "dark", "voice_pitch": 0.7 }
 	w.set_meta("castle_role", "warden")
 	out.append(w)
 	for k in REINFORCE_WAVES:
-		out += BWCastle.as_wave(BWCastle.soldiers(run, n, "guard_w%d" % (k + 1), "Guard", REINFORCE_COUNT, [], ENEMY_HP, ENEMY_MULT), k + 1)
+		out += BWCastle.as_wave(BWCastle.soldiers(run, n, "guard_w%d" % (k + 1), "Guard", REINFORCE_COUNT, [], ENEMY_HP, ENEMY_MULT, "storm"), k + 1)
 	return out
 
 

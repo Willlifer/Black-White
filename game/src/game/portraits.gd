@@ -63,7 +63,7 @@ static func enabled() -> bool:
 static func key_for(u: BWUnit) -> String:
 	if u == null:
 		return ""
-	if BWObelisk.is_objective(u):
+	if BWObelisk.is_objective(u) and not u is BWLilFella:    # D348: the Lil Fella is a figure
 		return "obelisk_" + (u as BWObelisk).kind
 	var lk := BWCharacter.look_for(u)
 	var hk := BWLook.hair_key(u.affinity, u.focus())
@@ -242,7 +242,7 @@ func _render(key: String, u: BWUnit) -> Texture2D:
 	var centre := FRAME_CENTRE
 	var size := FRAME_SIZE
 	var yaw := VIEW_YAW
-	if BWObelisk.is_objective(u):
+	if BWObelisk.is_objective(u) and not u is BWLilFella:
 		var ov := BWObeliskView.new()
 		_stage.add_child(ov)
 		ov.setup(u)

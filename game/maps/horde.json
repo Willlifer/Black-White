@@ -2125,85 +2125,6 @@
  },
  "objective": {
   "mode": "horde",
-  "exit": [
-   [
-    0,
-    14
-   ],
-   [
-    1,
-    14
-   ],
-   [
-    2,
-    14
-   ],
-   [
-    3,
-    14
-   ],
-   [
-    4,
-    14
-   ],
-   [
-    5,
-    14
-   ],
-   [
-    6,
-    14
-   ],
-   [
-    7,
-    14
-   ],
-   [
-    8,
-    14
-   ],
-   [
-    9,
-    14
-   ],
-   [
-    10,
-    14
-   ],
-   [
-    11,
-    14
-   ],
-   [
-    12,
-    14
-   ],
-   [
-    13,
-    14
-   ],
-   [
-    14,
-    14
-   ],
-   [
-    15,
-    14
-   ],
-   [
-    16,
-    14
-   ],
-   [
-    17,
-    14
-   ],
-   [
-    18,
-    14
-   ]
-  ],
-  "escape_limit": 8,
   "spawn_edge": [
    [
     0,
@@ -2359,7 +2280,7 @@
    ]
   ]
  },
- "notes": "D331-D333 Stop the Horde: the squad holds the road (rows 12-13) in front of the EXIT, the whole south row. Grunts come in waves from the north edge (rows 0-1, telegraphed a round ahead) and walk for the exit. Two water channels cross the field (row 4, fords at q 4 and 14; row 8, a dry ford in the middle and water 3 pools on the flanks) and grass on the flanks and the far bank, for electrified pools, Overheat and fire, squalls and Vortex pulls. Seven rocks break the lanes; a low rise behind the line.",
+ "notes": "D331/D349 Stop the Horde: the squad guards the Lil Fella (a little neutral NPC placed a row behind the squad's centre at battle start, BWHordeMode.fella_start) on the road (rows 12-13). Grunts come in waves from the north edge (rows 0-1, telegraphed a round ahead) and hunt the little one, who flees on its own turn; the map's edges hem it in. Two water channels cross the field (row 4, fords at q 4 and 14; row 8, a dry ford in the middle and water 3 pools on the flanks) and grass on the flanks and the far bank, for electrified pools, Overheat and fire, squalls and Vortex pulls. Seven rocks break the lanes; a low rise behind the line.",
  "camera": {
   "focus": [
    9,

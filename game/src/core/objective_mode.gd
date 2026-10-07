@@ -67,6 +67,16 @@ func ai_target_weight(_b: BWBattle, _u: BWUnit, _f: BWUnit) -> float:
 	return 1.0
 
 
+## D347: the resolve order inside a group turn (lower first, ties by id).
+func group_order(_b: BWBattle, _u: BWUnit) -> float:
+	return 0.0
+
+
+## D347: the turn order's name for group `key` ("" = the key, capitalised).
+func group_label(_b: BWBattle, _key: String) -> String:
+	return ""
+
+
 ## Lines for the HUD's objective plate (wave counter, escapes, divider ...).
 func hud_lines(_b: BWBattle) -> Array:
 	return []
