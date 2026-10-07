@@ -126,10 +126,13 @@ func test_painted_axis_decays(t) -> void:
 
 
 func test_detonation_scar(t) -> void:
+	# D264: thunder on (unglazed) water electrifies it instead; a glazed one
+	# (here a D262 pillar: ice on empty water 3) still shatters
 	var tl := BWTiles.new(_board({ C: { "h": -3 } }))
+	tl.apply([C], "ice", "a")
 	var out := tl.apply([C], "thunder", "a")
-	t.eq(out.detonations.size(), 1, "thunder detonates static water")
-	t.near(float(out.detonations[0].pct), 23.0, 0.001, "5 + 4x3 + 2x3 = 23%")
+	t.eq(out.detonations.size(), 1, "thunder shatters glazed static water")
+	t.near(float(out.detonations[0].pct), 34.5, 0.001, "(5 + 4x3 + 2x3) x 1.5 = 34.5%")
 	t.ok(tl.at(C).is_empty() and tl.is_scarred(C), "erased and scarred")
 	tl.tick()
 	t.ok(tl.at(C).is_empty(), "stays spent through the next cycle")
@@ -138,6 +141,7 @@ func test_detonation_scar(t) -> void:
 	t.ok(not tl.is_scarred(C), "scar gone")
 	# a fuse armed while it was spent holds the floor off until it fades
 	var tl2 := BWTiles.new(_board({ C: { "h": -3 } }))
+	tl2.apply([C], "ice", "a")
 	tl2.apply([C], "thunder", "a")
 	tl2.tick()
 	t.ok(tl2.apply([C], "thunder", "a").detonations.is_empty(), "no bomb while spent: thunder only arms a fuse")
@@ -163,10 +167,10 @@ func test_glaze_and_gale(t) -> void:
 	var tl := BWTiles.new(_board({ C: { "h": -3 } }))
 	tl.apply([C], "ice", "a")
 	t.ok(tl.is_glazed(C), "ice glazes static water")
-	t.eq(tl.move_penalty(C), 0, "frozen lake: walkable")
-	tl.tick()
-	tl.tick()
-	t.ok(not tl.is_glazed(C), "the glaze runs out")
+	t.ok(tl.is_pillar(C), "D262: on empty water 3 it raises a pillar")
+	for i in BWPools.PILLAR_TICKS:
+		tl.tick()
+	t.ok(not tl.is_glazed(C), "the pillar thaws")
 	t.eq(_hv(tl, C), Vector2i(-3, 0), "the water was never touched")
 	var out := tl.apply([C], "wind", "a")
 	t.eq(out.gales[0].copies.size(), 6, "a gale copies the static water to the ring")
@@ -180,7 +184,14 @@ func test_static_fire_never_ignites_grass(t) -> void:
 	for i in 4:
 		t.ok(tl.tick().is_empty(), "tick %d seeds nothing" % i)
 	tl.apply([C], "fire", "a")
-	t.eq(tl.tick().size(), 6, "a real cast on it still does")
+	# D285: fresh fire on fire 3 Overheats: the ring is already burning (propagated, it never seeds)
+	t.eq(tl.at(C).h, 2, "the cast erupts and vents the static to fire 2")
+	t.eq(tl.intensity(BWHex.neighbors(C)[0], "fire"), 2, "the ring takes fire 2 (spread)")
+	var tl2 := BWTiles.new(_board({ C: { "h": 2 } }, 9, "grassy"))
+	for i in 2:
+		t.ok(tl2.tick().is_empty(), "static fire 2: tick %d seeds nothing" % i)
+	tl2.apply([C], "fire", "a")
+	t.eq(tl2.tick().size(), 6, "a real cast on it still does")
 
 
 func test_static_fire_burns(t) -> void:
@@ -202,6 +213,7 @@ func test_undertow_on_static_water(t) -> void:
 	var r := b.reachable(me)
 	t.ok(r[Vector2i(9, 4)].stop, "a static pool pulls: +1 toward it")
 	t.ok(not r[Vector2i(0, 4)].stop, "and -1 away")
+	b.tiles.apply([Vector2i(10, 4)], "ice", "x")         # D264: water only blows glazed (a pillar here)
 	b.tiles.apply([Vector2i(10, 4)], "thunder", "x")
 	_turn(b, me)
 	t.ok(not b.reachable(me).has(Vector2i(9, 4)), "blown: no pool this cycle, no pull")
@@ -215,11 +227,11 @@ func test_shadowstep_across_static_dark(t) -> void:
 	var me := _u("me", "sword", "dark", ["dark_step"])
 	var to := Vector2i(7, 4)
 	var b := _fight(_board({ C: { "v": -2 }, to: { "v": -2 } }), [me], [_u("f", "axe", "water", [], { "con": 300 })], [C], [Vector2i(10, 10)])
-	for h in [Vector2i(5, 4), Vector2i(6, 4), Vector2i(5, 3), Vector2i(5, 5), Vector2i(6, 3), Vector2i(6, 5)]:
-		b.board.set_cell(h, "jagged")
+	b.board.set_cell(Vector2i(5, 4), "muddy")              # D281: Shadowstep needs sight, so no rock wall
+	b.board.set_cell(Vector2i(6, 4), "muddy")
 	_turn(b, me)
 	var r := b.reachable(me)
-	t.eq(int(r[to].cost), 1, "static dark to static dark: 1 move through the rock")
+	t.eq(int(r[to].cost), 1, "static dark to static dark: 1 move over the mud")
 	t.ok(b.move(me, to), "stepped")
 
 
@@ -249,7 +261,7 @@ func test_ai_on_static_maps(t) -> void:
 			ps.append(BWUnit.from_roster(roster[i + 3]))
 			es.append(BWUnit.from_roster(roster[i + 13]))
 		# the perks that read static ground, on both sides
-		for pair in [[ps[0], "water_undertow"], [ps[1], "dark_step"], [es[0], "fire_coal"], [es[1], "water_walk"]]:
+		for pair in [[ps[0], "water_undertow"], [ps[1], "dark_step"], [es[0], "fire_rush"], [es[1], "water_walk"]]:
 			var u: BWUnit = pair[0]
 			var pel := str(BWPicks.perk(pair[1]).element)
 			if u.affinity_rank(pel) < 1:

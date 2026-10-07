@@ -218,7 +218,7 @@ func test_charge_shove(t) -> void:
 	var me := _u("me", "axe", "fire")
 	var foe := _foe()
 	var b := _duel(me, [foe], [Vector2i(6, 4)])
-	b.tiles.apply([Vector2i(7, 4)], "fire", "x", 3)
+	b.tiles.apply([Vector2i(7, 4)], "fire", "x", 2)       # D285: fire 2, so the charge's own fire doesn't Overheat it
 	var hp := foe.hp
 	b.use_skill(me, "charge", "fire", E)
 	t.eq(me.pos, Vector2i(7, 4), "charger runs the full 3")

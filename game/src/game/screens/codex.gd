@@ -282,6 +282,30 @@ func _element_card(row: Dictionary) -> void:
 		_faint(("AXIS · " + ("raises" if role.ends_with("pos") else "lowers") + (" heat" if e in ["fire", "water"] else " light")) if axis else "OPERATOR"),
 		_dim("Opposite: ") + opp_txt]))
 	v.add_child(_rt(_element_body(e), BWStyle.F_SMALL))
+	v.add_child(_rt(_build_body(e), BWStyle.F_SMALL))       # D278: perks, keystones, the set
+
+
+## D278: what an element offers a build: its 4 perks, its 3 keystones (gold,
+## the sigil) and its set's 2 / 3 pieces. Hover a name for the rule.
+func _build_body(e: String) -> String:
+	var hint := func(text: String) -> String: return BWPicker.hint_safe(str(text))
+	var perks: PackedStringArray = []
+	for r in BWPicks.perks_of(e):
+		perks.append("[hint=%s]%s[/hint]" % [hint.call(str(r.effect_text)), str(r.name)])
+	var gold := BWPicker.GOLD.to_html(false)
+	var ks: PackedStringArray = []
+	for id in BWKeystones.of_element(e):
+		var r := BWKeystones.row(str(id))
+		ks.append("[hint=%s][color=#%s]%s[/color][/hint]%s" % [hint.call(str(r.get("text", ""))), gold, str(r.get("name", id)),
+			_faint(" (action)") if BWKeystones.is_action(str(id)) else ""])
+	var st := BWSets.row(e)
+	return "%s %s
+[color=#%s]◈ Keystones[/color] %s
+%s %s · 3: [hint=%s]%s[/hint]" % [
+		_faint("Perks (ranks 1, 2, 4, 5)"), " · ".join(perks),
+		gold, _faint("(rank 3: 1 of 2; rank 6: a second; 2 per unit)") + " " + " · ".join(ks),
+		_faint("Set (head, chest, legs, drawn weapon's imbue)"), _dim("2: " + str(st.get("two_text", ""))),
+		hint.call(str(st.get("three_text", ""))), str(st.get("three", ""))]
 
 
 func _element_body(e: String) -> String:

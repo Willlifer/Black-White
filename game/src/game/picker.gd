@@ -17,6 +17,9 @@ extends Control
 signal chosen(id: String)
 
 const CARD := Vector2(232, 316)
+## D278: the keystone rule (ELEMENTS-v3 §9: "the pick card is gold-ruled, with
+## KEYSTONE over the name"). The one non-element hue, kept to thin rules.
+const GOLD := Color(0.86, 0.71, 0.36)
 
 var unit: BWUnit
 var request: Dictionary = {}
@@ -36,7 +39,7 @@ func _init(u: BWUnit, req: Dictionary, ctx: String = "") -> void:
 	request = req
 	context = ctx
 	options = BWPicks.options(u, req)
-	var el := str(req.get("element", "")) if req.get("kind", "") == "perk" else u.element
+	var el := str(req.get("element", "")) if req.get("kind", "") in ["perk", "keystone"] else u.element
 	accent = BWLook.element_color(el) if el != "" else Color.WHITE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -61,6 +64,8 @@ func _build() -> void:
 	sb.border_color = Color.WHITE
 	sb.border_width_top = 6
 	sb.border_color = accent if request.get("kind", "") == "perk" else Color.WHITE
+	if request.get("kind", "") == "keystone":
+		sb.border_color = GOLD                      # D278: a keystone pick is gold-ruled
 	box.add_theme_stylebox_override("panel", sb)
 	center.add_child(box)
 	var v := VBoxContainer.new()
@@ -129,6 +134,10 @@ func _build() -> void:
 
 
 func _kicker() -> String:
+	if request.get("kind", "") == "keystone":
+		var kel := str(request.element)
+		return "KEYSTONE  ·  %s  ·  rank %d%s" % [kel.capitalize(), unit.affinity_rank(kel),
+			("  ·  " + context) if context != "" else ""]
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		return "%s perk  ·  rank %d%s" % [el.capitalize(), unit.affinity_rank(el),
@@ -142,8 +151,13 @@ func _subtitle() -> String:
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		var n := BWPicks.perks_of(el).size()
-		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank %d grants them all." % [
-			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n, BWPicks.ALL_RANK]
+		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Ranks 3 and 6 bring keystones." % [
+			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n]
+	if request.get("kind", "") == "keystone":
+		var kel := str(request.element)
+		return ("A keystone breaks one of %s's rules. %s A unit holds at most %d." % [kel,
+			"Your first: one of two drawn from three." if BWPicks.keystones_owned(unit, kel).is_empty() else "Your second: the two left.",
+			BWKeystones.MAX_PER_UNIT])
 	return "A new expertise letter: two ways to grow, drawn for you. You equip up to %d." % BWUnit.loadout_cap(str(request.get("weapon", "")))
 
 
@@ -221,6 +235,8 @@ class Card:
 		index = i
 		picker = p
 		custom_minimum_size = BWPicker.CARD
+		if str(o.get("kind", "")) == "keystone":
+			custom_minimum_size = BWPicker.CARD + Vector2(36, 84)   # D278: a keystone's rule is longer
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_ARROW if o.owned else Control.CURSOR_POINTING_HAND
 		tooltip_text = "%s\n%s" % [o.name, o.text]
@@ -244,13 +260,18 @@ class Card:
 		var sel := picker._sel == index
 		var acc: Color = picker.accent
 		var el := str(opt.get("element", ""))
+		var ks := str(opt.get("kind", "")) == "keystone"
 		var glyph_col := BWLook.element_color(el) if el != "" else acc
 		var fade := 0.32 if owned else 1.0
 		# plate
 		var bg := Color(0.11, 0.11, 0.12, 0.96) if (sel or _hover) and not owned else Color(0.06, 0.06, 0.07, 0.94)
 		draw_rect(Rect2(Vector2.ZERO, s), bg)
 		var rim := Color(1, 1, 1, 0.95) if sel else Color(1, 1, 1, 0.55 if _hover and not owned else 0.28)
+		if ks:                                     # D278: gold-ruled, a double rule inside the rim
+			rim = Color(BWPicker.GOLD, (1.0 if sel else (0.85 if _hover else 0.7)) * fade)
 		draw_rect(Rect2(Vector2.ZERO, s), rim, false, 3.0 if sel else 1.5)
+		if ks:
+			draw_rect(Rect2(Vector2(6, 6), s - Vector2(12, 12)), Color(BWPicker.GOLD, 0.45 * fade), false, 1.0)
 		# the element band across the top (thicker when chosen)
 		draw_rect(Rect2(Vector2.ZERO, Vector2(s.x, 8.0 if sel else 5.0)), Color(glyph_col, fade))
 		# hotkey
@@ -266,7 +287,10 @@ class Card:
 		draw_arc(c, 46, 0, TAU, 64, Color(glyph_col, 0.85 * fade), 2.5, true)
 		var g := Rect2(c - Vector2(28, 28), Vector2(56, 56))
 		var kind := str(opt.get("kind", "perk"))
-		if kind == "perk":
+		if kind == "keystone":
+			BWPicker.draw_keystone_sigil(self, c, 40.0, Color(BWPicker.GOLD, fade))
+			BWPicker.draw_element_glyph(self, el, Rect2(c - Vector2(20, 20), Vector2(40, 40)), Color(glyph_col, fade))
+		elif kind == "perk":
 			BWPicker.draw_element_glyph(self, el, g, Color(glyph_col, fade))
 		else:
 			BWPicker.draw_skill_glyph(self, kind, g, Color(Color.WHITE, fade))
@@ -274,10 +298,13 @@ class Card:
 		var nfs := BWStyle.F_BODY + 2           # shrink a long name to fit, never clip it
 		while nfs > BWStyle.F_SMALL - 2 and font.get_string_size(str(opt.name), HORIZONTAL_ALIGNMENT_LEFT, -1, nfs).x > s.x - 24:
 			nfs -= 1
-		draw_string(font, Vector2(12, 160), str(opt.name), HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, nfs,
+		if ks:                                     # D278: "KEYSTONE" over the name
+			draw_string(font, Vector2(12, 146), "KEYSTONE" + ("  ·  ACTION" if opt.get("action", false) else ""),
+				HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, BWStyle.F_SMALL - 2, Color(BWPicker.GOLD, fade))
+		draw_string(font, Vector2(12, 168 if ks else 160), str(opt.name), HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, nfs,
 			Color(BWStyle.TEXT, fade))
 		# effect text, wrapped; the last line that fits ends in an ellipsis (the tooltip has it all)
-		var y := 192.0
+		var y := 196.0 if ks else 192.0
 		var fs := BWStyle.F_SMALL - 1
 		var lines := _wrap(font, str(opt.text), s.x - 28, fs)
 		var room := int((s.y - 44.0 - y) / (BWStyle.F_SMALL + 3)) + 1
@@ -289,7 +316,7 @@ class Card:
 				Color(BWStyle.TEXT_DIM, fade))
 			y += BWStyle.F_SMALL + 3
 		if owned:
-			var tag := "OWNED" if kind == "perk" else "IMPROVED"
+			var tag := "OWNED" if kind in ["perk", "keystone"] else "IMPROVED"
 			draw_string(font, Vector2(14, s.y - 14), tag, HORIZONTAL_ALIGNMENT_CENTER, s.x - 28, BWStyle.F_MENU_TITLE,
 				Color(1, 1, 1, 0.55))
 		elif sel:
@@ -311,7 +338,50 @@ class Card:
 		return out
 
 
+# ---------------------------------------------------------------- keystone text (D278)
+
+## The sigil after a unit's element on its cards: a gold diamond-in-a-diamond
+## per keystone held ("" for none).
+static func sigil_bb(u: BWUnit) -> String:
+	if u == null or u.keystones.is_empty():
+		return ""
+	return " [color=#%s]%s[/color]" % [GOLD.to_html(false), "◈".repeat(u.keystones.size())]
+
+
+## One card line naming the keystones, each with its rule on hover:
+## "◈ Keystone  Prism · Doom" ("" for none).
+static func keystone_bb(u: BWUnit, fs: int) -> String:
+	if u == null or u.keystones.is_empty():
+		return ""
+	var names: PackedStringArray = []
+	for id in u.keystones:
+		var r := BWKeystones.row(str(id))
+		names.append("[hint=%s][color=#%s]%s[/color][/hint]" % [BWPicker.hint_safe("%s: %s" % [str(r.get("name", id)), str(r.get("text", ""))]),
+			BWGearText.hex(BWGearText.readable(BWLook.element_color(str(r.get("element", ""))))), str(r.get("name", id))])
+	return "[font_size=%d][color=#%s]◈ %s[/color]  %s[/font_size]" % [fs, GOLD.to_html(false),
+		"Keystones" if u.keystones.size() > 1 else "Keystone", " · ".join(names)]
+
+
+## A rule as a [hint=] value: no brackets, no "=" (the BBCode parser reads a
+## second "=" as a new tag argument and the whole tag leaks as text, D301), and
+## typographic quotes (a straight quote starts a quoted string in the parser;
+## see BWGlossary.hint_text).
+static func hint_safe(t: String) -> String:
+	return t.replace("[", "(").replace("]", ")").replace(" = ", " is ").replace("=", ":").replace("'", "’").replace("\"", "”")
+
+
 # ---------------------------------------------------------------- glyphs
+
+## D278: the keystone sigil, a diamond in a diamond (the picker card's ring,
+## the unit card beside the element dot, the hall). `r` = the outer half-size.
+static func draw_keystone_sigil(ci: CanvasItem, c: Vector2, r: float, col: Color, filled: bool = false) -> void:
+	var outer := PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0), c + Vector2(0, -r)])
+	if filled:
+		ci.draw_colored_polygon(outer.slice(0, 4), Color(col, col.a * 0.25))
+	ci.draw_polyline(outer, col, maxf(1.5, r * 0.07), true)
+	var k := r * 0.62
+	ci.draw_polyline(PackedVector2Array([c + Vector2(0, -k), c + Vector2(k, 0), c + Vector2(0, k), c + Vector2(-k, 0), c + Vector2(0, -k)]),
+		Color(col, col.a * 0.7), maxf(1.0, r * 0.04), true)
 
 ## A small vector mark per element, drawn into `r` in `col`.
 static func draw_element_glyph(ci: CanvasItem, el: String, r: Rect2, col: Color) -> void:

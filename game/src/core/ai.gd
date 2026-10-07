@@ -77,12 +77,18 @@ static func take_turn(b: BWBattle) -> void:
 		if not sup.is_empty() and (sk.is_empty() or sup.score > sk.score) and (best.is_empty() or sup.score > best.score):
 			sk = sup
 		if not sk.is_empty() and (best.is_empty() or sk.score > best.score):
-			b.use_skill(u, sk.key, sk.element, sk.target)
+			BWWind.ai_refine(b, u, sk.key, str(sk.element), sk.target)   # D274: ≤ 3 mode sims for a wind skill
+			if sk.has("choice"):
+				b.use_skill(u, sk.key, sk.element, sk.target, sk.choice)
+			else:
+				b.use_skill(u, sk.key, sk.element, sk.target)
 			if not b.over and u.alive() and "basic" in u.follow_up:
 				var fu := _best_target(b, u, u.pos)       # Transfer / Inversion: then a basic
 				if not fu.is_empty():
 					b.attack(u, fu.target)
 		elif not best.is_empty():
+			if b.basic_element(u) == "wind":
+				u.wind_mode = BWWind.ai_choose(b, u, best.target, u.pos)   # D274: a wind basic's mode
 			b.attack(u, best.target)
 			if not b.over and u.alive() and "basic" in u.follow_up:
 				var again := _best_target(b, u, u.pos)    # D197 Relentless: the extra attack
@@ -164,6 +170,8 @@ static func _best_support(b: BWBattle, u: BWUnit) -> Dictionary:
 				score += float(t.score)
 		if best.is_empty() or score > best.score:
 			best = { "key": row.key, "element": s.element, "target": s.target, "score": score }
+			if s.has("choice"):
+				best["choice"] = s.choice                  # D304: a second pick (a wall's heading, a wave's)
 	return best
 
 
@@ -217,13 +225,32 @@ static func _best_skill(b: BWBattle, u: BWUnit) -> Dictionary:
 			continue
 		for el in row.elements:
 			for h in b.skill_targets(u, row.key, el):
+				if el == "wind":                              # D274: a cheap mode per target
+					u.wind_mode = BWWind.ai_choose(b, u, _focus(b, u, h), BWWind.skill_origin(u, row, h))
 				var pv := b.skill_preview(u, row.key, el, h)
 				if pv.is_empty():
 					continue
 				var score := d.ai_score(b, u, pv)
+				score += BWOverheat.ai_skill(b, u, pv)                      # D285: Overheat rings and setups
+				score += BWThunderKeys.ai_skill(b, u, row.key, el, h, pv)   # D291: the Blast Rider dive (simulated)
 				if score > 0.0 and (best.is_empty() or score > best.score):
-					best = { "key": row.key, "element": el, "target": h, "score": score }
+					best = { "key": row.key, "element": el, "target": h, "score": score, "mode": u.wind_mode }
+	if not best.is_empty() and str(best.element) == "wind":
+		u.wind_mode = str(best.mode)
 	return best
+
+
+## D274: the foe a wind skill aimed at `h` is about: the one on it, else the
+## nearest to it.
+static func _focus(b: BWBattle, u: BWUnit, h: Vector2i) -> BWUnit:
+	var o := b.unit_at(h)
+	if o != null and o.team != u.team:
+		return o
+	var near: BWUnit = null
+	for f in b.foes_of(u):
+		if near == null or BWHex.distance(f.pos, h) < BWHex.distance(near.pos, h):
+			near = f
+	return near
 
 
 static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:
@@ -238,6 +265,7 @@ static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:
 		var score := ev + (1000.0 if ev >= f.hp else 0.0)   # finishing blows first
 		score += float(fc.get("arc_ev", 0.0))               # D86 chain lightning
 		score += objective_bonus(b, u, f, ev)               # D145
+		score += BWThunderKeys.ai_target(b, u, f, from)     # D290: a Static Blades backstab bursts
 		if best.is_empty() or score > best.score:
 			best = { "target": f, "score": score }
 	return best
@@ -259,6 +287,7 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 		var score := 0.0
 		var t := _best_target(b, u, h)
 		var hz := BWWeather.hazard_pct(b, u, h, wfc) if not wfc.is_empty() else 0.0
+		hz += BWPools.hazard_pct(b, u, h, reach[h])     # D264/D261: an electrified pool, a slide's slam
 		if not t.is_empty():
 			score = 10000.0 + t.score - hz * u.max_hp() / 100.0
 		elif b.objective_mode():
@@ -269,7 +298,9 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 				nearest = mini(nearest, BWHex.distance(h, f.pos))
 			score = -nearest
 			score -= hz * 0.3                             # D253: ~3 hexes of approach for a 10% hazard
+		score += BWKeystoneFx.ai_hex(b, u, h)          # D297: Riptide reach, Event Horizon wariness
 		score -= reach[h].cost * 0.01
+		score += BWBeams.ai_hex(b, u, h)                  # D287: form a beam on light, step off a foe's beam
 		if score > best_score:
 			best_score = score
 			best_h = h

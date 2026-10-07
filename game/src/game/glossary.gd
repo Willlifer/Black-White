@@ -196,7 +196,7 @@ static func hint_text(id: String) -> String:
 	var e: Dictionary = _entries.get(id, {})
 	# a straight quote inside a tag value starts a quoted string in the BBCode
 	# parser and swallows the rest of the line: use the typographic ones
-	return ("%s%s%s" % [e.get("term", id), HINT_SEP, e.get("definition", "")]).replace("'", "’").replace("\"", "”")
+	return ("%s%s%s" % [e.get("term", id), HINT_SEP, e.get("definition", "")]).replace("'", "’").replace("\"", "”").replace("[", "(").replace("]", ")").replace(" = ", " is ").replace("=", ":")      # D301: "=" or a bracket leaks the tag
 
 
 static func _norm(s: String) -> String:

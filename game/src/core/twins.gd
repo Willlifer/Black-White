@@ -33,8 +33,8 @@ const TITLE := "The Twins: Noon and Dusk"
 const MODEL := "glaive"
 
 ## Tuning (tools/campaign_sim.gd, env TWINS="hp,mult").
-static var TWINS_HP := 2.2          # x the unit's own D137 HP (D259, sim-tuned)
-static var TWINS_MULT := 1.15       # base-stat multiplier (D259)
+static var TWINS_HP := 2.6          # x the unit's own D137 HP (D259; D308: 2.2 -> 2.6 with the overhaul on)
+static var TWINS_MULT := 1.25       # base-stat multiplier (D259; D308: 1.15 -> 1.25)
 const PAINT_STEPS := 2
 const PAINT_RADIUS := 1
 const HEAL_PCT := 2.0               # % max HP per point of own colour

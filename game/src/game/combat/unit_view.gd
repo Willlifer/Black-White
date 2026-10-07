@@ -85,6 +85,7 @@ func setup(u: BWUnit) -> void:
 		scale = Vector3.ONE * TWIN_SCALE
 		_label.pixel_size *= 1.0 / TWIN_SCALE
 		_hp_label.pixel_size *= 1.0 / TWIN_SCALE
+		_float_shadow()                        # D298: they float; a faint shadow under them
 	refresh()
 
 
@@ -180,6 +181,28 @@ func refresh_equipment() -> void:
 		character.refresh_equipment()
 		_equip_sig = _signature()
 		_place_bar()
+
+
+## D298: a faint soft shadow on the ground under a floating figure (the
+## Twins): two translucent ink discs, the inner one darker.
+func _float_shadow() -> void:
+	for k in 2:
+		var d := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.5 - 0.16 * k
+		cm.bottom_radius = cm.top_radius
+		cm.height = 0.004
+		cm.radial_segments = 24
+		d.mesh = cm
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.albedo_color = Color(0.0, 0.0, 0.0, 0.16 + 0.1 * k)
+		d.material_override = m
+		d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		d.position.y = 0.03 + 0.002 * k
+		d.name = "float_shadow_%d" % k
+		add_child(d)
 
 
 func _build_disc() -> void:

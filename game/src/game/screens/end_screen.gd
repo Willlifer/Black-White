@@ -192,6 +192,8 @@ static func picks_text(u: BWUnit) -> String:
 	var parts: PackedStringArray = []
 	if not perks.is_empty():
 		parts.append("Perks: " + ", ".join(perks))
+	if not u.keystones.is_empty():                       # D278
+		parts.append("Keystones: " + ", ".join(u.keystones.map(func(id): return BWKeystones.name_of(str(id)))))
 	if not skills.is_empty():
 		parts.append("Skills: " + ", ".join(skills))
 	return "  ·  ".join(parts) if not parts.is_empty() else "—"

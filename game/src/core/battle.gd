@@ -63,6 +63,9 @@ var boss := {}
 ## D249-D254 weather (BWWeather, src/core/weather.gd): the fight's weather
 ## state, {} for none. Set with set_weather() before setup().
 var weather := {}
+## D269-D274 wind (BWWind, src/core/wind_modes.gd): walls { owner id: {hexes,
+## ticks} } and the tick flag. Ids and numbers only, so clone() copies it.
+var wind := {}
 
 
 func _init(p_board: BWBoard, seed_value: int = 1) -> void:
@@ -70,7 +73,11 @@ func _init(p_board: BWBoard, seed_value: int = 1) -> void:
 	tiles = BWTiles.new(board)
 	board.extra_cost = tiles.move_penalty
 	tiles.potency = _tile_potency          # FX hook: tile_potency_pct
+	board.blocker = tiles.blocks_move      # D262: ice pillars are impassable
+	board.sight_blocker = tiles.blocks_sight   # D262/D265: pillars and steam block sight
+	tiles.occupant = unit_at               # D261/D262: slides and pillars see the units
 	rng.seed = seed_value
+	BWWind.hook_board(self)                # D273: wind walls join the board's blocker (last: composes)
 
 
 ## Place both sides. `player_at` overrides the map's default player spawns
@@ -103,6 +110,7 @@ func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 				near = f
 		if near != null:
 			u.facing = BWHex.direction_index(u.pos, near.pos)
+	BWWind.hook_board(self)                   # D273 (re-composes if the blocker was replaced since _init)
 	_emit({ "type": "battle_start" })
 	_new_cycle()
 
@@ -340,6 +348,7 @@ func _pulse_move(o: BWObelisk) -> void:
 		if (pp.path as Array).size() > 1:
 			v.pos = pp.path[-1]
 			_emit({ "type": "move", "unit": v.id, "path": pp.path, "kind": o.pulse_kind })
+			BWSlides.after_push(self, v, dir)     # D261
 		elif str(pp.stop) in ["rock", "unit"]:
 			_emit({ "type": "slam", "unit": v.id, "by": o.id, "into": pp.stop, "name": o.name })
 			var dmg := BWTiles.tile_damage(v, BWObelisk.SLAM_PCT, "", 1.0)
@@ -400,6 +409,8 @@ func reachable(u: BWUnit) -> Dictionary:
 		budget = int(u.fx.get("bonus_move", 0))
 		if budget <= 0:
 			return { u.pos: { "cost": 0, "from": u.pos, "stop": true } }
+	if u.statuses.has("becalmed"):            # D270: Becalmed, no move of any kind
+		return { u.pos: { "cost": 0, "from": u.pos, "stop": true } }
 	var blocked := {}
 	var no_stop := {}
 	for o in units:
@@ -421,11 +432,14 @@ func reachable(u: BWUnit) -> Dictionary:
 	var pull := _undertow_for(u)          # D93 Undertow: search with move+1, filter by destination
 	if not pull.is_empty():
 		budget += int(pull.move)
+	var ice := BWSlides.ice_for(self, u)  # D261: a walk can't cross ice; entering it slides
+	var walk_blocked := blocked if ice.is_empty() else blocked.merged(ice)
 	var r: Dictionary
 	if rules.is_empty():
-		r = board.reachable(u.pos, budget, blocked, no_stop, opts)
+		r = board.reachable(u.pos, budget, walk_blocked, no_stop, opts)
 	else:
-		r = _reach_fx(u, budget, blocked, no_stop, opts, rules)
+		r = _reach_fx(u, budget, walk_blocked, no_stop, opts, rules)
+	BWSlides.walk_reach(self, u, r, budget, opts, rules, ice)   # D261: the slides' end hexes
 	if not pull.is_empty():
 		_undertow_filter(u, r, budget, pull)
 	BWEnchant.add_swaps(self, u, r)       # v2 hook: swap mode=move (Bodyguard)
@@ -452,6 +466,7 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	var path := BWBoard.path_to(r, h)
 	if path.is_empty():
 		return false
+	var slide: Dictionary = r[h].get("slide", {})   # D261: the walk ends in a slide
 	# Undo snapshot (D48): everything a move can touch, so Esc can put it back.
 	_undo = { "unit": u, "pos": u.pos, "moved": u.moved, "hp": u.hp, "fx": u.fx.duplicate(true), "facing": u.facing,
 		"mods": u.battle_mods.duplicate(true), "tiles": tiles.entries.duplicate(true) }
@@ -459,15 +474,17 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	u.moved = true
 	u.facing = BWHex.direction_index(path[-2], path[-1]) if path.size() > 1 else u.facing   # D87
 	u.fx["moved_hexes"] = int(u.fx.get("moved_hexes", 0)) + path.size() - 1   # Jousting
-	var e := { "type": "move", "unit": u.id, "path": path }
+	var e := { "type": "move", "unit": u.id, "path": BWSlides.walk_part(path, slide) }
 	if flow:
 		u.fx["bonus_move"] = 0
 		e["kind"] = "flow"
 	_mark_move_perks(u, path, e)              # D93: Heat Rush / Shadowstep spent
+	BWKsIce.after_walk(self, u, path)         # D294 Skater: free ice hexes spent
 	_emit(e)
+	BWSlides.emit_slide(self, u, slide)       # D261
 	# Fire burns every hex entered along the way, start excluded (ELEMENTS §2.2).
 	# D93 Heat Rush: no crossing damage.
-	var no_cross := BWEffects.has(u, "heat_rush")
+	var no_cross := BWEffects.has(u, "heat_rush") or BWOverheat.no_cross(u)   # D286: Trailblazer too
 	for i in range(1, path.size()):
 		if tiles.intensity(path[i], "water") > 0:          # v2 hook: Tidewalker counts water entered
 			u.fx["on_hexes:water"] = int(u.fx.get("on_hexes:water", 0)) + 1
@@ -475,10 +492,14 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 		if pct > 0 and u.alive() and not no_cross:
 			_tile_hurt(u, _tile_dmg(u, pct, "fire"), "fire_cross", str(tiles.at(path[i]).get("source", "")))
 	_lay_on_move(u, path)
+	BWOverheat.after_walk(self, u, path)      # D286: Trailblazer's fire 1 behind it
+	BWPools.on_walk(self, u, path)            # D264: an electrified pool's entry shock
+	BWSlides.after_walk(self, u, slide)       # D261: the slam, then +1 move
 	BWPhases.after_move(self, u, path)        # D256: the Twins' beam (crossing it)
 	if u.alive() and not over:
 		_static_field_check(u)                # D93 Static Field: ending a move on its fuse
 		_zone_check(u)                        # D97: ending a move inside an enemy zone
+		BWWind.after_move(self, u, path)      # D270: a gust field pushes, a becalm field stopped it
 	return true
 
 
@@ -516,6 +537,8 @@ func in_range(u: BWUnit, target: BWUnit, from: Vector2i = NOWHERE) -> bool:
 	var at := u.pos if from == NOWHERE else from
 	if u.statuses.has("blinded") and gap(u, target, at) > BWSkills.BLIND_RANGE:
 		return false                          # D94: Blinded targets within 2 only
+	if BWPools.steam_hides(self, u, at, target):
+		return false                          # D265: a unit in steam, only from within 2
 	return _reaches_unit(u, at, target, weapon_range(u))
 
 
@@ -595,7 +618,7 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	var hm := tiles.hit_mod(dfn.pos)
 	if hm != 0.0:
 		var lit := tiles.intensity(dfn.pos, "light")
-		if lit > 0 and BWEffects.has(dfn, "radiant_guard"):     # D93 Radiant Guard
+		if lit > 0 and (BWEffects.has(dfn, "radiant_guard") or BWPerkRules.team_has(self, dfn.team, "radiant_guard", "allies")):     # D93 Radiant Guard; D281 Sanctuary: allies too
 			mods.append({ "stage": "hit", "value": 0.0, "label": "Target on Light %d: Radiant Guard ignores it" % lit })
 		else:
 			mods.append({ "stage": "hit", "value": hm,
@@ -614,8 +637,9 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 			mods.append({ "stage": "dmg", "value": 1.0, "label": "Shatter: Rime Armour ignores it" })
 		elif BWEffects.has(att, "fault_lines"):                  # D93 Fault Lines
 			var fl := float(BWEffects.p(BWEffects.list(att, "fault_lines")[0], "pct", 30))
+			var brk := int(BWEffects.p(BWEffects.list(att, "fault_lines")[0], "nobreak", 0)) != 1   # D281: no break now
 			mods.append({ "stage": "dmg", "value": 1.0 + fl / 100.0,
-				"label": "Shatter (Fault Lines): +%d%%, breaks the glaze" % int(fl), "tag": "Shatter" })
+				"label": "Shatter (Fault Lines): +%d%%%s" % [int(fl), ", breaks the glaze" if brk else ""], "tag": "Shatter" })
 		else:
 			mods.append({ "stage": "dmg", "value": 1.0 + BWTiles.SHATTER_HIT_PCT / 100.0,
 				"label": "Shatter (glazed): +%d%%" % BWTiles.SHATTER_HIT_PCT, "tag": "Shatter" })
@@ -639,6 +663,10 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 			BWObelisk.attack_type(att, gap(att, dfn, ap)) == "melee")
 		if not em.is_empty():
 			mods.append(em)
+	BWCurse.rot_mods(dfn, mods)               # D275: Rot, +5% taken per stack
+	BWBeams.mods(self, att, mods)             # D287: Empowered, on its own turn
+	BWOverheat.basic_mods(self, att, dfn, el, basic, mods)   # D285: an Overheat note
+	BWKeystoneFx.blow_mods(self, att, dfn, mods)   # D294: Frozen (x2, counts as glazed)
 	if _fx_units.is_empty():
 		return mods
 	var e := tiles.at(dfn.pos)
@@ -849,6 +877,8 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 	elif spell and u.attuned != "":
 		paint([target_hex], u.attuned, u)
 	_fire_pistol(u, target_hex)
+	BWThunderKeys.after_basic(self, u, target, first, target_hex)   # D290: Static Blades (burst, else arm)
+	BWWind.after_basic(self, u, target, first)  # D271: a wind basic's mode on its target
 	_after_action(u, u.attuned if spell else "", true)
 	_answer(counters)
 	_counter_check(u, struck)
@@ -949,7 +979,8 @@ func skills_for(u: BWUnit) -> Array:
 		return out                            # D94: Staggered = basic attack only
 	# D89: the unit's loadout, else the weapon's kit; D98: plus skills learned
 	# mid-fight past the cap (usable for the rest of this battle).
-	for s in BWSkillRegistry.expand(u.fight_loadout(u.weapon_class)).map(func(k): return BWSkillRegistry.row(k)):
+	# D273: plus the keystone actions it holds (Wind Wall).
+	for s in BWSkillRegistry.expand(u.fight_loadout(u.weapon_class) + BWWind.keystone_actions(u)).map(func(k): return BWSkillRegistry.row(k)):
 		if not _skill_open(u, s):
 			continue
 		var els: Array = []
@@ -996,6 +1027,14 @@ func skill_targets(u: BWUnit, key: String, element: String = "") -> Array[Vector
 			if BWHex.distance(u.pos, h) <= BWSkills.BLIND_RANGE:
 				near.append(h)
 		out = near
+	if str(s.get("targeting", "")) in ["unit", "adjacent_unit"]:
+		var seen: Array[Vector2i] = []        # D265: a unit in steam, only from within 2
+		for h in out:
+			var o := unit_at(h)
+			if o == null or not BWPools.steam_hides(self, u, u.pos, o):
+				seen.append(h)
+		out = seen
+	out = BWWind.filter_targets(self, u, out, s)   # D273: a Wind Wall blocks skills both ways
 	return out
 
 
@@ -1013,10 +1052,13 @@ func skill_preview(u: BWUnit, key: String, element: String, target_hex: Vector2i
 	if not target_hex in skill_targets(u, key, element) or not _choice_ok(u, key, element, target_hex, choice):
 		return {}
 	var p := _plan(u, s, element, target_hex, choice)
+	var pre := BWWind.pre_hit(self, u, s, p, target_hex, true)   # D271: wind's mode first (positions only)
 	var forecasts := {}
 	for v in p.victims:
 		forecasts[v.id] = _skill_forecast(u, s, p.element, v, p)
+	BWWind.restore(pre)
 	return {
+		"wind": pre,                                             # D271: { moves, becalm, origin, mode }
 		"skill": key, "element": p.element, "hexes": p.hexes, "steps": p.steps,
 		"units": p.victims.map(func(v): return v.id), "forecasts": forecasts,
 		"dest": p.dest, "shove": p.shove, "follow_up": s.get("follow_up", []),
@@ -1060,8 +1102,10 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 		return {}
 	var p := _plan(u, s, element, target_hex, choice)
 	var el: String = p.element
+	BWBeams.spend_magnify(self, u, p)          # D289: a magnified cast spends this turn's Magnify
 	_arced.clear()
 	BWEnchant.begin_action(self, u)            # v2 hook
+	BWWind.pre_hit(self, u, s, p, target_hex)  # D271: wind on every weapon, the mode BEFORE the hits
 	# Direct hits read the ground BEFORE this action changes it (§7.3 step 2).
 	var fcs: Array = []
 	for v in p.victims:
@@ -1136,6 +1180,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 
 	# The ground changes whatever the rolls were (§7.3 step 3, E11).
 	var stripped := d.ground(self, u, el, target_hex, p)
+	BWKeystoneFx.after_skill(self, u, p)       # D294 Glacier Wall: a shape on your pillar shatters it
 	if not over and u.alive():
 		d.after_paint(self, u, el, target_hex, p, results, stripped)
 	if el == "wind" and not over and u.alive():
@@ -1195,6 +1240,8 @@ func _plan(u: BWUnit, s: Dictionary, element: String, target: Vector2i, choice: 
 	var d := BWSkillRegistry.get_def(str(s.key))
 	d.plan(self, u, element, target, p)
 	_widen(u, d, p)
+	BWBeams.magnify(self, u, d, p)            # D289: an ally on a Magnify holder's light casts magnified
+	BWOverheat.plan_notes(self, u, p)         # D285: the forecast names an Overheat
 	p.victims = (p.victims as Array).filter(func(v): return can_harm(u, v))   # D140: the enemy's shapes pass over an obelisk
 	return p
 
@@ -1248,6 +1295,7 @@ func skill_relocate(u: BWUnit, p: Dictionary, path: Array, kind: String) -> void
 	_emit({ "type": "move", "unit": u.id, "path": path, "kind": kind })
 	if not p.shove.is_empty():
 		_emit({ "type": "move", "unit": p.shove.unit.id, "path": [p.shove.from, p.shove.to], "kind": "shove" })
+		BWSlides.after_push(self, p.shove.unit, BWHex.direction_index(p.shove.from, p.shove.to), u.id)   # D261
 
 
 ## FX hook: aoe_radius_plus skills=1 (Cleaving, Channelling). An AoE skill's
@@ -1462,10 +1510,13 @@ func _answer(counters: Array) -> void:
 ## victim's damage triggers (trigger_stat damaged / low_hp), and avoided.
 func _after_blow(att: BWUnit, v: BWUnit, res: Dictionary, before: int, cause: String) -> void:
 	_fault_lines(att, v, res)              # D93: a Shatter hit breaks the glaze
+	BWOverheat.after_hurt(self, v)         # D286: Phoenix Heart's held KO Overheats the hex
+	BWKeystoneFx.after_blow(self, att, v, res)   # D294: a landed hit thaws Frozen
 	if not v.alive():
 		if before > 0:
 			_ko(v, att, cause)
 		return
+	_gale_force(att, v, res)               # D307: after moving 4+, the first hit applies your mode
 	if not res.hit:
 		_trigger(v, "avoided")             # FX hook: trigger_stat avoided (Poise, Tumble)
 	elif res.damage > 0:
@@ -1512,6 +1563,7 @@ func _ko(victim: BWUnit, by: BWUnit, cause: String = "") -> void:
 		_trigger(a, "ally_ko")
 	BWEnchant.on_ko(self, victim, by, cause)   # v2 hook: on-kill, ally_kill, ally_ko
 	BWPhases.on_ko(self, victim)               # D255: a boss unit fell (the rage clock)
+	BWCurse.on_ko(self, victim, by)            # D275: Lane C's Contagion hooks here
 
 
 func _trigger(u: BWUnit, trig: String) -> void:
@@ -1591,6 +1643,7 @@ func _after_action(u: BWUnit, el: String, attacked: bool) -> void:
 	if el != "":
 		u.fx["imbued"] = el
 	_after_action_move(u, el)              # D93: Bolt Step, Tailwind
+	BWBeams.after_action(self, u, attacked)   # D287: an attack spends Empowered
 	if not attacked:
 		return
 	for e in BWEffects.list(u, "guard"):
@@ -1633,11 +1686,13 @@ func _displace(v: BWUnit, dir: int, n: int, kind: String, elemental: bool = fals
 		return false
 	if elemental and _negate(v, "displacement"):
 		return false
+	n = BWCurse.gravity_step(self, v, dir, n)  # D276: a foe's dark 3 pulls (+1 toward, -1 away)
 	var path: Array = push_path(v, dir, n).path
 	if path.size() < 2:
 		return false
 	v.pos = path[-1]
 	_emit({ "type": "move", "unit": v.id, "path": path, "kind": kind })
+	BWSlides.after_push(self, v, dir)         # D261: pushed onto ice, it slides on
 	return true
 
 
@@ -1689,6 +1744,8 @@ func _immune(u: BWUnit, what: String) -> bool:
 		return true                            # D210: the Colossus is never moved
 	if what == "displace" and BWEffects.has(u, "eye_of_storm"):
 		return true                            # D93 Eye of the Storm
+	if what == "displace" and BWKeystoneFx.holds(u):
+		return true                            # D294: Frozen can't be displaced
 	if what == "displace" and BWEnchant.planted(self, u):
 		return true                            # v2: Planted
 	for e in BWEffects.list(u, "immune"):
@@ -1869,6 +1926,7 @@ func _tile_dmg(u: BWUnit, pct: float, element: String, mult: float = 1.0) -> int
 	if u.braced_against(element):
 		mult *= BWUnit.BRACE_TAKEN
 	mult *= BWEnchant.tile_mult(u, element)   # v2: Pyre's cost
+	mult *= BWCurse.taken_mult(u)              # D275: Rot
 	return BWTiles.tile_damage(u, pct, element, mult * BWEffects.tile_taken(u, element))
 
 
@@ -1894,6 +1952,9 @@ func end_turn() -> void:
 			if int(st_steady.turns) <= 0:
 				u.statuses.erase("steadied")
 				_emit({ "type": "status_end", "unit": u.id, "status": "steadied" })
+		BWWind.turn_end(self, u)                   # D270: Becalmed ends into Restless (2 turns)
+		BWCurse.turn_end(self, u)                  # D275: ending on a foe's dark: +1 Rot
+		BWBeams.turn_end(self, u)                  # D287: Empowered lasts until the end of this turn
 		for k in u.statuses.keys():                # D87: armed statuses end with this turn
 			if u.statuses[k].armed and not u.statuses[k].get("keep", false):
 				u.statuses.erase(k)
@@ -1924,8 +1985,14 @@ func set_weather(kind: String, seed_value: int = -1) -> void:
 
 func _new_cycle() -> void:
 	if cycle > 0:
+		BWWind.tick(self)                      # D270: vortex fields pull, walls count down (v3 tick step 2)
+		if over:
+			return
+		BWBeams.tick(self)                     # D287: light beams resolve (v3 tick step 3)
+		if over:
+			return
 		var seeded := tiles.tick()
-		_emit({ "type": "tiles_tick", "seeded": seeded })
+		_emit({ "type": "tiles_tick", "seeded": seeded, "spine": tiles.spine_tick.duplicate(true) })
 		for er in tiles.eruptions:             # FX hook: tile_erupt, after the tick
 			_erupt(er)
 		if not over and not weather.is_empty():
@@ -1969,7 +2036,7 @@ func _begin_turn() -> void:
 		return                                     # D140: no ground, perks or statuses; BWAI pulses it
 	_perk_turn_start(u)                            # D93: Frost Ward, Frostbite, Glare, move perks
 	BWEnchant.turn_start(self, u)                  # v2 hook: Hearthbound, Sheltering, Beacon, banked move
-	var night := BWEffects.has(u, "nightborn")     # D93 Nightborn: no dark drain on you
+	var night := BWEffects.has(u, "nightborn") or BWSets.no_drain(u)     # D93 Nightborn; D282 the Dark set: no dark drain on you
 	if u.statuses.has("shrouded") and not night:
 		_tile_hurt(u, _tile_dmg(u, BWSkills.SHROUD_DRAIN_PCT, "dark"), "shrouded", str(u.statuses.shrouded.source))
 	# Standing on the ground: damage first, then healing (ELEMENTS §2.2).
@@ -1980,11 +2047,21 @@ func _begin_turn() -> void:
 		for e in BWEffects.list(u, "ember_skin"):  # D93 Ember Skin: your standing fire halved
 			half = float(BWEffects.p(e, "stand_pct", 50)) / 100.0
 		_tile_hurt(u, _tile_dmg(u, st.fire, "fire", half), "fire", st.source)
+	BWPools.turn_shock(self, u)                    # D264: an electrified pool shocks (after fire, before the drain)
 	if st.drain > 0 and u.alive() and not night and not own:
 		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", st.source)
 	var heal := 0.0 if own else _light_heal(u, st)  # D93 Sanctuary / Glare
 	if heal > 0 and u.alive():
-		_heal(u, heal, "light")
+		BWBeams.light_heal(self, u, heal, str(st.source))   # D288: Overflow turns the excess into a Ward of Light
+	BWBeams.turn_start(self, u)                    # D287: Dawn, -1 on the longest cooldown on light 2+
+	BWThunderKeys.turn_start(self, u)              # D291: Blast Rider's launch lock lifts
+	BWWind.turn_start(self, u)                     # D270: starting on a gust field pushes 1
+	if over:
+		return
+	if u.alive() and BWKeystoneFx.turn_start(self, u):   # D295 Riptide; D294 Frozen skips the turn
+		if not over:
+			end_turn()
+		return
 	if over:
 		return
 	if not u.alive():
@@ -1992,6 +2069,9 @@ func _begin_turn() -> void:
 
 
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
+	if BWKeystoneFx.heal_blocked(self, u):              # D296 Event Horizon: no heals on its dark 3
+		_emit({ "type": "enchant", "unit": u.id, "name": "Event Horizon", "text": "can't be healed" })
+		return
 	var blocked := BWEnchant.heal_blocked(u, cause)     # v2: Hollow, Forsaken
 	if blocked != "":
 		_emit({ "type": "enchant", "unit": u.id, "name": blocked, "text": "can't be healed" })
@@ -2004,6 +2084,7 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 		e["cause"] = cause
 	_emit(e)
 	BWEnchant.on_healed(self, u, healed, cause)         # v2 hook: Mend-Link
+	BWCurse.on_heal(self, u, cause)                     # D275: a light heal cleans 1 Rot
 
 
 ## Lay `element` on hexes for `by`, and deal any detonations (ELEMENTS §3.5,
@@ -2018,7 +2099,19 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool = true, extra: Dictionary = {}) -> Dictionary:
 	var o := BWEffects.paint_opts(by, element, hexes, board, cast)
 	o.merge(extra, true)                       # v2: `propagated` (on-kill paint arrives as spread)
+	var guard: Array = []                      # D307 Static Field: allies' paint can't set off your fuses
+	for w in _fx_units:
+		if w != by and w.team == by.team and BWEffects.has(w, "static_field"):
+			guard.append(w.id)
+	if not guard.is_empty():
+		o["fuse_guard"] = guard
+	BWKeystoneFx.paint_opts(by, o)             # D293 Jetstream: gale 3, copies last 2
+	BWOverheat.paint_opts(by, element, o)      # D285: Conflagration
+	hexes = BWThunderKeys.filter_rearm(self, by, element, hexes)   # D291: Blast Rider's locked hex
+	var wsnap := BWWind.before_paint(self, hexes)   # D270: the fields about to fire (their mode)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
+	BWThunderKeys.inject_self_det(self, by, o, r)    # D306: Self-detonate on the holder's own empty fuse
+	BWThunderKeys.after_apply(self, by, element, r)   # D291: Daisy Chain, Blast Rider's self-detonation
 	if cast:
 		by.attuned = element
 	var pe := { "type": "paint", "unit": by.id, "element": element, "hexes": r.changed }
@@ -2029,6 +2122,8 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 			pe["gale2"] = true                 # D95: a gale 2 fired (radius 2 copies)
 	if not r.gales.is_empty():                 # D160: which hexes each gale copied onto (preview, recap)
 		pe["gales"] = r.gales.map(func(g): return { "origin": g.origin, "copies": (g.copies as Array).duplicate() })
+	if r.has("pools"):
+		pe["pools"] = r.pools                  # D262-D265: steam / rink / shock / pillars / melted
 	_emit(pe)
 	if not r.detonations.is_empty():
 		by.fx["detonated"] = true              # D93 Bolt Step reads it after the action
@@ -2074,6 +2169,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	for u in hurt:
 		_tile_hurt(u, hurt[u][0], "detonation", hurt[u][1])
 	BWEnchant.after_blast(self, hurt)          # v2 hook: Sapping
+	BWOverheat.after_paint(self, by, r)        # D285: Overheat rings (events, 6% summed per unit)
 	for g in r.gales:
 		for e in BWEffects.list(by, "knockback", "wind"):
 			if str(BWEffects.p(e, "on", "")) != "trigger" or not _chance(e):
@@ -2084,6 +2180,8 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(g.origin, h), int(BWEffects.p(e, "hexes", 1))])
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
+	BWWind.after_paint(self, by, element, r, wsnap)   # D270: stamp the mode on new gales; fired fields act; copies carry states
+	BWKeystoneFx.after_paint(self, by, r)          # D294 Glacier Wall: its pillars last all battle
 	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
 	BWPhases.after_paint(self, hexes, element, by)   # D256: thunder breaks the Twins' beam
 	return r
@@ -2145,6 +2243,9 @@ func _tile_hurt(u: BWUnit, amount: int, cause: String, source: String) -> void:
 		return                                 # D141: ground, blasts and slams never hurt an obelisk
 	if _class_immune(u, BWFormulas.damage_class({ "source": "tile" if cause in ELEMENTAL_CAUSES else cause })):
 		return                                 # D209: a Blank shrugs off the ground, a Being a slam
+	amount = BWOverheat.filter_hurt(self, u, amount, cause, source)   # D285-D291: Phoenix, Blast Rider, Ward of Light
+	if amount <= 0 or not u.alive():
+		return
 	if cause in ELEMENTAL_CAUSES and _negate(u, cause):
 		return                                 # D93: a Frost Ward / Nightborn took it
 	var before := u.hp
@@ -2160,6 +2261,7 @@ func _tile_hurt(u: BWUnit, amount: int, cause: String, source: String) -> void:
 		_check_end()
 	else:
 		_hurt_triggers(u, before)
+		BWOverheat.after_hurt(self, u)     # D286: Phoenix Heart's held KO Overheats the hex
 	_conduct(src, u, amount)            # D86: tile damage on a fuse arcs too
 
 
@@ -2382,7 +2484,7 @@ func apply_pick(u: BWUnit, req: Dictionary, choice: String) -> bool:
 
 
 func _picked(u: BWUnit, rec: Dictionary) -> void:
-	if rec.kind == "perk":
+	if rec.kind == "perk" or rec.kind == "keystone":   # D277: a keystone may be an effect source too
 		u.refresh_effects()                # a perk is an effect source (BWEffects.collect)
 		_fx_units = units.filter(func(o: BWUnit): return not o.effects.is_empty())
 	elif str(rec.get("id", "")).begins_with("learn:"):
@@ -2405,7 +2507,7 @@ func _picked(u: BWUnit, rec: Dictionary) -> void:
 
 ## Tile damage causes that count as an elemental effect (D93: a Frost Ward or
 ## Nightborn negates one). Slams and plain blows don't.
-const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "steam", "ember_skin"]
+const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "steam", "ember_skin", "shock", "overheat", "light_beam"]   # D285/D287
 
 
 ## D93: negate one elemental effect landing on `u`, if it holds a negation.
@@ -2414,8 +2516,8 @@ const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", 
 func _negate(u: BWUnit, what: String) -> bool:
 	if u == null or not u.alive():
 		return false
-	if BWEffects.has(u, "nightborn") and tiles.intensity(u.pos, "dark") > 0 \
-			and int(u.fx.get("nightborn_turn", -1)) != _turn_serial:
+	if (BWEffects.has(u, "nightborn") or BWPerkRules.nightborn_cover(self, u)) and tiles.intensity(u.pos, "dark") > 0 \
+			and int(u.fx.get("nightborn_turn", -1)) != _turn_serial:      # D281: an adjacent Nightborn ally covers it
 		u.fx["nightborn_turn"] = _turn_serial
 		_emit({ "type": "ward_break", "unit": u.id, "source": "nightborn", "what": what })
 		return true
@@ -2506,6 +2608,8 @@ func _perk_mods(att: BWUnit, dfn: BWUnit, ap: Vector2i, mods: Array) -> void:
 	for e in BWEffects.list(dfn, "eye_of_storm"):
 		if _missile(att, dfn, ap):
 			_stage_mod(mods, "hit", float(BWEffects.p(e, "hit", -15)), "%s (missile)" % e.name)
+			if int(BWEffects.p(e, "nocrit", 0)) == 1:     # D281: ranged can't crit it (was -15 hit)
+				mods.append({ "stage": "crit_x", "value": 0.0, "label": "%s (missile): can't crit" % e.name })
 	for e in BWEffects.list(dfn, "rime_armour"):
 		if BWEffects.level_at(tiles, dfn.pos, "ice") > 0:
 			_stage_mod(mods, "dmg", float(BWEffects.p(e, "pct", -10)), "%s (on ice)" % e.name)
@@ -2525,6 +2629,8 @@ func _perk_mods(att: BWUnit, dfn: BWUnit, ap: Vector2i, mods: Array) -> void:
 func _fault_lines(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 	if att == null or not res.hit or not BWEffects.has(att, "fault_lines") or BWEffects.has(v, "rime_armour"):
 		return
+	if int(BWEffects.p(BWEffects.list(att, "fault_lines")[0], "nobreak", 0)) == 1:
+		return                                     # D281: Fault Lines no longer breaks the glaze
 	if tiles.break_glaze(v.pos):
 		_emit({ "type": "glaze_break", "hex": v.pos, "unit": att.id, "name": "Fault Lines" })
 
@@ -2541,6 +2647,7 @@ func _perk_after_blow(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 				continue                               # v2 Spotter: basic attacks only
 			if on == "any" or BWEffects.level_at(tiles, v.pos, on) >= int(BWEffects.p(e, "min", 1)):
 				_add_status(v, str(BWEffects.p(e, "status", "blinded")), att, 1)
+	BWPerkRules.after_blow(self, att, v, res)      # D281: Current Push's push along the water
 	var fl := tiles.intensity(v.pos, "fire")
 	if fl > 0 and att.alive() and v.alive() and gap(v, att) <= 1:
 		for e in BWEffects.list(v, "ember_skin"):
@@ -2600,6 +2707,7 @@ func _after_action_move(u: BWUnit, el: String) -> void:
 		for e in BWEffects.list(u, "tailwind"):
 			more += int(BWEffects.p(e, "after", 1))
 			names.append(e.name)
+	more = BWThunderKeys.launch_move(u, more, names)   # D291: Blast Rider's launch replaces Bolt Step's +2
 	if more <= 0:
 		return
 	if u.moved:
@@ -2622,6 +2730,8 @@ func _gust(u: BWUnit, blows: Array) -> void:
 		var res: Dictionary = b[1]
 		if over or not v.alive() or not res.hit or not res.secondary or v.team == u.team:
 			continue
+		if BWWind.moved_this_action(self, v):
+			continue                               # D272: wind moves a unit once per action
 		var dir := BWHex.direction_index(u.pos, v.pos)
 		if dir < 0:
 			continue
@@ -2636,6 +2746,22 @@ func _gust(u: BWUnit, blows: Array) -> void:
 		if str(pp.stop) in ["rock", "unit"]:
 			_emit({ "type": "slam", "unit": v.id, "by": u.id, "into": pp.stop, "name": e.name })
 			_tile_hurt(v, _tile_dmg(v, float(BWEffects.p(e, "slam_pct", 8)), ""), "slam", u.id)
+
+
+## D307 Gale Force's v3 rider: after moving GALE_FORCE_MOVED+ hexes this turn,
+## the holder's first landed hit on a foe applies its wind mode (once a turn,
+## within the wind caps: nothing if the foe was already moved this action).
+func _gale_force(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
+	if att == null or over or not res.get("hit", false) or v.team == att.team or not v.alive():
+		return
+	if not att.perks.has(GALE_FORCE) or int(att.fx.get("moved_hexes", 0)) < GALE_FORCE_MOVED:
+		return
+	if int(att.fx.get("gale_force_turn", -1)) == _turn_serial or BWWind.moved_this_action(self, v):
+		return
+	if BWFormulas.strips_element(v):
+		return
+	att.fx["gale_force_turn"] = _turn_serial
+	BWWind.apply_mode(self, att, BWWind.mode(att), [v], att.pos, false)
 
 
 ## A unit's turn start: per-turn perk state, Frost Ward, Frostbite, Glare's
@@ -2691,6 +2817,10 @@ func _perk_turn_start(u: BWUnit) -> void:
 ## Turn-start move: start_move (Coal Engine for the team, Sunpath), Skate,
 ## Tailwind and allies' Slipstream. Kept in fx for move_range() and named in
 ## fx.move_notes for the Move hover.
+const SUNPATH := "light_sun"
+const GALE_FORCE := "wind_force"
+const GALE_FORCE_MOVED := 4
+
 func _start_move(u: BWUnit) -> void:
 	var notes: Array = []
 	for o in _fx_units:
@@ -2704,6 +2834,8 @@ func _start_move(u: BWUnit) -> void:
 			var val := int(BWEffects.by_level(e, lv))
 			if val != 0:
 				notes.append(["%s (%s%s)" % [e.name, BWEffects.ground_label(on, lv), "" if o == u else ", " + o.name], val])
+		if o != u and o.perks.has(SUNPATH) and BWBeams.on_beam_of(self, o, u):
+			notes.append(["Sunpath (on %s's beam)" % o.name, 1])   # D307: the v3 rider, read live
 		if o != u:
 			for e in BWEffects.list(o, "slipstream"):
 				if gap(o, u) <= int(BWEffects.p(e, "radius", 2)):
@@ -2756,10 +2888,13 @@ func _move_rules(u: BWUnit) -> Dictionary:
 				r["heat"] = int(BWEffects.p(e, "move", 1))
 		if not u.fx.get("shadowstep_used", false):
 			for e in BWEffects.list(u, "shadowstep"):
-				r["shadow"] = [int(BWEffects.p(e, "range", 3)), int(BWEffects.p(e, "cost", 1))]
+				r["shadow"] = [int(BWEffects.p(e, "range", 3)), int(BWEffects.p(e, "cost", 1)), int(BWEffects.p(e, "los", 0))]
 	var z := _enemy_zones(u)
 	if not z.is_empty():
 		r["zone"] = z
+	BWWind.stop_rules(self, u, r)             # D270: gust fields and a foe's becalm fields end a walk
+	BWCurse.move_rules(self, u, r)            # D276: a foe's dark 3 is heavy to climb out of
+	BWKsIce.move_rules(self, u, r)            # D294 Skater: the first 4 ice hexes cost 0
 	return r
 
 
@@ -2775,11 +2910,12 @@ func _enemy_zones(u: BWUnit) -> Dictionary:
 
 ## One step's cost under the unit's perks.
 func _perk_step(rules: Dictionary, h: Vector2i, n: Vector2i, sc: int) -> int:
+	var g := BWCurse.step_extra(rules, h, n)        # D276: +1 to step out of a foe's dark 3
 	if rules.has("cost_on") and BWEffects.level_at(tiles, n, str(rules.cost_on[0])) > 0:
-		return int(rules.cost_on[1])
+		return int(rules.cost_on[1]) + g
 	if rules.has("skate") and BWEffects.level_at(tiles, n, "ice") > 0:
-		return int(rules.skate) + maxi(board.elevation(n) - board.elevation(h), 0)
-	return sc
+		return int(rules.skate) + maxi(board.elevation(n) - board.elevation(h), 0) + g
+	return sc + g
 
 
 ## Dijkstra like BWBoard.reachable, over (hex, once-per-turn bonuses spent):
@@ -2816,6 +2952,10 @@ func _reach_fx(u: BWUnit, budget: int, blocked: Dictionary, no_stop: Dictionary,
 				continue
 			sc = _perk_step(rules, h, n, sc)
 			var nm := k.z
+			if rules.has("skater"):                   # D294 Skater: free ice hexes, counted in bits 3+
+				var sk := BWKsIce.step(self, rules, h, n, sc, nm)
+				sc = sk[0]
+				nm = sk[1]
 			if rules.has("heat") and nm & 1 == 0 and tiles.intensity(n, "fire") > 0:
 				nm |= 1
 				sc = maxi(0, sc - int(rules.heat))
@@ -2827,6 +2967,8 @@ func _reach_fx(u: BWUnit, budget: int, blocked: Dictionary, no_stop: Dictionary,
 			for t in board.area(h, int(rules.shadow[0])):
 				if t == h or blocked.has(t) or not board.is_passable(t) or tiles.intensity(t, "dark") <= 0:
 					continue
+				if rules.shadow.size() > 2 and int(rules.shadow[2]) == 1 and not board.has_los(h, t):
+					continue                                  # D281: Shadowstep needs sight of the hex
 				if fp > 0 and not board.fits(t, fp, blocked):
 					continue
 				steps.append([t, int(rules.shadow[1]), k.z | 2])
@@ -3221,6 +3363,10 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 					for h in g.copies:
 						copies[h] = true
 						_hex_kind(hx, before, h, "spread")
+				var pools: Dictionary = e.get("pools", {})      # D266: the pool that reacts, pillars
+				for pk in ["steam", "rink", "shock", "pillars", "melted"]:
+					for h in pools.get(pk, []):
+						_hex_kind(hx, before, h, "pillar" if pk == "pillars" else pk)
 				for h in e.get("hexes", []):
 					if copies.has(h):
 						continue
@@ -3237,8 +3383,13 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 					elif not "gale" in kinds:
 						_hex_kind(hx, before, h, "paint")
 			"move":
-				if str(e.get("kind", "")) in ["knockback", "push", "pull", "shove", "place", "charge", "leap"]:
-					out.moves.append({ "unit": str(e.unit), "path": e.path, "kind": str(e.kind) })
+				if str(e.get("kind", "")) in ["knockback", "push", "pull", "shove", "place", "charge", "leap", "slide"]:
+					out.moves.append({ "unit": str(e.unit), "path": e.path, "kind": str(e.kind), "stop": str(e.get("stop", "")) })
+			"slam":                                    # D261: a slide (or push) that slams
+				if not out.has("slams"):
+					out["slams"] = []
+				out.slams.append({ "unit": str(e.unit), "into": str(e.get("into", "")), "name": str(e.get("name", "")),
+					"hex": e.get("hex", NOWHERE), "target": str(e.get("target", "")) })
 	for h in hx:                                   # fire 2+ freshly cast on grass catches at the cycle's end
 		hx[h].after = tiles.at(h).duplicate()
 		var a2: Dictionary = hx[h].after
@@ -3262,6 +3413,7 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 		out.units[w.id] = { "name": w.name, "team": w.team, "friendly": w.team == actor.team,
 			"self": w.id == actor.id, "hp": int(hp0.get(w.id, w.hp)), "hp_after": w.hp, "damage": dmg,
 			"heal": heal, "ko": not w.alive(), "approx": approx, "sources": src[w.id], "pos": w.pos }
+	BWBeams.digest(self, out)                      # D287: the beams the board would hold after it
 	return out
 
 
@@ -3292,13 +3444,14 @@ func ground_report(hex: Vector2i) -> Dictionary:
 		"elevation": board.elevation(hex), "static": tiles.static_at(hex) if tiles.is_static(hex) else null,
 		"scarred": tiles.is_scarred(hex), "seeded": tiles.is_seeded(hex),
 		"move_extra": tiles.move_penalty(hex), "hit_mod": tiles.hit_mod(hex),
-		"conductive": tiles.conductive(hex), "unit": "", "turn": { "damage": 0, "heal": 0, "lines": [] } }
+		"conductive": tiles.conductive(hex), "unit": "", "turn": { "damage": 0, "heal": 0, "lines": [] },
+		"spine": BWPools.report(self, hex) }        # D266: rink, pillar, steam, electrified, pool
 	var u := _centre_at(hex)
 	if u == null or not u.alive() or BWObelisk.is_objective(u):
 		return out
 	out.unit = u.id
 	var t: Dictionary = out.turn
-	var night := BWEffects.has(u, "nightborn")
+	var night := BWEffects.has(u, "nightborn") or BWSets.no_drain(u)   # D282
 	if u.statuses.has("shrouded") and not night:
 		var sd := _tile_dmg(u, BWSkills.SHROUD_DRAIN_PCT, "dark")
 		t.damage += sd
@@ -3311,6 +3464,10 @@ func ground_report(hex: Vector2i) -> Dictionary:
 		var fd := _tile_dmg(u, st.fire, "fire", half)
 		t.damage += fd
 		t.lines.append(["Fire burns", -fd])
+	var sh := BWPools.shock_next(self, u, hex)       # D264
+	if sh > 0:
+		t.damage += sh
+		t.lines.append(["Electrified shock", -sh])
 	if st.drain > 0 and not night:
 		var dd := _tile_dmg(u, st.drain, "dark")
 		t.damage += dd

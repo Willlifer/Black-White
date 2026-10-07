@@ -63,7 +63,9 @@ const GEAR_KEYS := ["element_damage_pct", "damage_taken_mod", "tile_duration_plu
 const PERK_KEYS := ["move_cost", "stand_on_mod", "start_move", "undertow", "heat_rush", "ember_skin",
 	"wildfire", "skate", "rime_armour", "fault_lines", "frostbite", "frost_ward", "bolt_step", "grounded",
 	"overcharge", "static_field", "lightning_rod", "tailwind", "eye_of_storm", "gust", "slipstream",
-	"shadowstep", "nightborn", "hit_status", "cover", "radiant_guard", "judgement", "glare", "sanctuary"]
+	"shadowstep", "nightborn", "hit_status", "cover", "radiant_guard", "judgement", "glare", "sanctuary",
+	"pool_push", "crosswind",            # D281: Current Push's push along the water, Crosswind
+	"set_bonus"]                         # D282: an element set's 3-piece (BWSets)
 ## D196-D205 (design/ENCHANTMENTS-v2.md): four generic hooks so the v2 rows
 ## stay data. Served by BWEnchant (src/core/enchant_v2.gd) through the
 ## "v2 hook:" lines in battle.gd.
@@ -138,10 +140,17 @@ static func collect(u: BWUnit) -> Array:
 	# D90: element perks (data/perks.csv), in the order taken. The row's
 	# element column gates them like an element enchantment (always learned:
 	# a perk is only granted at affinity rank 1+).
+	# D281: a perk row's `also` column carries the folded rows (the deferred
+	# enchantments, e.g. Tidewalker inside Current Push) as extra records.
 	for id in u.perks:
 		var row := BWData.row("perks", str(id))
 		if not row.is_empty():
-			out.append(make(row, "perk", 1, str(row.get("name", id))))
+			for rec in records(row, str(row.get("name", id))):
+				rec["kind"] = "perk"
+				out.append(rec)
+	# D282: element set bonuses (2 / 3 pieces), from head, chest, legs and the
+	# drawn weapon's imbue (BWSets).
+	out.append_array(BWSets.records(u))
 	return out
 
 
@@ -320,6 +329,10 @@ static func paint_opts(u: BWUnit, element: String, hexes: Array, board: BWBoard,
 	var o := { "steps_plus": 0 }
 	if u == null:
 		return o
+	if element in BWPools.REACT and BWSets.pool_max(u) > BWPools.POOL_MAX:
+		o["pool_max"] = BWSets.pool_max(u)              # D307: the Water set's pools reach 25
+	if element == "ice" and BWSets.pillar_plus(u) > 0:
+		o["pillar_plus"] = BWSets.pillar_plus(u)        # D282: the Ice set's +1 pillar tick
 	var turns := int(total(u, "tile_duration_plus", "turns", element))
 	if turns > 0:
 		match element:
@@ -489,6 +502,8 @@ static func attack_mods(att: BWUnit, dfn: BWUnit, kind: String, element: String,
 					continue
 			elif e.element != "" and e.element != element:
 				continue
+			if float(p(e, "pct", 0)) == 0.0 or int(p(e, "blast_only", 0)) == 1:
+				continue                         # D282: the Thunder set's +10% is for detonations only                         # D281: a per_level-only row (Overcharge's Overload) adds no line
 			out.append(_m("dmg", e.name, 1.0 + float(p(e, "pct", 0)) / 100.0))
 	# aura_mod / own passives on the attacker: hit, crit, dmg_pct
 	if auras.is_valid():

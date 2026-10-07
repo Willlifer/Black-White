@@ -60,6 +60,12 @@ var errors: PackedStringArray = []
 var objective := {}
 ## Optional extra cost to enter a hex (the battle plugs in water from BWTiles).
 var extra_cost: Callable
+## D263 dynamic blockers (the battle plugs in BWTiles): `blocker` (hex -> bool)
+## makes a hex impassable for now (an ice pillar), `sight_blocker`
+## (hex, from, to) -> bool blocks line of sight through it (a pillar, steam).
+## Unset = none.
+var blocker: Callable
+var sight_blocker: Callable
 
 
 static func from_dict(d: Dictionary) -> BWBoard:
@@ -179,7 +185,7 @@ func cells() -> Array:
 ## FX hook `opts` (immune): no_muddy (Sure Stride) prices mud as neutral,
 ## no_water (Wading, Drift) skips the extra cost the tiles plug in.
 func step_cost(a: Vector2i, b: Vector2i, opts: Dictionary = {}) -> int:
-	if not is_passable(b):
+	if not is_passable(b) or blocked(b):
 		return -1
 	var rise := elevation(b) - elevation(a)
 	if rise > MAX_CLIMB:
@@ -195,9 +201,14 @@ func step_cost(a: Vector2i, b: Vector2i, opts: Dictionary = {}) -> int:
 ## centre only (ELEMENTS E15).
 func fits(h: Vector2i, r: int, blocked: Dictionary = {}) -> bool:
 	for f in BWHex.area(h, r):
-		if not is_passable(f) or blocked.has(f):
+		if not is_passable(f) or blocked.has(f) or self.blocked(f):
 			return false
 	return true
+
+
+## D263: is `h` impassable right now (an ice pillar)? Terrain is is_passable.
+func blocked(h: Vector2i) -> bool:
+	return blocker.is_valid() and bool(blocker.call(h))
 
 
 func neighbors(h: Vector2i) -> Array[Vector2i]:
@@ -277,17 +288,21 @@ static func path_to(reach: Dictionary, goal: Vector2i) -> Array[Vector2i]:
 		out.assign(reach[goal].path)
 		return out
 	var h := goal
-	while true:
+	for _i in reach.size() + 1:             # D308: bounded (a from-cycle once hung the sim)
 		out.push_front(h)
 		var prev: Vector2i = reach[h].from
 		if prev == h:
+			return out
+		if not reach.has(prev):
 			break
 		h = prev
+	out.clear()                             # no route back to the start: not a legal path
 	return out
 
 
 ## Line of sight (D20): blocked by jagged hexes and by any hex between that
-## stands 2+ levels above both ends. Units never block sight.
+## stands 2+ levels above both ends. Units never block sight. D263: nor can it
+## pass a dynamic sight blocker between (an ice pillar, steam).
 func has_los(a: Vector2i, b: Vector2i) -> bool:
 	var line := BWHex.line(a, b)
 	var top := maxi(elevation(a), elevation(b))
@@ -296,5 +311,7 @@ func has_los(a: Vector2i, b: Vector2i) -> bool:
 		if not exists(h) or terrain(h) == JAGGED:
 			return false
 		if elevation(h) >= top + 2:
+			return false
+		if sight_blocker.is_valid() and bool(sight_blocker.call(h, a, b)):
 			return false
 	return true

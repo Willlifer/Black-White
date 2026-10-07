@@ -51,6 +51,19 @@ var eruptions: Array = []
 const STATIC_SCAR_TICKS := 1
 var statics := {}
 var scars := {}
+## D261-D266 the ice/water spine (ELEMENTS-v3 §2, §4; src/core/pools.gd,
+## slides.gd). pillars: hex -> {owner, ticks, born}; steam: hex -> ticks;
+## fields (electrified): id -> {hexes, ticks, source, ramp {unit id: n}};
+## shock: hex -> field id. `occupant` (hex -> BWUnit or null) is the battle's
+## unit_at (unset = nobody). spine_tick: what the last tick thawed/discharged.
+var pillars := {}
+var steam := {}
+var fields := {}
+var shock := {}
+var spine_serial := 0
+var spine_tick := {}
+var pool_cache := {}
+var occupant: Callable
 
 
 func _init(p_board: BWBoard) -> void:
@@ -162,9 +175,26 @@ func crossing_pct(hex: Vector2i) -> float:
 	return FIRE_CROSS_PCT * fire * (pot(hex, "fire") if fire > 0 else 1.0)
 
 
-## D86: a unit standing on a fuse is conductive (§8.5).
+## D86: a unit standing on a fuse is conductive (§8.5). D264: so is one in an
+## electrified pool.
 func conductive(hex: Vector2i) -> bool:
-	return str(at(hex).get("marker", "")) == "fuse"
+	return str(at(hex).get("marker", "")) == "fuse" or shock.has(hex)
+
+
+## D262: an ice pillar stands here (impassable, blocks sight, slams).
+func is_pillar(hex: Vector2i) -> bool:
+	return pillars.has(hex) and is_glazed(hex)
+
+
+## D262/D264: the board's dynamic blockers (BWBoard.blocker / sight_blocker).
+func blocks_move(hex: Vector2i) -> bool:
+	return is_pillar(hex)
+
+
+## Steam blocks a line through it, except between hexes within
+## BWPools.STEAM_RANGE (a unit in steam can be targeted from that close).
+func blocks_sight(hex: Vector2i, from: Vector2i = hex, to: Vector2i = hex) -> bool:
+	return is_pillar(hex) or (steam.has(hex) and BWHex.distance(from, to) > BWPools.STEAM_RANGE)
 
 
 ## D86: does the hex hold axis charge (Spark needs it not to)?
@@ -259,14 +289,19 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	# D199: `propagated` = the charge arrives as spread (on-kill paint, ENCHANTMENTS
 	# §5.3): it never fires a marker and skips glazed hexes.
 	var fresh: bool = not opts.get("propagated", false)
+	var spine := BWPools.begin(self, hexes, element, fresh, steps, caster, opts)   # D264: pool reactions, pre-action
+	var hot := BWOverheat.begin(self, hexes, element, fresh, opts)   # D285: fresh fire on fire 3 erupts
+	var guard: Array = opts.get("fuse_guard", [])   # D307 Static Field: an ally's fuse ignores this paint
 	for hex in hexes:
 		if can_hold(hex) and not plans.has(hex):
 			if not fresh and is_glazed(hex):
 				continue
-			plans[hex] = _route(at(hex), element, fresh, steps, caster, opts)
+			if fuse_guarded(hex, guard):
+				continue
+			plans[hex] = spine.plans[hex] if spine.plans.has(hex) else _route(at(hex), element, fresh, steps, caster, opts)
 	var ring: Dictionary = opts.get("ring", {})
 	for hex in ring:
-		if can_hold(hex) and not plans.has(hex):
+		if can_hold(hex) and not plans.has(hex) and not fuse_guarded(hex, guard):
 			plans[hex] = _route(at(hex), element, true, int(ring[hex]), caster, opts)
 	var gales: Array = []
 	for hex in plans:
@@ -288,6 +323,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 			gales.append([hex, p.gale, int(p.get("gale_level", 1))])
 		if p.get("fired", false):
 			out.marker_fired.append(hex)
+	BWPools.finish(self, spine, element, caster, fresh, out, int(opts.get("glaze_plus", 0)))   # D262/D264
 	if opts.has("erupt"):
 		for hex in out.changed:
 			if carries(hex, element) and entries.has(hex) and str(entries[hex].source) == caster:
@@ -298,12 +334,22 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 			var en: Dictionary = entries.get(hex, {})
 			if not en.is_empty() and int(en.h) >= int(opts.wild) and str(en.source) == caster 					and en.origin == "cast" and int(en.glaze) == 0:
 				en["wild"] = true
+	BWOverheat.finish(self, hot, caster, out, opts)   # D285: the eruptions (ring +2, vent to 2), out.overheat
 	for g in gales:
 		# D95: a gale 2 copies one ring further (rings 1 and 2, same skip rules)
 		var copies := _gale_copy(g[0], g[1], caster, out.changed,
 			int(opts.get("gale_radius", 1)) + int(g[2]) - 1, int(opts.get("gale_timer_plus", 0)))
 		out.gales.append({ "origin": g[0], "copies": copies, "level": int(g[2]) })
 	return out
+
+
+## D307 Static Field: a fuse whose owner is in `guard` (allies of the painter
+## holding Static Field) can't be set off, re-armed or washed by that paint.
+func fuse_guarded(hex: Vector2i, guard: Array) -> bool:
+	if guard.is_empty():
+		return false
+	var e := at(hex)
+	return str(e.get("marker", "")) == "fuse" and str(e.get("source", "")) in guard
 
 
 ## D93 Fault Lines: a Shatter hit breaks the glaze (the charge stays).
@@ -346,6 +392,8 @@ func tick() -> Array:
 		var e: Dictionary = entries[hex]
 		if e.permanent or (statics.has(hex) and not scars.has(hex)):
 			continue                           # statics decay in _static_phase
+		if pillars.has(hex) or shock.has(hex):
+			continue                           # D262/D264: a pillar or a live field freezes decay
 		if e.glaze > 0:
 			e.glaze -= 1
 			continue
@@ -365,6 +413,7 @@ func tick() -> Array:
 			entries.erase(hex)
 		else:
 			e.timer = STEP_CYCLES
+	BWPools.tick(self)                         # D262/D264: pillars, steam and fields count down
 	var seeded := _grass_spread()
 	_static_phase()
 	return seeded
@@ -390,6 +439,8 @@ func _static_phase() -> void:
 			continue
 		var s: Vector2i = statics[hex]
 		var e := at(hex)
+		if pillars.has(hex) or shock.has(hex):
+			continue                           # D262/D264: frozen while the pillar or field stands
 		if e.is_empty():
 			entries[hex] = _static_entry(hex)
 			continue
@@ -509,7 +560,7 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 	if not charged:
 		var armed := _entry(0, 0, mk, caster, "cast")                    # arm or replace
 		if mk == "gale" and marker == "gale":
-			armed["gale_level"] = 2         # D95: wind on a gale = gale 2 (wind on gale 2 refreshes it)
+			armed["gale_level"] = mini(int(e.get("gale_level", 1)) + 1, int(opts.get("gale_max", 2)))   # D95: gale 2; D293 Jetstream: gale 3
 		if mk == "fuse":
 			armed.timer += int(opts.get("fuse_plus", 0))                 # D93 Static Field
 		return { "op": "set", "entry": armed }
@@ -571,7 +622,7 @@ func _grass_spread() -> Array:
 		var e: Dictionary = entries[hex]
 		var grass := board.terrain(hex) == BWBoard.GRASSY
 		var wild: bool = e.get("wild", false)
-		if not (grass or wild) or e.h < GRASS_IGNITE_MIN or e.origin != "cast" or e.glaze > 0:
+		if not (grass or wild) or e.h < GRASS_IGNITE_MIN or (e.origin != "cast" and not wild) or e.glaze > 0:   # D307: a wild eruption ring is spread
 			continue
 		spent.append(hex)
 		for n in board.neighbors(hex):

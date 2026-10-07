@@ -76,6 +76,8 @@ static func catalog() -> Array:
 	kj.shaded = false
 	out.append(["kanji", kj])
 	out.append_array(BWWeatherView.warm_catalog())      # D252: the weather's particles and telegraph
+	out.append_array(BWIceWaterView.warm_catalog())     # D266: rink sheen, steam, pillars, field pips
+	out.append_array(BWElementsView.warm_catalog())     # D292: beams, Overheat rims, bursts (one vertex-colour material)
 	return out
 
 

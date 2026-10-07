@@ -237,7 +237,7 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 	lines.append("[font_size=%d][color=#%s]%s%s ([hint=%s]%s[/hint])  [/color][color=#%s]■[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SUB, BWStyle.LABEL.to_html(false), (model + " · ") if model != "" else "",
 		BWText.weapon(u.weapon_class), BWGlossary.hint_text("expertise"), u.expertise_letter(u.weapon_class), el, BWStyle.LABEL.to_html(false),
-		BWKanji.bb(u.element) + BWGlossary.markup(u.element.capitalize())])     # D231: the kanji, when on
+		BWKanji.bb(u.element) + BWGlossary.markup(u.element.capitalize()) + BWPicker.sigil_bb(u)])     # D231: the kanji, when on; D278: the keystone sigil
 	lines.append_array(badge_lines(u, BWStyle.F_SMALL))      # D129/D130
 	lines.append("[font_size=%d]HP %d / %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.hp, u.max_hp(), u.move_range(), u.speed()])
 	lines.append("[font_size=%d][color=#%s]CON %d   STR %d   DEX %d   WIL %d
@@ -253,13 +253,15 @@ DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 		var img := ""
 		if status_glyph(str(k)) != null:
 			img = GLYPH_MARK + str(k) + GLYPH_MARK + " "     # D102: a glyph slot, filled by _set_rich
-		var until := " · until its turn ends" if not str(k) in WARD_KEYS else ""
+		var until := " · until its turn ends" if not str(k) in WARD_KEYS and not u.statuses[k].get("keep", false) else ""   # D270: Restless / Steadied count turns
 		lines.append("[font_size=%d]%s[b]%s[/b] [color=#%s]%s%s[/color][/font_size]" % [
 			BWStyle.F_SMALL, img, BWGlossary.markup(str(st[0])), BWStyle.TEXT_DIM.to_html(false), BWGlossary.markup(str(st[1])), until])
 	if not u.statuses.has("frost_ward") and not u.statuses.has("ward") and BWUnitView.has_ward(u):
 		var wi := status_info("frost_ward")
 		lines.append("[font_size=%d]%s[b]%s[/b] [color=#%s]%s[/color][/font_size]" % [
 			BWStyle.F_SMALL, GLYPH_MARK + "frost_ward" + GLYPH_MARK + " ", BWGlossary.markup(str(wi[0])), BWStyle.TEXT_DIM.to_html(false), BWGlossary.markup(str(wi[1]))])
+	lines.append_array(BWWindView.card_lines(u, BWStyle.F_SMALL))      # D275: Rot marks
+	lines.append_array(BWElementsView.card_lines(u, BWStyle.F_SMALL))  # D287/D288: Empowered, Ward of Light
 	_set_rich(c.text, "\n".join(lines))          # D153: no personality line          # D102: glyph slots become images
 
 
@@ -268,6 +270,9 @@ DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 static func badge_lines(u: BWUnit, fs: int) -> PackedStringArray:
 	var out: PackedStringArray = []
 	var dim := BWStyle.TEXT_DIM.to_html(false)
+	var ksl := BWPicker.keystone_bb(u, fs)               # D278: the keystones it holds, by name
+	if ksl != "":
+		out.append(ksl)
 	var imm: PackedStringArray = []
 	for st in u.immune_statuses:
 		imm.append(str(BWSkills.STATUS.get(st, [st])[0]))
@@ -599,6 +604,7 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	for n in fc.get("notes", []):                # D86/D87 riders, named; D125 terms hover
 		_fc_rows.add_child(_note_line(str(n)))
 	_forceful_toggle(att, what)                  # D244
+	_wind_toggle(att)                            # D269
 	var after := Label.new()
 	after.text = "HP %d → %d on a clean hit" % [dfn.hp, maxi(0, dfn.hp - int(fc.damage.value))]
 	after.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
@@ -612,6 +618,22 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	_forecast.visible = true
 	_menu.visible = false
 	_hovered.panel.visible = false
+
+
+## D269: a wind action's three-way mode toggle (Gust / Vortex / Becalm),
+## when the screen set `wind_action` for this forecast. `wind_changed` re-opens
+## it with the new mode. Consumed once (the next forecast must set it again).
+var wind_action := false
+var wind_changed: Callable
+
+
+func _wind_toggle(att: BWUnit) -> void:
+	if not wind_action:
+		return
+	wind_action = false
+	if att == null or att.team != "player":
+		return
+	_fc_rows.add_child(BWWindView.toggle_row(att, wind_changed))
 
 
 ## D244 Forceful: a basic attack's knock is the player's call, push or pull,
@@ -694,6 +716,7 @@ func show_plan(att: BWUnit, what: String, notes: Array) -> void:
 		c.queue_free()
 	for n in notes:
 		_fc_rows.add_child(_note_line(str(n)))
+	_wind_toggle(att)                            # D269: a gale laid on empty ground keeps the mode
 	var tip := Label.new()
 	tip.text = "Nothing to roll. Click again or press Enter to confirm."
 	tip.add_theme_font_size_override("font_size", 14)
@@ -715,9 +738,43 @@ func _num(v: float) -> String:
 # ---------------------------------------------------------------- feed etc.
 
 func feed(text: String) -> void:
+	_sums.clear()
+	_feed_line(text)
+
+
+func _feed_line(text: String) -> void:
+	_lines.append(text)
+	if _lines.size() > 60:
+		_lines.pop_front()
+		_sums.clear()                    # indices shifted: start summing afresh
 	_feed.append_text(BWGlossary.markup(text) + "\n")
 	if _feed.get_paragraph_count() > 60:
 		_feed.remove_paragraph(0)
+
+
+## D301: ground damage of one cause on one unit inside one action is ONE line,
+## summed ("Demeter takes 32 from slam (x2)"); any plain feed() ends the action.
+var _lines: Array = []
+var _sums := {}
+
+func feed_damage(who: String, amount: int, cause: String) -> void:
+	var key := who + "|" + cause
+	if not _sums.has(key):
+		_feed_line("%s takes %d from %s" % [who, amount, cause])
+		_sums[key] = { "amount": amount, "n": 1, "idx": _lines.size() - 1 }
+		return
+	var sm: Dictionary = _sums[key]
+	sm.amount = int(sm.amount) + amount
+	sm.n = int(sm.n) + 1
+	var idx := int(sm.idx)
+	if idx < 0 or idx >= _lines.size():
+		_sums.erase(key)
+		feed_damage(who, amount, cause)
+		return
+	_lines[idx] = "%s takes %d from %s (x%d)" % [who, int(sm.amount), cause, int(sm.n)]
+	_feed.clear()
+	for t in _lines:
+		_feed.append_text(BWGlossary.markup(str(t)) + "\n")
 
 
 func hint(text: String) -> void:
@@ -729,11 +786,41 @@ func banner(text: String, seconds: float = 1.4) -> void:
 	_banner.visible = true
 	_banner.modulate.a = 0.0
 	_banner.reset_size()
+	# D301: one banner tween at a time (an older tween's fade no longer fights
+	# the new one), on real time and through pauses / slow beats, so the banner
+	# always clears; a hard deadline hides it even if the tween never finishes.
+	if _banner_tw and _banner_tw.is_valid():
+		_banner_tw.kill()
 	var tw := create_tween()
+	tw.set_ignore_time_scale(true)
+	tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_banner_tw = tw
+	_banner_until = Time.get_ticks_msec() + int((seconds + 0.6) * 1000.0)
 	tw.tween_property(_banner, "modulate:a", 1.0, 0.12)
 	tw.tween_interval(seconds)
 	tw.tween_property(_banner, "modulate:a", 0.0, 0.3)
 	tw.tween_callback(func(): _banner.visible = false)
+
+
+var _banner_tw: Tween
+var _banner_until := 0
+
+
+## D301: is a banner on screen? (A stuck one past its deadline is hidden here.)
+func banner_up() -> bool:
+	if _banner == null or not _banner.visible:
+		return false
+	if Time.get_ticks_msec() > _banner_until + 500:
+		_banner.visible = false
+		return false
+	return true
+
+
+## D301: review tools await this before a frame so no banner hides the tags.
+func banner_gone() -> void:
+	var t0 := Time.get_ticks_msec()
+	while banner_up() and Time.get_ticks_msec() - t0 < 4000:
+		await get_tree().process_frame
 
 
 # ---- D100 skill callout (marked edit) ----

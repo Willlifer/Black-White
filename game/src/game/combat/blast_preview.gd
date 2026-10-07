@@ -15,6 +15,11 @@ extends Node3D
 ##   arm        the operator's colour, sparse (a marker laid)
 ##   paint      the element's colour, sparse; erase: grey, sparse
 ##   ignite     a dashed fire rim (fire 2+ on grass catches at cycle end)
+##   D266 pools  the pool that reacts: steam (grey hatch, dashed rim, "STEAM"),
+##              electrified (thunder hatch, dashed rim, "ELECTRIFIED"), rink
+##              glaze; a pillar that rises: ice hatch, heavy ink rim, "PILLAR"
+##   slides     D266: an ink arrow along the slide, a dashed ghost ring on the
+##              end hex, "SLIDE" there or "SLAM 8%" where it slams
 ##   arcs       a purple dashed arch from the conductive unit to the one
 ##              it would jump to, an arrow head over the receiver
 ##   units      a tag over every unit whose HP would change: "−31" exact,
@@ -95,8 +100,9 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 		var kinds: Array = rec.kinds
 		var k := _main_kind(kinds)
 		var col := _kind_color(k, rec, element)
-		_hatch(st, h, col, "dense" if k == "detonate" else ("mid" if k in ["glaze", "gale"] else "sparse"), 0.95)
-		_rim(st, h, INK if k == "detonate" else Color(col, 0.95), RIM_W * (1.6 if k == "detonate" else 1.0))
+		_hatch(st, h, col, "dense" if k in ["detonate", "pillar"] else ("mid" if k in ["glaze", "gale", "shock"] else "sparse"), 0.95)
+		_rim(st, h, INK if k in ["detonate", "pillar"] else Color(col, 0.95), RIM_W * (1.6 if k in ["detonate", "pillar"] else 1.0),
+			k in ["steam", "shock"])                   # D266: a reacting pool's outline is dashed
 		if "ignite" in kinds:
 			_rim(st, h, BWLook.glow_color("fire"), RIM_W * 0.8, true)
 		drawn[h] = true
@@ -113,15 +119,36 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 					pct = float(d.pct)
 			_hex_tag(h, "BLAST %d%%" % roundi(pct), BWLook.glow_color("thunder"), 0.3)
 		elif k == "gale":
-			_hex_tag(h, "GALE", BWLook.glow_color("wind"), 0.3)
+			var gm := str((rec.get("after", {}) as Dictionary).get("mode", ""))    # D270: the field's mode
+			_hex_tag(h, "GALE" if gm == "" else "%s GALE" % gm.to_upper(), BWLook.glow_color("wind"), 0.3)
 		elif k == "glaze":
 			_hex_tag(h, "GLAZE", BWLook.glow_color("ice"), 0.3)
+		elif k == "pillar":
+			_hex_tag(h, "PILLAR", BWLook.element_color("ice"), 0.3)
+		elif k in ["steam", "shock"] and not drawn.has(k):
+			drawn[k] = true                            # D266: one tag per reacting pool
+			_hex_tag(h, "STEAM" if k == "steam" else "ELECTRIFIED", Color(0.5, 0.52, 0.56) if k == "steam" else BWLook.glow_color("thunder"), 0.3)
 	for c in sim.chains:
 		_arc(st, c.hex, c.to_hex)
+	var slam_at := {}
+	for sl in sim.get("slams", []):
+		slam_at[str(sl.unit)] = sl
 	for mv in sim.get("moves", []):
 		var path: Array = mv.path
 		if path.size() >= 2 and str(mv.kind) != "leap":
 			_shove(st, path[0], path[path.size() - 1])
+		if str(mv.kind) == "slide" and path.size() >= 2:  # D266: the slide's ghost and its slam
+			var end: Vector2i = path[path.size() - 1]
+			_rim(st, end, INK, RIM_W * 1.3, true)
+			var sl: Dictionary = slam_at.get(str(mv.unit), {})
+			_hex_tag(end, "SLAM %d%%" % int(BWSlides.SLAM_PCT) if not sl.is_empty() else "SLIDE", BWLook.element_color("ice"), 0.75)
+	for ev in sim.get("events", []):                # D270: Becalm marks (still ink rings + a tag)
+		if str(ev.get("type", "")) == "becalm":
+			var bh: Vector2i = ev.hex
+			for k2 in 2:
+				_ring(st, bh, 0.42 + 0.2 * k2, 0.06)
+			_hex_tag(bh, "BECALM", BWLook.glow_color("wind"), 0.55)
+	BWElementsView.preview(self, st, sim)          # D285-D292: Overheat rings, beams + Empowered, Static fuse, launch, Magnify
 	_mesh.mesh = st.commit()
 	for id in sim.units:
 		_unit_tag(sim.units[id])
@@ -129,7 +156,7 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 
 ## Which kind a hex reads as when it has several (the strongest consequence).
 static func _main_kind(kinds: Array) -> String:
-	for k in ["detonate", "glaze", "gale", "spread", "arm", "paint", "erase"]:
+	for k in ["detonate", "pillar", "shock", "glaze", "steam", "gale", "spread", "arm", "paint", "erase"]:
 		if k in kinds:
 			return k
 	return "paint"
@@ -137,8 +164,10 @@ static func _main_kind(kinds: Array) -> String:
 
 static func _kind_color(k: String, rec: Dictionary, element: String) -> Color:
 	match k:
-		"detonate": return BWLook.glow_color("thunder")
+		"detonate", "shock": return BWLook.glow_color("thunder")
 		"glaze": return BWLook.glow_color("ice")
+		"pillar": return BWLook.element_color("ice")
+		"steam": return Color(0.55, 0.58, 0.62)
 		"gale", "spread": return BWLook.glow_color("wind")
 		"arm":
 			var mk := str((rec.after as Dictionary).get("marker", ""))
@@ -234,6 +263,18 @@ func _arc(st: SurfaceTool, a: Vector2i, b: Vector2i) -> void:
 	for p in [tip, back + side, back - side]:
 		st.set_color(col)
 		st.add_vertex(p)
+
+
+## D270: a still ink ring round a Becalmed unit's hex.
+func _ring(st: SurfaceTool, h: Vector2i, r: float, w: float) -> void:
+	var c := _top(h) + Vector3(0, 0.03, 0)
+	var seg := 24
+	for i in seg:
+		var a0 := TAU * i / seg
+		var a1 := TAU * (i + 1) / seg
+		var d0 := Vector3(cos(a0), 0, sin(a0))
+		var d1 := Vector3(cos(a1), 0, sin(a1))
+		_quad(st, c + d0 * (r - w * 0.5), c + d0 * (r + w * 0.5), c + d1 * (r + w * 0.5), c + d1 * (r - w * 0.5), INK)
 
 
 ## A knockback / push: an ink arrow on the ground from where the unit stands

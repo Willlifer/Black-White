@@ -93,20 +93,30 @@ func _foe(id: String, extra: Dictionary = {}) -> BWUnit:
 	return _u(id, "axe", "water", x)
 
 
+## D282: two armour pieces of an element row's colour (a 2-piece set).
+func _pieces(u: BWUnit, ench: String, n: int = 2) -> BWUnit:
+	var slots := ["head", "chest", "legs"]
+	for i in n:
+		u.equipment[slots[i]] = { "uid": "p_%s_%d" % [ench, i], "base": "", "slot": slots[i], "tier": "E",
+			"stats": {}, "enchant": ench, "worn": {} }
+	u.refresh_effects()
+	return u
+
+
 # ------------------------------------------------------------------ §1 scaling
 
 func test_scaling_pct_with_the_flat_floor(t) -> void:
-	var hi := _ench(_u("hi", "staff", "light", { "wil": 34 }), "sunlit")
-	var lo := _ench(_u("lo", "staff", "light", { "wil": 6 }), "sunlit")
+	var hi := _pieces(_u("hi", "staff", "light", { "wil": 34 }), "dawning")    # D282: Sunlit is the Light set's 2-piece
+	var lo := _pieces(_u("lo", "staff", "light", { "wil": 6 }), "dawning")
 	var b := _fight([hi, lo], [_foe("f")], [C, Vector2i(2, 2)], [FAR])
 	b.tiles.apply([C, Vector2i(2, 2)], "light", "x", 3)
-	t.eq(hi.stat("wil"), 34 + 10, "Sunlit: +10% WIL per light point (34 x 30% = +10)")
+	t.eq(hi.stat("wil"), 34 + 10, "Light set (2): +10% WIL per light point (34 x 30% = +10)")
 	t.eq(lo.stat("wil"), 6 + 3, "the floor: never less than +1 per point (+3 at WIL 6)")
-	var rim := _ench(_u("r", "sword", "ice", { "def": 30 }), "rimed")
+	var rim := _pieces(_u("r", "sword", "ice", { "def": 30 }), "glacial")
 	var b2 := _fight([rim], [_foe("f2")], [C], [FAR])
 	b2.tiles.apply([C], "fire", "x")
 	b2.tiles.apply([C], "ice", "x")
-	t.eq(rim.stat("def"), 36, "Rimed: +20% DEF on a glaze (30 -> +6, over the +2 floor)")
+	t.eq(rim.stat("def"), 36, "Ice set (2): +20% DEF on a glaze (30 -> +6, over the +2 floor)")
 	t.eq(int(BWEffects.parse_params(BWData.row("enchantments", "warded").params).pct), -25, "D243: the resist rows are one Warded row, at 25%")
 
 
@@ -524,15 +534,15 @@ func test_imbue_carries_an_element_enchantment(t) -> void:
 	var u := _u("u")
 	var w2 := r.make_item("sword", "C", "keen")
 	w2.imbue = "fire"
-	w2.imbue_enchant = "blazing"
+	w2.imbue_enchant = "kindled"
 	u.equipment["main_hand"] = w2
 	u.refresh_effects()
-	t.ok(u.effects.any(func(e): return e.source == "blazing"), "the drawn weapon's imbue enchantment is active")
+	t.ok(u.effects.any(func(e): return e.source == "kindled"), "the drawn weapon's imbue enchantment is active")
 	t.ok(u.effects.any(func(e): return e.source == "keen"), "next to its weapon enchantment")
 	u.equipment["second"] = w2
 	u.equipment["main_hand"] = r.make_item("axe", "E", "impact")
 	u.refresh_effects()
-	t.ok(not u.effects.any(func(e): return e.source == "blazing"), "carried, it gives nothing (D180)")
+	t.ok(not u.effects.any(func(e): return e.source == "kindled"), "carried, it gives nothing (D180)")
 	# save v9 migration: an old imbued weapon rolls its enchantment
 	var old := r.make_item("axe", "C")
 	old.erase("imbue_enchant")
@@ -562,13 +572,15 @@ func test_waterwalking_first_water_hex_free(t) -> void:
 	_turn(b, me)
 	t.ok(not me.fx.get("free_water_used", false), "back at the next turn")
 	me.fx["free_water_used"] = true
-	t.eq(int(b.reachable(me)[E2].cost), 3, "once spent, water costs as usual (1 + 2)")
+	t.eq(int(b.reachable(me)[E2].cost), 1, "once spent, water still never slows it (D281: Wading folded in)")
 
 
 # ------------------------------------------------------------------ the consolidation (D243-D247)
 
 func test_consolidation_counts(t) -> void:
-	t.eq(BWData.table("enchantments").size(), 97, "D243-D244: 139 -> 97 enchantments (83 + 14 left for the element pass)")
+	t.eq(BWData.table("enchantments").size(), 83, "D243-D244, D283: 139 -> 97 -> 83 (the 14 held rows went to perks and sets)")
+	for id in BWRun.ENCH_HELD:
+		t.ok(BWData.row("enchantments", id).is_empty(), "held row gone: %s" % id)
 	t.eq(BWData.table("abilities").size(), 25, "D245: 46 -> 25 abilities")
 	for id in BWRun.ENCH_MERGED:
 		t.ok(BWData.row("enchantments", id).is_empty(), "merged away: %s" % id)
@@ -640,7 +652,7 @@ func test_save_v10_migration(t) -> void:
 	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
 	d.version = 9
 	var back := BWRun.from_dict(d)
-	t.eq(int(back.to_dict().version), 10, "saves as v10")
+	t.eq(int(back.to_dict().version), BWRun.SAVE_VERSION, "saves as the current version")
 	var by := {}
 	for it in back.inventory:
 		by[str(it.uid)] = it
@@ -659,3 +671,39 @@ func test_save_v10_migration(t) -> void:
 	t.eq(int(back.ability_ranks[bu.id].iron_wall), 3, "a merged pair keeps the higher rank")
 	t.eq(int(back.ability_ranks[bu.id].flair), 2, "(Arena Born's 2 over Flair's 1)")
 	t.eq(back.equipped_ability[bu.id], { "reactive": "iron_wall", "passive": "hardened" }, "the equipped choice follows")
+
+
+
+## D283 save v11: the 14 held rows re-roll within their element (the item keeps
+## its colour); removed perks map to the perk they joined; keystones start empty.
+func test_save_v11_migration(t) -> void:
+	var r := _run()
+	var u: BWUnit = r.squad[0]
+	var bl := r.make_item("gladiator_chestpiece", "E", "keen")
+	bl.enchant = "blazing"
+	var wd := r.make_item("chaps", "E", "keen")
+	wd.enchant = "wading"
+	var bc := r.make_item("chain_mail", "C", "keen")
+	bc.enchant = "beacon"
+	var w := r.make_item("sword", "C", "keen")
+	w.imbue = "ice"
+	w.imbue_enchant = "rimed"
+	r.inventory.append_array([bl, wd, bc, w])
+	u.perks = ["water_flow", "water_guard", "ice_ward", "wind_slip"]
+	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
+	d.version = 10
+	for ud in d.squad:
+		ud.erase("keystones")
+	var back := BWRun.from_dict(d)
+	var by := {}
+	for it in back.inventory:
+		by[str(it.uid)] = it
+	for pair in [[bl, "fire"], [wd, "water"], [bc, "light"]]:
+		var it: Dictionary = by[pair[0].uid]
+		var row := BWData.row("enchantments", str(it.enchant))
+		t.ok(not row.is_empty(), "%s re-rolled to a live row (%s)" % [pair[0].uid, it.enchant])
+		t.eq(BWRun.item_element(it), pair[1], "%s keeps its colour (%s)" % [pair[0].uid, pair[1]])
+	t.ok(BWRun.of_element(BWData.row("enchantments", str(by[w.uid].imbue_enchant)), "ice"), "an imbue's held row re-rolls in its element")
+	t.eq(back.squad[0].perks, ["water_guard", "wind_tail"], "Flow State -> Tidal Guard (deduped), Frost Ward -> the Ice set, Slipstream -> Tailwind")
+	t.eq(back.squad[0].keystones, [], "no keystones in an old save")
+	t.eq(int(back.to_dict().version), 11, "saves as v11")

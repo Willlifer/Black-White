@@ -150,11 +150,12 @@ func _refresh_preview() -> void:
 	var cheap := "%s|%s|%s|%s|%s|%s|%s|%d|%s" % [s._hover, s._skill.get("key", ""), s._skill.get("element", ""),
 		s._skill.get("first", ""), var_to_str(s._pending_skill), s._pending_target.id if s._pending_target else "",
 		s.ui.forecast_open(), s.battle.history.size(), s._busy]
+	cheap += "|" + BWWind.mode(s.battle.current())     # D269: a mode flip re-simulates
 	if cheap == _cheap:
 		return
 	_cheap = cheap
 	var act := aimed_action()
-	var sig := var_to_str(act) + "|%d|%s" % [s.battle.history.size(), s.ui.forecast_open()]
+	var sig := var_to_str(act) + "|%d|%s|%s" % [s.battle.history.size(), s.ui.forecast_open(), BWWind.mode(s.battle.current())]
 	if sig == _sig:
 		return
 	_sig = sig
@@ -173,7 +174,7 @@ func simulate(act: Dictionary) -> Dictionary:
 	if _cache_at != b.history.size():
 		_cache.clear()
 		_cache_at = b.history.size()
-	var key := var_to_str(act)
+	var key := var_to_str(act) + "|" + BWWind.mode(b.current())    # D269
 	if not _cache.has(key):
 		_cache[key] = b.simulate(b.current(), act)
 	return _cache[key]
@@ -328,19 +329,23 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	lines.append("[color=#%s]%s ground · elevation %d[/color]" % [dim, str(r.terrain).capitalize(), int(r.elevation)])
 	# timers
 	var glaze := int(e.get("glaze", 0))
-	if glaze > 0:
+	if glaze > 0 and not b.tiles.is_pillar(h):       # D266: a pillar's own line says its ticks
 		lines.append("Glazed: %d cycle%s left, decay paused" % [glaze, "" if glaze == 1 else "s"])
 	if mk != "":
 		var what := { "fuse": "detonates the next fire, water, light or dark laid here",
 			"stasis": "glazes the next charge laid here", "gale": "copies the next charge to its ring" }
 		lines.append("%s mark: %s; fades in %d cycle%s" % [mk.capitalize(), what.get(mk, ""), int(e.timer), "" if int(e.timer) == 1 else "s"])
-	elif (hv != 0 or vv != 0) and glaze == 0 and not bool(e.get("permanent", false)) and r.static == null:
+	elif (hv != 0 or vv != 0) and glaze == 0 and not bool(e.get("permanent", false)) and r.static == null and not b.tiles.shock.has(h):
 		lines.append("Decay: steps down in %d cycle%s" % [int(e.timer), "" if int(e.timer) == 1 else "s"])
 	if r.static != null:
 		var sv: Vector2i = r.static
 		lines.append("Static (%s): returns every cycle%s" % [_hv_words(sv.x, sv.y), "; spent, back after the next tick" if r.scarred else ""])
 	if r.seeded:
 		lines.append("Seeded: holds until play changes it")
+	for sl in r.get("spine", []):                  # D266: rink, pillar, steam, electrified, pool
+		var scol := { "Pillar": BWLook.element_color("ice"), "Rink": BWLook.element_color("ice"),
+			"Electrified": BWLook.element_color("thunder"), "Steam": Color(0.75, 0.77, 0.8), "Pool": BWLook.element_color("water") }
+		lines.append("[color=#%s][b]%s[/b][/color]: %s" % [_hx(scol.get(str(sl[0]), Color.WHITE)), str(sl[0]), str(sl[1])])
 	# what it does
 	var does: PackedStringArray = []
 	if int(r.move_extra) > 0:
@@ -357,10 +362,20 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 		does.append("muddy: 2× move")
 	if not does.is_empty():
 		lines.append("[color=#%s]%s[/color]" % [dim, " · ".join(does)])
-	if hv != 0 or vv != 0:
+	if BWPools.is_water(b.tiles, h):                 # D264: thunder on water electrifies, never blasts
+		lines.append("[color=#%s]Thunder here: electrifies the water within 1 (%d%% + Staggered at turn start)%s[/color]" % [
+			_hx(BWLook.element_color("thunder")), int(BWPools.SHOCK_PCT), "; already live, nothing" if b.tiles.shock.has(h) else ""])
+	elif hv != 0 or vv != 0:
 		var plan: Dictionary = b.tiles._route(e, "thunder", true, 1, "")
 		if plan.has("detonate"):
 			lines.append("[color=#%s]Thunder here: %d%% blast, half on the ring[/color]" % [_hx(BWLook.element_color("thunder")), roundi(float(plan.detonate))])
+	# D270/D273/D275/D276: fields, walls, gravity, Rot
+	for l in BWWind.card_lines(b, h) + BWCurse.card_lines(b, h) + BWKeystoneFx.card_lines(b, h):   # D297: keystone lines
+		lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color("wind" if str(l).find("Rot") < 0 and str(l).find("Gravity") < 0 else "dark").lightened(0.35)), BWGlossary.markup(str(l))])
+	# D285-D292: Overheat, beams, Dawn, Magnify, Empowered, Static fuses, keystone holders
+	for pair in [["fire", BWOverheat.card_lines(b, h)], ["light", BWBeams.card_lines(b, h)], ["thunder", BWThunderKeys.card_lines(b, h)]]:
+		for l in pair[1]:
+			lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color(str(pair[0])).lightened(0.35)), BWGlossary.markup(str(l))])
 	# the occupant
 	if str(r.unit) != "":
 		var u := b._unit(str(r.unit))
@@ -460,6 +475,7 @@ static func recap(g: Array, b: BWBattle) -> Dictionary:
 	var splash: PackedStringArray = []
 	var actor: BWUnit = null
 	var other: PackedStringArray = []
+	var other_sum := {}
 	var detail: PackedStringArray = []
 	var sources := 0
 	var ground := false
@@ -513,12 +529,29 @@ static func recap(g: Array, b: BWBattle) -> Dictionary:
 						blast.append("%s %d%s" % [name_of.call(id), int(e.amount), ff])
 					else:
 						splash.append("%s %d splash%s" % [name_of.call(id), int(e.amount), ff])
-				elif str(e.cause) != "pulse":
-					other.append("%s %d %s" % [name_of.call(id), int(e.amount), str(e.cause).replace("_", " ")])
+				elif str(e.cause) != "pulse":           # D301: one entry per unit and cause, summed
+					var ok := id + "|" + str(e.cause)
+					var cw := str(e.cause).replace("_", " ")
+					if other_sum.has(ok):
+						var os: Dictionary = other_sum[ok]
+						os.amount = int(os.amount) + int(e.amount)
+						os.n = int(os.n) + 1
+						other[int(os.idx)] = "%s %d %s (x%d)" % [name_of.call(id), int(os.amount), cw, int(os.n)]
+					else:
+						other_sum[ok] = { "amount": int(e.amount), "n": 1, "idx": other.size() }
+						other.append("%s %d %s" % [name_of.call(id), int(e.amount), cw])
 			"chain":
 				ground = true
 				sources += 1
-				other.append("arc → %s %d" % [name_of.call(str(e.to)), int(e.amount)])
+				var ak := str(e.to) + "|arc"              # D303: arcs to one unit summed
+				if other_sum.has(ak):
+					var asm: Dictionary = other_sum[ak]
+					asm.amount = int(asm.amount) + int(e.amount)
+					asm.n = int(asm.n) + 1
+					other[int(asm.idx)] = "arc → %s %d (x%d)" % [name_of.call(str(e.to)), int(asm.amount), int(asm.n)]
+				else:
+					other_sum[ak] = { "amount": int(e.amount), "n": 1, "idx": other.size() }
+					other.append("arc → %s %d" % [name_of.call(str(e.to)), int(e.amount)])
 				add_total.call(str(e.to), int(e.amount))
 			"paint":
 				for gl in e.get("gales", []):

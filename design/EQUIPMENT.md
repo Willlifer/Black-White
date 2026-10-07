@@ -5,15 +5,44 @@ and `abilities.csv`; this page is the readable view of them. `SCHEMA.md` wins
 any disagreement. Every number here is a first pass, kept modest, and expected
 to move once it is played.
 
-Counts: 48 items (23 armour, 25 weapons), 97 enchantments and 25 abilities
+Counts: 48 items (23 armour, 25 weapons), 83 enchantments and 25 abilities
 (6 reactive, 7 supportive, 12 passive) after the Passives v2 consolidation
-(D243–D247, `PASSIVES-v2.md` §2): 139 → 97 enchantments, of which 14 element
-rows wait for the element pass, and 46 → 25 abilities. A merged row keeps the
+(D243–D247, `PASSIVES-v2.md` §2): 139 → 97 enchantments, then the element
+pass (D281–D283) moved the 14 held element rows out: Tidewalker, Forge,
+Overloading, Permafrost, Cold Snap, Nightfall, Beacon, Shattering and Wading
+into perks (their records ride in `perks.csv`'s `also` column), Blazing,
+Riptide, Shrouded, Sunlit and Rimed into the element sets' 2-pieces (below);
+abilities 46 → 25. A merged row keeps the
 union of its sources' items, so no piece lost an ability or a roll.
 `ENCHANTMENTS-v2.md` is the spec for the families, keys, tiers and caps.
 Every item can roll at least 3 enchantments; every armour piece teaches at
 least 1 ability. The tables in §2 list each armour piece's element rows and
 each weapon's weapon rows (the other families are in `ENCHANTMENTS-v2.md`).
+
+## 0. Element sets (D282)
+
+Head, chest and legs count toward their colour (the row's element; a Warded
+piece's ward) and the **drawn** weapon toward its imbue's element. The
+carried weapon counts for nothing; a swap recounts at once. Two pieces and
+three pieces; a fourth adds nothing. A set sleeps until its element is
+learned. Data: `game/data/sets.csv`; code: `BWSets` (`src/core/element_sets.gd`).
+
+| Set | 2 pieces | 3 pieces |
+|---|---|---|
+| Fire | On fire: +10% STR per level. Free fire crossing. | **Flashpoint**: once a battle, dropping under 50%, your hex and ring go to fire 3 and you heal 20%. |
+| Water | On water: +10% DEX per level. Your pools reach 25 (D307). | **Breakwater**: once a battle, a foe that hits you is swept 2 away and Drenched. |
+| Ice | On glaze: +20% DEF. Your pillars last 1 tick longer. | **Frost Ward**: each turn the nearest unwarded ally within 2 (else you) gets a ward that negates its next elemental effect. |
+| Thunder | Your detonations +10%. Electrified water shocks you for half. | **Stormfront**: your first detonation each turn also arcs 10% to every conductive foe it missed. |
+| Wind | +1 move. Your wind fields skip your allies. | **Slipstream**: after moving 4+ hexes, your attacks can't be avoided. |
+| Dark | On dark: +10% SPD per level. No dark drain on you. | **Vanish**: once a battle, on dark, a hit worth 25%+ of your max HP misses and you shift to the nearest free dark hex within 3. |
+| Light | On light: +10% WIL per level. Your Empowered allies get +5% more. | **Dawnward**: once a battle, an ally within 3 (you too) who would be KO'd holds at 1 HP, its hex at light 3. |
+
+On screen: the item card's dim line "Set: Fire 2/3 · next: Flashpoint"
+(shop, loot and loose pieces: "Set: Fire → 2/3"; a carried weapon: "counts
+when drawn"); the gear panel's "Sets" line under the paper doll; in battle,
+2-piece numbers as forecast notes ("Fire set: +4 STR (Della on fire 2)"),
+and a 3-piece trigger floats its name once. Family sets (Momentum, Bulwark,
+Hunter, Fortune, Company, Damned; PASSIVES-v2 §3) are not built.
 
 ## 1. The effect_key vocabulary (25 keys)
 

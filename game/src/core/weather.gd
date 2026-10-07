@@ -297,6 +297,7 @@ static func glaze(t: BWTiles, marks: Array) -> Array:
 			continue
 		e.glaze = BWTiles.GLAZE_CYCLES
 		e["glaze_source"] = ""
+		BWPools.raise_pillar(t, hex, "")          # D262: Blizzard on empty water 3 raises a pillar
 		out.append(hex)
 	return out
 

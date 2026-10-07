@@ -20,6 +20,8 @@ func _wait(t: float) -> void:
 
 
 func _shot(name: String) -> void:
+	if s and is_instance_valid(s) and s.ui:
+		await s.ui.banner_gone()          # D301: no leftover "Battle start"
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var p := "%s/%s.png" % [out, name]

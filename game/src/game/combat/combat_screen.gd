@@ -69,6 +69,9 @@ var turn_hook: Callable          # (u: BWUnit) -> true when it played (passed) t
 var weather_kind := ""           # BWWeather.KINDS, "" = none
 var weather_view: BWWeatherView
 var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate, intro)
+var wind_view: BWWindView       # ---- D269-D276: fields, walls, gravity, Rot marks
+var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
+var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -127,6 +130,16 @@ func _ready() -> void:
 		weather_view = BWWeatherView.new()
 		add_child(weather_view)
 		weather_view.setup(self)
+	wind_view = BWWindView.new()          # ---- D269-D276: wind fields, walls, gravity, Rot
+	add_child(wind_view)
+	wind_view.setup(self)
+	ks_view = BWKeystoneView.new()        # ---- D293-D299: wind, ice, water and dark keystones
+	add_child(ks_view)
+	ks_view.setup(self)
+	elements_view = BWElementsView.new()  # ---- D285-D292: fire, light and thunder marks and VFX
+	add_child(elements_view)
+	elements_view.setup(self)
+	ui.wind_changed = _wind_mode_changed  # the forecast's mode toggle re-opens the forecast
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
 		var v: BWUnitView = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
@@ -287,7 +300,13 @@ func _on_hover(h: Vector2i) -> void:
 		_show_options()
 		return
 	if battle.can_move_to(u, h) and h != u.pos:
-		_show_options(BWBoard.path_to(battle.reachable(u), h))
+		var rr := battle.reachable(u)
+		_show_options(BWBoard.path_to(rr, h))
+		var sl: Dictionary = rr[h].get("slide", {})     # ---- D266: a walk onto ice slides
+		if not sl.is_empty():
+			board_view.highlight([h], "target")
+			ui.hint("%s — slides on the ice to here%s; the walk ends, then 1 more move" % [u.name,
+				(", SLAMS into %s (%d%% to both)" % [str(sl.into), int(BWSlides.SLAM_PCT)]) if bool(sl.slam) else ""])
 	else:
 		_show_options()
 
@@ -308,6 +327,7 @@ func _on_click(h: Vector2i) -> void:
 		return
 	if target and target.team != u.team and (not u.acted or "basic" in u.follow_up) and battle.in_range(u, target):
 		_pending_target = target
+		ui.wind_action = battle.basic_element(u) == "wind"   # ---- D269: the mode toggle
 		ui.show_forecast(u, target, battle.forecast_basic(u, target))
 		board_view.clear_highlights()
 		board_view.highlight([target.pos], "target")
@@ -421,7 +441,8 @@ func _aim_skill(u: BWUnit, h: Vector2i) -> void:
 		_skill.erase("first")                    # nothing to choose (a braced foe): straight to the forecast
 		_open_confirm(u, pv, h)
 		return
-	if pv.forecasts.is_empty() and (pv.get("strike", {}) as Dictionary).is_empty():
+	# D269: wind on empty ground still confirms, so its mode (the field's) can be picked
+	if pv.forecasts.is_empty() and (pv.get("strike", {}) as Dictionary).is_empty() and str(_skill.element) != "wind":
 		var k: String = _skill.key
 		var el: String = _skill.element
 		_skill = {}
@@ -429,6 +450,22 @@ func _aim_skill(u: BWUnit, h: Vector2i) -> void:
 		_after_events()
 		return
 	_open_confirm(u, pv, h)
+
+
+## D269: the forecast's wind mode toggle was flipped: show the forecast (and,
+## through BWReadability, the blast preview) again with the new mode.
+func _wind_mode_changed() -> void:
+	var u := battle.current()
+	if u == null or not ui.forecast_open():
+		return
+	if _pending_target != null:
+		ui.wind_action = true
+		ui.show_forecast(u, _pending_target, battle.forecast_basic(u, _pending_target))
+	elif not _pending_skill.is_empty() and not _skill.is_empty():
+		var ps := _pending_skill
+		var pv := battle.skill_preview(u, ps.key, ps.element, ps.hex, ps.get("choice", BWBattle.NOWHERE))
+		if not pv.is_empty():
+			_open_confirm(u, pv, ps.hex, ps.get("choice", BWBattle.NOWHERE))
 
 
 ## D109: the legal second hexes for the chosen target.
@@ -441,6 +478,7 @@ func _seconds(u: BWUnit) -> Array[Vector2i]:
 ## words; the shape on the board. Click a highlighted hex or Enter confirms.
 func _open_confirm(u: BWUnit, pv: Dictionary, h: Vector2i, choice: Vector2i = BWBattle.NOWHERE) -> void:
 	var nm := str(_skill.row.get("name", _skill.key))
+	ui.wind_action = str(_skill.element) == "wind"      # ---- D269: the mode toggle
 	var ids: Array = pv.forecasts.keys()
 	var at: Array = ids.map(func(id): return battle._unit(str(id)).pos)
 	var strike: Dictionary = pv.get("strike", {})
@@ -597,7 +635,7 @@ func _play(e: Dictionary) -> void:
 						await vfx.dive(_views[e.unit], e.path)
 					else:
 						await _animate_leap(_views[e.unit], e.path)
-				"charge", "shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
+				"charge", "shove", "knockback", "pull", "push", "gale", "slide": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind in ["charge", "slide"] else 0.12)
 				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
 		"swap":                                             # ---- D181: put away, draw
@@ -637,6 +675,13 @@ func _play(e: Dictionary) -> void:
 				_float_text(nv, str(e.get("text", e.get("name", ""))), Color.WHITE, 0.8)
 				nv.refresh()
 			ui.feed("[b]%s[/b]: %s" % [str(e.get("name", "")), str(e.get("text", ""))])
+		"set_trigger":                               # ---- D282: a set's 3-piece fires; it floats once
+			var sv: BWUnitView = _views.get(str(e.get("unit", "")))
+			if sv:
+				_float_text(sv, str(e.get("name", "")).get_slice(" (", 0), BWGearText.readable(BWLook.element_color(str(e.get("element", "")))), 1.0)
+				sv.refresh()
+			ui.feed("[b]%s[/b]: %s" % [str(e.get("name", "")), str(e.get("text", ""))])
+			board_view.refresh_tiles()
 		"stat_up":
 			_float_text(_views[e.unit], "%s +%d %s" % [e.name, int(e.amount), "/".join(e.stats).to_upper()], Color.WHITE, 0.9)
 		"guard":
@@ -754,7 +799,7 @@ func _play(e: Dictionary) -> void:
 				return
 			_float_text(_views[e.unit], "-%d" % e.amount, Color(1, 1, 1))
 			_views[e.unit].refresh()
-			ui.feed("%s takes %d from %s" % [_name(e.unit), e.amount, e.cause.replace("_", " ")])
+			ui.feed_damage(_name(e.unit), int(e.amount), str(e.cause).replace("_", " "))   # D301: summed per unit and cause
 			await get_tree().create_timer(0.35).timeout
 		"paint", "tiles_tick":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): refresh + gust / ignition one-shots
@@ -764,6 +809,13 @@ func _play(e: Dictionary) -> void:
 		"weather":                             # ---- D252: the weather's tick
 			if weather_view:
 				await weather_view.on_event(e)
+		"overheat", "light_beams", "empowered", "blade_burst", "launch", "static_arm", "daisy", "magnify", "dawn", \
+				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze":   # ---- D285-D292
+			if elements_view:
+				await elements_view.on_event(e)
+		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "eye_pull", "riptide", "event_horizon":   # ---- D293-D299
+			if ks_view:
+				await ks_view.on_event(e)
 		"detonate":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): flash + ring burst
 			ui.feed("[b]Detonation![/b] %d%%" % int(e.pct))

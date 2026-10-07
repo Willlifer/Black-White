@@ -79,7 +79,7 @@ func _unpad(ids: Array) -> void:
 
 func test_registry_loads_every_skill(t) -> void:
 	var keys := BWSkillRegistry.keys()
-	t.eq(keys.size(), 62, "20 skills + 2 follow-up halves + 40 learnable (D103-D108), one file each")
+	t.eq(keys.size(), 67, "20 skills + 2 follow-up halves + 40 learnable (D103-D108) + Wind Wall (D273) + Flash Freeze, Tidal Release, Shatter (D294-D295) + Self-detonate (D306), keystone actions, one file each")
 	for k in keys:
 		var r := BWSkillRegistry.row(k)
 		for f in ["key", "name", "weapon", "cd", "targeting", "range", "desc", "clip"]:
@@ -158,7 +158,7 @@ func test_run_start_owes_one_perk(t) -> void:
 	var fire := { "kind": "perk", "element": "fire" }
 	var opts := BWPicks.options(u, BWPicks.pending(u)[0])
 	t.eq(opts.size(), 2, "two fire perks offered (D174)")
-	t.eq(BWPicks.all_options(u, fire).size(), BWPicks.perks_of("fire").size(), "of the five")
+	t.eq(BWPicks.all_options(u, fire).size(), BWPicks.perks_of("fire").size(), "of the four (D281)")
 	_offer(u, fire, "fire_rush")
 	t.ok(BWPicks.apply(u, { "kind": "perk", "element": "water" }, "fire_rush").is_empty(), "wrong element refused")
 	t.ok(not BWPicks.apply(u, fire, "fire_rush").is_empty(), "picked")
@@ -195,7 +195,7 @@ func test_two_options(t) -> void:
 		for x in o:
 			seen[x] = true
 		pairs[str(o)] = true
-	t.eq(seen.size(), 5, "every fire perk turns up somewhere")
+	t.eq(seen.size(), 4, "every fire perk turns up somewhere (D281: four)")
 	t.ok(pairs.size() >= 6, "many different pairs (%d)" % pairs.size())
 	# the next pick draws afresh, from what is left
 	var u := _u("n", "sword", "fire")
@@ -226,9 +226,9 @@ func test_two_options(t) -> void:
 	t.ok(so.all(func(x): return str(x.id) in BWPicks.skill_choices(w, "daggers")), "from the improve / learn pool")
 	# fewer than two left: what there is
 	var last := _u("l", "sword", "fire")
-	for r in BWPicks.perks_of("fire").slice(0, 4):
+	for r in BWPicks.perks_of("fire").slice(0, 3):
 		last.perks.append(str(r.id))
-	last.bonus_perks["fire"] = 4
+	last.bonus_perks["fire"] = 3
 	t.eq(BWPicks.options(last, fire).size(), 1, "one perk left: one card")
 
 
@@ -256,18 +256,87 @@ func test_rank_crossing_triggers_a_pick(t) -> void:
 	t.ok("skill" in kinds, "specializing the weapon to D owes a skill pick: %s" % [kinds])
 
 
-func test_rank_three_grants_all_five(t) -> void:
-	var u := _u("r3", "sword", "fire")
+## D277 (ELEMENTS-v3 §9): the ladder replaced "rank 3 grants all": perks at
+## ranks 1, 2, 4 and 5; a keystone at 3 (1 of 2 from 3) and 6 (the 2 left).
+func test_rank_ladder(t) -> void:
 	for el in BWFormulas.ELEMENTS:
-		t.eq(BWPicks.perks_of(el).size(), 5, "five %s perks (D93)" % el)
-	_offer(u, { "kind": "perk", "element": "fire" }, "fire_skin")
-	BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_skin")
+		t.eq(BWPicks.perks_of(el).size(), 4, "four %s perks (D281)" % el)
+		t.eq(BWKeystones.of_element(el).size(), 3, "three %s keystones" % el)
+	var u := _u("r3", "sword", "fire")
+	var want := { 1: [1, 0], 2: [2, 0], 3: [2, 1], 4: [3, 1], 5: [4, 1], 6: [4, 2], 7: [4, 2] }
+	for r in want:
+		u.affinity["fire"] = int(r) * 10
+		t.eq(BWPicks.allowance(u, "fire"), int(want[r][0]), "rank %d: %d perks" % [r, want[r][0]])
+		t.eq(BWPicks.keystone_allowance(u, "fire"), int(want[r][1]), "rank %d: %d keystones" % [r, want[r][1]])
 	u.affinity["fire"] = 30
-	var made := BWPicks.settle(u)
-	t.eq(made.size(), 4, "the other four granted")
-	t.eq(BWPicks.owned(u, "fire").size(), 5, "all five owned")
-	t.eq(BWPicks.pending(u), [], "rank 3 asks nothing")
-	t.ok(made.all(func(r): return r.auto), "granted, not chosen")
+	BWPicks.auto_resolve(u)
+	t.eq(BWPicks.owned(u, "fire").size(), 2, "rank 3: still two perks (no grant-all)")
+	t.eq(u.keystones.size(), 1, "and one keystone")
+	t.ok(BWKeystones.element_of(str(u.keystones[0])) == "fire", "a fire keystone")
+	t.eq(BWPicks.settle(u), [], "settle grants nothing by itself")
+	u.affinity["fire"] = 40
+	t.eq(BWPicks.pending(u), [{ "kind": "perk", "element": "fire" }], "rank 4: the third perk")
+	BWPicks.auto_resolve(u)
+	u.affinity["fire"] = 60
+	var p := BWPicks.pending(u)
+	t.eq(p, [{ "kind": "perk", "element": "fire" }, { "kind": "keystone", "element": "fire" }], "rank 6 (from 4): the fourth perk, then the second keystone")
+	var second := BWPicks.options(u, { "kind": "keystone", "element": "fire" })
+	t.eq(second.size(), 2, "the second keystone shows the 2 left")
+	t.ok(second.all(func(o): return not str(o.id) in u.keystones), "never one it holds")
+	BWPicks.auto_resolve(u)
+	t.eq(BWPicks.owned(u, "fire").size(), 4, "all four perks")
+	t.eq(u.keystones.size(), 2, "two keystones")
+	t.eq(BWPicks.pending(u), [], "nothing owed")
+
+
+func test_keystone_cap_two(t) -> void:
+	var u := _u("cap", "sword", "fire")
+	u.affinity["fire"] = 60
+	u.affinity["water"] = 30
+	u.affinity["wind"] = 30
+	BWPicks.auto_resolve(u)
+	t.eq(u.keystones.size(), BWKeystones.MAX_PER_UNIT, "at most 2 keystones across all elements")
+	t.ok(BWPicks.pending(u).filter(func(q): return q.kind == "keystone").is_empty(), "no keystone owed past the cap")
+	var other := ""
+	for id in BWKeystones.all_ids():
+		if not str(id) in u.keystones:
+			other = str(id)
+			break
+	t.ok(not BWKeystones.grant(u, other), "grant refuses a third")
+	var req := { "kind": "keystone", "element": BWKeystones.element_of(other) }
+	t.ok(BWPicks.apply(u, req, other).is_empty(), "apply refuses a third")
+	t.ok(BWKeystones.has(u, str(u.keystones[0])), "has() answers")
+	t.ok(not BWKeystones.has(null, "prism"), "has() is null-safe")
+
+
+func test_keystone_offers_are_seeded(t) -> void:
+	var req := { "kind": "keystone", "element": "thunder" }
+	var seen := {}
+	for k in 40:
+		var u := _u("k%d" % k, "daggers", "thunder")
+		u.pick_seed = k * 104729
+		u.affinity["thunder"] = 30
+		var o := BWPicks.offered(u, req)
+		t.eq(o.size(), 2, "%s: two of the three" % u.id)
+		t.eq(BWPicks.offered(u, req), o, "%s: the same two each time" % u.id)
+		t.ok(o.all(func(x): return BWKeystones.element_of(str(x)) == "thunder"), "%s: thunder ones" % u.id)
+		var off: Array = BWKeystones.of_element("thunder").filter(func(x): return not x in o)
+		t.ok(BWPicks.apply(u, req, str(off[0])).is_empty(), "%s: the third, not offered, is refused" % u.id)
+		for x in o:
+			seen[x] = true
+	t.eq(seen.size(), 3, "every thunder keystone turns up somewhere")
+	var r1 := BWRun.start(["aureli", "della"], 41)
+	var r2 := BWRun.start(["aureli", "della"], 41)
+	for r in [r1, r2]:
+		r.squad[0].affinity[r.squad[0].element] = 30
+	var el := str(r1.squad[0].element)
+	var o1 := BWPicks.offered(r1.squad[0], { "kind": "keystone", "element": el })
+	t.eq(BWPicks.offered(r2.squad[0], { "kind": "keystone", "element": el }), o1, "same run seed, same two")
+	var back := BWRun.from_dict(JSON.parse_string(JSON.stringify(r1.to_dict())))
+	t.eq(BWPicks.offered(back.squad[0], { "kind": "keystone", "element": el }), o1, "a reload shows the same two")
+	t.ok(not BWPicks.apply(back.squad[0], { "kind": "keystone", "element": el }, str(o1[1])).is_empty(), "take one")
+	var again := BWRun.from_dict(JSON.parse_string(JSON.stringify(back.to_dict())))
+	t.eq(again.squad[0].keystones, [str(o1[1])], "keystones survive a save (v11)")
 
 
 func test_perks_feed_the_effects_pipeline(t) -> void:
@@ -276,7 +345,7 @@ func test_perks_feed_the_effects_pipeline(t) -> void:
 	BWPicks.apply(u, { "kind": "perk", "element": "fire" }, "fire_kindling")
 	u.refresh_effects()
 	var rec: Array = u.effects.filter(func(e): return e.kind == "perk")
-	t.eq(rec.size(), 1, "one perk record")
+	t.eq(rec.size(), 2, "two perk records (D281: Kindling carries Forge in `also`)")
 	t.eq(rec[0].key, "stand_on_mod", "a D93 perk key")
 	var foe := _u("f", "axe", "water", { "con": 300 })
 	var b := _duel(u, foe)
@@ -287,10 +356,10 @@ func test_perks_feed_the_effects_pipeline(t) -> void:
 	var pv2 := b.skill_preview(u, "striketwice", "water", E) if "water" in b.learned_elements(u) else {}
 	t.ok(pv2.is_empty(), "(fire is the only element learned)")
 	# every row uses a key the engine knows (D93), and parses
-	t.eq(BWData.table("perks").size(), 35, "35 perks")
+	t.eq(BWData.table("perks").size(), 28, "28 perks (D281: 4 per element)")
 	for r in BWData.table("perks"):
-		var made := BWEffects.make(r, "perk")
-		t.ok(made.key in BWEffects.KEYS, "%s uses a known effect_key (%s)" % [r.id, made.key])
+		for made in BWEffects.records(r, str(r.name)):
+			t.ok(made.key in BWEffects.KEYS, "%s uses a known effect_key (%s)" % [r.id, made.key])
 		t.ok(not str(r.effect_text).contains("PLACEHOLDER"), "%s is final text" % r.id)
 		t.ok(str(r.element) in BWFormulas.ELEMENTS, "%s names an element" % r.id)
 

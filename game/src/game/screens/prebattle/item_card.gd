@@ -207,6 +207,16 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 		if not ie.is_empty():                    # D206: the imbue's own element enchantment (while drawn)
 			_passive.text += "\n[color=#%s]■ %s imbue · %s:[/color] %s%s" % [ec, el.capitalize(), BWGearText.row_name(ie),
 				BWGlossary.markup(str(ie.get("effect_text", ""))), curse_line(ie)]
+	# D282: one dim set line ("Set: Fire 2/3 · next: Flashpoint"); a loose or
+	# shop piece counts as if equipped ("Fire → 2/3"); the carried weapon counts
+	# only once drawn.
+	var setl := ""
+	if u != null and weapon and u.equipment.get(BWUnit.SECOND, {}).get("uid", "-") == item.get("uid", "?"):
+		setl = ("Set: %s · counts when drawn" % el.capitalize()) if el != "" else ""
+	else:
+		setl = BWSets.card_line(item, u, u != null and not worn)
+	if setl != "":
+		_passive.text += "\n[color=#%s]%s[/color]" % [BWGearText.hex(BWStyle.FAINT), setl]
 	# teaches (D216: collapsed when there's nothing to teach)
 	var t := BWGearText.teaches(item)
 	_teach_title.visible = not t.is_empty()

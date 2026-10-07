@@ -170,7 +170,7 @@ Water 3 hit by one fire becomes water 2, not "steam". There are no compounds.
 
 | Element | Effect | Numbers |
 |---|---|---|
-| **Thunder: detonate** | The charge explodes and the tile is erased. The occupant takes the full blast; every unit on the six neighbours takes half (rounded down). Splash is damage only and never lays charge. | blast = `5% + 4% × (|h| + |v|)` + `2%` per water intensity, × `1.5` if glazed ("shatter") |
+| **Thunder: detonate** | (Not on unglazed water: since D264 that electrifies, §14.) The charge explodes and the tile is erased. The occupant takes the full blast; every unit on the six neighbours takes half (rounded down). Splash is damage only and never lays charge. | blast = `5% + 4% × (|h| + |v|)` + `2%` per water intensity, × `1.5` if glazed ("shatter") |
 | **Ice: glaze** | Charge unchanged, `glaze = 2`. Decay paused. | 2 cycles |
 | **Wind: gale** | Charge unchanged at the origin. A **copy** of (h, v) goes to each of the six neighbours (§3.4). | radius 1, copies at `timer = 1` |
 
@@ -941,7 +941,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Fire | Heat Rush | No fire crossing damage; the first fire hex entered each turn gives +1 move. | `heat_rush` |
 | Fire | Ember Skin | An adjacent foe that hits you while you stand on fire takes 2/4/6% (your fire level); your fire standing damage is halved. | `ember_skin` |
 | Fire | Kindling | +5/+10/+15% damage when you or the target stands on fire (the higher level). | `stand_on_mod` either |
-| Fire | Wildfire | Your fresh fire at 2+ is `wild`: on the next tick it seeds fire 1 onto every neighbour whose fire axis is neutral, once per cast (origin flips to spread). Wild seeds never dry wet ground and never seed again. | `wildfire` |
+| Fire | Wildfire | Your fresh fire at 2+ is `wild`: on the next tick it seeds fire 1 onto every neighbour whose fire axis is neutral, once per cast (origin flips to spread). Wild seeds never dry wet ground and never seed again. D307: your Overheat ring hexes at 2+ are wild too (spread origin; the flag is spent at the tick). | `wildfire` |
 | Fire | Coal Engine | Allies (you included) starting their turn on fire 1/2/3: +1/+2/+3 move that turn. | `start_move` team |
 | Ice | Skate | Glazed and stasis hexes cost 1 (plus climb) even on mud; +1 move starting on one. | `skate` |
 | Ice | Rime Armour | −10% damage taken on a glazed or stasis hex; Shatter doesn't apply to you. | `rime_armour` |
@@ -951,11 +951,11 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Thunder | Bolt Step | After any action that detonated a tile: move 2 more. | `bolt_step` |
 | Thunder | Grounded | Chain arcs reaching you deal half; detonation splash on you is halved again. Still conductive. | `grounded` |
 | Thunder | Overcharge | An arc from a target you hit jumps once more: a second arc at 50% of the first's damage to the next-nearest of that team. With it, nobody is arced twice in one action. | `overcharge` |
-| Thunder | Static Field | Your fuses last 5 cycles (base 3); a foe ending its move on one is Staggered. | `static_field` |
+| Thunder | Static Field | Your fuses last 5 cycles (base 3); a foe ending its move on one is Staggered. D307: your allies' paint can't set off, re-arm or wash your fuses (`fuse_guard` in the paint opts). | `static_field` |
 | Thunder | Lightning Rod | An arc that would hit an ally within 3 of you hits you instead at 50%. | `lightning_rod` |
 | Wind | Tailwind | +2 move starting on a gale marker; after any wind action, move 1 more. | `tailwind` |
 | Wind | Eye of the Storm | Immune to displacement; bow, pistol and thrown (daggers beyond 1) attacks on you get −15 hit. | `eye_of_storm` |
-| Wind | Gale Force | +5% damage per hex moved this turn, up to +20%. | `attack_mod` |
+| Wind | Gale Force | +5% damage per hex moved this turn, up to +20%. D307: after moving 4+, your first landed hit on a foe that turn applies your wind mode (within the wind caps). | `attack_mod` |
 | Wind | Gust | A foe your wind skill hits (unresisted) is pushed 1 away; if rock or a unit stops it, it slams for 8%. | `gust` |
 | Wind | Slipstream | Allies starting their turn within 2 of you: +1 move. | `slipstream` |
 | Dark | Shadowstep | Once per turn, from a dark hex, step to another dark hex within 3 for 1 move, ignoring the path. | `shadowstep` |
@@ -963,7 +963,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Dark | Ambush | Attacking from dark 1/2/3: +5/+10/+15 crit. | `stand_on_mod` att |
 | Dark | Pall | A foe you hit while it stands on dark 2+ is Blinded. | `hit_status` |
 | Dark | Cover of Night | Attacks on allies adjacent to you: −7 hit. | `cover` |
-| Light | Sunpath | +1 move starting on light, +2 on light 3. | `start_move` |
+| Light | Sunpath | +1 move starting on light, +2 on light 3. D307: an ally on your beam (its hexes, the bend or the other end) starts its turn with +1 move, read live. | `start_move` |
 | Light | Radiant Guard | Light's hit bonus doesn't apply to attacks on you (shown as a 0 line). | `radiant_guard` |
 | Light | Judgement | Your attacks on a foe standing on light can't glance. | `judgement` |
 | Light | Glare | A foe starting its turn on light you laid isn't healed; on light 2+ it's Blinded. | `glare` |
@@ -995,3 +995,314 @@ blow, from the attacker's hex: directly behind "Rear attack +15 hit", the
 rear flanks "Rear flank +5 hit", the front flanks "Front flank +5 glance",
 straight ahead "Facing the blow +10 glance". Unknown facing adds nothing. The
 AI scores hexes with forecasts made from that hex, so it flanks.
+
+---
+
+## 14. The ice/water spine (D261-D268, Element Overhaul)
+
+Built from `ELEMENTS-v3.md` §2 and §4 with the author's rulings of
+2026-10-07. Code: `src/core/slides.gd` (BWSlides), `src/core/pools.gd`
+(BWPools, which also owns pillars); hooks in `BWTiles.apply` / `tick`,
+`BWBoard.blocker` / `sight_blocker`, `BWBattle.reachable` / `move` /
+`_displace`. View: `BWIceWaterView` (`src/game/combat/icewater_view.gd`,
+`shaders/icewater.gdshader`). Tests: `tests/test_icewater.gd`. Renders:
+`design/art/v3_icewater_*.png` (`tools/icewater_shots.gd`).
+
+### 14.1 Slides (D261)
+
+- **Slippery** = glazed charge that isn't a pillar (stasis doesn't slip).
+- A unit that **enters** one (walking, pushed, pulled, shoved) slides on in
+  its direction of travel, free, one hex at a time:
+  - next hex non-ice standable: it slides onto it and **stops there**;
+  - next hex lower (a ledge of any height): onto it, stop, no fall damage;
+  - next hex blocked (rock, a unit, a pillar or wall, a rise of 1+): stop
+    before it; if it slid 1+ that's a **slam: 8% to it and to the unit hit**;
+  - the map edge: stop, no slam; `SLIDE_MAX` 6 slide hexes.
+- **A walk that slides ends there; then the unit may move 1 more hex**
+  (once a turn). `reachable()` lists the slide's END hex (cost = the step
+  onto the ice); ice hexes are never stops. A slam can't be undone.
+- Crossing damage applies on slide hexes. Order in an action: hit, paint,
+  pushes, slides, slams.
+- Skate holders and multi-hex units never slide.
+
+### 14.2 Pillars (D262, D263)
+
+- A fresh glaze (ice, or a Blizzard mark) on **empty** water 3 raises a
+  pillar: impassable, blocks line of sight (`has_los` reads it, so basic
+  ranged attacks and `los` skills do), stops slides and pushes (slam).
+- 3 ticks (decay frozen), then water 3 again. Fire melts it; thunder
+  shatters it (34.5% centre, 17% ring). 4 per caster (a fifth melts the
+  oldest). Re-icing doesn't refresh it.
+
+### 14.3 Pools (D264, D265)
+
+- A **pool**: connected unglazed water, BFS from the cast hex, nearest first,
+  capped at 19 (`POOL_MAX`; 25 for a caster wearing the Water set (2), D307). Only fresh fire, ice and thunder react; light,
+  dark, water and wind never travel through a pool.
+- **Fire: steam** over the whole pool for 2 ticks. It blocks sight through
+  it (not between hexes within 2), and a unit in steam can be single-targeted
+  only from within 2.
+- **Ice: rink** within radius 1 of the cast hex: those pool hexes glaze;
+  empty water 3 among them become pillars.
+- **Thunder: electrified** within radius 1 of the cast hex (always, even a
+  1-hex puddle; water arriving on a fuse too; glazed water still shatters):
+  - 15% thunder at an occupant's turn start (after fire, before the drain)
+    and Staggered; 5% on entering, once per walk or slide; conductive;
+  - each unit's ramp per field: full, 25%, then immune;
+  - 2 ticks (decay frozen), then it discharges (each hex steps down 1 water;
+    a static scars a tick);
+  - never refreshed (one field per pool); fire on a hex clears it there.
+- An area shape on water reacts within 1 of each of its water hexes.
+- A seeded hex that reacts becomes ordinary water.
+
+### 14.4 Readability (D266)
+
+Blast preview: slide arrow + ghost ring + "SLIDE" / "SLAM 8%", the reacting
+pool hatched with a dashed outline and a "STEAM" / "ELECTRIFIED" tag, a
+rising "PILLAR". Move hover: the arrow runs over the ice, the hint names the
+slide and any slam. Tile card: Rink, Pillar, Steam, Electrified (with the
+occupant's next shock), Pool. Board: a slippery sheen, the inked ice pillar
+with its ticks, steam puffs, the electrified outline with timer pips.
+
+## 15. Fire, light and thunder (D285-D292, Element Overhaul)
+
+Built from `ELEMENTS-v3.md` §3, §5 and §7 with the author's rulings of
+2026-10-07 (fire as drafted; light without Dawn Relay, plus Magnify; Blast
+Rider without the full ring). Code: `src/core/overheat.gd` (BWOverheat),
+`src/core/beams.gd` (BWBeams), `src/core/thunder_keys.gd` (BWThunderKeys);
+hooks marked D285-D291 in `BWTiles.apply`, `BWBattle` (paint, _tile_hurt,
+_mods, _plan, use_skill, move, the turn start/end, the tick, _digest),
+`BWEnchant.land`, `BWSlides` and `BWAI`. Keystones are read through
+`BWKeystones.has` (or the dev flag `u.fx["ks:<id>"]`). View:
+`BWElementsView` (`src/game/combat/elements_view.gd`). Tests:
+`tests/test_fire_light_thunder.gd`. Renders: `design/art/v3_fire_*`,
+`v3_light_*`, `v3_thunder_*` (`tools/flt_shots.gd`).
+
+### 15.1 Fire: Overheat (D285)
+
+- A **fresh** fire arrival on a hex that was **already fire 3** (unglazed,
+  before the action) erupts. Propagated fire (spread, Trailblazer, on-kill
+  paint) never erupts.
+- **Ring:** each of the six neighbours gets a propagated **+2 fire**
+  through `_route` (water 3 → water 1, fire 1 → fire 3, empty → fire 2,
+  origin "spread", so it never ignites grass). Glazed and marked hexes,
+  pillars, walls and hexes erupting in the same action are skipped. Fire on
+  an electrified hex clears it there.
+- **Damage:** 6% (fire class) to every unit on the ring, both teams,
+  summed per unit over the action's eruptions (one event per unit, cause
+  `overheat`). The centre's occupant isn't hit by its own eruption.
+- **Centre:** vents to fire 2. A hex erupts once per action.
+- **Telegraph:** fire 3 hexes carry a pulsing fire-on-ink rim; the forecast
+  says "Overheat: … erupts, the ring to fire +2, 6% to every unit on it"
+  (skills) or carries the note (a fire basic on fire 3); the blast preview
+  hatches the ring with a dashed fire rim and tags "OVERHEAT 6%".
+
+### 15.2 Fire keystones (D286)
+
+- **Conflagration:** a ring hex the holder's eruption **raised** to fire 3
+  erupts too, at depth 2 at most; every qualifying ring hex of a depth-1
+  eruption chains (the preview tags "×2").
+- **Trailblazer:** every hex the holder leaves on a walk gets propagated
+  fire 1 (the start hex included, the end hex not), up to 4 a turn; no
+  crossing burns on walks or slides. Undoing the move removes the trail.
+- **Phoenix Heart:** its own fire (standing, crossing, Overheat) never hurts
+  it; standing on fire 3 (anyone's) at turn start heals 12% instead; once a
+  battle, a KO (a blow or ground damage) while it stands on fire leaves it at
+  1 HP and Overheats its hex (as the holder's eruption).
+
+### 15.3 Light: beams, Empowered, dawn (D287)
+
+- **Beam:** two allies, each on light 1+, on one straight hex line **2 to 4
+  apart** (adjacent allies don't beam: a beam needs a hex to cross), with no
+  rock, pillar or wall between. Units never block. One beam per pair; each
+  unit is the end of at most 2 (shortest pairs first, then setup order).
+  Beams are read from the board whenever asked, so they form and break as
+  units move.
+- **The tick** (after the vortex pull, before decay): foes on beam hexes
+  take **4% + 2% × the lower end's light** (light class, cause
+  `light_beam`), once per tick (the strongest beam); allies on beam hexes and
+  both ends become **Empowered**.
+- **Empowered:** +15% damage on the unit's next attack made on its own turn
+  (a basic or a damaging skill), spent by that action; it ends with the
+  unit's next turn. A unit is Empowered once (the stronger one stands).
+- **Dawn:** a unit starting its turn on light 2+ takes 1 off its longest
+  cooldown (after the normal turn tick), once per turn.
+- **Dawn Relay is removed** (the ruling).
+- **Telegraph:** a thin dashed light line between the ends (over an ink
+  stroke), "EMPOWERED +15%" over Empowered units, a light ribbon at the tick;
+  the blast preview draws the beams the board would hold after the action,
+  hatches their hexes and tags both ends "EMPOWERED".
+
+### 15.4 Light keystones (D288, D289)
+
+- **Prism:** a team with a holder may also beam two ends that aren't in
+  line through a **bend** ally on light (each segment straight, clear, 2-4);
+  the bend ally is on the beam but spends no end slot; one bend per beam.
+  Allies on a beam the holder is part of heal 5% at the tick.
+- **Overflow:** light healing the holder lays (its light tiles, its Prism
+  heals) beyond max HP becomes a **Ward of Light**: a shield of the excess,
+  up to 15% max HP, that absorbs the next damage (blow or ground) and breaks,
+  or fades after 2 cycles. A beam the holder is part of Empowers +25%.
+- **Magnify** (the ruling's enabler): an **ally** standing on the holder's
+  light (not the holder) casts magnified, **once per turn**, on its first
+  element or area skill:
+  - an area skill whose shape has radius 1 or 2 gets **+1 radius**: the
+    next ring joins the shape (hit and painted). Radius 2 becomes 3, never
+    more; a radius-3 shape gets the step instead;
+  - any other skill cast with an element gets **+1 charge step** on its
+    paint (the axis still caps at 3);
+  - basic attacks and elementless non-area skills aren't magnified (and
+    don't spend it).
+  The forecast's notes say "Magnify (X's light): +1 radius, 1 → 2" or "+1
+  charge step"; the blast preview rims the new ring and tags "MAGNIFY".
+
+### 15.5 Thunder keystones (D290, D291)
+
+Thunder's base rules are kept (water electrifies, §14.3).
+
+- **Static Blades:** each basic hit the holder lands arms **its fuse** on
+  the target's hex if the hex holds nothing (one Static fuse per foe; not
+  under a Blank). A **backstab** (the rear three, D96, judged from where the
+  blow was struck) on a foe standing on the holder's fuse bursts it instead:
+  **12%** to the occupant, **6%** to the ring, times the thunder bonus
+  (affinity rank, Stormcaller's), once per turn. The burst counts as a
+  detonation (Bolt Step, Daisy Chain, Blast Rider's immunity).
+- **Blast Rider:** immune to its own detonations (blast and splash, cause
+  `detonation` credited to it). A detonation from the holder's own action
+  **on its own hex** launches it: **move 2** after the action, replacing
+  Bolt Step's +2 (no stacking). The ring takes the **normal half** (the
+  ruling: no full ring). Once per turn; the blast spends the charge and the
+  holder can't re-arm that (empty) hex until its next turn.
+- **Self-detonate (D306):** a FREE action for a Blast Rider holder standing
+  on a charge thunder detonates (anything charged but unglazed water, which
+  electrifies) or on its own fuse: it blows its own hex under the rules
+  above (immune, the ring the normal half, launch 2, once per turn, the hex
+  locked). An own empty fuse blows at the 5% base and counts as a fuse going
+  off (Daisy Chain). It is the dagger bomber: Daggerleap into the pack onto a
+  fuse or fire, Self-detonate, launch out. Any weapon may use it. The AI
+  blows it when the simulated blast nets damage (free actions go last, then
+  it walks the launch to its safest hex). Def `self_detonate`; renders
+  `design/art/v3_final_dive_1|2|3.png`.
+- **Daisy Chain:** once per turn, when the holder's fuse detonates (a fresh
+  charge on it, or a blade burst), its nearest other fuse within 3 (ties by
+  hex order) detonates in the same action at the 5% base (a fuse is empty).
+  Nothing chains further.
+- **Readability:** the holder's fuses carry two crossed ink blades; the
+  blast preview tags "STATIC FUSE", "BLADE BURST 12%" and draws the launch
+  arc with "LAUNCH: MOVE 2"; VFX: crossing slashes, the launch arc.
+
+### 15.6 AI (D292)
+
+`BWAI._best_hex` adds `BWBeams.ai_hex` (a hex on light in line with an ally
+on light scores the beam's damage on the foes it would cross plus a little
+for Empowered; a hex on a foe's beam costs its damage). `_best_target` adds
+the blade burst a backstab would set off; `_best_skill` adds the Overheat
+ring's damage on foes minus allies (and a little for fire 2 brought to 3
+beside a foe) and, for a Blast Rider holder, a `simulate` of a thunder skill
+covering its own charged hex (ground damage on foes minus allies, +3 for
+the launch).
+
+## 16. Wind, ice, water and dark keystones (D293-D300, Element Overhaul)
+
+Built from `ELEMENTS-v3.md` §1, §2, §4 and §6 with the author's rulings of
+2026-10-07 (C3; numbered §14.5-§14.9 until D305 moved them here, after
+§15, so the overhaul reads §14 spine, §15 fire/light/thunder, §16 the other
+keystones). Code: `src/core/ks_wind.gd`, `ks_ice.gd`, `ks_water.gd`,
+`ks_dark.gd`, dispatched by `keystone_fx.gd` (BWKeystoneFx). Tests:
+`tests/test_keystones_c3.gd`. Renders: `design/art/v3_c3_*.png`.
+
+### 16.1 Wind keystones (D293)
+
+Code: `src/core/ks_wind.gd` (BWKsWind), hooked from `BWWind`; who holds
+what is `BWKeystones`. Every field move stays inside the wind caps (2 hexes
+a cycle, a field once a turn).
+
+- **Eye of the Vortex:** your Vortex fields pull everyone within 2 in, up to
+  2, step by step toward the centre (each stops before the first blocked
+  hex: no slam), when they fire and at the tick. Only your newest Vortex
+  field acts per tick (fields carry a `born` serial). Board: a dashed ink
+  ring at the field's 2-hex reach.
+- **Wind Wall:** the D273 action, now granted only by the keystone (the
+  `ks:wind_wall` flag and `wall_for_all` are gone). **AI (D304):** every legal
+  wall is scored; it raises the best when a ranged foe (reach 3+) threatens 2+
+  of its side along straight lines the wall cuts (8% of each screened unit's
+  max HP), or a melee foe within move + reach of a hurt ally (under 50%)
+  would approach across it ((10% + 20% x the missing share) of its max HP);
+  never with a foe beside the caster or while its own wall stands. The score
+  is in HP like an attack's, and the heading is passed as the second pick.
+- **Jetstream:** wind by a holder on a gale 2 makes a **gale 3** (copies to
+  radius 3; `gale_max` in the paint opts); the copies its paint makes, or its
+  gales make, last 2 cycles; its Gust fields push 2. Board: a gale 3 gets a
+  wide three-armed swirl.
+- **Rink carry (the D272 TODO):** a glazed hex never fires a gale, so a gale
+  that fires next to a rink carries it instead: its **water** copies glaze for
+  1 cycle (a fire or light copy stays unglazed; never a pillar).
+
+### 16.2 Ice keystones (D294)
+
+Code: `src/core/ks_ice.gd` (BWKsIce); defs `flash_freeze`, `glacier_shatter`.
+
+- **Skater:** never slides (pushed or pulled onto ice it stops there; a walk
+  crosses ice like ground, so "where to stop on the slide line" is where the
+  walk ends). Its first 4 ice hexes entered each turn cost 0 (only a climb
+  costs), then 1; the count rides the walk search's state. **Skate** (the
+  perk) stays the cheap version: it never slides and ice costs it 1; with
+  both, Skater's free hexes come first.
+- **Flash Freeze:** an action, once a battle (gone from the menu once spent),
+  range 3, a foe: **Frozen** (a status kept until thawed). It skips its next
+  turn (the turn starts, the ground acts, then it ends); a boss (the Twins, the
+  Colossus, a multi-hex unit) doesn't skip. It can't be displaced, it counts as
+  glazed for Shatter (+15%), and its next landed hit is x2, which thaws it.
+  Unhit, it thaws at the tick after its (skipped) turn. AI: the foe whose best
+  basic hurts its side most (a boss at 0.6).
+- **Glacier Wall:** your pillars last all battle (999 ticks, shown as ∞;
+  still 4 per caster) until melted or broken. **Break Pillar** (a menu row
+  while you hold it; the pillar has no HP, so this is the "basic"): your own
+  pillar within your weapon's reach. Any of your skills whose shape covers one
+  of your pillars raised before that action breaks it too. The break: 12% ice
+  to everyone on the six neighbours, both teams, then a push of 1 away (onto
+  ice they slide); the hex is left bare.
+
+### 16.3 Water keystones (D295)
+
+Code: `src/core/ks_water.gd` (BWKsWater); def `tidal_release`.
+
+- **Tidal Release:** an action, cooldown 4. A pool hex within 3, then a
+  heading (the second pick; the AI picks its own). The pool drains (every hex
+  loses its water; an electrified field there ends). A wave runs from that hex
+  along the heading, length = the pool's size (max 6), stopping at the edge or
+  rock. Everyone on the line is pushed 3 along it, front first; blocked, a slam
+  (8% both); onto glaze, a slide. The line then gets water 2. AI: a line that
+  pushes 2+ foes and no friend.
+- **Riptide:** at the holder's turn start, each foe in unglazed water 2-4 away
+  is pulled 1 toward it, closest first (a field move).
+- **Wellspring:** at the tick, you and allies standing in YOUR water heal 4%
+  per level; light on the same hex counts first (only the excess heals).
+
+### 16.4 Dark keystones (D296)
+
+Code: `src/core/ks_dark.gd` (BWKsDark), through BWCurse's hooks.
+
+- **Contagion:** a foe with Rot is KO'd: every foe within 2 of it gets +1 Rot
+  (cap 3). One jump per KO.
+- **Doom:** a foe reaching 3 Rot is **Doomed** (once per foe per battle). At
+  the end of its next turn (a Frozen skip counts) it takes 15% + 5% per Rot of
+  its max HP (dark) and each adjacent foe half that % of theirs; then its Rot
+  clears. A unit doomed during its own turn waits for the next one.
+- **Event Horizon:** your dark 3's gravity reaches 2; at the tick each foe
+  within 2 of it (not on it) is pulled exactly 1 toward the nearest (gravity
+  doesn't add its extra hex here); a foe on your dark 3 can't be healed.
+
+### 16.5 Readability and polish (D297-D299)
+
+`combat/keystone_view.gd` (BWKeystoneView): the Frozen unit in an inked ice
+prism with a "FROZEN x2" tag; a thorn ring and "DOOM n" under a Doomed unit;
+the gale 3 swirl; the Eye's reach ring. One-shots: the tidal wave crest
+running the line, Wellspring droplets, Contagion jump arcs, the Doom blast,
+ice shards on a thaw or a break. Unit tags (ROT /, FROZEN x2, DOOM n, RAGE IN
+n) sit on the HP bar (`BWKeystoneView.bar_mark`), so they follow its clamp
+below the turn order and its cull behind panels; Rot now reads "ROT /". The
+ice pillar has an ink hull and heavier side edges. The Twins hover (0.3 m, a
+slow bob) and glide (the Beings' motion, D220) over a faint shadow. Glossary:
+Frozen, Doomed, Gale 3. Renders `design/art/v3_c3_*.png`
+(`tools/keystones_c3_shots.gd`).

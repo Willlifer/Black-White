@@ -49,7 +49,22 @@
 
 ---
 
-**Draft for the author's review. Nothing here is built.** It adds to
+**Status:** the ice/water spine (§2 slides and pillars, §4 pools, steam,
+rinks and electrified water, with the rulings above; build order items 2-4)
+is **BUILT**, D261-D268; its rules as built are `ELEMENTS.md` §14. Fire
+(§5), light (§3, with the rulings) and thunder's keystones (§7) are **BUILT**,
+D285-D292: `ELEMENTS.md` §15. §9 (the ladder, keystone cards, enemy
+keystones; `data/keystones.csv`, `BWKeystones`) and §10 (the 28 perks, the
+element sets) are **BUILT**, D277-D284 (`PICKS.md` §1-2, `EQUIPMENT.md` §0).
+Wind modes and dark (§1, §6) are **BUILT**, D269-D276, and the wind, ice,
+water and dark keystones D293-D300: `ELEMENTS.md` §16. The final pass
+(D301-D308, 2026-10-07) added Blast Rider's **Self-detonate** free action,
+the §10 riders (Sunpath's beam move, Static Field's ally guard, Gale Force's
+mode, Wildfire's wild ring, the Water set's 25-hex pools) and re-tuned the
+curve with everything on. **The whole overhaul is built**; the text below is
+the draft it was built from (the rulings above and `ELEMENTS.md` win).
+
+**Draft for the author's review.** It adds to
 `ELEMENTS.md` (the charge grid, the tick, containment), which stays the
 rulebook for everything not named here. It also replaces the "rank 3 grants
 all" rule in `PICKS.md` and re-cuts `PASSIVES-v2.md` §2–3. Weather (built

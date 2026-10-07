@@ -39,6 +39,7 @@ const STATIC_SORT := 0.45  # over faces (0.30-0.35) and marks (0.40), under high
 ## charge, so the ring goes and never comes back.
 var _seed := {}           # Vector2i -> MeshInstance3D
 var kanji: BWKanjiLayer   # D231
+var icewater: BWIceWaterView   # D266: rinks, pillars, steam, electrified fields
 
 
 func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
@@ -75,6 +76,9 @@ func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
 			_seed[h] = _seed_rim(h, top)
 	kanji = BWKanjiLayer.new()                  # D231: element kanji on the tile tops (accessibility)
 	add_child(kanji)
+	icewater = BWIceWaterView.new()             # D266
+	add_child(icewater)
+	icewater.setup(self)
 	refresh_tiles(true)
 
 
@@ -139,6 +143,8 @@ func refresh_tiles(snap: bool = false) -> void:
 		_fx_apply(h, BWTileFX.layers(e), snap, formed)
 		if _seed.has(h):
 			_seed[h].visible = tiles.is_seeded(h)
+	if icewater:
+		icewater.refresh()                      # D266
 
 
 ## The tile FX state applied to hex h (for tests and tools).

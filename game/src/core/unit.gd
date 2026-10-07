@@ -26,6 +26,11 @@ var cosmetics := {}                  # hair_style, top, bottom, shade, voice_pit
 
 # --- picks (D89/D90): element perks and weapon-skill picks, BWPicks rules ---
 var perks: Array = []                # perk ids (data/perks.csv), in the order taken
+## D277: keystone ids (data/keystones.csv, BWKeystones), in the order taken; at most 2.
+var keystones: Array = []
+## D279: keystones this unit may hold at most (-1 = BWKeystones.MAX_PER_UNIT).
+## Enemies get theirs by stage (BWKeystones.arm_enemies), not by rank. Never saved.
+var keystone_cap := -1
 var known_skills: Array = []         # skills learned beyond the weapons' starting kits
 var skill_ranks := {}                # skill key -> rank (2 = improved; absent = 1)
 var skill_loadout := {}              # weapon class -> [keys] equipped (absent = the starter kit)
@@ -90,6 +95,9 @@ var statuses := {}
 ## D87: heading (0-5, BWHex.CUBE_DIRS) the unit last faced: its last step,
 ## or the last thing it struck. -1 = unknown. Daggerleap reads its back.
 var facing := -1
+## D269: the mode its wind actions carry (BWWind: gust | vortex | becalm),
+## chosen on the forecast, remembered (not reset per battle).
+var wind_mode := "gust"
 ## D97 engine hooks for weapon skills (BWSkillDef.zone / overwatch):
 ## zone = { hexes: [Vector2i], skill } — enemy movement entering one of these
 ## hexes stops there; overwatch = { radius, skill } — the first enemy attack
@@ -154,6 +162,8 @@ func speed() -> int:
 
 
 func move_range() -> int:
+	if statuses.has("becalmed"):                   # D270: Becalmed, move 0 (it can still act)
+		return 0
 	var m := BASE_MOVE + int(weapon().get("move_mod", 0))
 	if fx_hook.is_valid():
 		m += int(fx_hook.call(self, "move"))       # FX hook: aura_mod move (Leap Ready, Flutter)
@@ -403,7 +413,7 @@ func to_dict() -> Dictionary:
 		"stats": stats.duplicate(), "level": level,
 		"affinity": affinity.duplicate(), "expertise": expertise.duplicate(),
 		"cosmetics": cosmetics.duplicate(),
-		"perks": perks.duplicate(), "known_skills": known_skills.duplicate(),
+		"perks": perks.duplicate(), "keystones": keystones.duplicate(), "known_skills": known_skills.duplicate(),
 		"skill_ranks": skill_ranks.duplicate(), "skill_loadout": skill_loadout.duplicate(true),
 		"skill_picks": skill_picks.duplicate(),
 		"bonus_perks": bonus_perks.duplicate(), "bonus_skills": bonus_skills.duplicate(),

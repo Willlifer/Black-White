@@ -109,7 +109,10 @@ var _branch_day := -1
 ## ids map to the row they joined, Warded takes the old resist row's element
 ## (`ward`), and pure cuts re-roll within their old family and tier
 ## (migrate_v10).
-const SAVE_VERSION := 10
+## 11 (D283): the Element Overhaul re-cut. Units save `keystones`; the 14
+## held enchantment rows left for perks and sets re-roll within their element
+## (migrate_v11); removed perks map to the perk they joined (PERK_MERGED).
+const SAVE_VERSION := 11
 const OLDEST_LOADABLE := 5
 
 var rng := RandomNumberGenerator.new()
@@ -320,6 +323,76 @@ const ENCH_CUT := {
 	"high_ground": ["momentum", "D"], "vengeance": ["defensive", "C"], "fury": ["defensive", "E"],
 	"banner": ["team", "C"], "relay": ["team", "D"], "tending": ["team", "C"],
 }
+## D283 save v11: the 14 element rows the consolidation held back (D246) left
+## enchantments for perks (Tidewalker, Forge, Overloading, Permafrost, Cold
+## Snap, Nightfall, Beacon, Shattering, Wading) and sets (Blazing, Riptide,
+## Shrouded, Sunlit, Rimed): id -> [element, tier] they re-roll within.
+const ENCH_HELD := {
+	"tidewalker": ["water", "D"], "forge": ["fire", "D"], "overload": ["thunder", "C"],
+	"permafrost": ["ice", "C"], "cold_snap": ["ice", "C"], "nightfall": ["dark", "C"],
+	"beacon": ["light", "C"], "shattering": ["ice", "E"], "wading": ["water", "E"],
+	"blazing": ["fire", "E"], "riptide": ["water", "E"], "shrouded": ["dark", "E"],
+	"sunlit": ["light", "E"], "rimed": ["ice", "E"],
+}
+## D283 (D281's re-cut, 35 -> 28 perks): a removed perk -> the perk it joined
+## ("" = gone: Frost Ward became the Ice set's 3-piece; the pick is owed again).
+const PERK_MERGED := {
+	"water_flow": "water_guard", "fire_coal": "fire_rush", "thunder_grounded": "thunder_rod",
+	"wind_gust": "wind_force", "wind_slip": "wind_tail", "dark_cover": "dark_night",
+	"light_guard": "light_sanct", "ice_ward": "",
+}
+
+
+## D283: a unit's perks after the re-cut: merged ids map to their target,
+## duplicates collapse, gone ones drop (the ladder then owes the pick again).
+static func migrate_perks_v11(perks: Array) -> Array:
+	var out: Array = []
+	for id in perks:
+		var to := str(PERK_MERGED.get(str(id), str(id)))
+		if to != "" and not BWData.row("perks", to).is_empty() and not to in out:
+			out.append(to)
+	return out
+
+
+## D283: items carrying a held row re-roll within its element: the same
+## element at its old tier, else anything of that element the item's tier
+## unlocks, else the v10 family re-roll. An imbue's enchantment re-rolls in
+## its imbue's element.
+static func migrate_v11(items: Array, p_seed: int) -> void:
+	for it in items:
+		if not it is Dictionary:
+			continue
+		var uid := str(it.get("uid", ""))
+		var ench := str(it.get("enchant", ""))
+		if ench != "" and BWData.row("enchantments", ench).is_empty():
+			var et: Array = ENCH_HELD.get(ench, ["", "E"])
+			it["enchant"] = _reroll_held(str(it.get("base", "")), str(et[0]), str(et[1]), str(it.get("tier", "E")), p_seed, uid)
+			if it.enchant == "":
+				it["enchant"] = _reroll_cut(str(it.get("base", "")), "elemental", str(et[1]), str(it.get("tier", "E")), p_seed, uid)
+			if it.enchant == BWEffects.WARDED:
+				it["ward"] = str(et[0]) if str(et[0]) != "" else roll_ward(p_seed, uid)
+		var imb := str(it.get("imbue_enchant", ""))
+		if imb != "" and BWData.row("enchantments", imb).is_empty():
+			it["imbue_enchant"] = roll_imbue_enchant(p_seed, uid, str(it.get("imbue", "")), str(it.get("tier", "C")))
+
+
+static func _reroll_held(base: String, element: String, tier: String, item_tier: String, p_seed: int, uid: String) -> String:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("v11|%d|%s" % [p_seed, uid])
+	for pass_i in 3:                      # its tier; anything the item's tier unlocks; any tier (keep the colour)
+		var pool: Array = []
+		for e in BWData.table("enchantments"):
+			if not base in BWData.list(e.applies_to) or str(e.element) != element or element == "":
+				continue
+			if (pass_i == 0 and str(e.tier) == tier) or (pass_i == 1 and ench_weight(e, item_tier) > 0) or pass_i == 2:
+				pool.append([str(e.id), 1])
+		if not pool.is_empty():
+			return _weighted(pool, r)
+	if element != "" and base in BWData.list(BWData.row("enchantments", BWEffects.WARDED).get("applies_to", "")):
+		return BWEffects.WARDED                   # no row of its element fits the base: Warded of it keeps the colour
+	return ""
+
+
 ## Merged ability ids -> the ability they joined (D245).
 const ABILITY_MERGED := {
 	"enrage": "bloodied", "light_footed": "second_wind", "ward": "iron_wall", "brace": "iron_wall",
@@ -730,11 +803,14 @@ const ENEMY_STAGE_LAG := 2        # the D99 lag; fights past the table use it
 ## D194 re-tune (a level after every fight, LEVEL_ON_LOSS; enemy level =
 ## its stage, BWRooms.LEVELS_PER_STAGE 1; enemies carry a second weapon from
 ## fight 3, D193): see DECISIONS D194 for the measured table.
+## D308 re-tune with the whole Element Overhaul on (keystones and sets both
+## sides, weather, the Twins, rooms): fights 1, 3, 5, 6, 8, 10 harder (the
+## last measurement had 5-10 at ~92%); fight 7 is the Twins (BWTwins knobs).
 const ENEMY_CURVE := [
-	[0, 0.85, false, 0], [0, 0.95, false, 1],                     # 1-2: gentle start, no perks
-	[2, 1.7, true, 2], [2, 0.7, true, 3], [2, 1.25, true, 3],     # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
-	[1, 0.9, true, 3], [1, 1.1, true, 3], [1, 1.0, true, 3],      # 6-8: one behind
-	[0, 0.97, true, 3], [0, 1.0, true, 3],                        # 9-10: level with you
+	[0, 0.97, false, 0], [0, 1.05, false, 1],                     # 1-2: gentle start (fight 1 under full strength), no perks
+	[2, 1.95, true, 2], [2, 0.7, true, 3], [2, 1.35, true, 3],    # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
+	[1, 1.15, true, 3], [1, 1.1, true, 3], [1, 1.1, true, 3],     # 6-8: one behind
+	[0, 1.0, true, 3], [0, 1.03, true, 3],                        # 9-10: level with you
 ]
 ## D193: enemies carry a second weapon (a random other class) from this fight.
 const ENEMY_SECOND_FROM := 3
@@ -792,6 +868,12 @@ static func scale_stats(u: BWUnit, mult: float) -> void:
 ## ENEMY_RANKS and auto-picked (BWPicks.auto_resolve: perks, then improve /
 ## learn skills, data order, no rng). The boss is its own thing.
 func enemies_for(n: int, room: Dictionary = {}) -> Array:
+	var out := _enemies_for(n, room)
+	BWKeystones.arm_enemies(out, n, room)          # D279: enemy keystones by stage
+	return out
+
+
+func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 	# D186: a room's squad (`room` from BWRooms; empty = fight n's chosen room,
 	# the Standard one until a choice is made)
 	if room.is_empty() and n < BOSS_FIGHT:
@@ -1303,7 +1385,7 @@ func grant_skill_pick(u: BWUnit, wc: String) -> bool:
 ## D128: a free perk pick in `el` that doesn't move the rank. False when the
 ## unit already has (or is already owed) every perk of the element.
 func grant_perk_pick(u: BWUnit, el: String) -> bool:
-	if u.affinity_rank(el) >= BWPicks.ALL_RANK or BWPicks.allowance(u, el) >= BWPicks.perks_of(el).size():
+	if BWPicks.allowance(u, el) >= BWPicks.perks_of(el).size():     # D277: the ladder caps at 4
 		return false
 	u.bonus_perks[el] = int(u.bonus_perks.get(el, 0)) + 1
 	return true
@@ -1507,6 +1589,10 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.equipment = ud.equipment.duplicate(true)
 		# D90/D91 picks (save version 2)
 		u.perks = Array(ud.get("perks", [])).duplicate()
+		u.keystones = Array(ud.get("keystones", [])).map(func(x): return str(x))   # D277 (v11)
+		BWKeystones.enforce_cap(u)                    # D302: never more than 2
+		if version < 11:
+			u.perks = migrate_perks_v11(u.perks)          # D283: the 4-per-element re-cut
 		u.known_skills = Array(ud.get("known_skills", [])).duplicate()
 		u.skill_ranks = _ints(ud.get("skill_ranks", {}))
 		u.skill_picks = _ints(ud.get("skill_picks", {}))
@@ -1538,13 +1624,20 @@ static func from_dict(d: Dictionary) -> BWRun:
 			migrate_v10(list, r.seed_value)
 		for u in r.squad:
 			migrate_v10(u.equipment.values(), r.seed_value)
+	if version < 11:                                       # D283 (save v11)
+		for list in [r.inventory, r.trash]:
+			migrate_v11(list, r.seed_value)
+		for u in r.squad:
+			migrate_v11(u.equipment.values(), r.seed_value)
 	r.trust = d.trust.duplicate()
 	r.last_enemies = d.last_enemies.duplicate(true)
 	r.shop = d.shop.duplicate(true)
 	migrate_imbues(r.shop, r.seed_value)                   # D206
 	r.scrolls = Array(d.get("scrolls", [])).duplicate(true)      # D203 (save v8)
-	if version < 10:
-		migrate_v10(r.shop, r.seed_value)                  # D247
+	if version < 11:
+		if version < 10:
+			migrate_v10(r.shop, r.seed_value)              # D247
+		migrate_v11(r.shop, r.seed_value)                  # D283
 		for sc in r.scrolls:
 			if BWData.row("enchantments", str(sc.get("enchant", ""))).is_empty():
 				r.scrolls = []                             # a scroll of a gone row: re-roll the seven

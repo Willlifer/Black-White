@@ -110,6 +110,9 @@ const STATUS := {
 	"frost_ward": ["Frost Ward", "negates the next elemental effect on it, then breaks"],
 	"steadied": ["Steadied", "immune to stagger for its next 2 turns"],
 	"ward_cd": ["Frost Ward recharging", "no ward at its next turn (a ward every 2nd turn)"],
+	"becalmed": ["Becalmed", "move 0 (it can still act and be pushed)"],            # D270
+	"restless": ["Restless", "immune to Becalm for its next 2 turns"],             # D270
+	"frozen": ["Frozen", "skips its next turn; can't be displaced; counts as glazed (Shatter); its next hit taken is x2 and thaws it"],   # D294
 }
 ## D93: statuses that count as an elemental effect (Frost Ward / Nightborn
 ## negate them). Staggered counts only when an element lays it (Static Field).

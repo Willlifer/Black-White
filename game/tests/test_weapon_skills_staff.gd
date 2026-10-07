@@ -183,4 +183,7 @@ func test_ai_transfers_then_strikes(t) -> void:
 	BWAI.take_turn(b)
 	var kinds: Array = b.history.filter(func(e): return e.type in ["skill", "attack"]).map(func(e): return str(e.get("skill", e.type)))
 	t.eq(kinds.slice(0, 2), ["transfer", "attack"], "Transfer, then the basic (%s)" % [kinds])
-	t.eq(b.tiles.intensity(E, "fire"), 3, "the fire went under the foe")
+	t.ok(b.history.any(func(e): return e.type == "paint" and e.get("kind", "") == "transfer" and E in e.hexes), "the fire went under the foe")
+	# D285: the staff's fire basic then lands on that fire 3: it Overheats and vents to 2
+	t.ok(b.history.any(func(e): return e.type == "overheat" and e.hex == E), "and the fire blow on it Overheats")
+	t.eq(b.tiles.intensity(E, "fire"), 2, "venting to fire 2")

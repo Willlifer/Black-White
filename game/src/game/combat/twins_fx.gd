@@ -474,8 +474,9 @@ func _counters() -> void:
 			lab.outline_size = 10
 			lab.modulate = Color.WHITE
 			lab.outline_modulate = Color.BLACK
-			lab.position.y = 3.0
-			v.add_child(lab)
+			lab.render_priority = 16              # over the board's transparent tiles
+			lab.outline_render_priority = 15
+			BWKeystoneView.bar_mark(v, lab, 2)    # D299: on its HP bar, clamped below the turn order
 			_count_labels[u.id] = lab
 		if lab:
 			lab.visible = want

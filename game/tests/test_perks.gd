@@ -1,6 +1,7 @@
 extends RefCounted
-## D93: the 35 element perks (data/perks.csv, design/ELEMENTS.md §12), one
-## test each, asserted on the number or the rule they change.
+## D93: the element perks (data/perks.csv, design/ELEMENTS.md §12), one
+## test each, asserted on the number or the rule they change. D281 re-cut
+## them to 28 (4 per element); merged perks are tested through their new home.
 
 const C := Vector2i(4, 4)
 const E := Vector2i(5, 4)
@@ -82,26 +83,40 @@ func test_waterwalking(t) -> void:
 	t.eq(int(b.reachable(plain)[Vector2i(5, 8)].cost), 3, "without it: 1 + 2")
 
 
-func test_flow_state(t) -> void:
-	var me := _u("me", "sword", "water", {}, ["water_flow"])
+func test_tidal_guard_covers_allies(t) -> void:
+	var me := _u("me", "sword", "water", {}, ["water_guard"])      # D281: Flow State joined Tidal Guard
 	var mate := _u("m", "sword", "fire")
 	var foe := _foe()
 	var b := _fight([me, mate], [foe], [C, Vector2i(4, 8)], [Vector2i(5, 8)])
 	b.tiles.apply([Vector2i(4, 8)], "water", "x", 2)
-	b.tiles.apply([C], "water", "x", 1)
-	var m := _mod(b.forecast_basic(foe, mate), "Flow State")
-	t.eq(float(m.get("value", 0)), 6.0, "an ally in water 2: +6 avoid")
-	t.eq(str(m.get("stage", "")), "avoid", "an avoid term")
-	t.eq(float(_mod(b.forecast_basic(foe, me), "Flow State").get("value", 0)), 3.0, "the holder in water 1: +3")
+	var m := _mod(b.forecast_basic(foe, mate), "Tidal Guard")
+	t.eq(float(m.get("value", 0)), 30.0, "an ally in water 2: +30 glance")
+	t.eq(str(m.get("stage", "")), "glance", "a glance term")
 
 
 func test_current_push(t) -> void:
 	var me := _u("me", "sword", "water", {}, ["water_push"])
 	var foe := _foe()
 	var b := _fight([me], [foe], [C], [E])
-	t.ok(_mod(b.forecast_basic(me, foe), "Current Push").is_empty(), "not from dry ground")
+	t.ok(_mod(b.forecast_basic(me, foe), "Current Push (").is_empty(), "not from dry ground")
 	b.tiles.apply([C], "water", "x", 2)
-	t.near(float(_mod(b.forecast_basic(me, foe), "Current Push").get("value", 0)), 1.10, 0.001, "from water 2: +10%")
+	t.near(float(_mod(b.forecast_basic(me, foe), "Current Push (").get("value", 0)), 1.16, 0.001, "from water 2: +16% (D281: 8 per level)")
+	t.ok(me.effects.any(func(e): return e.key == "attack_mod" and e.name == "Current Push"), "Tidewalker folded in (D281)")
+
+
+func test_current_push_moves_along_water(t) -> void:
+	var pushed := false
+	for sd in range(1, 20):
+		var me := _u("me", "sword", "water", { "dex": 100 }, ["water_push"])
+		var foe := _foe()
+		var b := _fight([me], [foe], [C], [E], sd)
+		b.tiles.apply([E, Vector2i(6, 4)], "water", "x", 1)
+		_turn(b, me)
+		if b.attack(me, foe).hit:
+			t.eq(foe.pos, Vector2i(6, 4), "pushed 1 along the water, away from me")
+			pushed = true
+			break
+	t.ok(pushed, "a hit landed")
 
 
 func test_tidal_guard(t) -> void:
@@ -174,10 +189,10 @@ func test_kindling(t) -> void:
 	b.tiles.apply([E], "fire", "x", 3)
 	b.tiles.apply([C], "fire", "x", 1)
 	var m := _mod(b.forecast_basic(me, foe), "Kindling")
-	t.near(float(m.get("value", 0)), 1.15, 0.001, "the higher level counts: the target's fire 3")
+	t.near(float(m.get("value", 0)), 1.18, 0.001, "the higher level counts: the target's fire 3 (D281: 6 per level)")
 	t.ok(str(m.label).contains("target on Fire 3"), "named")
 	b.tiles.clear(E)
-	t.near(float(_mod(b.forecast_basic(me, foe), "Kindling").get("value", 0)), 1.05, 0.001, "or your own fire 1")
+	t.near(float(_mod(b.forecast_basic(me, foe), "Kindling").get("value", 0)), 1.06, 0.001, "or your own fire 1")
 
 
 func test_wildfire(t) -> void:
@@ -196,15 +211,14 @@ func test_wildfire(t) -> void:
 	t.eq(two.size(), 0, "seeds never seed")
 
 
-func test_coal_engine(t) -> void:
-	var me := _u("me", "sword", "fire", {}, ["fire_coal"])
+func test_heat_rush_moves_allies_on_fire(t) -> void:
+	var me := _u("me", "sword", "fire", {}, ["fire_rush"])         # D281: Coal Engine joined Heat Rush
 	var mate := _u("m", "sword", "water")
 	var b := _fight([me, mate], [_foe()], [C, Vector2i(8, 8)], [Vector2i(10, 0)])
 	b.tiles.apply([Vector2i(8, 8)], "fire", "x", 2)
 	_turn(b, mate)
 	t.eq(mate.move_range(), 4 + 2, "an ally starting on fire 2: +2 move")
-	t.ok(mate.move_notes().any(func(n): return str(n[0]).begins_with("Coal Engine")), "named on the Move hover")
-	t.ok(BWFormulas.move(mate).formula.contains("Coal Engine"), "and in the formula")
+	t.ok(mate.move_notes().any(func(n): return str(n[0]).begins_with("Heat Rush")), "named on the Move hover")
 
 
 # ------------------------------------------------------------------ ice
@@ -227,10 +241,11 @@ func test_rime_armour(t) -> void:
 	var foe := _foe()
 	var b := _fight([me], [foe], [C], [E])
 	b.tiles.apply([C], "water", "x")
-	b.tiles.apply([C], "ice", "x")
+	b.tiles.apply([C], "ice", me.id)
 	var fc := b.forecast_basic(foe, me)
 	t.near(float(_mod(fc, "Shatter").get("value", 0)), 1.0, 0.001, "Shatter doesn't apply")
-	t.near(float(_mod(fc, "Rime Armour").get("value", 0)), 0.9, 0.001, "-10% on ice")
+	t.near(float(_mod(fc, "Rime Armour (").get("value", 0)), 0.95, 0.001, "-5% per glaze level on my glaze (D281, Permafrost folded in)")
+	t.eq(BWPerkRules.slam_pct(b, me, foe.id, 8.0, false), 0.0, "no slam damage on glaze")
 
 
 func test_fault_lines(t) -> void:
@@ -242,12 +257,11 @@ func test_fault_lines(t) -> void:
 		b.tiles.apply([E], "water", "x")
 		b.tiles.apply([E], "ice", "x")
 		_turn(b, me)
-		t.near(float(_mod(b.forecast_basic(me, foe), "Shatter").get("value", 0)), 1.30, 0.001, "Shatter +30%")
+		t.near(float(_mod(b.forecast_basic(me, foe), "Shatter").get("value", 0)), 1.30, 0.001, "Shatter doubled: +30%")
+		t.eq(BWPerkRules.slam_pct(b, foe, me.id, 8.0, false), 16.0, "slams I cause: +8%")
 		var res := b.attack(me, foe)
 		if res.hit:
-			t.ok(not b.tiles.is_glazed(E), "the hit broke the glaze")
-			t.eq(b.tiles.intensity(E, "water"), 1, "the charge stays")
-			t.eq(_ev(b, "glaze_break").size(), 1, "an event")
+			t.ok(b.tiles.is_glazed(E), "D281: the hit no longer breaks the glaze")
 			done = true
 			break
 	t.ok(done, "a hit landed")
@@ -265,7 +279,9 @@ func test_frostbite(t) -> void:
 
 
 func test_frost_ward(t) -> void:
-	var me := _u("me", "sword", "ice", {}, ["ice_ward"])
+	var me := _u("me", "sword", "ice")                  # D282: Frost Ward is the Ice set's 3-piece now
+	for slot in ["head", "chest", "legs"]:
+		me.equipment[slot] = { "uid": "ice_" + slot, "slot": slot, "base": "", "enchant": "glacial", "tier": "E", "stats": {} }
 	var mate := _u("m", "sword", "fire")
 	var b := _fight([me, mate], [_foe()], [C, Vector2i(4, 6)], [Vector2i(10, 10)])
 	_turn(b, me)
@@ -274,22 +290,7 @@ func test_frost_ward(t) -> void:
 	b.tiles.apply([mate.pos], "fire", "x", 2)
 	_turn(b, mate)
 	t.ok(_ev(b, "tile_damage").filter(func(e): return e.unit == "m").is_empty(), "the ward negated the fire")
-	var wb := _ev(b, "ward_break")
-	t.eq(wb.size(), 1, "ward_break emitted")
-	t.eq(str(wb[0].source), "frost_ward", "named")
-	t.ok(not mate.statuses.has("frost_ward"), "and it broke")
-	t.ok(me.statuses.has("ward_cd"), "the holder shows the cooldown (unit card)")
-	_turn(b, me)
-	t.ok(not mate.statuses.has("frost_ward"), "every 2nd turn: nothing on the holder's 2nd turn")
-	t.ok(not me.statuses.has("ward_cd"), "cooldown spent")
-	_turn(b, me)
-	_turn(b, me)
-	_turn(b, me)
-	t.ok(mate.statuses.has("frost_ward") and me.statuses.has("frost_ward"), "3rd turn the ally, 5th (none unwarded left) me")
-	var n := _ev(b, "status").filter(func(e): return e.status == "frost_ward").size()
-	_turn(b, me)
-	_turn(b, me)
-	t.eq(_ev(b, "status").filter(func(e): return e.status == "frost_ward").size(), n, "one ward per unit at a time")
+	t.eq(str(_ev(b, "ward_break")[0].source), "frost_ward", "named")
 
 
 # ------------------------------------------------------------------ thunder
@@ -308,7 +309,7 @@ func test_bolt_step(t) -> void:
 func test_grounded(t) -> void:
 	var me := _u("me", "sword", "fire", { "dex": 100 })
 	var f := _foe("f")
-	var g := _foe("g", {}, ["thunder_grounded"])
+	var g := _foe("g", {}, ["thunder_rod"])               # D281: Grounded joined Lightning Rod
 	var ok := false
 	for sd in range(1, 12):
 		for u in [me, f, g]:
@@ -323,16 +324,6 @@ func test_grounded(t) -> void:
 			ok = true
 			break
 	t.ok(ok, "an arc happened")
-	var g1 := _foe("g1", {}, ["thunder_grounded"])
-	var g2 := _foe("g2")
-	g2.affinity["thunder"] = 10                        # same resistance as g1
-	var b2 := _fight([me], [f, g1, g2], [C], [E, Vector2i(6, 4), Vector2i(5, 3)])
-	b2.tiles.apply([E], "fire", "x", 3)
-	b2.paint([E], "thunder", me)
-	var td := _ev(b2, "tile_damage")
-	var a1: int = td.filter(func(e): return e.unit == "g1")[0].amount
-	var a2: int = td.filter(func(e): return e.unit == "g2")[0].amount
-	t.eq(a1, maxi(1, int(a2 * 0.5)), "splash halved again")
 
 
 func test_overcharge(t) -> void:
@@ -412,7 +403,10 @@ func test_eye_of_the_storm(t) -> void:
 	var b := _fight([me], [archer, sword], [C], [Vector2i(8, 4), E])
 	t.ok(not b._displace(me, 0, 1, "push"), "immune to displacement")
 	t.eq(_ev(b, "displace_resisted").size(), 1, "resisted")
-	t.eq(float(_mod(b.forecast_basic(archer, me), "Eye of the Storm").get("value", 0)), -15.0, "arrows: -15 hit")
+	var fc := b.forecast_basic(archer, me)
+	t.ok(_mod(fc, "Eye of the Storm (missile): -").is_empty(), "D281: no -hit any more")
+	t.eq(float(_mod(fc, "Eye of the Storm (missile): can't crit").get("value", -1)), 0.0, "arrows can't crit")
+	t.eq(fc.crit.value, 0.0, "on the crit line")
 	t.ok(_mod(b.forecast_basic(sword, me), "Eye of the Storm").is_empty(), "a sword: nothing")
 
 
@@ -432,7 +426,7 @@ func test_gust(t) -> void:
 	var slammed := false
 	for sd in range(1, 20):
 		for blocked in [false, true]:
-			var me := _u("me", "sword", "wind", { "dex": 100 }, ["wind_gust"])
+			var me := _u("me", "sword", "wind", { "dex": 100 }, ["wind_force"])
 			var foe := _foe()
 			var b := _fight([me], [foe], [C], [E], sd)
 			if blocked:
@@ -456,7 +450,7 @@ func test_gust(t) -> void:
 
 
 func test_slipstream(t) -> void:
-	var me := _u("me", "sword", "wind", {}, ["wind_slip"])
+	var me := _u("me", "sword", "wind", {}, ["wind_tail"])          # D281: Slipstream joined Tailwind
 	var near := _u("n", "sword", "fire")
 	var far := _u("x", "sword", "fire")
 	var b := _fight([me, near, far], [_foe()], [C, Vector2i(4, 6), Vector2i(4, 9)], [Vector2i(10, 10)])
@@ -474,16 +468,23 @@ func test_shadowstep(t) -> void:
 	var me := _u("me", "sword", "dark", {}, ["dark_step"])
 	var b := _fight([me], [_foe()], [C], [Vector2i(10, 10)])
 	var to := Vector2i(7, 4)
-	for h in [Vector2i(5, 4), Vector2i(6, 4), Vector2i(5, 3), Vector2i(5, 5), Vector2i(6, 3), Vector2i(6, 5)]:
-		b.board.set_cell(h, "jagged")
+	for h in [Vector2i(5, 4), Vector2i(6, 4)]:
+		b.board.set_cell(h, "muddy")
 	b.tiles.apply([C, to], "dark", "x")
 	_turn(b, me)
 	var r := b.reachable(me)
-	t.eq(int(r[to].cost), 1, "dark to dark within 3: 1 move, through the rock")
+	t.eq(int(r[to].cost), 1, "dark to dark within 3 in sight: 1 move")
 	t.eq(BWBoard.path_to(r, to).size(), 2, "the path is one jump")
 	t.ok(b.move(me, to), "stepped")
 	t.ok(_ev(b, "move")[0].has("shadowstep"), "the move says so")
 	t.ok(me.fx.get("shadowstep_used", false), "once per turn")
+	var me2 := _u("me2", "sword", "dark", {}, ["dark_step"])
+	var b2 := _fight([me2], [_foe()], [C], [Vector2i(10, 10)])
+	for h in [Vector2i(5, 4), Vector2i(6, 4), Vector2i(5, 3), Vector2i(5, 5), Vector2i(6, 3), Vector2i(6, 5)]:
+		b2.board.set_cell(h, "jagged")
+	b2.tiles.apply([C, to], "dark", "x")
+	_turn(b2, me2)
+	t.ok(not b2.reachable(me2).has(to), "D281: not through a rock wall (needs sight)")
 
 
 func test_nightborn(t) -> void:
@@ -510,8 +511,9 @@ func test_ambush(t) -> void:
 	var b := _fight([me], [foe], [C], [E])
 	b.tiles.apply([C], "dark", "x", 2)
 	var fc := b.forecast_basic(me, foe)
-	t.eq(float(_mod(fc, "Ambush").get("value", 0)), 10.0, "from dark 2: +10 crit")
-	t.near(fc.crit.value, 0.4 + 10.0, 0.001, "on the crit line")
+	t.eq(float(_mod(fc, "Ambush (").get("value", 0)), 12.0, "from dark 2: +12 crit (D281: 6 per level)")
+	t.near(fc.crit.value, 0.4 + 12.0, 0.001, "on the crit line")
+	t.ok(fc.mods.any(func(m): return str(m.stage) == "crit_mult" and str(m.label).begins_with("Ambush")), "Nightfall folded in: crit multiplier")
 
 
 ## Pall: the first seed whose basic attack on a foe standing on dark `lvl` lands.
@@ -534,15 +536,16 @@ func test_pall(t) -> void:
 	t.ok(f1 != null and not f1.statuses.has("blinded"), "dark 1: no")
 
 
-func test_cover_of_night(t) -> void:
-	var me := _u("me", "sword", "dark", {}, ["dark_cover"])
+func test_nightborn_covers_adjacent_allies(t) -> void:
+	var me := _u("me", "sword", "dark", {}, ["dark_night"])          # D281: Cover of Night joined Nightborn (no -hit)
 	var mate := _u("m", "sword", "fire")
-	var far := _u("x", "sword", "fire")
-	var foe := _foe()
-	var b := _fight([me, mate, far], [foe], [C, Vector2i(4, 5), Vector2i(4, 9)], [Vector2i(5, 6)])
-	t.eq(float(_mod(b.forecast_basic(foe, mate), "Cover of Night").get("value", 0)), -7.0, "an ally beside me: -7 hit")
-	t.ok(_mod(b.forecast_basic(foe, far), "Cover of Night").is_empty(), "not further away")
-	t.ok(_mod(b.forecast_basic(foe, me), "Cover of Night").is_empty(), "not me")
+	var b := _fight([me, mate], [_foe()], [C, Vector2i(4, 5)], [Vector2i(10, 10)])
+	b.tiles.apply([mate.pos], "dark", "x", 1)
+	_turn(b, mate)
+	var hp := mate.hp
+	b._tile_hurt(mate, 10, "fire", "")
+	t.eq(mate.hp, hp, "an adjacent ally on dark: its first elemental effect is negated")
+	t.ok(_mod(b.forecast_basic(_foe("z"), mate), "Cover of Night").is_empty(), "no -hit any more")
 
 
 # ------------------------------------------------------------------ light
@@ -559,13 +562,16 @@ func test_sunpath(t) -> void:
 
 
 func test_radiant_guard(t) -> void:
-	var me := _u("me", "sword", "light", {}, ["light_guard"])
+	var me := _u("me", "sword", "light", {}, ["light_sanct"])        # D281: Radiant Guard joined Sanctuary
 	var plain := _u("p", "sword", "light")
 	var foe := _foe()
 	var b := _fight([me, plain], [foe], [C, Vector2i(4, 8)], [E])
 	b.tiles.apply([C, Vector2i(4, 8)], "light", "x", 2)
 	t.eq(float(_mod(b.forecast_basic(foe, me), "Target on Light 2").get("value", -1)), 0.0, "light's +14 ignored on me")
-	t.eq(float(_mod(b.forecast_basic(foe, plain), "Target on Light 2").get("value", -1)), 14.0, "not on others")
+	t.eq(float(_mod(b.forecast_basic(foe, plain), "Target on Light 2").get("value", -1)), 0.0, "and on my allies")
+	var b2 := _fight([plain], [foe], [Vector2i(4, 8)], [E])
+	b2.tiles.apply([Vector2i(4, 8)], "light", "x", 2)
+	t.eq(float(_mod(b2.forecast_basic(foe, plain), "Target on Light 2").get("value", -1)), 14.0, "without a Sanctuary holder: +14")
 
 
 func test_judgement(t) -> void:

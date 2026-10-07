@@ -586,8 +586,8 @@ func handle(what: String) -> bool:
 ## fits the cruise, so the stop starts on a contact.
 func plan_move(distance: float, hexes: int) -> Dictionary:
 	var ramp := 0.22
-	if encounter == "being":
-		# D220: a Being glides (no steps): a trapezoid at the glide speed
+	if encounter in ["being", "twin"]:
+		# D220: a Being glides (no steps); D298: so do the Twins: a trapezoid at the glide speed
 		var gd := distance / GLIDE_SPEED + 0.3
 		var gs := func(t: float) -> float:
 			return BWCombatScreen._trapezoid(t, gd, 0.3) * distance
@@ -928,6 +928,8 @@ func _reframe(p: Dictionary, frame: String, target: Dictionary) -> Dictionary:
 const GLIDE_SPEED := 2.4          ## a Being's glide (u/s)
 const BEING_HOVER := 0.17         ## a Being floats this high (m), +- BEING_BOB
 const BEING_BOB := 0.025
+const TWIN_HOVER := 0.3          ## D298: the Twins float a little higher, a slower, wider bob
+const TWIN_BOB := 0.045
 const BLANK_LOOK := 2.6           ## the Blanks' shared head-turn beat (s)
 const BLANK_SNAP := 0.11          ## ... each turn takes this long: a snap, then dead still
 ## The Blanks' head yaw / tilt per beat (radians); one shared sequence.
@@ -970,6 +972,13 @@ func _encounter_setup(u: BWUnit) -> void:
 			rotate_idles = false
 			actions.idle = { "clip": "idle" }
 			actions.walk = { "clip": "idle" }     # it glides: no steps
+			actions.run = { "clip": "idle" }
+		"twin":
+			# D298 (the author: "Noon and Dusk should float around"): a hover
+			# idle and a glide, the Being's motion at a slightly higher float
+			rotate_idles = false
+			actions.idle = { "clip": "idle" }
+			actions.walk = { "clip": "idle" }
 			actions.run = { "clip": "idle" }
 
 
@@ -1023,14 +1032,16 @@ func _encounter_layer(p: Dictionary, delta: float) -> void:
 					continue
 				d.pos = (d.pos as Vector3).lerp(_base[h + "_pos"], w)
 				d.aim = (d.aim as Vector3).lerp(_base[h + "_aim"], w).normalized()
-		"being":
+		"being", "twin":
 			# hovering: no contacts (the lock lets the feet hang), toes down,
 			# a slow bob; leaning into a glide. A knocked-out Being drops.
 			var want := 0.0 if clip == "fall" else 1.0
 			_enc_w = move_toward(_enc_w, want, delta * (4.0 if want > 0.0 else 6.0))
 			var w := smoothstep(0.0, 1.0, _enc_w)
 			var ph := float(absi(hash(character.unit.id if character and character.unit else "b")) % 628) / 100.0
-			var h := (BEING_HOVER + BEING_BOB * sin(_enc_t * 1.6 + ph)) * w
+			var hov := TWIN_HOVER if encounter == "twin" else BEING_HOVER
+			var bob := TWIN_BOB if encounter == "twin" else BEING_BOB
+			var h := (hov + bob * sin(_enc_t * (1.2 if encounter == "twin" else 1.6) + ph)) * w
 			var v := clampf(Vector2(velocity.x, velocity.z).length() / GLIDE_SPEED, 0.0, 1.0)
 			p.root = (p.root as Vector3) + Vector3(0, h, 0)
 			p.spine = (p.spine as Vector3) + Vector3(0.16 * v * w, 0, 0)

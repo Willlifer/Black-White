@@ -155,7 +155,7 @@ static func steps() -> Array:
 		{ "id": "results", "lesson": 10, "wait": "results", "hl": { "ui": "level_up" },
 			"text": "The summary shows who did what. Every fight, won or lost, gives every unit one level." },
 		{ "id": "perk", "lesson": 10, "wait": "pick", "pick": { "unit": "della", "kind": "perk", "element": "fire" },
-			"text": "Ranks in an element earn perks. Pick one of the two cards." },
+			"text": "Element ranks earn perks; ranks 3 and 6 earn a gold keystone that breaks a rule. Pick one of the two cards." },
 		{ "id": "skill_pick", "lesson": 10, "wait": "pick", "pick": { "unit": "della", "kind": "skill", "weapon": "sword" },
 			"text": "Ranks with a weapon earn skill picks: improve a skill you have or learn a new one." },
 		# ---- 11. the closing card
@@ -199,6 +199,7 @@ static func make_run() -> BWRun:
 		u.equipment["main_hand"] = run.make_item(u.weapon_model, "E", "")   # no enchantment: plain numbers
 		match u.id:
 			"della":
+				u.perks = ["fire_rush"]     # D284: fixed (the drawn one was Coal Engine, now inside Heat Rush; a 4-perk draw gave Wildfire)
 				u.equipment[BWUnit.SECOND] = run.make_item("m1911", "E", "")
 				_learn(u, "sword", ["heart_seeker", "striketwice"])
 				_learn(u, "pistols", ["pistol_whip", "quick_shot", "reload"])
@@ -209,6 +210,7 @@ static func make_run() -> BWRun:
 			"gail":
 				_learn(u, "bow", ["pinning_shot", "arcing_shot"])
 		u.sync_weapon()
+		u.wind_mode = "becalm"      # D271: the lessons' wind moves nobody (they predate wind modes)
 	return run
 
 

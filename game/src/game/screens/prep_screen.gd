@@ -152,6 +152,17 @@ func _make_tag(i: int) -> Dictionary:
 		pk.add_theme_color_override("font_outline_color", Color.BLACK)
 		pk.add_theme_constant_override("outline_size", 6)
 		box.add_child(pk)
+	for kid in u.keystones:                               # D278: the hall lists keystones, gold, with the sigil
+		var kl := Label.new()
+		kl.name = "keystone_" + str(kid)
+		kl.text = "◈ " + BWKeystones.name_of(str(kid))
+		kl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		kl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		kl.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 3)
+		kl.add_theme_color_override("font_color", BWPicker.GOLD)
+		kl.add_theme_color_override("font_outline_color", Color.BLACK)
+		kl.add_theme_constant_override("outline_size", 6)
+		box.add_child(kl)
 	var pips := BWDowntimeWidgets.GearPips.new()
 	pips.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	pips.set_unit(run.squad[i])

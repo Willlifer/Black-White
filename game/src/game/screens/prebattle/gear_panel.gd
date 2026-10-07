@@ -46,6 +46,7 @@ var _give_flow: HFlowContainer
 var _give_label: Label
 var _swap_btn: Button              # D180
 var _sort_btns := {}               # D235
+var _sets: RichTextLabel           # D282
 var _trash_box: PanelContainer     # D234
 var _trash_row: HBoxContainer
 var _trash_title: Label
@@ -139,6 +140,16 @@ func _init(p_run: BWRun) -> void:
 			_swap_btn.pressed.connect(_swap)
 			rs.add_child(_swap_btn)
 	doll.tooltip_text = "Drag to turn the model. Double-click a slot to take it off."
+	_sets = RichTextLabel.new()                         # D282: the active element sets, one line
+	_sets.name = "active_sets"
+	_sets.bbcode_enabled = true
+	_sets.fit_content = true
+	_sets.scroll_active = false
+	_sets.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_sets.custom_minimum_size = Vector2(500, 0)
+	_sets.add_theme_font_size_override("normal_font_size", BWStyle.F_SMALL - 1)
+	_sets.add_theme_font_size_override("bold_font_size", BWStyle.F_SMALL - 1)
+	dc.add_child(_sets)
 	_msg = Label.new()
 	_msg.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
 	_msg.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
@@ -241,6 +252,7 @@ func refresh() -> void:
 		t.set_item(unit.equipment.get(slot, {}))
 		t.draggable = slot != "main_hand"
 	_swap_btn.disabled = unit.second_weapon().is_empty()
+	_fill_sets()
 	for f in _filter_btns:
 		_filter_btns[f].button_pressed = f == _filter
 	_fill_grid()
@@ -252,6 +264,29 @@ func refresh() -> void:
 		_sel = {}
 		card.clear()
 	_fill_trash()
+
+
+## D282: "Sets: Fire 2/3 · Water 3/3 (Breakwater)", each in its colour; hover
+## for what the tiers do. Empty sets: a faint hint of how they're made.
+func _fill_sets() -> void:
+	var act := BWSets.active(unit)
+	var faint := BWGearText.hex(BWStyle.FAINT)
+	if act.is_empty():
+		_sets.text = "[color=#%s]Sets: none. Head, chest, legs and the drawn weapon's imbue count toward their element.[/color]" % faint
+		_sets.tooltip_text = ""
+		return
+	var parts: PackedStringArray = []
+	var tips: PackedStringArray = []
+	for a in act:
+		var ec := BWGearText.hex(BWGearText.readable(BWLook.element_color(str(a.element))))
+		parts.append("[color=#%s][b]%s %d/3[/b][/color]%s" % [ec, str(a.element).capitalize(), int(a.pieces),
+			(" [color=#%s](%s)[/color]" % [ec, a.three]) if int(a.tier) >= 3 else ""])
+		tips.append("%s 2: %s" % [str(a.element).capitalize(), a.two_text])
+		if int(a.tier) >= 3:
+			tips.append("%s 3, %s: %s" % [str(a.element).capitalize(), a.three, a.three_text])
+	_sets.text = "[color=#%s]Sets[/color]  %s" % [faint, "  ·  ".join(parts)]
+	_sets.tooltip_text = "
+".join(tips)
 
 
 func _fill_grid() -> void:

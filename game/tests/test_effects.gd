@@ -101,9 +101,10 @@ func test_parse_collect_and_conversions(t) -> void:
 	t.eq(pct.call("geyser").dmg_pct_per_point, 2, "D196: Geyser sets 2% per point directly")
 	t.eq(pct.call("flaring").heal_pct_per_point, 3, "Flaring heal 2 flat -> 3% per point")
 	var keys := {}
-	for r in BWData.table("enchantments") + BWData.table("abilities"):
-		keys[str(r.effect_key)] = true
-		for part in str(r.get("also", "")).split("|", false):     # D243: merged rows carry keys in `also`
+	for r in BWData.table("enchantments") + BWData.table("abilities") + BWData.table("perks") + BWData.table("sets"):
+		if str(r.get("effect_key", "")) != "":
+			keys[str(r.effect_key)] = true
+		for part in (str(r.get("also", "")) + "|" + str(r.get("two", ""))).split("|", false):   # D243 `also`; D281 perks; D282 set 2-pieces
 			keys[part.strip_edges().get_slice("(", 0)] = true
 	for k in BWEffects.GEAR_KEYS:
 		t.ok(keys.has(k), "the 25 gear keys are all used (%s)" % k)
@@ -128,10 +129,10 @@ func test_rank_scaling(t) -> void:
 
 
 func test_sleeping_enchantments(t) -> void:
-	var u := _ench(_u("w", "sword", "water"), "blazing")
-	t.ok(not BWEffects.has(u, "stand_on_bonus"), "a fire row sleeps on a unit without fire")
+	var u := _ench(_u("w", "sword", "water"), "explosive")
+	t.ok(not BWEffects.has(u, "tile_erupt"), "a fire row sleeps on a unit without fire")
 	u.affinity["fire"] = 10
-	t.ok(BWEffects.has(u, "stand_on_bonus"), "and wakes once fire is learned")
+	t.ok(BWEffects.has(u, "tile_erupt"), "and wakes once fire is learned")
 	t.ok(BWEffects.has(_ench(_u("v", "sword", "water"), "warded", "", "fire"), "damage_taken_mod"), "defensive rows never sleep")
 
 
@@ -276,8 +277,10 @@ func test_tile_potency_pct(t) -> void:
 	t.eq(b.tiles.move_penalty(W), 2, "Brimming: water 2 costs ceil(1 × 1.5)")
 	b.tiles.apply([Vector2i(8, 7)], "water", "x", 2)
 	t.eq(b.tiles.move_penalty(Vector2i(8, 7)), 1, "control: someone else's water 2")
-	# Shattering: a lock you made shatters ×1.5 × 1.33 (≈ ×2).
-	var icy := _ench(_u("i", "staff", "ice"), "shattering")
+	# Shattering (D281: inside the Fault Lines perk): a lock you made shatters ×1.5 × 1.33 (≈ ×2).
+	var icy := _u("i", "staff", "ice")
+	icy.perks.append("ice_fault")
+	icy.refresh_effects()
 	var other := _u("o", "staff", "thunder")
 	var b2 := _fight([icy, other], [_far()], [C, Vector2i(0, 5)], [FAR])
 	b2.tiles.apply([X], "fire", "x")
@@ -286,18 +289,29 @@ func test_tile_potency_pct(t) -> void:
 	t.near(_events(b2, "detonate")[0].pct, 9.0 * 1.5 * 1.33, 0.01, "Shattering: fire 1 shatter")
 
 
+## D282: stand_on_bonus is the element sets' 2-piece now (Blazing, Rimed... left
+## enchantments): two fire pieces, two ice pieces.
+func _set_pieces(u: BWUnit, ench: String, n: int = 2) -> BWUnit:
+	var slots := ["head", "chest", "legs"]
+	for i in n:
+		u.equipment[slots[i]] = { "uid": "s_%s_%d" % [ench, i], "base": "", "slot": slots[i], "tier": "E",
+			"stats": {}, "enchant": ench, "worn": {} }
+	u.refresh_effects()
+	return u
+
+
 func test_stand_on_bonus(t) -> void:
-	var me := _ench(_u("me", "sword", "fire"), "blazing")
+	var me := _set_pieces(_u("me", "sword", "fire"), "kindled")
 	var b := _fight([me], [_far()], [C], [FAR])
 	t.eq(me.stat("str"), 4, "off the fire")
 	b.tiles.apply([C], "fire", "anyone", 2)
-	t.eq(me.stat("str"), 6, "Blazing: +1 str per fire point under you (anyone's; the D196 floor at STR 4)")
-	var rimed := _ench(_u("r", "sword", "ice"), "rimed")
+	t.eq(me.stat("str"), 6, "Fire set (2): +1 str per fire point under you (anyone's; the D196 floor at STR 4)")
+	var rimed := _set_pieces(_u("r", "sword", "ice"), "glacial")
 	var b2 := _fight([rimed], [_far()], [C], [FAR])
 	b2.tiles.apply([C], "fire", "x")
 	t.eq(rimed.stat("def"), 4, "unlocked fire: nothing")
 	b2.tiles.apply([C], "ice", "x")
-	t.eq(rimed.stat("def"), 6, "Rimed: +2 def on a glazed tile")
+	t.eq(rimed.stat("def"), 6, "Ice set (2): +2 def on a glazed tile")
 
 
 func test_lay_on(t) -> void:
@@ -400,12 +414,14 @@ func test_immune(t) -> void:
 	b2.attack(me2, f1)
 	t.eq(f1.pos, E, "Unflinching: the neighbour can't be knocked back")
 	# Wading and Sure Stride: terrain and water costs.
-	var wader := _ench(_u("w", "sword", "water"), "wading")
+	var wader := _u("w", "sword", "water")              # D281: Wading lives in the Waterwalking perk
+	wader.perks.append("water_walk")
+	wader.refresh_effects()
 	var plain := _u("p", "sword", "water")
 	var b3 := _fight([wader, plain], [_far()], [C, Vector2i(5, 8)], [FAR])
 	b3.tiles.apply([E], "water", "x", 3)
 	b3.tiles.apply([_nb(Vector2i(5, 8), 0)], "water", "x", 3)
-	t.eq(b3.reachable(wader)[E].cost, 1, "Wading: water 3 costs nothing extra")
+	t.eq(b3.reachable(wader)[E].cost, 0, "Waterwalking (Wading folded in): the first water hex is free")
 	_turn(b3, plain)
 	t.eq(b3.reachable(plain)[_nb(Vector2i(5, 8), 0)].cost, 3, "control: water 3 = 1 + 2")
 	var strider := _ab(_u("s", "sword", "fire"), "sure_stride")

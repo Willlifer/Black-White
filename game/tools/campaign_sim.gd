@@ -35,6 +35,11 @@ extends SceneTree
 ## 15 points is flagged). The run's own fights play their room's weather.
 ## Env POLICY limits the downtime habits to one (e.g. POLICY=mixed).
 ## Per fight it also prints the win rate in each kind of room played.
+## D308: per keystone the squad's AI took (BWPicks.auto_resolve), the win rate
+## of the fights (1-10, rooms as played) a deployed unit holding it fought
+## (informational: spotting an overpowered keystone; late fights hold more).
+## TRACE_SIM=1 prints each fight's turns, cycles and time; TRACE_FIGHT="run:fight"
+## prints the acting unit before every turn of that one fight (D308: finding a hang).
 
 const POLICIES := {
 	"specialize": ["specialize"],
@@ -119,6 +124,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 			wins.append(0); rounds.append([]); alive.append(0); played.append({})
 		var boss_left: Array = []
 		var by_room := {}       # D188: "n|kind" -> [wins, played]
+		var ks_fights := {}     # D308: keystone -> [wins, fights a deployed holder fought]
 		for s in runs:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 9000 + s
@@ -179,15 +185,30 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				b.set_weather(BWWeather.for_fight(run, n))          # D249: the room's weather
 				b.setup(deployed, enemies, [])
 				var guard := 0
+				var t0 := Time.get_ticks_msec()
+				var tf := OS.get_environment("TRACE_FIGHT") == "%d:%d" % [s, n]
 				while not b.over and guard < 1500:
+					if tf:
+						var cu := b.current()
+						print("  turn %d %s %s pos %s ks %s" % [guard, cu.id if cu else "-", cu.team if cu else "", str(cu.pos) if cu else "", str(cu.keystones) if cu else ""])
 					BWAI.take_turn(b)
 					guard += 1
+				if OS.get_environment("TRACE_SIM") == "1":       # timing: which fight runs long
+					print("run %d fight %d %s turns %d cycles %d %d ms %s" % [s, n, mname, guard, b.cycle, Time.get_ticks_msec() - t0, b.winner])
 				var won := b.winner == "player"
 				if won:
 					wins[n - 1] += 1
 				rounds[n - 1].append(b.cycle)
 				alive[n - 1] += deployed.filter(func(u): return u.alive()).size()
 				healthy = won and deployed.all(func(u): return u.alive())
+				if n < BWRun.BOSS_FIGHT:
+					var seen := {}
+					for u in deployed:
+						for kid in u.keystones:
+							seen[str(kid)] = true
+					for kid in seen:
+						var kp: Array = ks_fights.get(kid, [0, 0])
+						ks_fights[kid] = [kp[0] + (1 if won else 0), kp[1] + 1]
 				var rk := "%d|%s" % [n, kind]
 				var wp: Array = by_room.get(rk, [0, 0])
 				by_room[rk] = [wp[0] + (1 if won else 0), wp[1] + 1]
@@ -249,6 +270,13 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 					"  <-- FLAG (>15)" if absf(wr - cr) > 15.0 else "", "  ".join(row)])
 		boss_left.sort()
 		out.append("  Giant HP left (of 500): %s" % str(boss_left))
+		var kids: Array = ks_fights.keys()
+		kids.sort_custom(func(a, c): return int(ks_fights[a][1]) > int(ks_fights[c][1]))
+		var krow: PackedStringArray = []
+		for kid in kids:
+			var kp: Array = ks_fights[kid]
+			krow.append("%s %d%% (%d)" % [BWKeystones.name_of(str(kid)), 100 * int(kp[0]) / maxi(int(kp[1]), 1), int(kp[1])])
+		out.append("  keystones (squad, fights 1-10 with a deployed holder): " + (", ".join(krow) if not krow.is_empty() else "none"))
 		print("\n".join(out))
 	quit()
 

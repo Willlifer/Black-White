@@ -1,37 +1,33 @@
-# Handoff — 2026-10-06 (playtest 1 pass)
+# Handoff — 2026-10-07 (the Element Overhaul has landed)
 
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
 **Git:**
-- `main` is the full internal history: everything except Godot caches and Ableton `.asd` files.
-- The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github`, built on top of the remote's README commit. The export excludes `design/art/` renders, `Visual References/`, the raw Ableton projects, the root loop WAVs, `Audio Barks/` sources, `archive/` and the concept docx.
-- First push on 2026-10-05: internal `a20f29d` was exported as `03653ab` on GitHub `main`.
-- 2026-10-06: internal `aa5ef11` was exported as `cc156eb`. The worktree `../bw-export` (branch `github`) is kept for future exports. After `git checkout main -- …`, also `git rm` any files that were deleted on main.
-- **Re-export in a separate worktree, never by switching branches here.** Switching branches deletes the excluded files from this folder until you switch back:
-  `git worktree add ../bw-export github`, then in `../bw-export` run `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, then commit and run `git push origin github:main`.
+- `main` is the full internal history. The working tree holds the whole overhaul (lanes C1–C3 and this final pass) **uncommitted** on top of `f2ff1b1`: commit it as one "Element Overhaul" commit (or per lane) before the next session.
+- The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github` (no `design/art/` renders, references, raw audio, `archive/`, the concept docx). Re-export in the `../bw-export` worktree, never by switching branches here: `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, `git rm` anything deleted on main, commit, `git push origin github:main`. Last export: internal `aa5ef11` → `cc156eb` (2026-10-06).
 
-**Green as of the last check:** `--self-test` (all suites), `--ui-probe`, `--flow-probe`, and autoplay with zero `SCRIPT ERROR`.
+**Green as of 2026-10-07:** `--self-test` 643/643 in 57 suites, `--ui-probe`, `--flow-probe`, `--tutorial-probe` (exit 0), autoplay on arena, lake, tinderbox, catacombs, ravine, twins and obelisks with zero `SCRIPT ERROR`.
 
-## What just landed (2026-10-06)
-- 2026-10-04/05 design pass: `history/2026-10-04_05-sessions.md`.
-- Lanes: two choices per pick, no XP (D174–D179); two weapons and imbues (D180–D185); rooms, Standard/Hard (D186–D190).
-- Finishing pass (D191–D195): **a lost fight levels the squad too** (LEVEL_ON_LOSS true); swaps are free and **unlimited**, shown as a ~0.5 s holster-and-draw (`design/art/weapons2_swap_strip.png`) with a tiny white class tag; enemies carry a second weapon from fight 3; Branch out's find is the fight's tier; XP/expertise-gate leftovers fixed.
-- Re-tune (D194): enemy level = its stage; curve 0.85 0.95 1.7 0.7 1.25 0.9 1.1 1.0 0.97 1.0; Hard ×1.18. Sim: Standard 66–95 %, rounds 6–7 from fight 3, Giant 100 %. Fight 4 stuck at 45 % (L-18). Loose on purpose: re-tune after the enchantment/shop/encounter lanes (L-19).
-- **Special encounters (D208–D214):** fights 1–2 skip the room screen (choice from fight 3). A third of the Hard rooms from fight 3 are an encounter (Horde of 10, Colossus on 7 hexes with a line thrust, Blanks immune to elements and ×2 from melee, Elemental Beings immune to physical), built at the squad's level, Hard pay. Physical vs elemental lives in `BWFormulas.damage_class`. Renders: `design/art/encounters_*.png`. Balance: L-20.
-- **HP bars + card fit (D215–D218):** bars are black with white pips at/above 50%, white with black pips below, numbers only on hover, a pulse at the flip; over-unit bars clamp below the turn order; item cards fit unscrolled; no "Sword · Sword". Renders `design/art/hpbar_*.png` (`tools/hpbar_shots.gd`). Watch: L-21, L-22.
-- **Cleanup + accessibility (D227–D232):** glossary stops (Charge, light/dark grey, Covering Fire); `hides_hair` per head piece; the gear panel fits 16:9; over-unit bars hide behind HUD panels; VFX shaders pre-warm offscreen at boot (`tools/prewarm_probe.gd`: worst first-use frame +26–29 ms → +2–3 ms); **Settings › Accessibility › Element kanji** (off by default): 火水氷雷風闇光 on tiles (weight = level), markers, cards, picks, rooms. Renders `design/art/a11y_*.png` (`tools/a11y_shots.gd`).
-
-- **Playtest 1 fixes (D233–D238):** the first perk is drawn at random (no picker after the roster; the hall names it); a **discard pile** under the gear grid (thrown away when the battle starts); **sorting** (Newest/Element/Slot/Tier) in the gear panel and shop; **scrolls are free**; ground-aimed skills that hurt nobody play **without a cutscene** (and a blast that hurts nobody gets no slow beat). Renders `design/art/playtest1_*.png` (`tools/playtest1_shots.gd`). Not committed. L-23.
-
-- **The Twins, fight 7 (D255–D260):** a fixed boss (no room choice, no weather, boss music) on `court.json`, built on a reusable phase framework (`BWPhases`); paint, own-colour heal, the beam (10% + Blinded/Shrouded, thunder breaks it), the swap at 50%, the rage 2 cycles after a fall; a pick for everyone on a win. Sim fight 7: 56%, the rest of the curve 68–93%. `--combat twins --autoplay`; renders `design/art/twins_*.png`. L-24.
-
-- **Weather (D249–D254):** Rain, Ashfall, Eclipse, Blizzard, Gale tag ~25% of rooms from fight 5 (not Obelisks/Twins/Giant); shown on the room card, a HUD plate, ink particles and next-tick telegraphs; acts at the cycle tick (`BWWeather`); Hard + weather pays +1 drop; the AI steps off telegraphed hazards. `--weather <kind>`; rules design/WEATHER.md; renders `design/art/weather_*.png`. Sim: no weather swings >15 points. L-25.
+## What landed: the Element Overhaul (design/ELEMENTS-v3.md, the author's rulings at its top)
+- **Spine (D261–D268):** ice slides and pillars, pools, steam, rinks, electrified water. ELEMENTS.md §14.
+- **Wind and dark (D269–D276):** wind modes (Gust/Vortex/Becalm) on every weapon, fields, caps, Wind Wall; dark's Rot (curse) and gravity (void).
+- **C1 (D277–D284):** the rank ladder (keystones at ranks 3 and 6, max 2), 21 keystones in `data/keystones.csv`, enemy keystones by stage, 28 perks, 2/3-piece element sets, save v11.
+- **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15.
+- **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
+- **Final pass (D301–D308):**
+  - Unit cards no longer leak BBCode: an `=` in a hint payload broke the tag (D301). Keystone cap enforced in `grant`; the old 3-keystone render was the shot tool (D302).
+  - Recap and log sum per unit and cause; the banner always clears and review tools wait for it (D303).
+  - The AI raises Wind Walls (D304). Magnify text and §16 docs fixed (D305).
+  - **Self-detonate**, Blast Rider's free action, enables the dagger bomber dive (D306). All five L-30 riders are built (D307).
+  - **Re-tune (D308):** curve 0.97 1.05 1.95 0.7 1.35 1.15 1.1 1.1 1.0 1.03, Twins HP ×2.6 / stats ×1.25. Sim (24 runs, Standard): 87 62 75 54 87 70 62 79 75 75 %, Hard 12–25 under, rounds 6–8 from fight 3, Giant 95%. Also fixed a reach-tree cycle that hung `path_to`.
+- Review renders `design/art/v3_*.png`; this pass `v3_final_card*.png`, `v3_final_dive_1|2|3.png` (`tools/final_shots.gd`).
 
 ## Do this first
-1. **The author plays a full run** (`game\run.bat`), then sends notes. Most open items are AWAITING PLAY (`LEDGER.md` L-1, L-3, L-20).
-2. **Cheap OWED items while waiting:** L-10 (art docs name pass), L-8 (VFX polish). The author's read of the element kanji (D231) at play distance.
-3. Keep `HANDOFF.md` ≤ 40 lines, and rewrite it at the end of each session.
+1. **Commit** the overhaul (see Git above).
+2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team. Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34 (this pass), L-18 (the Obelisks still 54%).
+3. Cheap OWED items while waiting: L-10 (art docs name pass), L-8 / L-13 (VFX and animation nits).
+4. Keep `HANDOFF.md` ≤ 40 lines, and rewrite it at the end of each session.
 
 ## Known exposures
-- Review renders (`design/art/*.png|gif`, ~250 MB) are only in the local repo and on this disk. Back up the `.git` folder (e.g. `git bundle create D:\backup\bw.bundle --all`) if the drive matters.
-- DECISIONS numbers are handed out in reserved ranges to parallel agents. Check the file's last number before adding rows.
+- Review renders (`design/art/*.png|gif`, ~250 MB+) are only in the local repo and on this disk. Back up `.git` (`git bundle create D:\backup\bw.bundle --all`).
+- The sim's 16–24-run rates move about ±10 points per fight; read trends, not single cells. A stray long-running `--self-test` Godot process (not started by this pass) was using CPU on 2026-10-07; check Task Manager if sims run slow.

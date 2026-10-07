@@ -163,6 +163,7 @@ static func mods(att: BWUnit, dfn: BWUnit, kind: String, element: String, ctx: D
 	if auras.is_valid():
 		for a in auras.call(dfn, "taken_pct"):
 			m.call("dmg", "%s: %+d%%" % [a.label, int(a.value)], 1.0 + float(a.value) / 100.0)
+	out.append_array(BWSets.mods(att, dfn, ctx))       # D282: set lines, Slipstream
 	return out
 
 
@@ -257,7 +258,7 @@ static func roll_blow(b: BWBattle, att: BWUnit, v: BWUnit, fc: Dictionary, basic
 				att.fx["pressure"] = minf(cap, float(att.fx.get("pressure", 0)) + float(BWEffects.p(e, "per", 8)))
 				att.fx["pressure_name"] = e.name
 			break
-	return res
+	return BWSets.roll(b, att, v, fc, res)            # D282: Vanish (dark 3)
 
 
 ## Before a blow's damage lands: a Parry / Shelter is spent, Bulwark caps it,
@@ -301,6 +302,8 @@ static func land(b: BWBattle, att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 				dmg = maxi(0, v.hp - 1)
 				_ev(b, v, e.name, "Undying: held at 1 HP")
 				break
+	dmg = BWSets.land(b, v, dmg)                      # D282: Dawnward (light 3)
+	dmg = BWOverheat.hold_blow(b, v, dmg)             # D286/D288: Ward of Light, Phoenix Heart's KO hold
 	res["damage"] = maxi(0, dmg)
 
 
@@ -311,6 +314,7 @@ static func after_blow(b: BWBattle, att: BWUnit, v: BWUnit, res: Dictionary, dir
 	_flush_cover(b)
 	if att == null or b.over:
 		return
+	BWSets.after_blow(b, att, v, res)                 # D282: Breakwater (water 3)
 	var dealt := int(res.get("damage", 0))
 	var foe := att.team != v.team
 	if foe and direct and dealt > 0 and att.alive():
@@ -686,6 +690,7 @@ static func planted(b: BWBattle, u: BWUnit) -> bool:
 static func hurt(b: BWBattle, v: BWUnit, before: int) -> void:
 	if not v.alive() or b.over:
 		return
+	BWSets.hurt(b, v, before)                         # D282: Flashpoint (fire 3)
 	var m := float(v.max_hp())
 	for o in b._fx_units:
 		if o == v or not o.alive() or o.team != v.team:
@@ -769,6 +774,7 @@ static func overload(src: BWUnit, points: int) -> float:
 
 ## Sapping: each detonation source heals pct_of% of the blast it dealt to foes.
 static func after_blast(b: BWBattle, hurt: Dictionary) -> void:
+	BWSets.after_blast(b, hurt)                       # D282: Stormfront (thunder 3)
 	var by_src := {}
 	for u in hurt:
 		var src := b._unit(str(hurt[u][1]))

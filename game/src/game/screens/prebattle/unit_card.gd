@@ -57,7 +57,7 @@ func show_unit(u: BWUnit) -> void:
 	var wname := BWText.weapon(u.weapon_class)
 	lines.append("[font_size=%d][color=#%s]%s (%s)   [/color][color=#%s]◆[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SMALL, lab, wname, u.expertise_letter(u.weapon_class), BWGearText.hex(BWLook.element_color(u.element)), el,
-		BWKanji.bb(u.element) + u.element.capitalize()])     # D231
+		BWKanji.bb(u.element) + u.element.capitalize() + BWPicker.sigil_bb(u)])     # D231; D278 the keystone sigil
 	lines.append_array(BWCombatUI.badge_lines(u, BWStyle.F_SMALL))      # D130: immunity, next battle
 	lines.append("[font_size=%d]HP %d    Move %d    Speed %d[/font_size]" % [BWStyle.F_BODY, u.max_hp(), u.move_range(), u.speed()])
 	var st: PackedStringArray = []

@@ -379,7 +379,7 @@ func test_enemy_scaling(t) -> void:
 			t.eq(int(u.skill_picks.get(u.weapon_class, 0)), want[n][2], "fight %d: one skill pick per letter" % n)
 			t.ok(run.can_equip(u, u.equipment.main_hand), "fight %d: the weapon is legal for it" % n)
 		t.eq(es.map(func(u): return u.perks), run.enemies_for(n).map(func(u): return u.perks), "deterministic")
-	t.ok(run.enemies_for(9)[0].perks.size() >= 3, "fight 9 (tier A): affinity rank 3, the whole element")
+	t.ok(run.enemies_for(9)[0].perks.size() >= 2, "fight 9 (tier A): affinity rank 3, two perks (D277 ladder)")
 
 
 ## D133: the curve is data; fights 1-2 are gentle (no perks, 90% base stats).
