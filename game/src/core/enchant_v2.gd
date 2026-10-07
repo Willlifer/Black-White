@@ -81,12 +81,13 @@ static func mods(att: BWUnit, dfn: BWUnit, kind: String, element: String, ctx: D
 				m.call("dmg", "%s (%d0%% HP missing): +%d%%" % [e.name, tenths, int(miss10 * tenths)], 1.0 + miss10 * tenths / 100.0)
 		if float(BWEffects.p(e, "nocrit_pct", 0)) != 0.0:
 			m.call("nocrit_x", "%s: hits that don't crit deal %d%%" % [e.name, int(BWEffects.p(e, "nocrit_pct"))], float(BWEffects.p(e, "nocrit_pct")) / 100.0)
-	# Fury (trigger_stat dmg_pct): stacks banked for the battle
-	for e in BWEffects.list(att, "trigger_stat"):
-		var got := float(att.fx.get("fury:" + str(e.source), 0))
-		if got > 0.0:
-			m.call("dmg", "%s (hurt %d times): +%d%%" % [e.name, roundi(got / maxf(1.0, float(BWEffects.p(e, "dmg_pct", 1)))), int(got)], 1.0 + got / 100.0)
-	# empowerments (Rallying, Vengeance, Relay, Beacon)
+		var per_adj := float(BWEffects.p(e, "dmg_per_adjacent_ally", 0))      # D244 Lockstep
+		if per_adj != 0.0 and int(ctx.get("att_adjacent", 0)) > 0:
+			var pc3 := minf(float(BWEffects.p(e, "adj_max_pct", 1000)), per_adj * int(ctx.att_adjacent))
+			m.call("dmg", "%s (%d adjacent allies): +%d%%" % [e.name, ctx.att_adjacent, int(pc3)], 1.0 + pc3 / 100.0)
+		if int(BWEffects.p(e, "first_crit", 0)) > 0 and not att.fx.has("first_attack_done"):   # D245 Flair
+			m.call("crit", "%s: your first attack this battle crits" % e.name, 1000.0)
+	# empowerments (Rallying, Heavy Is the Head, Poise, Beacon)
 	for em in att.fx.get("empower", []):
 		if float(em.get("dmg_pct", 0)) != 0.0:
 			m.call("dmg", "%s: +%d%%" % [em.name, int(em.dmg_pct)], 1.0 + float(em.dmg_pct) / 100.0)
@@ -103,15 +104,24 @@ static func mods(att: BWUnit, dfn: BWUnit, kind: String, element: String, ctx: D
 		m.call("crit_x", "%s: this strike can't crit" % str(att.fx.get("follow_name", "Follow-Through")), 0.0)
 	if float(att.fx.get("pressure", 0)) > 0.0:
 		m.call("crit", "%s (%d hits without a crit)" % [str(att.fx.get("pressure_name", "Pressure")), roundi(float(att.fx.pressure) / 8.0)], float(att.fx.pressure))
-	# Advantage on the resist roll (Second Opinion: the attacker's; Stubborn: the defender's)
+	# Advantage on the resist roll (Second Opinion: the attacker's; Warded: the
+	# defender's, against its own element only; Mana Veil: an adjacent ally's aura)
 	if BWFormulas.is_magic(kind, element):
 		for e in _pity(att, "resist"):
-			if str(BWEffects.p(e, "side", "att")) == "att" and int(att.fx.get("adv_cd", 0)) <= 0:
+			if str(BWEffects.p(e, "side", "att")) == "att" and int(att.fx.get("adv_cd", 0)) <= 0 \
+					and str(BWEffects.p(e, "element", element)) == element:
 				out.append({ "stage": "resist_adv", "value": 1.0, "label": "%s: advantage (the resist rolls twice, you keep the better)" % e.name, "who": att.id })
 				break
+		var def_adv := false
 		for e in _pity(dfn, "resist"):
-			if str(BWEffects.p(e, "side", "att")) == "def" and int(dfn.fx.get("adv_cd", 0)) <= 0:
+			if str(BWEffects.p(e, "side", "att")) == "def" and int(dfn.fx.get("adv_cd", 0)) <= 0 \
+					and str(BWEffects.p(e, "element", element)) == element:
 				out.append({ "stage": "resist_adv", "value": -1.0, "label": "%s: advantage (rolls the resist twice, keeps the better)" % e.name, "who": dfn.id })
+				def_adv = true
+				break
+		if not def_adv and auras.is_valid():
+			for a in auras.call(dfn, "resist_adv"):                       # D245 Mana Veil: no recharge
+				out.append({ "stage": "resist_adv", "value": -1.0, "label": "%s: advantage (rolls the resist twice, keeps the better)" % a.label, "who": "" })
 				break
 	# defender side
 	for e in BWEffects.list(dfn, "attack_mod"):
@@ -137,6 +147,8 @@ static func mods(att: BWUnit, dfn: BWUnit, kind: String, element: String, ctx: D
 	for e in BWEffects.list(dfn, "immune"):
 		if str(BWEffects.p(e, "what", "")) == "ko" and not dfn.fx.has("undying_used"):
 			out.append({ "stage": "note", "label": "%s: the first blow that would KO it leaves it at 1 HP" % e.name })
+		if str(BWEffects.p(e, "what", "")) == "first_attack" and not dfn.fx.has("acrobat_used") and att.team != dfn.team:
+			m.call("miss", "%s: the first attack on it this battle misses" % e.name, 1.0)   # D245 Acrobat
 	if dfn.fx.has("parry"):
 		m.call("dmg", "%s: next hit %d%% less" % [str(dfn.fx.get("parry_name", "Parry")), int(dfn.fx.parry)], 1.0 - float(dfn.fx.parry) / 100.0)
 	var dw := _drawback(dfn, "status")
@@ -154,10 +166,15 @@ static func mods(att: BWUnit, dfn: BWUnit, kind: String, element: String, ctx: D
 	return out
 
 
-## Lockstep (aura_mod self_if_ally): the holder gets its own aura while an ally
-## is within the radius. [{label, value}] for one key.
+## aura_mod self_if_ally: the holder gets its own aura while an ally is within
+## the radius. D245: plus the battle-long terms a reactive ability fired
+## (u.fx.ts_aura: Bloodied's and Second Wind's move, Iron Wall's taken_pct).
+## [{label, value}] for one key.
 static func self_auras(b: BWBattle, u: BWUnit, key: String) -> Array:
 	var out: Array = []
+	for t in u.fx.get("ts_aura", []):
+		if str(t.key) == key:
+			out.append({ "label": str(t.label), "value": float(t.value) })
 	for e in BWEffects.list(u, "aura_mod"):
 		if int(BWEffects.p(e, "self_if_ally", 0)) != 1 or float(BWEffects.p(e, key, 0)) == 0.0:
 			continue
@@ -300,6 +317,13 @@ static func after_blow(b: BWBattle, att: BWUnit, v: BWUnit, res: Dictionary, dir
 		for e in _on(att, "dealt"):
 			if str(BWEffects.p(e, "do", "")) == "heal":
 				ev_heal(b, att, _pct_hp(att, dealt * float(BWEffects.p(e, "pct_of", 15)) / 100.0), e.name)
+	if foe and not v.fx.has("acrobat_used"):            # D245 Acrobat: spent by the first attack on it
+		for e in BWEffects.list(v, "immune"):
+			if str(BWEffects.p(e, "what", "")) == "first_attack":
+				v.fx["acrobat_used"] = true
+				if not res.get("hit", false):
+					_ev(b, v, e.name, "Acrobat: slips the first attack")
+				break
 	if not v.alive() or not foe:
 		return
 	var melee := b.gap(att, v) <= 1
@@ -322,7 +346,8 @@ static func after_blow(b: BWBattle, att: BWUnit, v: BWUnit, res: Dictionary, dir
 		for e in _on(v, "avoided"):
 			match str(BWEffects.p(e, "do", "")):
 				"step":
-					_step_once(b, v, att, e)
+					if int(BWEffects.p(e, "melee_only", 0)) != 1 or melee:
+						_step_once(b, v, att, e)
 				"empower":
 					var near: BWUnit = null
 					for o in b.side(v.team):
@@ -464,9 +489,14 @@ static func on_ko(b: BWBattle, victim: BWUnit, by: BWUnit, cause: String) -> voi
 					if f.alive() and BWHex.distance(f.pos, victim.pos) <= int(BWEffects.p(e, "radius", 1)) and b.can_harm(by, f):
 						b._tile_hurt(f, maxi(1, roundi(f.max_hp() * pct / 100.0)), "knell", by.id)
 			"paint":
+				var el := str(e.element)
+				if el == "" and str(BWEffects.p(e, "element", "")) == "attuned":
+					el = by.attuned                       # D244 Wake: your attuned element
+				if el == "":
+					continue
 				var hexes: Array = b._on_board(b.board.area(victim.pos, int(BWEffects.p(e, "radius", 1))))
-				_ev(b, by, e.name, "%s spreads" % e.element.capitalize(), { "hex": victim.pos })
-				b.paint(hexes, e.element, by, int(BWEffects.p(e, "step", 1)), false, { "propagated": true })
+				_ev(b, by, e.name, "%s spreads" % el.capitalize(), { "hex": victim.pos })
+				b.paint(hexes, el, by, int(BWEffects.p(e, "step", 1)), false, { "propagated": true })
 			"heal":
 				if str(BWEffects.p(e, "target", "self")) == "allies":
 					for o in b.side(by.team):
@@ -508,6 +538,7 @@ static func end_action(b: BWBattle, u: BWUnit, attacked: bool) -> void:
 	var rolls := int(u.fx.get("_rolls", 0))
 	var hits := int(u.fx.get("_hits", 0))
 	if attacked and rolls > 0:
+		u.fx["first_attack_done"] = true                  # D245 Flair is spent
 		if u.fx.get("_steady_live", false):
 			u.fx.erase("steady")
 		var em: Array = u.fx.get("empower", [])
@@ -814,16 +845,27 @@ static func shrug_status(b: BWBattle, v: BWUnit, key: String, by: BWUnit) -> boo
 	return false
 
 
-## Fury (trigger_stat dmg_pct): +dmg_pct% per firing, up to cap_pct.
-static func fury(b: BWBattle, u: BWUnit, e: Dictionary) -> void:
-	var key := "fury:" + str(e.source)
-	var got := float(u.fx.get(key, 0))
-	var cap := float(BWEffects.p(e, "cap_pct", 20))
-	var add := minf(float(BWEffects.p(e, "dmg_pct", 4)), cap - got)
-	if add <= 0.0:
-		return
-	u.fx[key] = got + add
-	_ev(b, u, e.name, "Fury +%d%% (%d%%)" % [int(add), int(got + add)])
+## D245: the non-stat halves of a fired trigger_stat. `move` and `taken_pct`
+## last the battle (read by self_auras); next_crit / next_dmg_pct / next_sure
+## empower the next attack (Poise, Heavy Is the Head).
+static func trigger_extras(b: BWBattle, u: BWUnit, e: Dictionary) -> void:
+	var bits: PackedStringArray = []
+	var held: Array = u.fx.get("ts_aura", [])
+	for k in ["move", "taken_pct"]:
+		var v := float(BWEffects.p(e, k, 0))
+		if v != 0.0:
+			held.append({ "key": k, "value": v, "label": e.name })
+			bits.append(("%+d move" % int(v)) if k == "move" else ("%+d%% damage taken" % int(v)))
+	u.fx["ts_aura"] = held
+	if not bits.is_empty():
+		_ev(b, u, e.name, ", ".join(bits))
+	var nc := float(BWEffects.p(e, "next_crit", 0))
+	var nd := float(BWEffects.p(e, "next_dmg_pct", 0))
+	var ns := int(BWEffects.p(e, "next_sure", 0)) == 1
+	if nc != 0.0 or nd != 0.0 or ns:
+		var rec := { "name": e.name, "source": e.source,
+			"params": { "crit": nc, "dmg_pct": nd, "sure": 1 if ns else 0, "uses": "next_attack" } }
+		_empower(b, u, rec, u)
 
 
 ## Leaden: the drawback's move.

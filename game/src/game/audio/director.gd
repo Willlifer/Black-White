@@ -6,8 +6,11 @@ extends Node
 ##     confirm, cancel or plain click by its label
 ##   - every BWUnitView: a BWUnitAudio child (animation markers -> sound)
 ##   - every BWCombatScreen: a BWCombatAudio child (battle events -> sound)
-##   - title, roster and downtime screens: a small watcher for their moments
-##     (start, browse, pick, progress the day)
+##   - title, roster, downtime, results, rooms screens: a small watcher for
+##     their moments (start, browse, pick, progress the day, the jackpot, a
+##     level up, a Hard room)
+##   - every BWPicker: the pick-reveal sting; the gear panel and the shop:
+##     the cursed sting / the purchase sound (D240)
 ## One instance, under the root (BWAudio.ensure makes it).
 
 const CONFIRM_WORDS: PackedStringArray = ["begin", "confirm", "lock", "progress", "continue", "start", "done", "ok",
@@ -46,8 +49,12 @@ func _on_node(n: Node) -> void:
 		_attach(n, func(): return BWUnitAudio.new(), BWUnitAudio)
 	elif n is BWCombatScreen:
 		_attach(n, func(): return BWCombatAudio.new(), BWCombatAudio)
-	elif n is BWTitleScreen or n is BWRosterScreen or n is BWDowntimeScreen or n is BWResultsScreen or n is BWLoadingScreen or n is BWPrebattleScreen:
+	elif n is BWTitleScreen or n is BWRosterScreen or n is BWDowntimeScreen or n is BWResultsScreen or n is BWLoadingScreen 			or n is BWPrebattleScreen or n is BWRoomScreen:
 		_attach(n, func(): return BWScreenAudio.new(), BWScreenAudio)
+	elif n is BWPicker:
+		_hook_picker(n as BWPicker)
+	elif n is BWShopPanel or n is BWGearPanel:
+		_hook_gear(n)
 
 
 func _attach(n: Node, make: Callable, cls: Variant) -> void:
@@ -86,6 +93,48 @@ func _press(b: BaseButton) -> void:
 		return
 	_last_hover = Time.get_ticks_msec() / 1000.0          # a click's focus change isn't a hover
 	BWSfx.ui(press_sound(b.get("text") if "text" in b else ""), { "tag": "press" })
+
+
+## D240: a picker opening plays the pick-reveal sting; it fades out when the
+## pick is taken or the picker goes (the sting is longer than most picks).
+func _hook_picker(p: BWPicker) -> void:
+	if p.has_meta("bw_audio"):
+		return
+	p.set_meta("bw_audio", true)
+	BWMusic.sting("pick")
+	p.chosen.connect(func(_id): BWMusic.stop_sting(0.8, "pick"))
+	p.tree_exiting.connect(func(): BWMusic.stop_sting(0.8, "pick"))
+
+
+## D240: the gear panel and the shop. A change that leaves the squad wearing
+## more cursed pieces than before -> the cursed sting; any other shop change
+## (a trade, a scroll used) -> the purchase sound.
+func _hook_gear(panel: Node) -> void:
+	if panel.has_meta("bw_audio"):
+		return
+	panel.set_meta("bw_audio", true)
+	var state := { "cursed": worn_cursed(panel.get("run")) }
+	var shop := panel is BWShopPanel
+	panel.connect("changed", func():
+		var n := worn_cursed(panel.get("run"))
+		if n > int(state.cursed):
+			BWMusic.sting("cursed")
+		elif shop:
+			BWSfx.ui("shop_purchase", { "tag": "shop" })
+		state.cursed = n)
+
+
+## Cursed pieces worn across the squad (D201: the enchantment row's flag).
+static func worn_cursed(run: Variant) -> int:
+	var n := 0
+	if not run is BWRun:
+		return 0
+	for u in (run as BWRun).squad:
+		for slot in u.equipment:
+			var it: Variant = u.equipment[slot]
+			if it is Dictionary and str((it as Dictionary).get("enchant", "")) != "" and BWEffects.cursed(str(it.enchant)):
+				n += 1
+	return n
 
 
 ## The sound a button makes by its label: confirm, cancel or a plain click.

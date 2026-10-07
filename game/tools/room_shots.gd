@@ -6,7 +6,8 @@ extends SceneTree
 ## Needs a window (real renders). Re-renders the map thumbnails (no disk cache).
 ## D208: the choice starts at fight 3 (the default FIGHT). ENC=<horde|colossus|
 ## blank|being> puts that encounter in the Hard room's place and saves
-## encounters_room_<kind>.png (the select only).
+## encounters_room_<kind>.png (the select only). WEATHER=<kind> (D252, use
+## FIGHT=5+) tags the Hard room with that weather -> weather_room.png.
 var out := ""
 var scr: BWRoomScreen
 
@@ -58,6 +59,11 @@ func _go() -> void:
 	if enc != "":
 		var rooms := BWRooms.offer(run)
 		rooms[1] = BWEncounters.room(run.fight, enc, str(rooms[1].map))
+	var wk := OS.get_environment("WEATHER")          # D252: WEATHER=<kind> tags the Hard room -> weather_room.png
+	if wk != "":
+		var wrooms := BWRooms.offer(run)
+		wrooms[1]["weather"] = wk
+		enc = "_weather"
 	scr = BWRoomScreen.new()
 	scr.run = run
 	root.add_child(scr)
@@ -68,6 +74,10 @@ func _go() -> void:
 	await _wait(2.0)                      # portraits
 	await _move(Vector2(800, 30))
 	await _wait(0.4)
+	if enc == "_weather":
+		await _shot("weather_room")
+		quit(0)
+		return
 	if enc != "":
 		await _shot("encounters_room_" + enc)
 		quit(0)

@@ -28,7 +28,7 @@ const RANK_STEP := 0.25
 const UNSCALED := ["radius", "allies", "threshold", "once", "once_per_battle", "min_range",
 	"per_turn", "range", "count", "mult", "plus", "ranged_only", "basic", "skills", "friendly",
 	"delay", "consume", "melee_only", "chance", "turns", "steps", "step", "hexes", "push",
-	"move", "cap_pct", "cap"]
+	"move", "cap_pct", "cap", "hits", "times", "first_crit", "next_sure", "resist_adv", "melee_plus", "choice"]
 ## Multiplier params scale only their excess over 1 (×2 → ×2.5 at rank 3).
 const MULT_PARAMS := ["chance_mult", "reduction_mult"]
 
@@ -110,7 +110,7 @@ static func collect(u: BWUnit) -> Array:
 		var imb_row := BWData.row("enchantments", str(it.get("imbue_enchant", "")))
 		if not imb_row.is_empty():
 			var bn := str(BWData.row("equipment", str(it.get("base", ""))).get("name", it.get("base", "")))
-			out.append_array(records(imb_row, "%s (%s imbue)" % [str(imb_row.get("name_pattern", "")).replace("{item}", bn), str(it.get("imbue", ""))]))
+			out.append_array(records(imb_row, "%s (%s imbue)" % [str(imb_row.get("name_pattern", "")).replace("{item}", bn), str(it.get("imbue", ""))], str(it.get("imbue", ""))))
 		var ench := str(it.get("enchant", ""))
 		if ench == "":
 			continue
@@ -119,7 +119,10 @@ static func collect(u: BWUnit) -> Array:
 			continue
 		var base_name := str(BWData.row("equipment", str(it.get("base", ""))).get("name", it.get("base", "")))
 		var nm := str(row.get("name_pattern", ench)).replace("{item}", base_name)
-		out.append_array(records(row, nm))
+		var ward := str(it.get("ward", ""))
+		if ward != "" and ench == WARDED:
+			nm = nm.replace("Warded", "%s-Warded" % ward.capitalize())
+		out.append_array(records(row, nm, ward))
 	for type in TYPES:
 		var a: Dictionary = u.abilities.get(type, {})
 		if a.is_empty():
@@ -142,10 +145,17 @@ static func collect(u: BWUnit) -> Array:
 	return out
 
 
+## D243: the Warded row (one row for the old Fireproof, Grounded, Windbreak,
+## Nightforged and Stubborn): its params say "ward" where the element goes,
+## and the item's `ward` field (rolled on drop; an imbue's own element) fills it.
+const WARDED := "warded"
+
+
 ## D196: an enchantment row's records: its own key, then each `also` record
 ## ("key(a=1;b=2) | key(...)"), then its `drawback` (key "drawback"), all
-## under the item's name and the row's element.
-static func records(row: Dictionary, display: String) -> Array:
+## under the item's name and the row's element. `ward` (D243) replaces any
+## param written as "ward".
+static func records(row: Dictionary, display: String, ward: String = "") -> Array:
 	var out: Array = [make(row, "enchant", 1, display)]
 	for part in str(row.get("also", "")).split("|", false):
 		var t := part.strip_edges()
@@ -162,6 +172,11 @@ static func records(row: Dictionary, display: String) -> Array:
 		r3["effect_key"] = "drawback"
 		r3["params"] = dw
 		out.append(make(r3, "enchant", 1, display))
+	if ward != "":
+		for rec in out:
+			for k in rec.params:
+				if str(rec.params[k]) == "ward":
+					rec.params[k] = ward
 	return out
 
 
@@ -242,20 +257,48 @@ static func p(e: Dictionary, param: String, default: Variant = 0) -> Variant:
 
 # ----------------------------------------------------------------- stat_share
 
-## stat_share (Steel Under Cloth, Nimble Strength, Insight): pct% of the
-## `from` stat, read from base + gear only so two shares can never loop.
+## stat_share: pct% of the `from` stat, read from base + gear only so two
+## shares can never loop. D245 Crosstrained: from=second;to=best, the unit's
+## second-best and best stats (base + gear, CON left out; ties in STATS order).
 static func share(u: BWUnit, key: String) -> int:
 	var v := 0
 	for e in u.effects:
-		if e.key != "stat_share" or str(e.params.get("to", "")) != key:
+		if e.key != "stat_share":
 			continue
+		var to := str(e.params.get("to", ""))
 		var from := str(e.params.get("from", ""))
-		var raw: int = int(u.stats.get(from, 0))
-		for slot in u.equipment:
-			if slot != BWUnit.SECOND:                  # D180: the carried weapon gives nothing
-				raw += int(u.equipment[slot].get("stats", {}).get(from, 0))
-		v += floori(raw * float(e.params.get("pct", 0)) / 100.0)
+		if to == "best":
+			var ranked := _ranked_stats(u)
+			to = ranked[0]
+			from = ranked[1]
+		if to != key:
+			continue
+		v += floori(_raw_stat(u, from) * float(e.params.get("pct", 0)) / 100.0)
 	return v
+
+
+static func _raw_stat(u: BWUnit, key: String) -> int:
+	var raw: int = int(u.stats.get(key, 0))
+	for slot in u.equipment:
+		if slot != BWUnit.SECOND:                  # D180: the carried weapon gives nothing
+			raw += int(u.equipment[slot].get("stats", {}).get(key, 0))
+	return raw
+
+
+## BWUnit.STATS but CON (HP is not a stat you fight with) by base + gear
+## value, highest first (a stable sort: ties keep STATS order).
+static func _ranked_stats(u: BWUnit) -> Array:
+	var ks: Array = BWUnit.STATS.filter(func(k): return k != "con")
+	var vals := {}
+	for k in ks:
+		vals[k] = _raw_stat(u, k)
+	var out: Array = []
+	for k in ks:
+		var i := 0
+		while i < out.size() and vals[out[i]] >= vals[k]:
+			i += 1
+		out.insert(i, k)
+	return out
 
 
 ## aura_mod that the holder itself gets (radius 0, or allies=0): what a sheet
@@ -365,14 +408,19 @@ static func ground_label(on: String, level: int) -> String:
 
 # ----------------------------------------------------------------- range
 
-## range_mod: basic range = range × mult + plus (Piercing, Longshot,
-## Throwing, Ammo Belt). `ranged_only` limits a row to bows and pistols.
+## range_mod: basic range = range × mult + plus (Longshot, Throwing, Ammo
+## Belt). `ranged_only` limits a row to bows and pistols. D244 Longshot:
+## `melee_plus` replaces `plus` for a reach-1 weapon (the old Piercing: 1 → 2).
 static func basic_range(u: BWUnit) -> int:
-	var r := float(u.weapon().get("range", 1))
+	var base := float(u.weapon().get("range", 1))
+	var r := base
 	for e in list(u, "range_mod"):
 		if int(p(e, "ranged_only", 0)) == 1 and not u.weapon_class in ["bow", "pistols"]:
 			continue
-		r = r * float(p(e, "mult", 1)) + float(p(e, "plus", 0))
+		var plus := float(p(e, "plus", 0))
+		if base <= 1.0 and e.params.has("melee_plus"):
+			plus = float(p(e, "melee_plus"))
+		r = r * float(p(e, "mult", 1)) + plus
 	return int(r)
 
 
@@ -406,6 +454,8 @@ static func attack_mods(att: BWUnit, dfn: BWUnit, kind: String, element: String,
 			out.append(_m("hit", e.name, float(p(e, "hit"))))
 		if float(p(e, "hit_per_hex", 0)) != 0.0 and dist > 1:
 			out.append(_m("hit", "%s (%d hexes between)" % [e.name, dist - 1], float(p(e, "hit_per_hex")) * (dist - 1)))
+		if float(p(e, "crit_per_hex", 0)) != 0.0 and dist > 1:         # D245 Deadeye
+			out.append(_m("crit", "%s (%d hexes between)" % [e.name, dist - 1], float(p(e, "crit_per_hex")) * (dist - 1)))
 		if float(p(e, "crit", 0)) != 0.0:
 			out.append(_m("crit", e.name, float(p(e, "crit"))))
 		if float(p(e, "crit_mult", 0)) != 0.0:

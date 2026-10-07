@@ -65,6 +65,10 @@ var feel: BWHitFeel              # ---- D170 hit feel (marked edit)
 # ---- D223 tutorial hooks (marked edit): BWTutorial steers the real screen
 var gate: Callable               # (kind: click|confirm|cancel|attack|swap|wait|skill, arg) -> may it go through?
 var turn_hook: Callable          # (u: BWUnit) -> true when it played (passed) that turn itself
+# ---- D249-D252 weather (marked edit): set before adding to the tree
+var weather_kind := ""           # BWWeather.KINDS, "" = none
+var weather_view: BWWeatherView
+var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate, intro)
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -75,6 +79,8 @@ func _ready() -> void:
 	var board := BWBoard.load_file(_cfg.get("map", "res://maps/arena.json"))
 	battle = BWBattle.new(board, _cfg.get("seed", 1))
 	battle.picks_live = picks_live                 # ---- D91 picks (marked edit)
+	if weather_kind != "":
+		battle.set_weather(weather_kind)           # ---- D249: before setup, so cycle 1 shows the telegraphs
 	battle.event.connect(func(e): _queue.append(e))
 
 	var we := WorldEnvironment.new()
@@ -117,6 +123,10 @@ func _ready() -> void:
 	readability = BWReadability.new()     # ---- D160-D163 readability (marked edit): preview, tile card, recap, beat
 	add_child(readability)
 	readability.setup(self)
+	if not battle.weather.is_empty():     # ---- D252 weather: particles, telegraphs, the plate
+		weather_view = BWWeatherView.new()
+		add_child(weather_view)
+		weather_view.setup(self)
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
 		var v: BWUnitView = BWObeliskView.new() if BWObelisk.is_objective(u) else BWUnitView.new()   # D145
@@ -138,9 +148,15 @@ func _ready() -> void:
 		ui.feed("[b]Objective:[/b] break either obelisk. Wiping the enemy does not end it; the stones pulse until one falls.")
 		for o in battle.objectives():
 			ui.feed("%s: %s" % [o.name, (o as BWObelisk).rule_text()])
-	else:
+	elif BWPhases.kind(battle) != "twins":
 		ui.banner("Battle start")
 	get_tree().create_timer(1.6).timeout.connect(barks.on_start)
+	if BWPhases.kind(battle) == "twins":             # ---- D260: the Twins' title card, then play
+		twins_fx = BWTwinsFX.new()
+		add_child(twins_fx)
+		twins_fx.setup(self)
+		ui.feed("[b]%s[/b]  %s" % [BWTwins.TITLE, BWTwins.beam_text()])
+		await twins_fx.intro()
 	_after_events()
 
 
@@ -581,7 +597,7 @@ func _play(e: Dictionary) -> void:
 						await vfx.dive(_views[e.unit], e.path)
 					else:
 						await _animate_leap(_views[e.unit], e.path)
-				"charge", "shove", "knockback", "pull", "push": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
+				"charge", "shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
 				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
 		"swap":                                             # ---- D181: put away, draw
@@ -742,6 +758,12 @@ func _play(e: Dictionary) -> void:
 			await get_tree().create_timer(0.35).timeout
 		"paint", "tiles_tick":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): refresh + gust / ignition one-shots
+		"beam", "beam_hit", "beam_break", "phase", "phase_pending", "phase_cancel":   # ---- D260: the Twins
+			if twins_fx:
+				await twins_fx.on_event(e)
+		"weather":                             # ---- D252: the weather's tick
+			if weather_view:
+				await weather_view.on_event(e)
 		"detonate":
 			board_view.on_tile_event(e)        # Phase 5 tile FX (D82): flash + ring burst
 			ui.feed("[b]Detonation![/b] %d%%" % int(e.pct))

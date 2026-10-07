@@ -75,6 +75,7 @@ static func catalog() -> Array:
 	kj.pixel_size = 0.004
 	kj.shaded = false
 	out.append(["kanji", kj])
+	out.append_array(BWWeatherView.warm_catalog())      # D252: the weather's particles and telegraph
 	return out
 
 

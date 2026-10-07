@@ -71,6 +71,26 @@
      "peak_db": -4.09,
      "seam_jump": 0.01506,
      "step_p99": 0.02944
+    },
+    "low_beat": {
+     "file": "low_beat.wav",
+     "what": "author drop 2: Low Beat (120 BPM, 8 bars) as is, last 8 ms faded",
+     "k_rms_db": -20.0,
+     "peak_db": -5.14,
+     "seam_jump": 4e-05,
+     "step_p99": 0.01047,
+     "drop": 2,
+     "end_fade_ms": 8,
+     "raw_seam_jump": 0.0411
+    },
+    "kick": {
+     "file": "kick.wav",
+     "what": "author drop 2: no snare beat (120 BPM, 4 bars) twice",
+     "k_rms_db": -25.3,
+     "peak_db": -1.05,
+     "seam_jump": 0.00548,
+     "step_p99": 0.01222,
+     "drop": 2
     }
    }
   },
@@ -207,6 +227,15 @@
       "E",
       480.0
      ]
+    },
+    "kick": {
+     "file": "battle/kick.wav",
+     "what": "kick re-timed to 108.0 BPM (WSOLA anchored on the 16th)",
+     "k_rms_db": -25.64,
+     "peak_db": -1.05,
+     "seam_jump": 0.0,
+     "step_p99": 0.01349,
+     "drop": 2
     }
    }
   },
@@ -299,6 +328,98 @@
       "E",
       482.0
      ]
+    },
+    "kick": {
+     "file": "boss/kick.wav",
+     "what": "kick re-timed to 132.3 BPM (WSOLA anchored on the 16th)",
+     "k_rms_db": -24.76,
+     "peak_db": -1.05,
+     "seam_jump": 5e-05,
+     "step_p99": 0.0144,
+     "drop": 2
+    }
+   }
+  },
+  "arpeggio": {
+   "samples": 579072,
+   "seconds": 13.130884,
+   "free": true,
+   "folder": "drop2",
+   "source": "design/audio/MainTheme Arpeggio.wav",
+   "layers": {
+    "arpeggio": {
+     "file": "drop2/arpeggio.wav",
+     "what": "free-tempo phrase loop (4 phrases, D-A-C-D), first onset to its repeat",
+     "k_rms_db": -21.38,
+     "peak_db": -1.05,
+     "seam_jump": 0.00055,
+     "step_p99": 0.02061,
+     "drop": 2,
+     "from_s": 0.859,
+     "to_s": 13.99
+    }
+   }
+  },
+  "chillin": {
+   "samples": 297408,
+   "seconds": 6.743946,
+   "free": true,
+   "folder": "drop2",
+   "source": "design/audio/chillin main theme.wav",
+   "layers": {
+    "chillin": {
+     "file": "drop2/chillin.wav",
+     "what": "three sustained chords at their measured spacing, ring-out wrapped",
+     "k_rms_db": -24.5,
+     "peak_db": -1.05,
+     "seam_jump": 0.01129,
+     "step_p99": 0.02603,
+     "drop": 2,
+     "chords_s": [
+      0.163,
+      2.389,
+      4.659
+     ],
+     "period_s": 2.248
+    }
+   }
+  },
+  "moderato": {
+   "samples": 316160,
+   "seconds": 7.169161,
+   "free": true,
+   "folder": "drop2",
+   "source": "design/audio/moderato main loopish.wav",
+   "layers": {
+    "moderato": {
+     "file": "drop2/moderato.wav",
+     "what": "two cycles of its arpeggiated figure",
+     "k_rms_db": -20.0,
+     "peak_db": -5.6,
+     "seam_jump": 0.0,
+     "step_p99": 0.01827,
+     "drop": 2,
+     "period_s": 3.5846
+    }
+   }
+  },
+  "rooms": {
+   "samples": 301899,
+   "seconds": 6.845782,
+   "free": true,
+   "folder": "drop2",
+   "source": "design/audio/Music Rooms.wav",
+   "layers": {
+    "rooms": {
+     "file": "drop2/rooms.wav",
+     "what": "the phrase and its own decay, lead trimmed",
+     "k_rms_db": -20.0,
+     "peak_db": -2.13,
+     "seam_jump": 0.0,
+     "step_p99": 0.02984,
+     "drop": 2,
+     "from_s": 0.335,
+     "end_db": -57.0
     }
    }
   }

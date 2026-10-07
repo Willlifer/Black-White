@@ -248,6 +248,9 @@ const BLANK_TINT := Color(1.6, 1.6, 1.6)
 
 func _encounter_look() -> void:
 	var kind := str(look.get("encounter", ""))
+	if kind == "twin":
+		BWTwinsLook.apply(self)                      # D260: Noon and Dusk
+		return
 	if kind != "blank" and kind != "being":
 		return
 	var tint := BLANK_TINT

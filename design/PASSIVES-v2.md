@@ -1,6 +1,8 @@
 # Passives v2: fewer, bigger, set bonuses
 
-**Draft for review.** Nothing is in data or code yet. Where `PICKS.md` is stale, the CSVs win. There's no overlay and no board counters: everything new lives on the item card, in the forecast, and in the existing `enchant` float.
+**Status (2026-10-07):** the non-element consolidation of §2 is in data and code (D243–D248): enchantments 139 → 97 (the 83 approved, plus 14 rows held for the element pass, listed in D246), abilities 46 → 25, save v10. The perks, the element sets, the family sets and the moves "into perks" / "→ set" wait for the element-identity rework. The "On kill (9 → 5)" line lists six survivors, so the total is 83, not 82.
+
+**Draft for review.** Nothing else is in data or code yet. Where `PICKS.md` is stale, the CSVs win. There's no overlay and no board counters: everything new lives on the item card, in the forecast, and in the existing `enchant` float.
 
 ## 1. Diagnosis
 

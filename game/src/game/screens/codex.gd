@@ -13,7 +13,7 @@ extends CanvasLayer
 
 signal closed
 
-const TABS := ["elements", "weapons", "stats", "terrain", "glossary"]     # D125: + glossary
+const TABS := ["elements", "weapons", "stats", "terrain", "bosses", "glossary"]     # D125: + glossary; D260: + bosses
 const LAYER := 90                 # under BWGame's fade (100)
 
 ## Intensity names per axis element (design/ELEMENTS.md §4 / elements.csv).
@@ -65,6 +65,7 @@ func open(p_tab: String = "elements") -> void:
 		"weapons": _weapons()
 		"stats": _stats()
 		"terrain": _terrain()
+		"bosses": _bosses()
 		"glossary": _glossary()
 	_scroll.scroll_vertical = 0
 
@@ -86,7 +87,7 @@ func _input(ev: InputEvent) -> void:
 			var i := TABS.find(tab)
 			match ev.keycode:
 				KEY_ESCAPE, KEY_I: close()
-				KEY_1, KEY_2, KEY_3, KEY_4, KEY_5: open(TABS[mini(ev.keycode - KEY_1, TABS.size() - 1)])
+				KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6: open(TABS[mini(ev.keycode - KEY_1, TABS.size() - 1)])
 				KEY_LEFT: open(TABS[(i + TABS.size() - 1) % TABS.size()])
 				KEY_RIGHT, KEY_TAB: open(TABS[(i + 1) % TABS.size()])
 				KEY_UP: _scroll.scroll_vertical -= 80
@@ -490,6 +491,25 @@ func _terrain() -> void:
 	var v2 := _card("")
 	v2.add_child(_rt("[font_size=%d][b]Height[/b][/font_size]" % (BWStyle.F_SUB + 3)))
 	v2.add_child(_rt(_dim("Each level climbed costs one extra move, and a step can rise at most %d levels. Dropping down is free." % BWBoard.MAX_CLIMB), BWStyle.F_SMALL))
+
+
+# ---------------------------------------------------------------- bosses (D260)
+
+## The fixed fights: the Twins at fight 7 (BWTwins), the Giant at the end.
+func _bosses() -> void:
+	_intro("Two fights are always the same: the Twins at fight %d, the Giant at the end. No room choice, no weather." % BWRun.TWINS_FIGHT)
+	_pending_parent = _body
+	var v := _card("light")
+	v.add_child(_rt("[font_size=%d][b]%s[/b][/font_size]  %s" % [BWStyle.F_SUB + 3, BWTwins.TITLE, _dim("fight %d · the Court" % BWRun.TWINS_FIGHT)]))
+	v.add_child(_rt(_dim("Two tall figures, one hex each. Noon is white with a halo-ring head; Dusk is black with a hollow ring for a head. They mirror each other. Their HP follows your squad's level."), BWStyle.F_SMALL))
+	v.add_child(_rt("[b]Phase 1.[/b] At the end of its turn each paints its colour (+%d) on itself and the ring around it: Noon light, Dusk dark. Each heals %d%% max HP per point of its own colour under it at its turn start. More than %d hexes apart, a [b]Beam[/b] joins them: %s" % [
+		BWTwins.PAINT_STEPS, int(BWTwins.HEAL_PCT), BWTwins.BEAM_GAP, BWTwins.beam_text()], BWStyle.F_SMALL))
+	v.add_child(_rt("[b]Phase 2[/b] (either under 50%%). The colours swap: Noon paints dark, Dusk light, and each heals ×2 on its own colour.", BWStyle.F_SMALL))
+	v.add_child(_rt("[b]Phase 3.[/b] When one falls, the other [b]Rage[/b]s %d cycles later: +1 move, paint radius 2. Down both within those %d cycles and the rage never comes." % [BWTwins.RAGE_DELAY, BWTwins.RAGE_DELAY], BWStyle.F_SMALL))
+	v.add_child(_rt(_dim("Counter: light and dark cancel, so paint the opposite colour over their ground; thunder the beam (it breaks for a cycle and jolts both for %d%%); burst both together. Win: every squad unit gets one extra pick (two cards). A loss still levels the squad." % int(BWTwins.FEEDBACK_PCT)), BWStyle.F_SMALL))
+	var g := _card("dark")
+	g.add_child(_rt("[font_size=%d][b]The Giant[/b][/font_size]  %s" % [BWStyle.F_SUB + 3, _dim("the end · the Arena")]))
+	g.add_child(_rt(_dim("500 HP, 50 in every stat, seven hexes. It isn't forced to be unbeatable."), BWStyle.F_SMALL))
 
 
 # ---------------------------------------------------------------- glossary (D125)

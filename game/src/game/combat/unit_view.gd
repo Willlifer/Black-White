@@ -66,6 +66,7 @@ var _bar_w := BAR_W
 ## Bigger than v1 (0.9 × 0.075): the HP has to read at combat distance.
 const BAR_W := 1.25
 const BAR_H := 0.13
+const TWIN_SCALE := 1.6       # D260
 var _t := 0.0
 
 
@@ -79,6 +80,11 @@ func setup(u: BWUnit) -> void:
 		scale = Vector3.ONE * 2.6
 		_label.pixel_size *= 1.0 / 2.6
 		_hp_label.pixel_size *= 1.0 / 2.6      # D213: the HP number reads at the normal size too (Giant, Colossus)
+	elif str(u.encounter) == "twin":
+		# D260: the Twins: tall figures on one hex each
+		scale = Vector3.ONE * TWIN_SCALE
+		_label.pixel_size *= 1.0 / TWIN_SCALE
+		_hp_label.pixel_size *= 1.0 / TWIN_SCALE
 	refresh()
 
 

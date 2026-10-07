@@ -405,6 +405,8 @@ def main() -> int:
     info["main_chroma_centroid"] = {k: chroma_peak(v[0]) for k, v in main_layers.items() if v[0] is not None}
     (OUT / "layers.json").write_text(json.dumps(info, indent=1))
     print(f"wrote {sum(len(s['layers']) for s in info['sets'].values())} layers to {OUT}")
+    import make_drop2                     # D239: the author's drop-2 layers and sets, merged back in
+    make_drop2.music()
     return 0
 
 

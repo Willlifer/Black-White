@@ -107,8 +107,7 @@ func test_scaling_pct_with_the_flat_floor(t) -> void:
 	b2.tiles.apply([C], "fire", "x")
 	b2.tiles.apply([C], "ice", "x")
 	t.eq(rim.stat("def"), 36, "Rimed: +20% DEF on a glaze (30 -> +6, over the +2 floor)")
-	for id in ["fireproof", "grounded", "windbreak", "nightforged"]:
-		t.eq(int(BWEffects.parse_params(BWData.row("enchantments", id).params).pct), -20, "%s: the resist rows sit at 20%%" % id)
+	t.eq(int(BWEffects.parse_params(BWData.row("enchantments", "warded").params).pct), -25, "D243: the resist rows are one Warded row, at 25%")
 
 
 # ------------------------------------------------------------------ on_event: on kill
@@ -158,33 +157,32 @@ func test_pursuit_feast_and_wake(t) -> void:
 	b.attack(me, v)
 	t.eq(me.move_range(), mv + 2, "Pursuit: a KO gives +2 move this turn")
 	t.eq(me.hp - h0, roundi(me.max_hp() * 0.15), "Feast: a KO heals 15% max HP")
-	# Wake of Ash: kill paint arrives as spread, so a fuse beside the victim never fires.
-	var ash := _ench(_u("ash"), "wake_fire", "chest")
+	# Wake (D244, the four merged): your attuned element; kill paint arrives as
+	# spread, so a fuse beside the victim never fires.
+	var ash := _ench(_u("ash"), "wake", "chest")
 	var v2 := _foe("v2")
 	var b2 := _fight([ash], [v2, _foe("far")], [C], [E, FAR])
+	ash.attuned = "fire"
 	var ring := _nb(E, 0)
 	b2.tiles.apply([ring], "thunder", "x")
 	v2.hp = 1
 	b2.attack(ash, v2)
-	t.ok(b2.tiles.intensity(E, "fire") >= 1, "Wake of Ash: fire on the victim's hex")
+	t.ok(b2.tiles.intensity(E, "fire") >= 1, "Wake: attuned to fire, fire on the victim's hex")
 	t.eq(str(b2.tiles.at(ring).get("marker", "")), "fuse", "the fuse in the ring is untouched (no marker fires)")
 	t.ok(_ev(b2, "detonate").is_empty(), "no detonation")
 
 
-func test_vengeance_and_tag_team(t) -> void:
-	var avenger := _ench(_u("av"), "vengeance")
-	var tag := _ench(_u("tg"), "tag_team")
+## D244: Pursuit carries Tag Team (an ally's KO within 2 banks +2 move).
+func test_pursuit_on_an_allys_kill(t) -> void:
+	var tag := _ench(_u("tg"), "pursuit", "head")
 	var killer := _u("k")
 	var foe := _foe("f")
-	var b := _fight([killer, avenger, tag], [foe, _foe("stay")], [C, Vector2i(1, 1), _nb(C, 3)], [_nb(C, 0), FAR])
+	var b := _fight([killer, tag], [foe, _foe("stay")], [C, _nb(C, 3)], [_nb(C, 0), FAR])
 	foe.hp = 1
 	b.attack(killer, foe)
-	t.eq(int(tag.fx.get("next_move", 0)), 2, "Tag Team: an ally within 2 KO'd a foe: +2 move next turn")
+	t.eq(int(tag.fx.get("next_move", 0)), 2, "Pursuit: an ally within 2 KO'd a foe: +2 move next turn")
 	_turn(b, tag)
-	t.ok(tag.move_notes().any(func(n): return str(n[0]).contains("Tag Team")), "banked into the next turn, named on the Move line")
-	b._tile_hurt(killer, 9999, "fire", "")
-	var em: Array = avenger.fx.get("empower", [])
-	t.ok(em.any(func(x): return float(x.dmg_pct) == 50.0 and x.sure), "Vengeance: an ally falls: +50% and can't be avoided")
+	t.ok(tag.move_notes().any(func(n): return str(n[0]).contains("Pursuit")), "banked into the next turn, named on the Move line")
 
 
 # ------------------------------------------------------------------ on_event: recovery + the heal cap
@@ -212,18 +210,16 @@ func test_leeching_and_the_heal_cap(t) -> void:
 	t.eq(_ev(b, "heal").size(), heals, "never from tiles")
 
 
-func test_second_breath_hearthbound_mend_link(t) -> void:
-	var me := _ench(_ench(_u("me", "staff", "light"), "hearth_light", "head"), "mend_link")
+func test_mend_link(t) -> void:      # D244: Hearthbound and Second Breath are cut
+	t.ok(BWData.row("enchantments", "hearth_light").is_empty() and BWData.row("enchantments", "second_breath").is_empty(), "the small heals are gone")
+	var me := _ench(_u("me", "staff", "light"), "mend_link")
 	var mate := _u("m")
 	var b := _fight([me, mate], [_foe("f")], [C, _nb(C, 0)], [FAR])
-	b.paint([C], "light", me)
 	me.hp = me.max_hp() / 2
 	mate.hp = mate.max_hp() / 2
 	var h0 := me.hp
 	var m0 := mate.hp
-	_turn(b, me)
-	t.ok(_fired(b, "Hearthbound").size() + _ev(b, "heal").filter(func(e): return str(e.get("cause", "")).contains("Hearthbound")).size() > 0,
-		"Hearthbound: start on your own light: heal 3% per level")
+	b._heal(me, 10.0, "test")
 	t.ok(me.hp > h0, "the holder healed")
 	t.ok(mate.hp > m0, "Mend-Link: the heal echoes to the most-hurt ally within 2")
 	t.ok(_ev(b, "heal").any(func(e): return e.unit == "m" and e.get("cause", "") == "mend_link"), "as a mend_link heal (which never echoes)")
@@ -232,7 +228,7 @@ func test_second_breath_hearthbound_mend_link(t) -> void:
 # ------------------------------------------------------------------ pity
 
 func test_steady_hand_graze_second_chance(t) -> void:
-	var me := _ench(_ench(_u("me"), "graze"), "steady_hand", "head")
+	var me := _ench(_u("me"), "steady_hand", "main_hand")      # D244: Grazing and Rerouted merged in
 	var foe := _foe("f", { "dex": 2000, "con": 300 })
 	var b := _fight([me], [foe], [C], [_nb(C, 0)])
 	var h0 := foe.hp
@@ -297,13 +293,18 @@ func test_advantage_on_a_three_turn_cooldown(t) -> void:
 		t.ok(not b.forecast_basic(me, foe).has("resist_adv"), "not ready yet (turn %d)" % (k + 1))
 	_turn(b, me)
 	t.eq(int(b.forecast_basic(me, foe).get("resist_adv", 0)), 1, "ready again on the third turn")
-	# Stubborn: the defender's side
-	var mule := _ench(_u("mu", "axe", "water", { "res": 30, "con": 300 }), "stubborn", "chest")
+	# Warded (D243, Stubborn merged in): the defender's side, its own element only
+	var mule := _ench(_u("mu", "axe", "water", { "res": 30, "con": 300 }), "warded", "chest")
+	mule.equipment.chest["ward"] = "fire"
+	mule.refresh_effects()
 	var caster := _u("ca", "staff", "fire")
 	var b2 := _fight([caster], [mule], [C], [_nb(C, 0)])
+	caster.attuned = "fire"
 	var f2 := b2.forecast_basic(caster, mule)
 	var r := float(f2.resist_base) / 100.0
-	t.near(float(f2.resist.value), 100.0 * (1.0 - (1.0 - r) * (1.0 - r)), 0.01, "Stubborn: you roll the resist twice and keep the better")
+	t.near(float(f2.resist.value), 100.0 * (1.0 - (1.0 - r) * (1.0 - r)), 0.01, "Warded (fire): you roll the fire resist twice and keep the better")
+	caster.attuned = "thunder"
+	t.ok(not b2.forecast_basic(caster, mule).has("resist_adv"), "no Advantage against another element")
 
 
 # ------------------------------------------------------------------ drawback (cursed)
@@ -360,23 +361,19 @@ func test_bodyguard_and_lifeline(t) -> void:
 	t.ok(b.move(me, at), "the swap is the move")
 	t.eq([me.pos, mate.pos], [at, C], "they trade places")
 	t.ok(not b.can_move(me), "and the move is spent")
-	var life := _ench(_u("li"), "lifeline", "chest")
+	var life := _ench(_u("li"), "bodyguard", "chest")              # D244: Lifeline merged in
 	var hurt := _u("h")
 	var b2 := _fight([life, hurt], [_foe("g")], [C, at], [FAR])
 	b2._tile_hurt(hurt, roundi(hurt.max_hp() * 0.8), "fire", "")
 	t.eq([life.pos, hurt.pos], [at, C], "Lifeline: an ally dropping below 25% trades places with you")
 	t.ok(not _fired(b2, "Lifeline").is_empty(), "named as it fires")
+	t.ok(_fired(b2, "Bodyguard").size() > 0, "under the Bodyguard's name")
 
 
 # ------------------------------------------------------------------ team rows (new, D202)
 
 func test_team_rows(t) -> void:
-	var tend := _ench(_u("te"), "tending", "chest")
-	var mate := _u("m")
-	var b := _fight([tend, mate], [_foe("f")], [C, _nb(C, 0)], [FAR])
-	mate.hp = 10
-	b.end_turn()
-	t.eq(mate.hp, 10 + roundi(mate.max_hp() * 0.04), "Tending: end your turn, allies beside you heal 4%")
+	t.ok(BWData.row("enchantments", "tending").is_empty() and BWData.row("enchantments", "relay").is_empty(), "D244: Tending and Relay are cut")
 	var sh := _ench(_u("sh"), "sheltering", "head")
 	var m2 := _u("m2")
 	var foe := _foe("f2")
@@ -392,16 +389,22 @@ func test_team_rows(t) -> void:
 	var b3 := _fight([pin, helper], [vic], [C, _nb(E, 1)], [E])
 	b3.attack(pin, vic)
 	t.ok(_ev(b3, "counter").any(func(e): return e.get("cause", "") == "assist" and e.unit == "he"), "Pincer: the ally beside the foe strikes too")
+	# Lockstep (D244, Shieldwall merged in): per adjacent ally you deal 5% more
+	# and take 5% less; the ally beside you gets 5% / 5% too.
 	var ls := _ench(_u("ls"), "lockstep", "legs")
 	var pal := _u("pal")
-	var b4 := _fight([ls, pal], [_foe("f4")], [C, _nb(C, 0)], [FAR])
-	t.ok(b4._auras(ls, "dmg_pct").any(func(a): return str(a.label).contains("Lockstep")), "Lockstep: you get it with an ally beside you")
-	t.ok(b4._auras(pal, "dmg_pct").any(func(a): return str(a.label).contains("Lockstep")), "and so does the ally")
-	var rc := _ench(_u("rc"), "rally_cry", "chest")
+	var f4 := _foe("f4")
+	var b4 := _fight([ls, pal], [f4], [C, _nb(C, 0)], [_nb(C, 3)])
+	var own := _mod(b4.forecast_basic(ls, f4), "adjacent allies")
+	t.near(float(own.get("value", 0)), 1.05, 0.001, "Lockstep: +5% with one ally beside you")
+	t.near(float(_mod(b4.forecast_basic(f4, ls), "Lockstep").get("value", 0)), 0.95, 0.001, "and 5% less taken")
+	t.ok(b4._auras(pal, "dmg_pct").any(func(a): return str(a.label).contains("Lockstep")), "the ally gets +5% too")
+	t.ok(b4._auras(pal, "taken_pct").any(func(a): return str(a.label).contains("Lockstep")), "and 5% less taken")
+	var rc := _ench(_u("rc"), "sheltering", "chest")              # D244: Rally Cry merged in
 	var low := _u("lo")
 	var b5 := _fight([rc, low], [_foe("f5")], [C, FAR - Vector2i(1, 1)], [FAR])
 	b5._tile_hurt(low, roundi(low.max_hp() * 0.7), "fire", "")
-	t.eq(float(low.fx.get("guard", 0)), 25.0, "Rally Cry: below 35% HP, a 25% guard")
+	t.eq(float(low.fx.get("guard", 0)), 25.0, "Sheltering (Rally Cry): below 35% HP, a 25% guard")
 
 
 # ------------------------------------------------------------------ forecast lines for the positional rows
@@ -412,19 +415,19 @@ func test_positional_rows_are_forecast_lines(t) -> void:
 	var b := _fight([fl], [foe], [C], [_nb(C, 0)])
 	foe.facing = BWHex.direction_index(foe.pos, _nb(foe.pos, 0))      # facing away from C
 	t.ok(not _mod(b.forecast_basic(fl, foe), "from behind").is_empty(), "Flanker: +20% from behind")
-	var rs := _ench(_u("rs"), "resonance")
+	var rs := _ench(_u("rs"), "conducting")
 	var f2 := _foe("f2")
 	var b2 := _fight([rs], [f2], [C], [_nb(C, 0)])
 	b2.tiles.apply([f2.pos], "fire", "x", 2)
 	var m := _mod(b2.forecast_basic(rs, f2), "charge levels")
-	t.near(float(m.get("value", 0)), 1.08, 0.001, "Resonance: +4% per charge level (fire 2: +8%)")
+	t.near(float(m.get("value", 0)), 1.10, 0.001, "Conducting (D244, Resonant merged in): +5% per charge level (fire 2: +10%)")
 
 
 # ------------------------------------------------------------------ tiers (D200)
 
 func test_tiers_unlock_and_weigh_double(t) -> void:
 	var b_row := BWData.row("enchantments", "relentless")
-	var d_row := BWData.row("enchantments", "graze")
+	var d_row := BWData.row("enchantments", "steady_hand")
 	var e_row := BWData.row("enchantments", "keen")
 	t.eq(BWRun.ench_weight(b_row, "D"), 0, "a B row can't drop at D")
 	t.eq(BWRun.ench_weight(b_row, "B"), 2, "at its own tier it weighs double")
@@ -466,7 +469,7 @@ func test_scrolls_per_element_and_rerolled_each_battle(t) -> void:
 	t.eq(r.scrolls.map(func(s): return str(s.element)), BWFormulas.ELEMENTS, "seven scrolls, one per element")
 	for s in r.scrolls:
 		var row := BWData.row("enchantments", str(s.enchant))
-		t.eq(str(row.get("element", "")), str(s.element), "the %s scroll holds a %s row (%s)" % [s.element, s.element, s.enchant])
+		t.ok(BWRun.of_element(row, str(s.element)), "the %s scroll holds a %s row (%s)" % [s.element, s.element, s.enchant])
 		t.ok(BWRun.ench_weight(row, r.tier_for(r.fight)) > 0, "unlocked at the shop's tier")
 	var before := r.scrolls.map(func(s): return str(s.uid) + ":" + str(s.enchant))
 	var e := r.enemies_for(1)
@@ -514,7 +517,7 @@ func test_imbue_carries_an_element_enchantment(t) -> void:
 	for i in 40:
 		var w := r.make_item("flamberge", "C")
 		var row := BWData.row("enchantments", str(w.get("imbue_enchant", "")))
-		if str(row.get("element", "")) != str(w.imbue) or BWRun.ench_weight(row, "C") <= 0:
+		if not BWRun.of_element(row, str(w.imbue)) or BWRun.ench_weight(row, "C") <= 0:
 			t.ok(false, "C weapon %s: imbue %s with %s" % [w.uid, w.imbue, w.get("imbue_enchant", "")])
 			return
 	t.ok(true, "C weapons roll an imbue with an enchantment of its element, unlocked at C")
@@ -538,7 +541,7 @@ func test_imbue_carries_an_element_enchantment(t) -> void:
 	d.version = 8
 	var back := BWRun.from_dict(d)
 	var mig: Dictionary = back.inventory.back()
-	t.eq(str(BWData.row("enchantments", str(mig.get("imbue_enchant", ""))).get("element", "")), str(mig.imbue), "migrated: an enchantment of its imbue's element")
+	t.ok(BWRun.of_element(BWData.row("enchantments", str(mig.get("imbue_enchant", ""))), str(mig.imbue)), "migrated: an enchantment of its imbue's element")
 
 
 # ------------------------------------------------------------------ Waterwalking (D204)
@@ -560,3 +563,99 @@ func test_waterwalking_first_water_hex_free(t) -> void:
 	t.ok(not me.fx.get("free_water_used", false), "back at the next turn")
 	me.fx["free_water_used"] = true
 	t.eq(int(b.reachable(me)[E2].cost), 3, "once spent, water costs as usual (1 + 2)")
+
+
+# ------------------------------------------------------------------ the consolidation (D243-D247)
+
+func test_consolidation_counts(t) -> void:
+	t.eq(BWData.table("enchantments").size(), 97, "D243-D244: 139 -> 97 enchantments (83 + 14 left for the element pass)")
+	t.eq(BWData.table("abilities").size(), 25, "D245: 46 -> 25 abilities")
+	for id in BWRun.ENCH_MERGED:
+		t.ok(BWData.row("enchantments", id).is_empty(), "merged away: %s" % id)
+		t.ok(not BWData.row("enchantments", str(BWRun.ENCH_MERGED[id])).is_empty(), "%s's target exists" % id)
+	for id in BWRun.ENCH_CUT:
+		t.ok(BWData.row("enchantments", id).is_empty(), "cut: %s" % id)
+	for id in BWRun.ABILITY_MERGED:
+		t.ok(BWData.row("abilities", id).is_empty(), "ability merged away: %s" % id)
+		var to := str(BWRun.ABILITY_MERGED[id])
+		t.ok(not BWData.row("abilities", to).is_empty(), "%s's target exists" % id)
+
+
+## D243: Frostbitten glazes on the first basic that lands each turn, no roll.
+func test_frostbitten_first_basic_each_turn(t) -> void:
+	var me := _ench(_u("me", "sword", "ice"), "frostbitten")
+	me.affinity["ice"] = 10
+	me.refresh_effects()
+	var foe := _foe("f", { "con": 300 })
+	var b := _fight([me], [foe], [C], [_nb(C, 0)])
+	b.attack(me, foe)
+	t.ok(b.tiles.is_glazed(foe.pos) or b.tiles.carries(foe.pos, "ice"), "the first basic that lands locks the tile")
+	var paints := _ev(b, "paint").size()
+	me.acted = false
+	b.attack(me, foe)
+	t.eq(_ev(b, "paint").size(), paints, "a second basic the same turn lays nothing")
+
+
+## D243: Warded's element is the item's own (rolled; a scroll sets its element).
+func test_warded_element(t) -> void:
+	var r := _run()
+	var it := r.make_item("chaps", "E", "warded")
+	t.ok(str(it.get("ward", "")) in BWFormulas.ELEMENTS, "a Warded drop rolls its element")
+	t.eq(BWRun.item_element(it), str(it.ward), "and wears its colour")
+	t.ok(BWRun.item_name(it).contains("%s-Warded" % str(it.ward).capitalize()), "the name says which")
+	var c := r.make_item("crown", "E", "radiant")
+	r.inventory.append(c)
+	BWRun.apply_scroll({ "element": "thunder", "enchant": "warded" }, c)
+	t.eq(str(c.get("ward", "")), "thunder", "a Warded scroll wards its own element")
+	BWRun.apply_scroll({ "element": "fire", "enchant": "kindled" }, c)
+	t.ok(not c.has("ward"), "another row clears it")
+
+
+## D247 save v10: merged ids map, the resist rows become Warded of their
+## element, pure cuts re-roll in their family and tier, abilities follow.
+func test_save_v10_migration(t) -> void:
+	var r := _run()
+	var u: BWUnit = r.squad[0]
+	var a := r.make_item("chaps", "E", "keen")
+	a.enchant = "smouldering"
+	var g := r.make_item("chain_mail", "E", "keen")
+	g.enchant = "grounded"
+	var st := r.make_item("chaps", "C", "keen")
+	st.enchant = "stubborn"
+	var hb := r.make_item("vest", "E", "keen")
+	hb.enchant = "hearth_fire"
+	var bn := r.make_item("crown", "C", "keen")
+	bn.enchant = "banner"
+	var w := r.make_item("sword", "C", "keen")
+	w.enchant = "serrated"
+	w.imbue = "fire"
+	w.imbue_enchant = "smouldering"
+	var w2 := r.make_item("axe", "C", "keen")
+	w2.imbue = "dark"
+	w2.imbue_enchant = "wake_dark"
+	r.inventory.append_array([a, g, st, hb, bn, w, w2])
+	r.learned[u.id] = ["brace", "ward", "flair", "arena_born", "visor"]
+	r.ability_ranks[u.id] = { "brace": 3, "ward": 1, "flair": 1, "arena_born": 2, "visor": 1 }
+	r.equipped_ability[u.id] = { "reactive": "brace", "passive": "visor" }
+	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
+	d.version = 9
+	var back := BWRun.from_dict(d)
+	t.eq(int(back.to_dict().version), 10, "saves as v10")
+	var by := {}
+	for it in back.inventory:
+		by[str(it.uid)] = it
+	t.eq(str(by[a.uid].enchant), "kindled", "Smouldering -> Kindled")
+	t.eq([str(by[g.uid].enchant), str(by[g.uid].get("ward", ""))], ["warded", "thunder"], "Grounded -> Warded (thunder)")
+	t.ok(str(by[st.uid].enchant) == "warded" and str(by[st.uid].get("ward", "")) in BWFormulas.ELEMENTS, "Stubborn -> Warded, element rolled")
+	var hr := BWData.row("enchantments", str(by[hb.uid].enchant))
+	t.ok(BWRun.ench_weight(hr, "E") > 0 and "vest" in BWData.list(hr.applies_to), "Hearthbound (cut; no E recovery row fits a vest) -> an E row the vest can roll (%s)" % hr.get("id", ""))
+	var br := BWData.row("enchantments", str(by[bn.uid].enchant))
+	t.ok(str(br.get("family", "")) == "team" and str(br.get("tier", "")) == "C" and "crown" in BWData.list(br.applies_to), "Banner (cut) -> a C team row on the crown (%s)" % br.get("id", ""))
+	t.eq(str(by[w.uid].enchant), "keen", "Serrated -> Keen")
+	t.eq(str(by[w.uid].imbue_enchant), "kindled", "an imbue's merged row maps when it keeps the element")
+	t.ok(BWRun.of_element(BWData.row("enchantments", str(by[w2.uid].imbue_enchant)), "dark"), "an imbue row that lost its element re-rolls in it")
+	var bu: BWUnit = back.squad[0]
+	t.eq(back.learned[bu.id], ["iron_wall", "flair", "hardened"], "learned abilities follow their merges, no duplicates")
+	t.eq(int(back.ability_ranks[bu.id].iron_wall), 3, "a merged pair keeps the higher rank")
+	t.eq(int(back.ability_ranks[bu.id].flair), 2, "(Arena Born's 2 over Flair's 1)")
+	t.eq(back.equipped_ability[bu.id], { "reactive": "iron_wall", "passive": "hardened" }, "the equipped choice follows")

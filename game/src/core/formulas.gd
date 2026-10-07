@@ -58,7 +58,8 @@ static func calc(label: String, value: float, formula: String, values: String) -
 ## crit_mult (adds to ×1.5), glance_x (× glance chance), glance_red (× the
 ## glance reduction, held to `cap`%), crit_x (× crit chance: 0 = can't crit,
 ## D94 Blinded), def_ignore (fraction of DEF ignored), dmg (× damage after
-## mitigation). Stage "note" is ignored here (a ◆ line for the forecast box).
+## mitigation), miss (any = the hit chance is 0: D245 Acrobat). Stage "note"
+## is ignored here (a ◆ line for the forecast box).
 static func _pts(mods: Array, stage: String) -> Array:
 	var s := 0.0
 	var f := ""
@@ -207,6 +208,9 @@ static func hit_chance(att: BWUnit, dfn: BWUnit, kind: String, element: String =
 		vals += " %+.1f" % bonus
 	f += h[1]
 	vals += h[2]
+	var miss := _pts(mods, "miss")        # D245 Acrobat: this attack misses outright
+	if miss[0] > 0.0:
+		return calc("Hit", 0.0, f + "  → 0" + miss[1], vals + "  → 0")
 	return calc("Hit", v, f + "  (5–100)", vals)
 
 

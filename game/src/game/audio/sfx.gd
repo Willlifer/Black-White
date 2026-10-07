@@ -28,6 +28,10 @@ const MIX := {
 	"step_stone": -18.0, "ko_thud": -3.0,
 	"ui_hover": -15.0, "ui_click": -10.0, "ui_confirm": -8.0, "ui_cancel": -9.0, "ui_pick": -8.0,
 	"ui_turn": -9.0, "ui_levelup": -5.0, "sting_victory": -2.0, "sting_defeat": -2.0, "progress_day": -4.0,
+	# D240: the author's drop 2 (tools/audio/make_drop2.py), files at -16 like the rest
+	# levelled in the drop-2 capture: a sting's body ~ the music it ducks (momentary max)
+	"sting_good": 0.5, "sting_bad": 0.5, "sting_level_up": 1.0, "sting_room_hard": 0.0,
+	"sting_pick_reveal": -7.0, "shop_purchase": -6.0,
 }
 ## Pitch jitter per play (± fraction) so repeats don't machine-gun. 0 in captures.
 static var jitter := 0.035

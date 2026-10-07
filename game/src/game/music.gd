@@ -6,12 +6,15 @@ extends Node
 ## the next beat, each with short fades, so the drums come in on a downbeat.
 ##
 ##   BWMusic.ensure(node)          once (also builds the buses, BWSfx, the director)
-##   BWMusic.play("combat")        title roster prebattle rest combat boss
+##   BWMusic.play("combat")        title roster prebattle rest rooms tutorial combat boss
 ##   BWMusic.set_intensity(2)      0..2, combat only (BWCombatAudio drives it)
-##   BWMusic.sting("victory")      victory / defeat: a sting over ducked music
+##   BWMusic.sting("victory")      a sting over ducked music (STINGS); one at a time
+##   BWMusic.stop_sting()          fade the playing sting out (a picker closed)
 ##
 ## Layers (tools/audio/make_music.py; 8 bars each, all the same length):
-##   full calm air drums drums_top drums_half voice_pad
+##   full bright calm air drums drums_top drums_half voice_pad, and from the
+##   author's drop 2 (make_drop2.py) low_beat and kick; plus four free-tempo
+##   one-layer sets (arpeggio chillin moderato rooms), D239
 ## Tempo sets: main 120 BPM; slow 102 BPM (roster, rest: the docx's "slow it
 ## down for roster picking"); boss 132.3 BPM (+10%). Pre-rendered with
 ## pitch-preserving WSOLA, so the key never moves. A set change crossfades on
@@ -28,31 +31,55 @@ const BARS := 8
 const BEATS_PER_BAR := 4
 const OFF_DB := -80.0
 const SETS := {
-	"main": ["full", "bright", "calm", "air", "drums", "drums_top", "drums_half", "voice_pad"],
+	"main": ["full", "bright", "calm", "air", "drums", "drums_top", "drums_half", "voice_pad", "low_beat", "kick"],
 	"slow": ["full", "bright", "calm", "voice_pad"],
-	"battle": ["full", "bright", "air", "drums", "drums_top", "voice_pad"],
-	"boss": ["full", "bright", "calm", "air", "drums", "drums_top", "voice_pad"],
+	"battle": ["full", "bright", "air", "drums", "drums_top", "voice_pad", "kick"],
+	"boss": ["full", "bright", "calm", "air", "drums", "drums_top", "voice_pad", "kick"],
+	# D239: the author's drop 2 phrase loops, one layer each (tools/audio/make_drop2.py)
+	"arpeggio": ["arpeggio"],
+	"chillin": ["chillin"],
+	"moderato": ["moderato"],
+	"rooms": ["rooms"],
 }
-const SET_FOLDER := { "main": "", "slow": "slow/", "battle": "battle/", "boss": "boss/" }
+const SET_FOLDER := { "main": "", "slow": "slow/", "battle": "battle/", "boss": "boss/",
+	"arpeggio": "drop2/", "chillin": "drop2/", "moderato": "drop2/", "rooms": "drop2/" }
 ## 8 bars of each set in samples (44.1 kHz): main 120, slow 102.0, battle 108.0, boss 132.3 BPM.
-const SET_SAMPLES := { "main": 705600, "slow": 830000, "battle": 784000, "boss": 640000 }
+## The drop 2 sets are free-tempo phrase loops at their own measured length (AUDIO.md).
+const SET_SAMPLES := { "main": 705600, "slow": 830000, "battle": 784000, "boss": 640000,
+	"arpeggio": 579072, "chillin": 297408, "moderato": 316160, "rooms": 301899 }
+## D239: free-tempo sets (played rubato, no bar grid): a cue change leaves them
+## at once with the deck crossfade, and they are always entered at their start.
+## Only the four re-timings of the 8-bar loop share a progression.
+const FREE := ["arpeggio", "chillin", "moderato", "rooms"]
 ## Cue -> tempo set and layer volumes (dB; a layer not listed is off).
 ## "intensity" lists overrides for combat levels 0, 1, 2.
 ## Author 10/4: brighter ("a little depressing … up it an octave") — `bright`
 ## (the loop +12 st) leads the menus and rides over combat; the muffled `calm`
 ## low-pass is retired from the cues. Combat drops to the 108 BPM `battle`
 ## set ("when battle starts it's a little too fast").
+## D239 (author's drop 2): title = MainTheme Arpeggio, rest (the hall) =
+## chillin main theme, tutorial = moderato main loopish, rooms = Music Rooms,
+## prebattle = Low Beat over the no-snare kick; the kick also joins combat at
+## intensity 2 and the boss. A solo phrase loop is one quieter layer than a
+## stack, so its gain is above 0 dB (levelled to the old cues' loudness).
 const CUES := {
-	"title": { "set": "main", "mix": { "full": -3.0, "bright": -3.0, "air": -14.0 } },
+	"title": { "set": "arpeggio", "mix": { "arpeggio": 6.0 } },
 	"roster": { "set": "slow", "mix": { "bright": -1.0, "full": -7.0 } },
-	"prebattle": { "set": "main", "mix": { "bright": -1.0, "full": -9.0, "air": -12.0, "drums_half": -11.0 } },
-	"rest": { "set": "slow", "mix": { "bright": -2.0, "full": -9.0, "voice_pad": -13.0 } },
+	"prebattle": { "set": "main", "mix": { "low_beat": 6.5, "kick": 2.5 } },
+	"rest": { "set": "chillin", "mix": { "chillin": 6.5 } },
+	"rooms": { "set": "rooms", "mix": { "rooms": 3.0 } },
+	"tutorial": { "set": "moderato", "mix": { "moderato": 4.5 } },
 	"combat": { "set": "battle", "mix": { "full": -4.0, "bright": -3.0, "drums": 0.0, "drums_top": -10.0 },
 		"intensity": [{}, { "full": -3.0, "bright": -2.0, "drums_top": -5.0, "air": -12.0 },
-			{ "full": -2.0, "bright": -1.0, "drums_top": -2.0, "air": -8.0, "voice_pad": -11.0 }] },
-	"boss": { "set": "boss", "mix": { "full": 0.0, "bright": -4.0, "drums": 0.0, "drums_top": -3.0, "air": -7.0, "voice_pad": -7.0 } },
+			{ "full": -2.0, "bright": -1.0, "drums_top": -2.0, "air": -8.0, "voice_pad": -11.0, "kick": -6.0 }] },
+	"boss": { "set": "boss", "mix": { "full": 0.0, "bright": -4.0, "drums": 0.0, "drums_top": -3.0, "air": -7.0, "voice_pad": -7.0, "kick": -5.0 } },
 }
-const STINGS := { "victory": "sting_victory", "defeat": "sting_defeat" }
+## The highest a layer may be pushed (dB): the solo loops' make-up gain.
+const MAX_DB := 8.0
+## D240: the author's stings. One at a time: a new one fades out the last.
+## The procedural sting_victory / sting_defeat stay in the manifest unused.
+const STINGS := { "victory": "sting_good", "defeat": "sting_bad", "jackpot": "sting_good", "cursed": "sting_bad",
+	"level_up": "sting_level_up", "pick": "sting_pick_reveal", "room_hard": "sting_room_hard" }
 const FADE_IN := 0.08          # a layer coming in (on the beat)
 const FADE_OUT := 0.45         # a layer leaving
 const DECK_IN := 0.1           # a tempo set entering on the bar line
@@ -107,6 +134,9 @@ var _active: Deck
 var _cue := ""
 var _intensity := 0
 var _queue: Array = []         # { deck, at, fn, what }
+var _sting_player: Node        # D240: the sting playing now (one at a time)
+var _sting_kind := ""
+var _duck: Tween
 
 
 static func ensure(parent: Node) -> void:
@@ -271,7 +301,7 @@ func _play(cue: String) -> void:
 	var c: Dictionary = CUES[cue]
 	var set_name := str(c.set)
 	var rate := 1.0
-	if runtime_tempo and set_name != "main":
+	if runtime_tempo and set_name != "main" and not set_name in FREE:
 		rate = runtime_rate(set_name)
 		set_name = "main"
 	var mix := cue_mix(cue, 0)
@@ -297,6 +327,8 @@ func _play(cue: String) -> void:
 func _switch(to: Deck, mix: Dictionary) -> void:
 	var from_deck := _active
 	var bar_i := int(round(from_deck.abs_pos() / from_deck.bar())) % BARS
+	if from_deck.set_name in FREE or to.set_name in FREE:
+		bar_i = 0                                    # D239: a phrase loop has no shared progression
 	_stop(from_deck, DECK_OUT)
 	_start(to, mix, bar_i * to.bar(), DECK_IN)
 	_log({ "type": "start", "cue": _cue, "deck": to.key, "from": bar_i * to.bar(), "bar": bar_i })
@@ -339,18 +371,51 @@ func _set_intensity(level: int) -> void:
 func _sting(kind: String) -> void:
 	if not STINGS.has(kind):
 		return
-	var p := BWSfx.ui(STINGS[kind], { "tag": "sting" })
+	_stop_sting(0.3, false)                          # D240: one sting at a time, never stacked
+	var name: String = STINGS[kind]
+	var p := BWSfx.ui(name, { "tag": "sting", "stack": true })
+	_sting_player = p
+	_sting_kind = kind
 	var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
 	if amp == null:
 		return
+	# duck for the sting's body (manifest body_s: until it falls 20 dB under
+	# its peak), not its long reverb tail; else the old length - 1.2 s
 	var hold := 2.0
-	if p is AudioStreamPlayer and (p as AudioStreamPlayer).stream:
+	var lv: Array = BWSfx.info(name).get("levels", [])
+	if not lv.is_empty() and (lv[0] as Dictionary).has("body_s"):
+		hold = maxf(float(lv[0].body_s) - 0.3, 0.5)
+	elif p is AudioStreamPlayer and (p as AudioStreamPlayer).stream:
 		hold = maxf((p as AudioStreamPlayer).stream.get_length() - 1.2, 0.5)
-	var tw := create_tween()
-	tw.tween_property(amp, "volume_db", DUCK_DB, 0.15)
-	tw.tween_interval(hold)
-	tw.tween_property(amp, "volume_db", 0.0, 1.8).set_trans(Tween.TRANS_SINE)
-	_log({ "type": "sting", "kind": kind })
+	if _duck and _duck.is_valid():
+		_duck.kill()
+	_duck = create_tween()
+	_duck.tween_property(amp, "volume_db", DUCK_DB, 0.15)
+	_duck.tween_interval(hold)
+	_duck.tween_property(amp, "volume_db", 0.0, 1.8).set_trans(Tween.TRANS_SINE)
+	_log({ "type": "sting", "kind": kind, "sfx": name })
+
+
+## Fade the playing sting out (a picker closed, a newer sting); `release`
+## also lifts the music duck at once instead of waiting it out.
+static func stop_sting(fade: float = 0.6, kind: String = "") -> void:
+	if _inst and (kind == "" or kind == _inst._sting_kind):
+		_inst._stop_sting(fade, true)
+
+
+func _stop_sting(fade: float, release: bool) -> void:
+	var p := _sting_player
+	_sting_player = null
+	_sting_kind = ""
+	if p != null and is_instance_valid(p) and p.is_inside_tree():
+		BWSfx.loop_stop(p, fade)
+	if release:
+		var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
+		if amp:
+			if _duck and _duck.is_valid():
+				_duck.kill()
+			_duck = create_tween()
+			_duck.tween_property(amp, "volume_db", 0.0, 1.0).set_trans(Tween.TRANS_SINE)
 
 
 # ---------------------------------------------------------------- the grid
@@ -361,6 +426,8 @@ func _schedule(d: Deck, quant: String, what: String, fn: Callable) -> void:
 	var at := (floorf(now / q) + 1.0) * q
 	if at - now < 0.02:
 		at += q
+	if d.set_name in FREE:
+		at = now + 0.02                              # D239: no grid to wait for: leave on the next frame
 	_queue.append({ "deck": d, "at": at, "fn": fn, "what": what, "quant": quant })
 
 

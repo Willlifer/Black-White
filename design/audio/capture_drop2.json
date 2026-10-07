@@ -1,0 +1,568 @@
+{
+ "fps": 60.0,
+ "markers": [],
+ "marks": [
+  {
+   "frame": 9,
+   "usec": 3674445,
+   "what": "record_start"
+  },
+  {
+   "frame": 99,
+   "usec": 5211265,
+   "what": "title"
+  },
+  {
+   "frame": 607,
+   "usec": 13713874,
+   "what": "rest"
+  },
+  {
+   "frame": 1146,
+   "usec": 22746065,
+   "what": "rooms"
+  },
+  {
+   "frame": 1426,
+   "usec": 27676162,
+   "what": "room_hard"
+  },
+  {
+   "frame": 1666,
+   "usec": 31705643,
+   "what": "prebattle"
+  },
+  {
+   "frame": 1905,
+   "usec": 35680659,
+   "what": "picker_open"
+  },
+  {
+   "frame": 2145,
+   "usec": 39676773,
+   "what": "picker_close"
+  },
+  {
+   "frame": 2266,
+   "usec": 41863115,
+   "what": "shop_purchase"
+  },
+  {
+   "frame": 2497,
+   "usec": 45695192,
+   "what": "cursed_equip"
+  },
+  {
+   "frame": 2857,
+   "usec": 51695329,
+   "what": "tutorial"
+  },
+  {
+   "frame": 3396,
+   "usec": 60686191,
+   "what": "combat"
+  },
+  {
+   "frame": 3696,
+   "usec": 65678575,
+   "what": "intensity_2"
+  },
+  {
+   "frame": 3996,
+   "usec": 70691243,
+   "what": "boss"
+  },
+  {
+   "frame": 4476,
+   "usec": 78681227,
+   "what": "jackpot"
+  },
+  {
+   "frame": 4716,
+   "usec": 82679672,
+   "what": "victory"
+  },
+  {
+   "frame": 4956,
+   "usec": 86680207,
+   "what": "defeat"
+  },
+  {
+   "frame": 5196,
+   "usec": 90680290,
+   "what": "record_stop"
+  }
+ ],
+ "mix_rate": 48000.0,
+ "music": [
+  {
+   "cue": "title",
+   "frame": 99,
+   "type": "cue",
+   "usec": 5209617
+  },
+  {
+   "active": "arpeggio",
+   "cue": "title",
+   "deck": "arpeggio",
+   "deck_pos_s": 0.00758349427780509,
+   "frame": 99,
+   "from": 0.0,
+   "type": "start",
+   "usec": 5211254
+  },
+  {
+   "active": "arpeggio",
+   "cue": "rest",
+   "deck_pos_s": 8.50636671594238,
+   "frame": 607,
+   "type": "cue",
+   "usec": 13712791
+  },
+  {
+   "active": "chillin",
+   "bar": 0,
+   "cue": "rest",
+   "deck": "chillin",
+   "deck_pos_s": 0.0121154942778051,
+   "frame": 607,
+   "from": 0.0,
+   "type": "start",
+   "usec": 13736458
+  },
+  {
+   "active": "chillin",
+   "cue": "rest",
+   "deck": "arpeggio",
+   "deck_pos_s": 0.0121234942778051,
+   "err_ms": 6.28706225585951,
+   "frame": 607,
+   "grid_s": 1.64136054421769,
+   "pos_s": 8.53372077819824,
+   "quant": "bar",
+   "target_s": 8.52743371594238,
+   "type": "applied",
+   "usec": 13736466,
+   "what": "cue"
+  },
+  {
+   "active": "chillin",
+   "deck_pos_s": 0.649822239585876,
+   "frame": 647,
+   "kind": "level_up",
+   "sfx": "sting_level_up",
+   "type": "sting",
+   "usec": 14376567
+  },
+  {
+   "active": "chillin",
+   "cue": "rooms",
+   "deck_pos_s": 2.26559581785583,
+   "frame": 1146,
+   "type": "cue",
+   "usec": 22744666
+  },
+  {
+   "active": "rooms",
+   "bar": 0,
+   "cue": "rooms",
+   "deck": "rooms",
+   "deck_pos_s": 0.00444849427780509,
+   "frame": 1146,
+   "from": 0.0,
+   "type": "start",
+   "usec": 22919046
+  },
+  {
+   "active": "rooms",
+   "cue": "rooms",
+   "deck": "chillin",
+   "deck_pos_s": 0.00445649427780509,
+   "err_ms": 156.890275009156,
+   "frame": 1146,
+   "grid_s": 0.842993197278912,
+   "pos_s": 2.44385809286499,
+   "quant": "bar",
+   "target_s": 2.28696781785583,
+   "type": "applied",
+   "usec": 22919056,
+   "what": "cue"
+  },
+  {
+   "active": "rooms",
+   "deck_pos_s": 4.77221435128784,
+   "frame": 1426,
+   "kind": "room_hard",
+   "sfx": "sting_room_hard",
+   "type": "sting",
+   "usec": 27680114
+  },
+  {
+   "active": "rooms",
+   "cue": "prebattle",
+   "deck_pos_s": 1.9276290790329,
+   "frame": 1666,
+   "type": "cue",
+   "usec": 31692800
+  },
+  {
+   "active": "main",
+   "bar": 0,
+   "cue": "prebattle",
+   "deck": "main",
+   "deck_pos_s": 0.00345449427780509,
+   "frame": 1668,
+   "from": 0.0,
+   "type": "start",
+   "usec": 31726855
+  },
+  {
+   "active": "main",
+   "cue": "prebattle",
+   "deck": "rooms",
+   "deck_pos_s": 0.00346449427780509,
+   "err_ms": -0.231445526123197,
+   "frame": 1668,
+   "grid_s": 0.855722789115646,
+   "pos_s": 1.96408454542542,
+   "quant": "bar",
+   "target_s": 1.96431599095154,
+   "type": "applied",
+   "usec": 31726866,
+   "what": "cue"
+  },
+  {
+   "active": "main",
+   "deck_pos_s": 3.96085325639343,
+   "frame": 1905,
+   "kind": "pick",
+   "sfx": "sting_pick_reveal",
+   "type": "sting",
+   "usec": 35679605
+  },
+  {
+   "active": "main",
+   "deck_pos_s": 13.9725265661011,
+   "frame": 2497,
+   "kind": "cursed",
+   "sfx": "sting_bad",
+   "type": "sting",
+   "usec": 45695179
+  },
+  {
+   "active": "main",
+   "cue": "tutorial",
+   "deck_pos_s": 19.9639070025024,
+   "frame": 2857,
+   "type": "cue",
+   "usec": 51694001
+  },
+  {
+   "active": "moderato",
+   "bar": 0,
+   "cue": "tutorial",
+   "deck": "moderato",
+   "deck_pos_s": 0.00497849427780509,
+   "frame": 2859,
+   "from": 0.0,
+   "type": "start",
+   "usec": 51727595
+  },
+  {
+   "active": "moderato",
+   "cue": "tutorial",
+   "deck": "main",
+   "deck_pos_s": 0.00498849427780509,
+   "err_ms": 3.0286192321789,
+   "frame": 2859,
+   "grid_s": 2.0,
+   "pos_s": 20.0030286192322,
+   "quant": "bar",
+   "target_s": 20.0,
+   "type": "applied",
+   "usec": 51727608,
+   "what": "cue"
+  },
+  {
+   "active": "moderato",
+   "cue": "combat",
+   "deck_pos_s": 1.78331255269623,
+   "frame": 3396,
+   "type": "cue",
+   "usec": 60677818
+  },
+  {
+   "active": "battle",
+   "bar": 0,
+   "cue": "combat",
+   "deck": "battle",
+   "deck_pos_s": 0.00661649427780509,
+   "frame": 3398,
+   "from": 0.0,
+   "type": "start",
+   "usec": 60711607
+  },
+  {
+   "active": "battle",
+   "cue": "combat",
+   "deck": "moderato",
+   "deck_pos_s": 0.00662349427780509,
+   "err_ms": 5.64934718322752,
+   "frame": 3398,
+   "grid_s": 0.896145124716553,
+   "pos_s": 1.81731689987946,
+   "quant": "bar",
+   "target_s": 1.81166755269623,
+   "type": "applied",
+   "usec": 60711617,
+   "what": "cue"
+  },
+  {
+   "active": "battle",
+   "cue": "combat",
+   "deck_pos_s": 4.9743009423523,
+   "frame": 3696,
+   "level": 2,
+   "type": "intensity",
+   "usec": 65678569
+  },
+  {
+   "active": "battle",
+   "cue": "combat",
+   "deck": "battle",
+   "deck_pos_s": 4.99172897348022,
+   "err_ms": -8.31602651977548,
+   "frame": 3697,
+   "grid_s": 0.555555555555556,
+   "pos_s": 4.99168397348022,
+   "quant": "beat",
+   "target_s": 5.0,
+   "type": "applied",
+   "usec": 65695143,
+   "what": "intensity"
+  },
+  {
+   "active": "battle",
+   "cue": "boss",
+   "deck_pos_s": 9.97603099346924,
+   "frame": 3996,
+   "type": "cue",
+   "usec": 70678803
+  },
+  {
+   "active": "boss",
+   "bar": 5,
+   "cue": "boss",
+   "deck": "boss",
+   "deck_pos_s": 9.07751847662353,
+   "frame": 4064,
+   "from": 9.0702947845805,
+   "type": "start",
+   "usec": 71812349
+  },
+  {
+   "active": "boss",
+   "cue": "boss",
+   "deck": "battle",
+   "deck_pos_s": 9.07752747662354,
+   "err_ms": -2.3408356594512,
+   "frame": 4064,
+   "grid_s": 2.22222222222222,
+   "pos_s": 11.1087702754517,
+   "quant": "bar",
+   "target_s": 11.1111111111111,
+   "type": "applied",
+   "usec": 71812360,
+   "what": "cue"
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 15.9455971585789,
+   "frame": 4476,
+   "kind": "jackpot",
+   "sfx": "sting_good",
+   "type": "sting",
+   "usec": 78681208
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 19.9415085239201,
+   "frame": 4716,
+   "kind": "victory",
+   "sfx": "sting_good",
+   "type": "sting",
+   "usec": 82679658
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 23.9432681740056,
+   "frame": 4956,
+   "kind": "defeat",
+   "sfx": "sting_bad",
+   "type": "sting",
+   "usec": 86680192
+  }
+ ],
+ "output_latency": 0.00999999977648258,
+ "record_start_usec": 3674441,
+ "sections": [
+  [
+   "sync",
+   0.0
+  ],
+  [
+   "title",
+   1.5
+  ],
+  [
+   "rest",
+   10.0
+  ],
+  [
+   "rooms",
+   19.0
+  ],
+  [
+   "prebattle",
+   28.0
+  ],
+  [
+   "shop",
+   38.0
+  ],
+  [
+   "tutorial",
+   48.0
+  ],
+  [
+   "combat",
+   57.0
+  ],
+  [
+   "boss",
+   67.0
+  ],
+  [
+   "stings",
+   75.0
+  ],
+  [
+   "end",
+   87.0
+  ]
+ ],
+ "sfx": [
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 40,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 4191921
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 55,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 4441304
+  },
+  {
+   "delay": 0.0,
+   "file": "ui_click_1.wav",
+   "frame": 70,
+   "name": "ui_click",
+   "offset": 0.0,
+   "tag": "sync",
+   "unit": "",
+   "usec": 4691021
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_level_up_1.wav",
+   "frame": 647,
+   "name": "sting_level_up",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 14376524
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_room_hard_1.wav",
+   "frame": 1426,
+   "name": "sting_room_hard",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 27680066
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_pick_reveal_1.wav",
+   "frame": 1905,
+   "name": "sting_pick_reveal",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 35679562
+  },
+  {
+   "delay": 0.0,
+   "file": "shop_purchase_1.wav",
+   "frame": 2266,
+   "name": "shop_purchase",
+   "offset": 0.0,
+   "tag": "shop",
+   "unit": "",
+   "usec": 41863098
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_bad_1.wav",
+   "frame": 2497,
+   "name": "sting_bad",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 45695141
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_good_1.wav",
+   "frame": 4476,
+   "name": "sting_good",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 78681141
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_good_1.wav",
+   "frame": 4716,
+   "name": "sting_good",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 82679623
+  },
+  {
+   "delay": 0.0,
+   "file": "sting_bad_1.wav",
+   "frame": 4956,
+   "name": "sting_bad",
+   "offset": 0.0,
+   "tag": "sting",
+   "unit": "",
+   "usec": 86680147
+  }
+ ],
+ "voice": [],
+ "wav_seconds": 87.008
+}

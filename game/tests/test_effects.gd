@@ -24,13 +24,17 @@ func _u(id: String, wc: String = "sword", el: String = "fire", extra: Dictionary
 	return BWUnit.from_roster(row)
 
 
-## Put enchantment `ench_id` on the first item it applies to (stats 0).
-func _ench(u: BWUnit, ench_id: String) -> BWUnit:
+## Put enchantment `ench_id` on the first item it applies to (stats 0), or on
+## `base`. `ward`: a Warded row's element (D243).
+func _ench(u: BWUnit, ench_id: String, base: String = "", ward: String = "") -> BWUnit:
 	var row := BWData.row("enchantments", ench_id)
-	var base := str(BWData.list(row.applies_to)[0])
+	if base == "":
+		base = str(BWData.list(row.applies_to)[0])
 	var b := BWData.row("equipment", base)
 	u.equipment[str(b.slot)] = { "uid": "t_" + ench_id, "base": base, "slot": str(b.slot),
 		"weight": str(b.weight), "tier": "E", "stats": {}, "enchant": ench_id, "worn": {} }
+	if ward != "":
+		u.equipment[str(b.slot)]["ward"] = ward
 	u.refresh_effects()
 	return u
 
@@ -99,6 +103,8 @@ func test_parse_collect_and_conversions(t) -> void:
 	var keys := {}
 	for r in BWData.table("enchantments") + BWData.table("abilities"):
 		keys[str(r.effect_key)] = true
+		for part in str(r.get("also", "")).split("|", false):     # D243: merged rows carry keys in `also`
+			keys[part.strip_edges().get_slice("(", 0)] = true
 	for k in BWEffects.GEAR_KEYS:
 		t.ok(keys.has(k), "the 25 gear keys are all used (%s)" % k)
 	for k in keys:
@@ -108,11 +114,11 @@ func test_parse_collect_and_conversions(t) -> void:
 
 
 func test_rank_scaling(t) -> void:
-	var row := BWData.row("abilities", "brace")
-	t.eq(BWEffects.make(row, "ability", 1).params.amount, 1, "rank 1 = as written")
-	t.eq(BWEffects.make(row, "ability", 3).params.amount, 2, "rank 3 = ×1.5, rounded")
-	t.eq(BWEffects.make(row, "ability", 3).params.cap, 3, "caps don't scale")
-	t.eq(BWEffects.make(row, "ability", 9).params.amount, 2, "ranks above 3 count as 3")
+	var row := BWData.row("abilities", "iron_wall")
+	t.eq(BWEffects.make(row, "ability", 1).params.taken_pct, -20, "rank 1 = as written")
+	t.eq(BWEffects.make(row, "ability", 3).params.taken_pct, -30, "rank 3 = ×1.5")
+	t.eq(BWEffects.make(row, "ability", 3).params.hits, 3, "thresholds don't scale (D245)")
+	t.eq(BWEffects.make(row, "ability", 9).params.taken_pct, -30, "ranks above 3 count as 3")
 	t.eq(BWEffects.make(BWData.row("abilities", "deadeye"), "ability", 2).params.hit_per_hex, 6, "×1.25 at rank 2")
 	t.near(BWEffects.make(BWData.row("abilities", "bastion"), "ability", 3).params.chance_mult, 2.5, 0.001,
 		"multipliers scale their excess: ×2 -> ×2.5")
@@ -126,27 +132,28 @@ func test_sleeping_enchantments(t) -> void:
 	t.ok(not BWEffects.has(u, "stand_on_bonus"), "a fire row sleeps on a unit without fire")
 	u.affinity["fire"] = 10
 	t.ok(BWEffects.has(u, "stand_on_bonus"), "and wakes once fire is learned")
-	t.ok(BWEffects.has(_ench(_u("v", "sword", "water"), "fireproof"), "damage_taken_mod"), "defensive rows never sleep")
+	t.ok(BWEffects.has(_ench(_u("v", "sword", "water"), "warded", "", "fire"), "damage_taken_mod"), "defensive rows never sleep")
 
 
 # ------------------------------------------------------------------ element keys
 
 func test_tile_duration_plus(t) -> void:
-	var me := _ench(_u("me", "staff", "fire"), "smouldering")
+	# D243: the duration rows merged into their element's step / area rows (`also`).
+	var me := _ench(_u("me", "staff", "fire"), "kindled")
 	var plain := _u("p", "staff", "fire")
-	var icy := _ench(_u("ice", "staff", "ice"), "frozen")
+	var icy := _ench(_u("ice", "staff", "ice"), "glacial")
 	var b := _fight([me, plain, icy], [_far()], [C, Vector2i(0, 5), Vector2i(0, 6)], [FAR])
 	b.paint([X], "fire", me)
-	t.eq(b.tiles.at(X).timer, BWTiles.STEP_CYCLES + 1, "Smouldering: fire lasts 1 cycle longer")
+	t.eq(b.tiles.at(X).timer, BWTiles.STEP_CYCLES + 1, "Kindled (was Smouldering): fire lasts 1 cycle longer")
 	b.paint([Vector2i(2, 2)], "fire", plain)
 	t.eq(b.tiles.at(Vector2i(2, 2)).timer, BWTiles.STEP_CYCLES, "control: plain fire")
 	b.paint([Vector2i(2, 2)], "ice", icy)
-	t.eq(b.tiles.at(Vector2i(2, 2)).glaze, BWTiles.GLAZE_CYCLES + 1, "Frozen: the lock lasts 1 longer")
-	var windy := _ench(_u("wi", "staff", "wind"), "lingering")
+	t.eq(b.tiles.at(Vector2i(2, 2)).glaze, BWTiles.GLAZE_CYCLES + 1, "Glacial (was Frozen): the lock lasts 1 longer")
+	var windy := _ench(_u("wi", "staff", "wind"), "gusting")
 	var b2 := _fight([windy], [_far()], [C], [FAR])
 	b2.tiles.apply([X], "fire", "x")
 	b2.paint([X], "wind", windy)
-	t.eq(b2.tiles.at(_nb(X, 0)).timer, 2, "Lingering: gale copies last 1 longer")
+	t.eq(b2.tiles.at(_nb(X, 0)).timer, 2, "Gusting (was Lingering): gale copies last 1 longer")
 
 
 func test_tile_erupt_explosive(t) -> void:
@@ -346,18 +353,19 @@ func test_element_damage_pct(t) -> void:
 
 func test_damage_taken_mod(t) -> void:
 	var att := _u("a", "staff", "fire")
-	var proof := _ench(_u("p", "axe", "water"), "fireproof")
+	var proof := _ench(_u("p", "axe", "water"), "warded", "", "fire")
 	var bare := _u("q", "axe", "water")
 	var b := _fight([att], [proof, bare], [C], [_nb(C, 0), _nb(C, 3)])
 	var fc := b.forecast_basic(att, proof)
-	t.eq(fc.damage.value, maxf(1.0, roundf(b.forecast_basic(att, bare).damage.value * 0.80)), "Fireproof (D196): fire −20%")
-	t.ok(fc.damage.formula.contains("Fireproof"), "in the breakdown")
-	t.eq(b._tile_dmg(proof, 8.0, "fire"), BWTiles.tile_damage(proof, 8.0, "fire", 0.5), "Fireproof: burning tiles at half")
-	var visor := _ab(_u("v", "axe", "water"), "visor")
-	var b2 := _fight([att], [visor], [C], [_nb(C, 0)])
-	var fv := b2.forecast_basic(att, visor)
-	t.near(fv.crit_mult, 1.25, 0.001, "Visor: crits against you ×1.25")
-	t.ok(fv.crit.formula.contains("Visor"), "shown on the crit line")
+	t.eq(fc.damage.value, maxf(1.0, roundf(b.forecast_basic(att, bare).damage.value * 0.75)), "Warded (fire, D243): fire −25%")
+	t.ok(fc.damage.formula.contains("Fire-Warded"), "in the breakdown, named with its element")
+	t.eq(b._tile_dmg(proof, 8.0, "fire"), BWTiles.tile_damage(proof, 8.0, "fire", 0.75), "Warded: fire tiles −25%")
+	t.eq(b._tile_dmg(proof, 8.0, "thunder"), BWTiles.tile_damage(proof, 8.0, "thunder", 1.0), "other elements untouched")
+	var hard := _ab(_u("v", "axe", "water"), "hardened")
+	var b2 := _fight([att], [hard], [C], [_nb(C, 0)])
+	var fv := b2.forecast_basic(att, hard)
+	t.near(fv.crit_mult, 1.275, 0.001, "Hardened (was Visor): crits against you −15%, ×1.275")
+	t.ok(fv.crit.formula.contains("Hardened"), "shown on the crit line")
 
 
 func test_affinity_gain_plus(t) -> void:
@@ -404,6 +412,8 @@ func test_immune(t) -> void:
 	var b4 := _fight([strider], [_far()], [C], [FAR])
 	b4.board.set_cell(E, "muddy")
 	t.eq(b4.reachable(strider)[E].cost, 1, "Sure Stride: mud costs 1")
+	b4.tiles.apply([_nb(C, 3)], "water", "x", 3)
+	t.eq(b4.reachable(strider)[_nb(C, 3)].cost, 1, "Sure Stride (D245, Drift merged in): water 3 costs 1")
 
 
 # ------------------------------------------------------------------ weapon keys
@@ -425,17 +435,17 @@ func test_aoe_radius_plus(t) -> void:
 	var hit := _events(b, "attack").map(func(e): return e.target)
 	t.eq(hit, ["f1", "f2"], "Cleaving: the basic also hits the ring around the target, once each")
 	t.ok(not "al" in hit, "and spares allies there")
-	# Channelling: the staff's Surge reaches one more ring.
+	# Cleaving on a staff (D244, Channelling merged in): the Surge reaches one more ring.
 	var T := X
 	var outer := _nb(_nb(T, 0), 0)
 	for ch in [false, true]:
 		var mage := _u("m", "staff", "fire")
 		if ch:
-			_ench(mage, "channelling")
+			_ench(mage, "cleaving", "staff")
 		var foe := _u("f", "axe", "water")
 		var b2 := _fight([mage], [foe], [C], [outer])
 		var pv := b2.skill_preview(mage, "surge", "fire", T)
-		t.eq("f" in pv.units, ch, "Channelling=%s: a foe 2 from the Surge's centre" % ch)
+		t.eq("f" in pv.units, ch, "Cleaving=%s: a foe 2 from the Surge's centre" % ch)
 		if ch:
 			b2.use_skill(mage, "surge", "fire", T)
 			t.eq(b2.tiles.intensity(outer, "fire"), 0, "the added ring takes damage, not paint")
@@ -443,7 +453,7 @@ func test_aoe_radius_plus(t) -> void:
 
 func test_range_mod(t) -> void:
 	var b := _fight([_u("a")], [_far()], [C], [FAR])
-	t.eq(b.weapon_range(_ench(_u("s", "sword"), "piercing_strikes")), 2, "Piercing: sword range 1 × 2")
+	t.eq(b.weapon_range(_ench(_u("s", "sword"), "longshot", "sword")), 2, "Longshot (D244, Piercing merged in): a reach-1 sword reaches 2")
 	t.eq(b.weapon_range(_ench(_u("l", "bow"), "longshot")), 8, "Longshot: bow 6 + 2")
 	t.eq(b.weapon_range(_ab(_u("ab", "sword"), "ammo_belt")), 1, "Ammo Belt: not on a sword")
 	t.eq(b.weapon_range(_ab(_u("ab2", "bow"), "ammo_belt")), 7, "Ammo Belt: bows +1")
@@ -515,18 +525,19 @@ func test_knockback(t) -> void:
 	var b := _fight([me], [foe], [C], [E])
 	b.attack(me, foe)
 	t.eq(foe.pos, E2, "Impact: 1 hex straight back")
-	var hooker := _ench(_u("h", "lance", "fire", { "dex": 60 }), "hooking")
+	var hooker := _ench(_u("h", "lance", "fire", { "dex": 60 }), "impact", "anchor")
 	var foe2 := _u("f", "axe", "water", { "con": 40 })
 	var b2 := _fight([hooker], [foe2], [C], [E2])
+	hooker.fx["force_pull"] = true                     # D244 Forceful: the forecast toggle set to pull
 	b2.attack(hooker, foe2)
-	t.eq(foe2.pos, E, "Hooking: dragged 1 hex in")
-	# on=trigger, thunder: Jolting knocks the detonation's occupant away from you.
-	var jolt := _ench(_u("j", "staff", "thunder"), "jolting")
+	t.eq(foe2.pos, E, "Forceful set to pull (was Hooking): dragged 1 hex in")
+	# on=trigger, thunder: Arcing (Jolting merged in) knocks the detonation's occupant away from you.
+	var jolt := _ench(_u("j", "staff", "thunder"), "arcing")
 	var foe3 := _u("f", "axe", "water", { "con": 40 })
 	var b3 := _fight([jolt], [foe3], [C], [X])
 	b3.tiles.apply([X], "fire", "x")
 	b3.paint([X], "thunder", jolt)
-	t.eq(foe3.pos, BWHex.neighbors(X)[BWHex.direction_index(C, X)], "Jolting: pushed away from the detonator")
+	t.eq(foe3.pos, BWHex.neighbors(X)[BWHex.direction_index(C, X)], "Arcing: pushed away from the detonator")
 	# on=trigger, wind: Howling pushes units on the copied tiles outward.
 	var howl := _ench(_u("w", "staff", "wind"), "howling")
 	var foe4 := _u("f", "axe", "water", { "con": 40 })
@@ -565,8 +576,7 @@ func test_attack_mod(t) -> void:
 	var fk := b.forecast_basic(keen, foe)
 	t.near(fk.crit.value, base.crit.value + 10.0, 0.001, "Keen: +10 crit")
 	t.ok(fk.crit.formula.contains("Keen"), "named")
-	var serr := _ench(_u("s", "sword", "fire"), "serrated")
-	t.near(b.forecast_basic(serr, foe).crit_mult, 2.0, 0.001, "Serrated: crits ×2")
+	t.near(fk.crit_mult, 2.0, 0.001, "Keen (D244, Serrated merged in): crits ×2")
 	# Sundering: 16 − 0.75 × 12 = 7; ignoring 25%: 16 − 0.75 × 9 = 9.25 → 9.
 	var sund := _ench(_u("u", "sword", "fire"), "sundering")
 	t.eq(base.damage.value, 7.0, "control")
@@ -587,19 +597,17 @@ func test_attack_mod(t) -> void:
 	var b3 := _fight([eye, bow], [foe3], [C, C], [X])
 	t.near(b3.forecast_basic(eye, foe3).hit.value, b3.forecast_basic(bow, foe3).hit.value + 10.0, 0.001,
 		"Deadeye: 2 hexes between = +10 hit")
-	# Fletcher's Eye gates on min_range 3.
-	var fl := _ab(_u("fe", "bow", "fire"), "fletchers_eye")
-	var b4 := _fight([fl], [foe3], [C], [X])
-	t.ok(b4.forecast_basic(fl, foe3).crit.formula.contains("Fletcher"), "at 3: +5 crit")
-	foe3.pos = _nb(_nb(C, 0), 0)
-	t.ok(not b4.forecast_basic(fl, foe3).crit.formula.contains("Fletcher"), "at 2: nothing")
-	# Conducting: +25% against a target on charge.
+	# D245: Deadeye also +3 crit per hex between (Fletcher's Eye merged in).
+	t.near(b3.forecast_basic(eye, foe3).crit.value, b3.forecast_basic(bow, foe3).crit.value + 6.0, 0.001,
+		"Deadeye: 2 hexes between = +6 crit")
+	# Conducting (Resonant merged in): +5% per charge level on the target's hex.
 	var cond := _ench(_u("c", "staff", "fire"), "conducting")
 	var foe5 := _u("f5", "axe", "water")
 	var b5 := _fight([cond], [foe5], [C], [E])
 	t.ok(not b5.forecast_basic(cond, foe5).damage.formula.contains("Conducting"), "bare ground: nothing")
 	b5.tiles.apply([E], "dark", "x")
-	t.ok(b5.forecast_basic(cond, foe5).damage.formula.contains("Conducting"), "on charge: ×1.25")
+	var fcd := b5.forecast_basic(cond, foe5)
+	t.ok(fcd.damage.formula.contains("Conducting") and fcd.damage.values.contains("1.05"), "dark 1: ×1.05")
 	# Dragoon's Descent: +10% per level above the target.
 	var dragoon := _ab(_u("dr", "sword", "fire"), "dragoons_descent")
 	var foe6 := _u("f6", "axe", "water")
@@ -607,6 +615,7 @@ func test_attack_mod(t) -> void:
 	b6.board.set_cell(C, "neutral", 2)
 	var fd := b6.forecast_basic(dragoon, foe6)
 	t.ok(fd.damage.formula.contains("(2 above)") and fd.damage.values.contains("1.20"), "Dragoon's Descent: 2 levels = ×1.2")
+	t.ok(fd.crit.formula.contains("(2 above)"), "and +16 crit (D245, High Ground merged in)")
 
 
 func test_skill_cd_minus(t) -> void:
@@ -639,62 +648,97 @@ func test_guard(t) -> void:
 
 # ------------------------------------------------------------------ ability keys
 
+## D245: reactive abilities are thresholds, not stacks.
 func test_trigger_stat(t) -> void:
-	var me := _ab(_u("me", "sword", "fire", { "con": 100 }), "brace")
-	var b := _fight([me], [_far()], [C], [FAR])
-	for i in 5:
+	# hits: Iron Wall fires on the 3rd time you're hurt, once.
+	var me := _ab(_u("me", "sword", "fire", { "con": 100 }), "iron_wall")
+	var foe := _u("f", "axe", "water")
+	var b := _fight([me], [foe], [C], [_nb(C, 0)])
+	var before: float = b.forecast_basic(foe, me).damage.value
+	for i in 2:
 		b._tile_hurt(me, 5, "test", "")
-	t.eq(int(me.battle_mods.get("def", 0)), 3, "Brace: +1 def per hit taken, capped at +3")
-	t.eq(me.stat("def"), 7, "and stat() reads it")
-	t.eq(_events(b, "stat_up").size(), 3, "one stat_up event per grant")
-	# low_hp, once: Second Wind.
+	t.ok(not b.forecast_basic(foe, me).damage.formula.contains("Iron Wall"), "Iron Wall: nothing after 2 hits")
+	b._tile_hurt(me, 5, "test", "")
+	var fc := b.forecast_basic(foe, me)
+	t.ok(fc.damage.formula.contains("Iron Wall"), "the 3rd hit: on")
+	t.eq(fc.damage.value, maxf(1.0, roundf(before * 0.8)), "20% less for the battle")
+	for i in 4:
+		b._tile_hurt(me, 5, "test", "")
+	t.eq(b._auras(me, "taken_pct").size(), 1, "once")
+	# low_hp, once: Second Wind (+2 spd, +2 move) and Bloodied (+25% str, +1 move).
 	var sw := _ab(_u("sw", "sword", "fire"), "second_wind")
 	var b2 := _fight([sw], [_far()], [C], [FAR])
+	var mv := sw.move_range()
 	b2._tile_hurt(sw, 70, "test", "")                # D178: 123 HP, so 70 takes it below half
 	t.eq(int(sw.battle_mods.get("spd", 0)), 2, "Second Wind: below half, +2 spd")
+	t.eq(sw.move_range(), mv + 2, "and +2 move")
 	sw.hp = sw.max_hp()
 	b2._tile_hurt(sw, 70, "test", "")
 	t.eq(int(sw.battle_mods.get("spd", 0)), 2, "only the first time")
-	# knockout: Encore. ally_ko: Heavy Is the Head. avoided: Poise.
-	var enc := _ab(_u("en", "sword", "fire"), "encore")
-	var crown := _ab(_u("cr", "sword", "fire"), "heavy_is_the_head")
+	t.eq(sw.move_range(), mv + 2, "the move too")
+	var bl := _ab(_u("bl", "axe", "fire", { "str": 20 }), "bloodied")
+	var b5 := _fight([bl], [_far()], [C], [FAR])
+	var mv2 := bl.move_range()
+	b5._tile_hurt(bl, 70, "test", "")
+	t.eq(int(bl.battle_mods.get("str", 0)), 5, "Bloodied: +25% of STR 20")
+	t.eq(bl.move_range(), mv2 + 1, "and +1 move")
+	t.eq(_events(b5, "stat_up").size(), 1, "one stat_up event")
+	# knockout: Crowd Pleaser (up to 2). ally_ko: Heavy Is the Head. avoided: Poise.
+	var enc := _ab(_u("en", "sword", "fire", { "str": 20, "def": 10 }), "crowd_pleaser")
+	var crown := _ab(_u("cr", "sword", "fire", { "wil": 10, "res": 10 }), "heavy_is_the_head")
 	var buddy := _u("bu", "sword", "fire")
 	var f1 := _u("f1", "axe", "water")
-	var b3 := _fight([enc, crown, buddy], [f1, _far()], [C, Vector2i(0, 5), Vector2i(0, 6)], [X, FAR])
+	var f2 := _u("f2", "axe", "water")
+	var f3 := _u("f3", "axe", "water")
+	var b3 := _fight([enc, crown, buddy], [f1, f2, f3, _far()], [C, Vector2i(0, 5), Vector2i(0, 6)], [X, Vector2i(8, 8), Vector2i(9, 8), FAR])
 	b3._tile_hurt(f1, 9999, "test", "en")
-	t.eq(int(enc.battle_mods.get("spd", 0)), 1, "Encore: a knockout credited to you, +1 spd")
+	t.eq(int(enc.battle_mods.get("str", 0)), 3, "Crowd Pleaser: a knockout credited to you, +15% STR")
+	t.eq(int(enc.battle_mods.get("def", 0)), 1, "and +15% DEF")
+	b3._tile_hurt(f2, 9999, "test", "en")
+	b3._tile_hurt(f3, 9999, "test", "en")
+	t.eq(int(enc.battle_mods.get("str", 0)), 6, "up to 2 times")
 	b3._tile_hurt(buddy, 9999, "test", "")
-	t.eq(int(crown.battle_mods.get("wil", 0)), 2, "Heavy Is the Head: an ally falls, +2 wil")
-	t.eq(int(crown.battle_mods.get("res", 0)), 2, "and +2 res")
+	t.eq(int(crown.battle_mods.get("wil", 0)), 2, "Heavy Is the Head: an ally falls, +20% WIL")
+	t.eq(int(crown.battle_mods.get("res", 0)), 2, "and +20% RES")
+	var fh := b3.forecast_basic(crown, b3.foes_of(crown).back())
+	t.ok(fh.hit.value >= 100.0 and fh.damage.formula.contains("Heavy Is the Head"), "and the next attack is +50% and sure")
 	var poise := _ab(_u("po", "sword", "fire"), "poise")
 	var b4 := _fight([poise], [_far()], [C], [FAR])
+	var c0: float = b4.forecast_basic(poise, b4.foes_of(poise)[0]).crit.value
 	b4._after_blow(b4.foes_of(poise)[0], poise, { "hit": false, "damage": 0 }, poise.hp, "")
-	t.eq(int(poise.battle_mods.get("wil", 0)), 1, "Poise: an avoided attack, +1 wil")
+	t.near(b4.forecast_basic(poise, b4.foes_of(poise)[0]).crit.value, c0 + 25.0, 0.001, "Poise: an avoided attack, +25 crit on the next")
 
 
 func test_aura_mod(t) -> void:
 	var E := _nb(C, 0)
 	var guard := _ab(_u("g", "sword", "fire"), "guardian")
 	var ally := _u("a", "sword", "fire")
-	var b := _fight([guard, ally], [_far()], [C, E], [FAR])
-	t.eq(ally.stat("def"), 6, "Guardian: an ally next to you +2 def")
-	t.eq(guard.stat("def"), 4, "not the holder")
-	ally.pos = Vector2i(5, 9)
-	t.eq(ally.stat("def"), 4, "out of reach: gone")
+	var foe0 := _u("f0", "axe", "water")
+	var b := _fight([guard, ally], [foe0], [C, E], [_nb(E, 0)])
+	var plain_dmg: float = b.forecast_basic(foe0, guard).damage.value
+	var fg := b.forecast_basic(foe0, ally)
+	t.ok(fg.damage.formula.contains("Guardian (g)"), "Guardian (D245): an ally next to you takes 10% less")
+	t.eq(fg.damage.value, maxf(1.0, roundf(plain_dmg * 0.9)), "×0.9")
+	t.ok(not b.forecast_basic(foe0, guard).damage.formula.contains("Guardian"), "not the holder")
 	var leap := _ab(_u("l", "sword", "fire"), "leap_ready")
 	t.eq(leap.move_range(), 5, "Leap Ready: +1 move, on the sheet too")
 	var b2 := _fight([leap], [_far()], [C], [FAR])
 	t.eq(leap.move_range(), 5, "and in battle")
-	# Heads Up (+5 avoid to allies within 2) and Royal Presence (+10% damage).
-	var cap := _ab(_u("c", "sword", "fire"), "heads_up")
+	# Scout's Lead (+1 move to allies within 2; Heads Up merged in) and Royal Presence (+10% damage).
+	var cap := _ab(_u("c", "sword", "fire"), "scouts_lead")
 	var crown := _ab(_u("k", "sword", "fire"), "royal_presence")
 	var mate := _u("m", "sword", "fire")
 	var foe := _u("f", "axe", "water")
 	var b3 := _fight([cap, crown, mate], [foe], [C, _nb(C, 3), E], [_nb(E, 0)])
-	var fc := b3.forecast_basic(foe, mate)
-	t.near(fc.avoid.value, 5.0 + 0.4 + 5.0, 0.001, "Heads Up: +5 avoid")
-	t.ok(fc.avoid.formula.contains("Heads Up (c)"), "named with its holder")
+	t.eq(mate.move_range(), 5, "Scout's Lead: an ally within 2 gets +1 move")
+	t.eq(cap.move_range(), 4, "not the holder")
 	t.ok(b3.forecast_basic(mate, foe).damage.formula.contains("Royal Presence (k)"), "Royal Presence: ally damage ×1.1")
+	# Mana Veil (D245): an adjacent ally rolls element resists with Advantage.
+	var veil := _ab(_u("v", "sword", "fire"), "mana_veil")
+	var mage := _u("mg", "staff", "fire")
+	var b6 := _fight([mage], [_u("t1", "axe", "water"), veil], [C], [_nb(C, 0), _nb(_nb(C, 0), 0)])
+	var fm := b6.forecast_basic(mage, b6.foes_of(mage)[0])
+	t.ok(fm.has("resist_adv") and int(fm.resist_adv) < 0, "Mana Veil: the ally beside it resists with Advantage")
 
 
 func test_glance_mod(t) -> void:
@@ -702,32 +746,41 @@ func test_glance_mod(t) -> void:
 	var foe := _u("f", "axe", "water")
 	var bast := _ab(_u("b", "sword", "fire"), "bastion")
 	var b := _fight([bast], [foe], [C], [E])
-	t.near(b.forecast_basic(foe, bast).glance.value, 28.0, 0.001, "Bastion: (10 + 4) × 2")
-	var woven := _ab(_u("w", "sword", "fire"), "woven_rings")
-	var b2 := _fight([woven], [foe], [C], [E])
-	var fw := b2.forecast_basic(foe, woven)
-	t.near(fw.glance_mult, 0.25, 0.001, "Woven Rings: glances deal 25%")
-	t.ok(fw.glance.formula.contains("Woven Rings"), "named on the glance line")
-	var sc := _ab(_u("s", "sword", "fire"), "shoulder_check")
-	var b3 := _fight([sc], [foe], [C], [E])
-	t.near(b3.forecast_basic(foe, sc).glance.value, 19.0, 0.001, "Shoulder Check: +5 vs melee")
-	var archer := _u("a", "bow", "fire")
-	var b4 := _fight([sc], [archer], [C], [X])
-	t.near(b4.forecast_basic(archer, sc).glance.value, 14.0, 0.001, "nothing vs ranged")
-	var rg := _ab(_u("r", "sword", "fire"), "ring_guard")
-	var mate := _u("m", "sword", "fire")
-	var b5 := _fight([rg, mate], [foe], [C, E], [_nb(E, 0)])
-	t.near(b5.forecast_basic(foe, mate).glance.value, 19.0, 0.001, "Ring Guard: the ally next to you +5")
-	t.near(b5.forecast_basic(foe, rg).glance.value, 14.0, 0.001, "not the holder")
+	var fb := b.forecast_basic(foe, bast)
+	t.near(fb.glance.value, 28.0, 0.001, "Bastion: (10 + 4) × 2")
+	t.near(fb.glance_mult, 0.25, 0.001, "Bastion (D245, Woven Rings merged in): glances deal 25%")
+	t.ok(fb.glance.formula.contains("Bastion"), "named on the glance line")
 
 
 func test_stat_share(t) -> void:
-	var u := _ab(_u("s", "sword", "fire", { "dex": 10 }), "steel_under_cloth")
-	t.eq(u.stat("str"), 4 + 2, "Steel Under Cloth: + floor(25% × DEX 10)")
-	var both := _u("b", "sword", "fire", { "dex": 8, "str": 8 })
-	both.abilities = { "passive": { "id": "nimble_strength", "rank": 1 } }
-	both.refresh_effects()
-	t.eq(both.stat("dex"), 10, "Nimble Strength: + 25% STR")
+	# D245 Crosstrained: 25% of the second-best stat (CON left out) adds to the best.
+	var u := _ab(_u("s", "sword", "fire", { "dex": 10, "wil": 8, "con": 40 }), "crosstrained")
+	t.eq(u.stat("dex"), 10 + 2, "Crosstrained: DEX 10 + floor(25% × WIL 8)")
+	t.eq(u.stat("wil"), 8, "the second-best is unchanged")
+	t.eq(u.stat("con"), 40, "CON is never the best")
+
+
+## D245: Flair (your first attack each battle crits) and Acrobat (the first
+## attack on you each battle misses): once-a-battle certainties, spent by use.
+func test_flair_and_acrobat(t) -> void:
+	var fl := _ab(_u("fl", "sword", "fire", { "dex": 60 }), "flair")
+	var foe := _u("f", "axe", "water", { "con": 300 })
+	var b := _fight([fl], [foe], [C], [_nb(C, 0)])
+	var fc := b.forecast_basic(fl, foe)
+	t.eq(float(fc.crit.value), 100.0, "Flair: the first attack crits")
+	t.ok(fc.crit.formula.contains("Flair"), "named on the crit line")
+	b.attack(fl, foe)
+	t.ok(b.forecast_basic(fl, foe).crit.value < 100.0, "spent by that attack")
+	var ac := _ab(_u("ac", "axe", "water", { "con": 300 }), "acrobat")
+	var att := _u("a", "sword", "fire", { "dex": 60 })
+	var b2 := _fight([att], [ac], [C], [_nb(C, 0)])
+	var fa := b2.forecast_basic(att, ac)
+	t.eq(float(fa.hit.value), 0.0, "Acrobat: the first attack on it misses")
+	t.ok(fa.hit.formula.contains("Acrobat"), "and the forecast says why")
+	var h0 := ac.hp
+	b2.attack(att, ac)
+	t.eq(ac.hp, h0, "it does")
+	t.ok(b2.forecast_basic(att, ac).hit.value > 0.0, "once a battle")
 
 
 # ------------------------------------------------------------------ plumbing
@@ -735,11 +788,11 @@ func test_stat_share(t) -> void:
 func test_every_mod_is_in_the_breakdown(t) -> void:
 	var att := _ab(_ench(_u("a", "bow", "fire"), "keen"), "deadeye")
 	var crown := _ab(_u("k", "sword", "fire"), "royal_presence")
-	var dfn := _ab(_ench(_u("d", "axe", "water"), "fireproof"), "supple")
+	var dfn := _ab(_ench(_u("d", "axe", "water"), "warded", "", "fire"), "bastion")
 	var b := _fight([att, crown], [dfn], [C, _nb(C, 3)], [X])
 	b.tiles.apply([X], "dark", "x")
 	var fc := b.forecast_basic(att, dfn)
-	t.ok(fc.mods.size() >= 5, "ground + keen + deadeye + royal presence + supple")
+	t.ok(fc.mods.size() >= 5, "ground + keen + deadeye + royal presence + bastion")
 	var text := ""
 	for k in ["hit", "avoid", "glance", "crit", "damage"]:
 		text += str(fc[k].formula) + "|"
@@ -751,18 +804,18 @@ func test_prepare_for_battle(t) -> void:
 	var ids := BWData.table("roster").slice(0, 6).map(func(x): return str(x.id))
 	var r := BWRun.start(ids, 5)
 	var u: BWUnit = r.squad[0]
-	r.learned[u.id] = ["deadeye", "brace", "ward", "flair"]
-	r.ability_ranks[u.id] = { "brace": 2 }
+	r.learned[u.id] = ["deadeye", "iron_wall", "bloodied", "flair"]
+	r.ability_ranks[u.id] = { "iron_wall": 2 }
 	var auto := r.prepare_for_battle([u])
-	t.eq(u.abilities.reactive.id, "brace", "auto-equip: the first learned reactive")
+	t.eq(u.abilities.reactive.id, "iron_wall", "auto-equip: the first learned reactive")
 	t.eq(u.abilities.reactive.rank, 2, "at its trained rank")
 	t.eq(u.abilities.supportive.id, "deadeye", "first supportive")
 	t.eq(u.abilities.passive.id, "flair", "first passive")
 	t.eq(auto.size(), 3, "each auto-equip is reported")
-	t.eq(r.equipped_ability[u.id].reactive, "brace", "and saved")
-	t.ok(r.equip_ability(u, "ward"), "equip another")
+	t.eq(r.equipped_ability[u.id].reactive, "iron_wall", "and saved")
+	t.ok(r.equip_ability(u, "bloodied"), "equip another")
 	t.eq(r.prepare_for_battle([u]).size(), 0, "nothing to auto-equip now")
-	t.eq(u.abilities.reactive.id, "ward", "the chosen one is used")
+	t.eq(u.abilities.reactive.id, "bloodied", "the chosen one is used")
 	t.ok(BWEffects.has(u, "trigger_stat"), "and its effect is live")
 	var stranger := _u("x")
 	r.prepare_for_battle([stranger])
@@ -773,9 +826,9 @@ func test_effects_fight_reproduces(t) -> void:
 	var histories: Array = []
 	for k in 2:
 		var p1 := _ab(_ench(_u("p1", "staff", "fire"), "explosive"), "imbued")
-		var p2 := _ab(_ench(_u("p2", "daggers", "fire"), "doubleshot"), "brace")
+		var p2 := _ab(_ench(_u("p2", "daggers", "fire"), "doubleshot"), "iron_wall")
 		var p3 := _ab(_ench(_u("p3", "sword", "water"), "riposting"), "guardian")
-		var e1 := _ab(_ench(_u("e1", "axe", "water"), "impact"), "enrage")
+		var e1 := _ab(_ench(_u("e1", "axe", "water"), "impact"), "bloodied")
 		var e2 := _ab(_ench(_u("e2", "bow", "thunder"), "spreadshot"), "deadeye")
 		var e3 := _ab(_ench(_u("e3", "lance", "dark"), "flowing"), "flair")
 		var b := BWBattle.new(_board(), 99)

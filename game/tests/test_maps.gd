@@ -14,8 +14,8 @@ func _maps() -> Array:
 
 
 func test_ten_maps(t) -> void:
-	t.eq(_maps(), ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "forge.json", "lake.json",
-		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json"], "the ten maps (D117: four static-tile maps; D140: the Obelisks)")
+	t.eq(_maps(), ["arena.json", "bridge.json", "catacombs.json", "chapel.json", "court.json", "forge.json", "lake.json",
+		"obelisks.json", "paintball.json", "ravine.json", "tinderbox.json"], "the eleven maps (D117: four static-tile maps; D140: the Obelisks; D256: the Twins' court)")
 	for m in BWRun.MAPS:
 		t.ok(FileAccess.file_exists(MAP_DIR + m + ".json"), "rotation map %s exists" % m)
 
@@ -28,19 +28,23 @@ func test_rotation(t) -> void:
 	var r := BWRun.start(ids, 4242)
 	var seen: Array = []
 	for n in range(1, BWRun.FIGHTS + 1):
-		if n != BWRun.OBJECTIVE_FIGHT:
+		if n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT:
 			seen.append(r.map_for(n))
 	t.eq(r.map_for(4), "obelisks", "fight 4 is the Obelisks")
+	t.eq(r.map_for(BWRun.TWINS_FIGHT), "court", "fight 7 is the Twins' court (D256)")
 	t.eq(r.map_for(BWRun.BOSS_FIGHT), "arena", "the boss on the arena")
 	var sorted := seen.duplicate()
 	sorted.sort()
-	var pool: Array = BWRun.MAP_POOL.duplicate()
-	pool.sort()
-	t.eq(sorted, pool, "fights 1-3 and 5-10: every pool map once, no repeats")
+	var uniq: Array = []
+	for m in sorted:
+		if not m in uniq:
+			uniq.append(m)
+	t.eq(uniq.size(), sorted.size(), "fights 1-3, 5-6, 8-10: eight pool maps, no repeats (D256: fight 7 is fixed)")
+	t.ok(sorted.all(func(m): return m in BWRun.MAP_POOL), "all from the pool")
 	# D187/D208: fights 1-2 take the front map; rooms take the front two from fight 3; always Standard plays the first,
-	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6, 8, 5, 3, 7.
+	# the unchosen Hard map goes to the back: slots 0, 1, 2, 4, 6, 8, 5, 3 (D256: fight 7 takes none).
 	var sh := BWRun.shuffled_maps(4242)
-	t.eq(seen, [0, 1, 2, 4, 6, 8, 5, 3, 7].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
+	t.eq(seen, [0, 1, 2, 4, 6, 8, 5, 3].map(func(i): return sh[i]), "the order follows the seeded shuffle through the room queue")
 	var again := BWRun.start(ids, 4242)
 	t.eq(range(1, 11).map(func(n): return again.map_for(n)), range(1, 11).map(func(n): return r.map_for(n)), "same seed, same order")
 	var other := BWRun.start(ids, 4243)

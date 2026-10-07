@@ -366,7 +366,8 @@ func test_enemy_scaling(t) -> void:
 	t.eq(BWRun.enemy_stage(7), 6, "fight 7 uses fight 6 (one behind for 6-8)")
 	t.eq(BWRun.enemy_stage(9), 9, "fight 9 is level with you")
 	# fight: [tier, level, expertise rank]; D194: an enemy's level is its stage
-	var want := { 1: ["E", 1, 0], 5: ["D", 3, 1], 7: ["C", 6, 2], 9: ["A", 9, 4] }
+	# (D256: fight 7 is the Twins, built at the squad's level, so fight 8 stands in for "one behind")
+	var want := { 1: ["E", 1, 0], 5: ["D", 3, 1], 8: ["B", 7, 3], 9: ["A", 9, 4] }
 	for n in want:
 		var es := run.enemies_for(n)
 		for u in es:

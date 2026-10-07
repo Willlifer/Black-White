@@ -52,7 +52,8 @@ func test_deterministic_per_seed(t) -> void:
 func test_no_choice_at_obelisks_or_giant(t) -> void:
 	t.ok(not BWRooms.has_choice(4), "fight 4 (Obelisks): no choice")
 	t.ok(not BWRooms.has_choice(BWRun.BOSS_FIGHT), "the Giant: no choice")
-	for n in [3, 5, 6, 7, 8, 9, 10]:
+	t.ok(not BWRooms.has_choice(BWRun.TWINS_FIGHT), "fight 7 (the Twins): no choice (D256)")
+	for n in [3, 5, 6, 8, 9, 10]:
 		t.ok(BWRooms.has_choice(n), "fight %d offers rooms" % n)
 	var r := _run()
 	for n in 3:
@@ -138,10 +139,10 @@ func test_maps_over_a_run(t) -> void:
 		var uniq: Dictionary = {}
 		for m in played:
 			uniq[m] = true
-		t.eq(played.size(), 9, "nine queued fights")
-		t.eq(offered.size(), 7, "seven choice fights (3, 5-10)")
+		t.eq(played.size(), 8, "eight queued fights (D256: fight 7 is the Twins)")
+		t.eq(offered.size(), 6, "six choice fights (3, 5, 6, 8-10)")
 		if pick == 0:
-			t.eq(uniq.size(), 9, "always Standard: every pool map once (%s)" % [played])
+			t.eq(uniq.size(), 8, "always Standard: eight pool maps, no repeats (%s)" % [played])
 		else:
 			t.ok(uniq.size() >= 8, "always Hard: at most one replay (%s)" % [played])
 		for i in 6:
@@ -170,7 +171,9 @@ func test_save_load_mid_choice(t) -> void:
 		d.erase(k)
 	var old := BWRun.from_dict(d)
 	t.eq(old.room_log, { "1": { "kind": "standard", "map": str(r.map_order[0]) }, "2": { "kind": "standard", "map": str(r.map_order[1]) } }, "v6: fights 1-2 played their D145 slots")
-	t.eq(old.map_queue, r.map_order.slice(2), "v6: the rest of the order is the queue")
+	var rest: Array = r.map_order.slice(2)
+	rest.remove_at(BWRooms._slot(BWRun.TWINS_FIGHT) - 2)     # D256: fight 7 takes no map
+	t.eq(old.map_queue, rest, "v6: the rest of the order is the queue")
 	t.eq(BWRooms.chosen_index(old), -1, "v6: nothing on offer yet")
 	t.eq(BWRooms.offer(old).size(), 2, "v6: the room screen rolls a fresh offer")
 

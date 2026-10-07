@@ -56,6 +56,13 @@ var _arced := {}
 var _action_serial := 0
 var _onkill_depth := 0
 var _pending_cover: Array = []
+## D255: a boss fight's state (BWPhases: the phase script, fired / pending
+## phases, per-unit rules; the boss's own keys, e.g. the Twins' beam). Ids
+## and numbers only, so clone() copies it. {} = no boss.
+var boss := {}
+## D249-D254 weather (BWWeather, src/core/weather.gd): the fight's weather
+## state, {} for none. Set with set_weather() before setup().
+var weather := {}
 
 
 func _init(p_board: BWBoard, seed_value: int = 1) -> void:
@@ -86,6 +93,7 @@ func setup(players: Array, enemies: Array, player_at: Array = []) -> void:
 		u.pos = lay[i]
 		units.append(u)
 	_place_objectives()                       # D140: the map's obelisks, a third side
+	BWPhases.setup(self)                      # D255: a boss's phase script (the Twins)
 	_fx_units = units.filter(func(u: BWUnit): return not u.effects.is_empty())
 	for u in units:
 		u.fx_hook = _situational              # FX hook: stand_on_bonus, aura_mod stats/move
@@ -467,6 +475,7 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 		if pct > 0 and u.alive() and not no_cross:
 			_tile_hurt(u, _tile_dmg(u, pct, "fire"), "fire_cross", str(tiles.at(path[i]).get("source", "")))
 	_lay_on_move(u, path)
+	BWPhases.after_move(self, u, path)        # D256: the Twins' beam (crossing it)
 	if u.alive() and not over:
 		_static_field_check(u)                # D93 Static Field: ending a move on its fuse
 		_zone_check(u)                        # D97: ending a move inside an enemy zone
@@ -644,6 +653,7 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 		"att_alone": _alone(att, ap), "dfn_alone": _alone(dfn, dfn.pos),
 		"charge_levels": 0 if e.is_empty() else absi(int(e.h)) + absi(int(e.v)),
 		"dfn_adjacent": side(dfn.team).filter(func(o): return o != dfn and gap(o, dfn) <= 1).size(),
+		"att_adjacent": side(att.team).filter(func(o): return o != att and gap(att, o, ap) <= 1).size(),   # D244 Lockstep
 	}
 	mods.append_array(BWEffects.attack_mods(att, dfn, kind, el, ctx, _auras))
 	return mods
@@ -1486,6 +1496,7 @@ func _hurt_triggers(v: BWUnit, before: int) -> void:
 			_fire_stat(v, e)
 	_sanctuary_check(v, before)            # D93 Sanctuary
 	BWEnchant.hurt(self, v, before)        # v2 hook: Rally Cry, Lifeline
+	BWPhases.check(self)                   # D255: HP thresholds (the Twins' swap)
 
 
 ## A knockout event, plus trigger_stat knockout (the killer: Encore, Crowd
@@ -1500,6 +1511,7 @@ func _ko(victim: BWUnit, by: BWUnit, cause: String = "") -> void:
 	for a in side(victim.team):
 		_trigger(a, "ally_ko")
 	BWEnchant.on_ko(self, victim, by, cause)   # v2 hook: on-kill, ally_kill, ally_ko
+	BWPhases.on_ko(self, victim)               # D255: a boss unit fell (the rage clock)
 
 
 func _trigger(u: BWUnit, trig: String) -> void:
@@ -1510,28 +1522,46 @@ func _trigger(u: BWUnit, trig: String) -> void:
 			_fire_stat(u, e)
 
 
-## Grant a trigger_stat's amount to each of its stats for the battle, held to
-## its cap (per stat) or to one firing with once=1. Emits "stat_up".
+## Fire a trigger_stat (D245: thresholds, not stacks). Gates: `hits` (fires
+## on the Nth trigger), `once`, `times` (fires at most N times), `cap` (flat
+## stat points per stat). Then, for the battle: `amount` flat or `pct` % of
+## base + gear to each of `stats` ("stat_up"), `move` and `taken_pct` as the
+## holder's own aura terms (BWEnchant.self_auras), and next_crit /
+## next_dmg_pct / next_sure as an empowerment on the next attack.
 func _fire_stat(u: BWUnit, e: Dictionary) -> void:
-	if float(BWEffects.p(e, "dmg_pct", 0)) != 0.0:
-		BWEnchant.fury(self, u, e)             # v2: Fury banks damage, not stats
-		return
 	var key := "ts:" + str(e.source)
-	var given := int(u.fx.get(key, 0))
-	if int(BWEffects.p(e, "once", 0)) == 1 and given > 0:
+	var hits := int(BWEffects.p(e, "hits", 0))
+	if hits > 0:
+		var n := int(u.fx.get(key + "@", 0)) + 1
+		u.fx[key + "@"] = n
+		if n < hits:
+			return
+	var fired := int(u.fx.get(key + "#", 0))
+	if int(BWEffects.p(e, "once", 0)) == 1 and fired > 0:
 		return
+	if int(BWEffects.p(e, "times", 0)) > 0 and fired >= int(BWEffects.p(e, "times", 0)):
+		return
+	var given := int(u.fx.get(key, 0))
 	var amt := int(BWEffects.p(e, "amount", 0))
 	var cap := int(BWEffects.p(e, "cap", 0))
 	if cap > 0:
 		amt = mini(amt, cap - given)
-	if amt <= 0:
-		return
+		if amt <= 0:
+			return
+	u.fx[key + "#"] = fired + 1
 	var stats := str(BWEffects.p(e, "stats", "")).split("+", false)
+	var pct := float(BWEffects.p(e, "pct", 0))
 	for s in stats:
-		u.battle_mods[s] = int(u.battle_mods.get(s, 0)) + amt
-	u.fx[key] = given + amt
-	_emit({ "type": "stat_up", "unit": u.id, "stats": Array(stats), "amount": amt,
-		"source": e.source, "name": e.name })
+		var a := amt
+		if pct > 0.0:
+			a = maxi(1, floori(BWEffects._raw_stat(u, s) * pct / 100.0))
+		if a <= 0:
+			continue
+		u.battle_mods[s] = int(u.battle_mods.get(s, 0)) + a
+		_emit({ "type": "stat_up", "unit": u.id, "stats": [s], "amount": a, "source": e.source, "name": e.name })
+	if amt > 0 and pct <= 0.0:
+		u.fx[key] = given + amt
+	BWEnchant.trigger_extras(self, u, e)       # move / taken_pct / next attack (D245)
 
 
 ## One growth award, plus affinity_gain_plus (Whistling, Attuned).
@@ -1582,6 +1612,8 @@ func _knockback_hit(att: BWUnit, v: BWUnit) -> void:
 		if str(BWEffects.p(e, "on", "hit")) != "hit" or not _chance(e):
 			continue
 		var n := int(BWEffects.p(e, "hexes", 1))
+		if int(BWEffects.p(e, "choice", 0)) == 1 and att.fx.get("force_pull", false):
+			n = -absi(n)                       # D244 Forceful: the player chose pull on the forecast
 		if n > 0:
 			_displace(v, BWHex.direction_index(att.pos, v.pos), n, "knockback")
 		elif n < 0:
@@ -1660,7 +1692,7 @@ func _immune(u: BWUnit, what: String) -> bool:
 	if what == "displace" and BWEnchant.planted(self, u):
 		return true                            # v2: Planted
 	for e in BWEffects.list(u, "immune"):
-		if str(BWEffects.p(e, "what", "")) == what:
+		if what in str(BWEffects.p(e, "what", "")).split("+"):     # D245 Sure Stride: muddy+water_wading
 			return true
 	for o in _fx_units:
 		if o == u or not o.alive() or o.team != u.team:
@@ -1706,6 +1738,11 @@ func _lay_on(u: BWUnit, trigger: String, ctx: Dictionary) -> void:
 		hexes = _on_board(hexes)
 		if hexes.is_empty() or not _chance(e):
 			continue
+		if int(BWEffects.p(e, "per_turn", 0)) == 1:   # D243 Frostbitten: the first basic each turn
+			var tk := "lay_turn:%s:%s" % [str(e.source), trigger]
+			if int(u.fx.get(tk, -1)) == _turn_serial:
+				continue
+			u.fx[tk] = _turn_serial
 		paint(hexes, lay_el, u, maxi(1, int(BWEffects.p(e, "step", 1))), false)
 
 
@@ -1763,6 +1800,7 @@ func _situational(u: BWUnit, key: String) -> int:
 	if key == "move":                      # D93: turn-start and after-action move perks
 		v += float(u.fx.get("start_move", 0)) + float(u.fx.get("extra_move", 0))
 		v += BWEnchant.move_mod(u)             # v2: Leaden's cost
+		v += BWPhases.move_plus(self, u)       # D255: a boss phase's move (the Twins' rage)
 	if _fx_units.is_empty():
 		return int(v)
 	for a in _auras(u, key):
@@ -1845,6 +1883,9 @@ func end_turn() -> void:
 		return
 	var u := current()
 	if u:
+		BWPhases.turn_end(self, u)  # D256: the Twins paint; a foe ending on the beam pays
+		if over:
+			return
 		u.follow_up = []           # waiting declines a follow-up
 		u.fx.erase("momentum")
 		var st_steady: Dictionary = u.statuses.get("steadied", {})
@@ -1875,18 +1916,27 @@ func end_turn() -> void:
 		_begin_turn()
 
 
+## D249: this fight's weather (BWWeather.KINDS, "" = none), seeded from the
+## fight seed unless given. Call before setup() so cycle 1 shows the telegraphs.
+func set_weather(kind: String, seed_value: int = -1) -> void:
+	weather = BWWeather.start(self, kind, seed_value if seed_value >= 0 else int(rng.seed))
+
+
 func _new_cycle() -> void:
 	if cycle > 0:
 		var seeded := tiles.tick()
 		_emit({ "type": "tiles_tick", "seeded": seeded })
 		for er in tiles.eruptions:             # FX hook: tile_erupt, after the tick
 			_erupt(er)
+		if not over and not weather.is_empty():
+			BWWeather.tick(self)               # D250: the weather acts at the cycle tick
 		if over:
 			return
 	cycle += 1
 	queue = BWTurnQueue.build(units)
 	turn_index = 0
 	_emit({ "type": "cycle", "cycle": cycle, "order": queue.map(func(u): return u.id) })
+	BWPhases.new_cycle(self)               # D255: pending phases come due (the rage)
 	_begin_turn()
 
 
@@ -1924,14 +1974,15 @@ func _begin_turn() -> void:
 		_tile_hurt(u, _tile_dmg(u, BWSkills.SHROUD_DRAIN_PCT, "dark"), "shrouded", str(u.statuses.shrouded.source))
 	# Standing on the ground: damage first, then healing (ELEMENTS §2.2).
 	var st := tiles.standing(u.pos)
+	var own := BWPhases.turn_start(self, u)        # D256: a Twin heals on its own colour instead
 	if st.fire > 0 and u.alive():
 		var half := 1.0
 		for e in BWEffects.list(u, "ember_skin"):  # D93 Ember Skin: your standing fire halved
 			half = float(BWEffects.p(e, "stand_pct", 50)) / 100.0
 		_tile_hurt(u, _tile_dmg(u, st.fire, "fire", half), "fire", st.source)
-	if st.drain > 0 and u.alive() and not night:
+	if st.drain > 0 and u.alive() and not night and not own:
 		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", st.source)
-	var heal := _light_heal(u, st)                 # D93 Sanctuary / Glare
+	var heal := 0.0 if own else _light_heal(u, st)  # D93 Sanctuary / Glare
 	if heal > 0 and u.alive():
 		_heal(u, heal, "light")
 	if over:
@@ -2034,6 +2085,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
 	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
+	BWPhases.after_paint(self, hexes, element, by)   # D256: thunder breaks the Twins' beam
 	return r
 
 
@@ -2518,7 +2570,7 @@ func _sanctuary_check(v: BWUnit, before: int) -> void:
 ## Light healing at a turn start, with Sanctuary (the tile's layer heals its
 ## own side more) and Glare (it heals no foe of its layer).
 func _light_heal(u: BWUnit, st: Dictionary) -> float:
-	var heal: float = st.heal
+	var heal: float = st.heal * BWWeather.heal_mult(weather)   # D250: Eclipse, light heals x2
 	if heal <= 0.0:
 		return 0.0
 	var src := _unit(str(st.source))
@@ -3264,7 +3316,7 @@ func ground_report(hex: Vector2i) -> Dictionary:
 		t.damage += dd
 		t.lines.append(["Dark 3 drains", -dd])
 	if st.heal > 0:
-		var pct := float(st.heal)
+		var pct := float(st.heal) * BWWeather.heal_mult(weather)   # D250: Eclipse
 		var s := _unit(str(st.source))
 		if s != null and s.team != u.team and BWEffects.has(s, "glare"):
 			pct = 0.0

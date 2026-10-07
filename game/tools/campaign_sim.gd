@@ -28,6 +28,11 @@ extends SceneTree
 ## encounter (BWEncounters: horde, colossus, blank, being) on a copy of the
 ## run, the Hard room's map; printed per fight and as a fights 3-10 total.
 ## ENC_TUNE="horde_mult,horde_hp,colossus_mult,colossus_hp,blank_mult,being_mult[,blank_hp,being_hp]" (tuning).
+## WEATHER=1 (D254): every choice fight from fight 5 is also played on a copy
+## of the run in its Standard room, once with no weather and once in each
+## weather (BWWeather.KINDS), paired: same squad, same day, same map; printed
+## per kind as fights 5-10 win rate vs the paired clear-sky rate (a swing over
+## 15 points is flagged). The run's own fights play their room's weather.
 ## Env POLICY limits the downtime habits to one (e.g. POLICY=mixed).
 ## Per fight it also prints the win rate in each kind of room played.
 
@@ -80,6 +85,11 @@ func _init() -> void:
 		BWEncounters.BLANK_MULT = float(e[4]); BWEncounters.BEING_MULT = float(e[5])
 		if e.size() >= 8:
 			BWEncounters.BLANK_HP = float(e[6]); BWEncounters.BEING_HP = float(e[7])
+	if OS.get_environment("TWINS") != "":                  # D259 tuning: "hp,mult" for the Twins (fight 7)
+		var tw := OS.get_environment("TWINS").split(",")
+		BWTwins.TWINS_HP = float(tw[0])
+		if tw.size() > 1:
+			BWTwins.TWINS_MULT = float(tw[1])
 	if OS.get_environment("ELVL") != "":                   # tuning: enemy levels per stage
 		BWRooms.LEVELS_PER_STAGE = float(OS.get_environment("ELVL"))
 	print("Curve: %s, levels per stage %.2f" % [str((BWRun.curve_override if not BWRun.curve_override.is_empty() else BWRun.ENEMY_CURVE).map(func(r): return r[1])), BWRooms.LEVELS_PER_STAGE])
@@ -150,6 +160,15 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 							var ekk := "%d|enc:%s" % [n, ek]
 							var ewp: Array = by_room.get(ekk, [0, 0])
 							by_room[ekk] = [ewp[0] + (1 if _fight(er, n) else 0), ewp[1] + 1]
+				if OS.get_environment("WEATHER") == "1" and n >= BWWeather.FROM_FIGHT and BWRooms.has_choice(n):
+					# D254: paired, the Standard room on a copy: clear sky, then each weather
+					for wk in [""] + BWWeather.KINDS:
+						var wr := BWRun.from_dict(JSON.parse_string(JSON.stringify(run.to_dict())))
+						BWRooms.offer(wr)
+						BWRooms.choose(wr, 0)
+						var wkk := "%d|w:%s" % [n, wk if wk != "" else "clear"]
+						var wwp: Array = by_room.get(wkk, [0, 0])
+						by_room[wkk] = [wwp[0] + (1 if _fight(wr, n, wk) else 0), wwp[1] + 1]
 				var deployed := _deploy(run)
 				_gear(run, deployed)
 				var enemies := run.enemies_for(n)
@@ -157,6 +176,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				var mname := run.map_for(n)
 				played[n - 1][mname] = int(played[n - 1].get(mname, 0)) + 1
 				var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % mname), run.seed_value * 31 + n)
+				b.set_weather(BWWeather.for_fight(run, n))          # D249: the room's weather
 				b.setup(deployed, enemies, [])
 				var guard := 0
 				while not b.over and guard < 1500:
@@ -191,7 +211,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 			var r: Array = rounds[f]
 			r.sort()
 			out.append("  fight %2d %-9s  win %3d%%  rounds med %2d  survivors %.1f/3%s" % [f + 1,
-				"(Giant)" if f + 1 == BWRun.BOSS_FIGHT else "(%s)" % _maps_label(played[f]),
+				"(Giant)" if f + 1 == BWRun.BOSS_FIGHT else "(Twins)" if f + 1 == BWRun.TWINS_FIGHT else "(%s)" % _maps_label(played[f]),
 				100 * wins[f] / maxi(r.size(), 1), r[r.size() / 2] if r.size() > 0 else 0,
 				float(alive[f]) / maxf(r.size(), 1), _room_rates(by_room, f + 1)])
 		if OS.get_environment("ENC") == "1":
@@ -206,6 +226,27 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 						tw += wp[0]
 						tp += wp[1]
 				out.append("  %-14s fights 3-10 %3d%% (%d)   %s" % ["hard (paired)" if ek == "shadow" else ek.substr(4), 100 * tw / maxi(tp, 1), tp, "  ".join(row)])
+		if OS.get_environment("WEATHER") == "1":
+			var clear: Array = [0, 0]
+			for f in range(BWWeather.FROM_FIGHT, BWRun.FIGHTS + 1):
+				var cp: Array = by_room.get("%d|w:clear" % f, [0, 0])
+				clear = [clear[0] + cp[0], clear[1] + cp[1]]
+			var cr: float = 100.0 * clear[0] / maxf(clear[1], 1)
+			out.append("  weather (paired, Standard room) clear sky fights 5-10 %3d%% (%d)" % [roundi(cr), clear[1]])
+			for wk in BWWeather.KINDS:
+				var row: PackedStringArray = []
+				var tw := 0
+				var tp := 0
+				for f in range(BWWeather.FROM_FIGHT, BWRun.FIGHTS + 1):
+					var wp: Array = by_room.get("%d|w:%s" % [f, wk], [0, 0])
+					var cp: Array = by_room.get("%d|w:clear" % f, [0, 0])
+					if wp[1] > 0:
+						row.append("%d:%3d%%/%3d%%" % [f, 100 * wp[0] / wp[1], 100 * cp[0] / maxi(cp[1], 1)])
+						tw += wp[0]
+						tp += wp[1]
+				var wr: float = 100.0 * tw / maxf(tp, 1)
+				out.append("  %-9s fights 5-10 %3d%% (%d)  swing %+d%s   %s" % [wk, roundi(wr), tp, roundi(wr - cr),
+					"  <-- FLAG (>15)" if absf(wr - cr) > 15.0 else "", "  ".join(row)])
 		boss_left.sort()
 		out.append("  Giant HP left (of 500): %s" % str(boss_left))
 		print("\n".join(out))
@@ -213,12 +254,13 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 
 
 ## One fight on run `r` as the sim plays it (deploy, gear, AI both sides): won?
-func _fight(r: BWRun, n: int) -> bool:
+func _fight(r: BWRun, n: int, weather: String = "?") -> bool:
 	var deployed := _deploy(r)
 	_gear(r, deployed)
 	var enemies := r.enemies_for(n)
 	r.prepare_for_battle(deployed)
 	var b := BWBattle.new(BWBoard.load_file("res://maps/%s.json" % r.map_for(n)), r.seed_value * 31 + n)
+	b.set_weather(BWWeather.for_fight(r, n) if weather == "?" else weather)   # D254
 	b.setup(deployed, enemies, [])
 	var guard := 0
 	while not b.over and guard < 1500:

@@ -64,7 +64,10 @@ static func row_name(row: Dictionary) -> String:
 
 static func passive_text(item: Dictionary) -> String:
 	var e := enchant(item)
-	return str(e.get("effect_text", "")) if not e.is_empty() else ""
+	var t := str(e.get("effect_text", "")) if not e.is_empty() else ""
+	if str(e.get("id", "")) == BWEffects.WARDED and str(item.get("ward", "")) != "":
+		t = t.replace("one element, rolled when it drops", str(item.ward).capitalize())   # D243
+	return t
 
 
 ## Abilities the base item teaches after LEARN_BATTLES battles worn.

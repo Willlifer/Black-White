@@ -317,6 +317,9 @@ func _spoils(v: VBoxContainer) -> void:
 	v.add_child(_section("Spoils" if not report.loot.is_empty() else "No spoils"))
 	for it in report.loot:
 		v.add_child(_loot_row(it))
+	if report.has("twins_reward"):                     # D258: the Twins' gift
+		v.add_child(_gap(4))
+		v.add_child(_section("The Twins' gift: one extra pick for every unit"))
 	if not report.learned.is_empty():
 		v.add_child(_gap(4))
 		v.add_child(_section("Learned"))

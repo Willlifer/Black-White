@@ -49,7 +49,7 @@ func go_title() -> void:
 func go_tutorial() -> void:
 	var s := BWTutorial.new()
 	await _swap(s)
-	BWMusic.play("combat")
+	BWMusic.play("tutorial")                       # D239: moderato main loopish
 	await s.finished
 	go_title()
 
@@ -104,6 +104,7 @@ func go_rooms(from_hall: bool = false) -> void:
 	s.run = run
 	s.can_back = from_hall
 	await _swap(s)
+	BWMusic.play("rooms")                          # D239: Music Rooms
 	_save()                                        # the offer is stored: a reload shows the same two
 	var i: int = await s.done
 	if i < 0:
@@ -132,8 +133,9 @@ func go_combat(plan: Dictionary) -> void:
 		run.seed_value * 31 + run.fight)
 	s.trust_fn = run.trust_stage
 	s.picks_live = true                            # D91: rank-ups pick mid-fight
+	s.weather_kind = BWWeather.for_fight(run, run.fight)   # D249: the chosen room's weather
 	await _swap(s)
-	BWMusic.play("boss" if run.is_boss() else "combat")
+	BWMusic.play("boss" if run.is_boss() or run.is_twins() else "combat")   # D256: the Twins use the boss set
 	var result: Array = await s.finished           # [winner, battle]
 	var battle: BWBattle = result[1]
 	var won: bool = result[0] == "player"
@@ -156,6 +158,8 @@ func go_results(report: Dictionary) -> void:
 	await _swap(s)
 	BWMusic.play("rest")
 	await s.done
+	if report.has("twins_reward"):
+		await go_picks("The Twins' gift: a pick each")   # D258
 	go_downtime()
 
 

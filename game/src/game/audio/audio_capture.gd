@@ -15,7 +15,12 @@ extends Node
 ## SFX pitch jitter is off so each sound matches its file for the analysis.
 
 const SECTIONS := [["sync", 0.0], ["title", 1.5], ["roster", 12.0], ["combat", 24.0], ["boss", 50.0], ["end", 61.0]]
+## D242: `--drop2`: the author's drop-2 cues and stings, each through the hook
+## that plays it in the game (screens, the picker, the shop and gear panels).
+const SECTIONS_DROP2 := [["sync", 0.0], ["title", 1.5], ["rest", 10.0], ["rooms", 19.0], ["prebattle", 28.0],
+	["shop", 38.0], ["tutorial", 48.0], ["combat", 57.0], ["boss", 67.0], ["stings", 75.0], ["end", 87.0]]
 
+var drop2 := false
 var out_dir := ""
 var _rec: AudioEffectRecord
 var _rec_sfx: AudioEffectRecord      # the SFX bus alone: a clean signal for the marker-sync check
@@ -51,6 +56,9 @@ func _swap(next: Node) -> void:
 
 
 func _run() -> void:
+	if drop2:
+		await _run_drop2()
+		return
 	BWSfx.jitter = 0.0
 	BWSfx.log_enabled = true
 	BWMusic.log_enabled = true
@@ -138,6 +146,163 @@ func _run() -> void:
 	f.close()
 	print("[audio-capture] wrote %s (%s), %.1f s at %d Hz" % [wav_path, error_string(err), wav.get_length() if wav else 0.0, AudioServer.get_mix_rate()])
 	get_tree().quit(0 if err == OK else 1)
+
+
+func _begin() -> void:
+	BWSfx.jitter = 0.0
+	BWSfx.log_enabled = true
+	BWMusic.log_enabled = true
+	BWUnitAudio.log_enabled = true
+	BWVoice.log_enabled = true
+	_rec = AudioEffectRecord.new()
+	_rec.format = AudioStreamWAV.FORMAT_16_BITS
+	AudioServer.add_bus_effect(0, _rec)
+	_rec_sfx = AudioEffectRecord.new()
+	_rec_sfx.format = AudioStreamWAV.FORMAT_16_BITS
+	AudioServer.add_bus_effect(AudioServer.get_bus_index("SFX"), _rec_sfx)
+	for i in 10:
+		await get_tree().process_frame
+	_rec.set_recording_active(true)
+	_rec_sfx.set_recording_active(true)
+	_t0 = Time.get_ticks_usec()
+	_mark("record_start")
+	await _until(0.5)
+	for k in 3:
+		BWSfx.ui("ui_click", { "variant": 1, "stack": true, "tag": "sync" })
+		await _until(0.75 + 0.25 * k)
+
+
+func _finish(stem: String, sections: Array) -> void:
+	_mark("record_stop")
+	_rec.set_recording_active(false)
+	_rec_sfx.set_recording_active(false)
+	var wav := _rec.get_recording()
+	var sfx := _rec_sfx.get_recording()
+	DirAccess.make_dir_recursive_absolute(out_dir)
+	var wav_path := out_dir.path_join(stem + ".wav")
+	var err := wav.save_to_wav(wav_path) if wav else ERR_CANT_CREATE
+	if sfx:
+		sfx.save_to_wav(out_dir.path_join(stem + "_sfx.wav"))
+	var log := {
+		"record_start_usec": _t0, "mix_rate": AudioServer.get_mix_rate(), "output_latency": AudioServer.get_output_latency(),
+		"sections": sections, "marks": _marks, "sfx": BWSfx.events, "markers": BWUnitAudio.events,
+		"music": _music_log(), "voice": BWVoice.events, "fps": Engine.get_frames_per_second(),
+		"wav_seconds": wav.get_length() if wav else 0.0,
+	}
+	var f := FileAccess.open(out_dir.path_join(stem + ".json"), FileAccess.WRITE)
+	f.store_string(JSON.stringify(log, " "))
+	f.close()
+	print("[audio-capture] wrote %s (%s), %.1f s at %d Hz" % [wav_path, error_string(err), wav.get_length() if wav else 0.0, AudioServer.get_mix_rate()])
+	get_tree().quit(0 if err == OK else 1)
+
+
+## D242: the drop-2 run. Real screens where the hook watches a screen
+## (results, rooms), real panels for the shop and the cursed piece, a real
+## picker; the jackpot, victory and defeat stings by their BWMusic call.
+func _run_drop2() -> void:
+	await _begin()
+	var ids := BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+	var run := BWRun.start(ids, 99)
+	for k in 1:                                   # fight 2; the results below make it 3 (D208: the first room choice)
+		var e := run.enemies_for(run.fight)
+		for x in e:
+			x.hp = 0
+		run.after_fight(true, run.squad.slice(0, 3), e, e, [])
+
+	await _until(1.5)
+	await _swap(BWTitleScreen.new())
+	BWMusic.play("title")
+	_mark("title")
+
+	await _until(10.0)                            # the hall's cue, under a results screen that levelled the squad
+	var e3 := run.enemies_for(run.fight)
+	for x in e3:
+		x.hp = 0
+	var rs := BWResultsScreen.new()
+	rs.run = run
+	rs.report = run.after_fight(true, run.squad.slice(0, 3), e3, e3, [])
+	await _swap(rs)
+	BWMusic.play("rest")
+	_mark("rest")
+
+	await _until(19.0)
+	var rooms := BWRoomScreen.new()
+	rooms.run = run
+	await _swap(rooms)
+	BWMusic.play("rooms")
+	_mark("rooms")
+	await _until(24.0)
+	var hard := 0
+	for i in rooms.rooms.size():
+		if str(rooms.rooms[i].kind) == BWRooms.HARD:
+			hard = i
+	rooms.choose(hard)
+	_mark("room_hard")
+
+	await _until(28.0)
+	var blank := Control.new()
+	await _swap(blank)
+	BWMusic.play("prebattle")
+	_mark("prebattle")
+	await _until(32.0)
+	var u: BWUnit = run.squad[0]
+	var req := { "kind": "perk", "element": u.element, "rank": 2 }
+	var picker := BWPicker.new(u, req, "capture")
+	blank.add_child(picker)
+	_mark("picker_open")
+	await _until(36.0)
+	picker.queue_free()
+	_mark("picker_close")
+
+	await _until(38.0)
+	var shop := BWShopPanel.new(run)
+	blank.add_child(shop)
+	await get_tree().process_frame
+	shop.changed.emit()                           # a trade / scroll went through
+	_mark("shop_purchase")
+	await _until(42.0)
+	var gear := BWGearPanel.new(run)
+	blank.add_child(gear)
+	await get_tree().process_frame
+	var curse := ""
+	for r in BWData.table("enchantments"):
+		if BWEffects.cursed(r):
+			curse = str(r.id)
+			break
+	var it: Dictionary = (u.equipment.get("head", { "slot": "head", "tier": "E", "stats": {} }) as Dictionary).duplicate()
+	it["enchant"] = curse
+	u.equipment["head"] = it
+	gear.changed.emit()                           # a cursed piece put on
+	_mark("cursed_equip")
+
+	await _until(48.0)
+	await _swap(Control.new())
+	BWMusic.play("tutorial")
+	_mark("tutorial")
+
+	await _until(57.0)
+	BWMusic.play("combat")
+	_mark("combat")
+	await _until(62.0)
+	BWMusic.set_intensity(2)
+	_mark("intensity_2")
+
+	await _until(67.0)
+	BWMusic.play("boss")
+	_mark("boss")
+
+	await _until(75.0)
+	BWMusic.sting("jackpot")
+	_mark("jackpot")
+	await _until(79.0)
+	BWMusic.sting("victory")
+	_mark("victory")
+	await _until(83.0)
+	BWMusic.sting("defeat")
+	_mark("defeat")
+
+	await _until(87.0)
+	_finish("capture_drop2", SECTIONS_DROP2)
 
 
 ## BWMusic's log, made JSON-safe (decks are objects).

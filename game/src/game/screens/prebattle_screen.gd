@@ -203,7 +203,7 @@ func _build_ui() -> void:
 	_ui.add_child(_root)
 
 	var title := Label.new()
-	title.text = ("THE GIANT" if run.is_boss() else "Fight %d of %d" % [run.fight, BWRun.FIGHTS]) + "  ·  " + _board.name
+	title.text = ("THE GIANT" if run.is_boss() else "THE TWINS" if run.is_twins() else "Fight %d of %d" % [run.fight, BWRun.FIGHTS]) + "  ·  " + _board.name
 	title.position = Vector2(24, 14)
 	title.add_theme_font_size_override("font_size", 30)
 	title.add_theme_color_override("font_outline_color", Color.BLACK)

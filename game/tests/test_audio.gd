@@ -6,7 +6,7 @@ extends RefCounted
 
 const SRC_DIRS := ["res://src/game/", "res://src/game/audio/", "res://src/game/combat/", "res://src/game/screens/"]
 const SFX_PREFIXES := ["swing_", "hit_", "bow_", "arrow_", "pistol_", "flintlock_", "cast_", "bolt_", "channel_",
-	"elem_", "heal", "tile_", "step_", "ko_", "ui_", "sting_", "progress_"]
+	"elem_", "heal", "tile_", "step_", "ko_", "ui_", "sting_", "progress_", "shop_"]
 const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "dark", "light"]
 const CEIL := 0.8913          # -1 dBFS
 
@@ -49,7 +49,10 @@ static func wav_peak(path: String) -> float:
 		return 99.0
 	var f := FileAccess.open(path, FileAccess.READ)
 	f.seek(int(info.data_offset))
-	var ints := f.get_buffer(int(info.data_size)).to_int32_array()     # two 16-bit samples per int
+	var buf := f.get_buffer(int(info.data_size))
+	if buf.size() % 4 != 0:                                            # an odd count of mono samples
+		buf.resize(buf.size() + 4 - buf.size() % 4)
+	var ints := buf.to_int32_array()     # two 16-bit samples per int
 	var m := 0
 	for v in ints:
 		var lo := v & 0xFFFF
@@ -108,7 +111,7 @@ func test_every_referenced_sfx_exists(c) -> void:
 				c.ok(false, "%s (used in %s) is in sfx.json" % [n, refs[n]])
 			continue
 		var count := int(manifest[n].variants)
-		c.ok(count >= 2, "%s has 2+ variations (%d)" % [n, count])
+		c.ok(count >= 2 or int(manifest[n].get("drop", 0)) > 0, "%s has 2+ variations, or is an author drop (%d)" % [n, count])
 		for v in range(1, count + 1):
 			var p := BWSfx.path_of(n, v)
 			c.ok(FileAccess.file_exists(p), "file %s" % p)
@@ -144,8 +147,12 @@ func test_music_layers_are_aligned_loops(c) -> void:
 	for set_name in BWMusic.SETS:
 		var want := int(BWMusic.SET_SAMPLES[set_name])
 		c.eq(int(info.sets[set_name].samples), want, "%s: layers.json length = BWMusic.SET_SAMPLES" % set_name)
-		var bpm := 120.0 * 705600.0 / want
-		c.near(float(info.sets[set_name].bpm), bpm, 0.01, "%s bpm" % set_name)
+		if set_name in BWMusic.FREE:
+			c.ok(bool(info.sets[set_name].get("free", false)), "%s: a free-tempo phrase loop (D239)" % set_name)
+			c.eq((BWMusic.SETS[set_name] as Array).size(), 1, "%s: one layer" % set_name)
+		else:
+			var bpm := 120.0 * 705600.0 / want
+			c.near(float(info.sets[set_name].bpm), bpm, 0.01, "%s bpm" % set_name)
 		var lengths := {}
 		for layer in BWMusic.SETS[set_name]:
 			var res_path := BWMusic.layer_path(set_name, layer)
@@ -204,7 +211,7 @@ func test_bus_layout(c) -> void:
 
 
 func test_cue_tables(c) -> void:
-	for cue in ["title", "roster", "prebattle", "rest", "combat", "boss"]:
+	for cue in ["title", "roster", "prebattle", "rest", "rooms", "tutorial", "combat", "boss"]:
 		c.ok(BWMusic.CUES.has(cue), "cue %s" % cue)
 	for cue in BWMusic.CUES:
 		var set_name := str(BWMusic.CUES[cue].set)
@@ -215,15 +222,25 @@ func test_cue_tables(c) -> void:
 		c.eq(mix.size(), (BWMusic.SETS[set_name] as Array).size(), "%s: a level for every layer" % cue)
 		var on := 0
 		for l in mix:
-			c.ok(float(mix[l]) <= 0.0 and float(mix[l]) >= BWMusic.OFF_DB, "%s/%s in range" % [cue, l])
+			c.ok(float(mix[l]) <= BWMusic.MAX_DB and float(mix[l]) >= BWMusic.OFF_DB, "%s/%s in range" % [cue, l])
+			if float(mix[l]) > 0.0:
+				c.ok(set_name in BWMusic.FREE or l in ["low_beat", "kick"], "%s/%s: only a drop-2 solo layer is pushed above 0 dB" % [cue, l])
 			if float(mix[l]) > BWMusic.OFF_DB:
 				on += 1
 		c.ok(on >= 1, "%s plays something" % cue)
-	c.ok(float(BWMusic.cue_mix("title").full) > BWMusic.OFF_DB and float(BWMusic.cue_mix("title").bright) > BWMusic.OFF_DB, "title: the loop, brightened by its octave-up voicing")
+	# D239: the author's drop 2 takes the title, the hall, the tutorial, the rooms and the pre-battle
+	c.eq(str(BWMusic.CUES.title.set), "arpeggio", "title: MainTheme Arpeggio")
+	c.eq(str(BWMusic.CUES.rest.set), "chillin", "rest (the hall): chillin main theme")
+	c.eq(str(BWMusic.CUES.tutorial.set), "moderato", "tutorial: moderato main loopish")
+	c.eq(str(BWMusic.CUES.rooms.set), "rooms", "rooms: Music Rooms")
+	for l in BWMusic.cue_mix("prebattle"):
+		c.ok((float(BWMusic.cue_mix("prebattle")[l]) > BWMusic.OFF_DB) == (l in ["low_beat", "kick"]),
+			"prebattle: only Low Beat and the kick (its C/E bass clashes with the loop's F# bars): %s" % l)
+	c.ok(float(BWMusic.cue_mix("combat", 2).kick) > BWMusic.OFF_DB and float(BWMusic.cue_mix("combat", 1).kick) <= BWMusic.OFF_DB, "combat: the kick joins at intensity 2")
+	c.ok(float(BWMusic.cue_mix("boss").kick) > BWMusic.OFF_DB, "boss: the kick")
 	c.eq(str(BWMusic.CUES.roster.set), "slow", "roster: slowed")
 	c.ok(float(BWMusic.cue_mix("prebattle").drums) <= BWMusic.OFF_DB, "no drumline before the fight")
 	c.eq(float(BWMusic.cue_mix("combat").drums), 0.0, "combat: the drums come in")
-	c.ok(float(BWMusic.cue_mix("prebattle").bright) > float(BWMusic.cue_mix("prebattle").full), "prebattle: led by the bright voicing (author 10/4)")
 	c.eq(str(BWMusic.CUES.combat.set), "battle", "combat: the slower 108 BPM set (author 10/4)")
 	c.eq(str(BWMusic.CUES.boss.set), "boss", "boss: the +10% set")
 	var boss_on := BWMusic.cue_mix("boss").values().filter(func(v): return v > BWMusic.OFF_DB).size()
@@ -239,6 +256,62 @@ func test_cue_tables(c) -> void:
 	c.ok(BWMusic.runtime_rate("boss") > 1.08 and BWMusic.runtime_rate("slow") < 0.9, "runtime tempo rates")
 	for k in BWMusic.STINGS:
 		c.ok(BWSfx.variants(BWMusic.STINGS[k]) >= 1, "sting %s exists" % k)
+	for k in ["victory", "defeat", "level_up", "pick", "room_hard", "jackpot", "cursed"]:
+		c.ok(BWMusic.STINGS.has(k), "sting %s is mapped (D240)" % k)
+
+
+## D239-D241: the author's drop 2. Stings start on cue (no leading silence),
+## carry a body length for the duck, and the screen hooks read their state.
+func test_drop2(c) -> void:
+	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
+	var drops := 0
+	for n in manifest:
+		if int(manifest[n].get("drop", 0)) != 2:
+			continue
+		drops += 1
+		var lv: Dictionary = (manifest[n].levels as Array)[0]
+		c.ok(float(lv.get("body_s", 0.0)) > 0.5 and float(lv.body_s) <= float(lv.seconds), "%s: body %.2f s of %.2f" % [n, float(lv.get("body_s", 0.0)), float(lv.seconds)])
+		var p := ProjectSettings.globalize_path(BWSfx.path_of(n, 1))
+		c.ok(head_peak(p, 0.03) > 0.01, "%s: sound within 30 ms of the start (lead trimmed)" % n)
+		c.eq(str(manifest[n].bus), "UI", "%s on the UI bus" % n)
+	c.eq(drops, 6, "six drop-2 one-shots")
+	for k in BWMusic.FREE:
+		c.ok(not BWMusic.CUES.values().filter(func(q): return str(q.set) == k).is_empty(), "%s is used by a cue" % k)
+	# results: one sting when anyone levelled, none otherwise
+	c.ok(BWScreenAudio.leveled({ "levels": { "a": { "str": 1 }, "b": {} } }), "a level-up report stings")
+	c.ok(not BWScreenAudio.leveled({ "levels": { "a": {} } }), "no gains, no sting")
+	c.ok(not BWScreenAudio.leveled(null), "no report, no sting")
+	# the cursed count the gear and shop hooks compare
+	var curse := ""
+	for r in BWData.table("enchantments"):
+		if BWEffects.cursed(r):
+			curse = str(r.id)
+			break
+	c.ok(curse != "", "a cursed enchantment exists in the data")
+	var run := BWRun.start(BWData.table("roster").slice(0, 6).map(func(r): return str(r.id)), 7)
+	var before := BWAudioDirector.worn_cursed(run)
+	var u: BWUnit = run.squad[0]
+	var it: Dictionary = (u.equipment.get("head", { "slot": "head", "tier": "E", "stats": {} }) as Dictionary).duplicate()
+	var was_cursed := str(it.get("enchant", "")) != "" and BWEffects.cursed(str(it.enchant))
+	it["enchant"] = curse
+	u.equipment["head"] = it
+	c.eq(BWAudioDirector.worn_cursed(run), before + (0 if was_cursed else 1), "a cursed piece put on counts")
+	c.eq(BWAudioDirector.worn_cursed(null), 0, "no run, no count")
+
+
+## Peak |sample| over the first `sec` seconds of a 16-bit WAV.
+static func head_peak(path: String, sec: float) -> float:
+	var info := wav_info(path)
+	if not info.ok:
+		return 0.0
+	var f := FileAccess.open(path, FileAccess.READ)
+	f.seek(int(info.data_offset))
+	var n := int(sec * int(info.rate)) * int(info.channels)
+	var b := f.get_buffer(n * 2)
+	var m := 0.0
+	for i in range(0, b.size() - 1, 2):
+		m = maxf(m, absf(b.decode_s16(i) / 32768.0))
+	return m
 
 
 func test_barks_and_hooks(c) -> void:

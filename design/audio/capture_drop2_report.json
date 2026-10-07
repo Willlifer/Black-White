@@ -1,0 +1,277 @@
+{
+ "sample_rate": 48000,
+ "seconds": 87.01,
+ "fps": 60.0,
+ "output_path_latency_ms": 0.2,
+ "sections": [
+  {
+   "section": "title",
+   "lufs": -20.4,
+   "momentary_max": -16.2,
+   "peak_dbfs": -6.3,
+   "clipped": 0
+  },
+  {
+   "section": "rest",
+   "lufs": -22.8,
+   "momentary_max": -14.8,
+   "peak_dbfs": -3.0,
+   "clipped": 0
+  },
+  {
+   "section": "rooms",
+   "lufs": -19.9,
+   "momentary_max": -17.1,
+   "peak_dbfs": -6.2,
+   "clipped": 0
+  },
+  {
+   "section": "prebattle",
+   "lufs": -20.6,
+   "momentary_max": -15.7,
+   "peak_dbfs": -6.4,
+   "clipped": 0
+  },
+  {
+   "section": "shop",
+   "lufs": -18.6,
+   "momentary_max": -15.2,
+   "peak_dbfs": -4.4,
+   "clipped": 0
+  },
+  {
+   "section": "tutorial",
+   "lufs": -19.6,
+   "momentary_max": -15.4,
+   "peak_dbfs": -8.1,
+   "clipped": 0
+  },
+  {
+   "section": "combat",
+   "lufs": -17.6,
+   "momentary_max": -13.5,
+   "peak_dbfs": -3.3,
+   "clipped": 0
+  },
+  {
+   "section": "boss",
+   "lufs": -16.8,
+   "momentary_max": -14.4,
+   "peak_dbfs": -3.4,
+   "clipped": 0
+  },
+  {
+   "section": "stings",
+   "lufs": -19.4,
+   "momentary_max": -14.8,
+   "peak_dbfs": -4.6,
+   "clipped": 0
+  }
+ ],
+ "phase6_reference": {
+  "title": -20.3,
+  "roster": -20.3,
+  "combat": -19.5,
+  "boss": -17.9
+ },
+ "cue_changes": [
+  {
+   "cue": "title",
+   "wait_s": 0.002,
+   "deck": "arpeggio"
+  },
+  {
+   "cue": "rest",
+   "wait_s": 0.024,
+   "deck": "chillin"
+  },
+  {
+   "cue": "rooms",
+   "wait_s": 0.174,
+   "deck": "rooms"
+  },
+  {
+   "cue": "prebattle",
+   "wait_s": 0.034,
+   "deck": "main"
+  },
+  {
+   "cue": "tutorial",
+   "wait_s": 0.034,
+   "deck": "moderato"
+  },
+  {
+   "cue": "combat",
+   "wait_s": 0.034,
+   "deck": "battle"
+  },
+  {
+   "cue": "boss",
+   "wait_s": 1.134,
+   "deck": "boss"
+  }
+ ],
+ "stings": [
+  {
+   "name": "sting_level_up",
+   "tag": "sting",
+   "asked_s": 10.702,
+   "found": true,
+   "match": 1.0,
+   "start_vs_expected_ms": -0.2,
+   "music_before_lufs": -14.9,
+   "body_s": 2.99,
+   "with_sting_momentary_max": -17.5,
+   "peak_dbfs": -7.8
+  },
+  {
+   "name": "sting_room_hard",
+   "tag": "sting",
+   "asked_s": 24.006,
+   "found": true,
+   "match": 1.0,
+   "start_vs_expected_ms": 8.3,
+   "music_before_lufs": -17.6,
+   "body_s": 2.59,
+   "with_sting_momentary_max": -18.3,
+   "peak_dbfs": -6.2
+  },
+  {
+   "name": "sting_pick_reveal",
+   "tag": "sting",
+   "asked_s": 32.005,
+   "found": true,
+   "match": 0.9,
+   "start_vs_expected_ms": 8.8,
+   "music_before_lufs": -15.8,
+   "body_s": 7.08,
+   "with_sting_momentary_max": -14.8,
+   "peak_dbfs": -4.9
+  },
+  {
+   "name": "shop_purchase",
+   "tag": "shop",
+   "asked_s": 38.189,
+   "found": true,
+   "match": 0.5,
+   "start_vs_expected_ms": 96.8,
+   "music_before_lufs": -16.2,
+   "body_s": 2.74,
+   "with_sting_momentary_max": -14.8,
+   "peak_dbfs": -4.4
+  },
+  {
+   "name": "sting_bad",
+   "tag": "sting",
+   "asked_s": 42.021,
+   "found": true,
+   "match": 0.97,
+   "start_vs_expected_ms": -1.5,
+   "music_before_lufs": -15.4,
+   "body_s": 1.8,
+   "with_sting_momentary_max": -17.5,
+   "peak_dbfs": -5.2
+  },
+  {
+   "name": "sting_good",
+   "tag": "sting",
+   "asked_s": 75.007,
+   "found": true,
+   "match": 0.98,
+   "start_vs_expected_ms": 4.6,
+   "music_before_lufs": -14.4,
+   "body_s": 4.93,
+   "with_sting_momentary_max": -17.6,
+   "peak_dbfs": -7.4
+  },
+  {
+   "name": "sting_good",
+   "tag": "sting",
+   "asked_s": 79.005,
+   "found": true,
+   "match": 0.96,
+   "start_vs_expected_ms": 6.1,
+   "music_before_lufs": -17.6,
+   "body_s": 4.93,
+   "with_sting_momentary_max": -17.3,
+   "peak_dbfs": -5.8
+  },
+  {
+   "name": "sting_bad",
+   "tag": "sting",
+   "asked_s": 83.006,
+   "found": true,
+   "match": 0.98,
+   "start_vs_expected_ms": 5.5,
+   "music_before_lufs": -17.3,
+   "body_s": 1.8,
+   "with_sting_momentary_max": -17.4,
+   "peak_dbfs": -5.8
+  }
+ ],
+ "sting_log": [
+  {
+   "active": "chillin",
+   "deck_pos_s": 0.649822239585876,
+   "frame": 647,
+   "kind": "level_up",
+   "sfx": "sting_level_up",
+   "type": "sting",
+   "usec": 14376567
+  },
+  {
+   "active": "rooms",
+   "deck_pos_s": 4.77221435128784,
+   "frame": 1426,
+   "kind": "room_hard",
+   "sfx": "sting_room_hard",
+   "type": "sting",
+   "usec": 27680114
+  },
+  {
+   "active": "main",
+   "deck_pos_s": 3.96085325639343,
+   "frame": 1905,
+   "kind": "pick",
+   "sfx": "sting_pick_reveal",
+   "type": "sting",
+   "usec": 35679605
+  },
+  {
+   "active": "main",
+   "deck_pos_s": 13.9725265661011,
+   "frame": 2497,
+   "kind": "cursed",
+   "sfx": "sting_bad",
+   "type": "sting",
+   "usec": 45695179
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 15.9455971585789,
+   "frame": 4476,
+   "kind": "jackpot",
+   "sfx": "sting_good",
+   "type": "sting",
+   "usec": 78681208
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 19.9415085239201,
+   "frame": 4716,
+   "kind": "victory",
+   "sfx": "sting_good",
+   "type": "sting",
+   "usec": 82679658
+  },
+  {
+   "active": "boss",
+   "deck_pos_s": 23.9432681740056,
+   "frame": 4956,
+   "kind": "defeat",
+   "sfx": "sting_bad",
+   "type": "sting",
+   "usec": 86680192
+  }
+ ]
+}

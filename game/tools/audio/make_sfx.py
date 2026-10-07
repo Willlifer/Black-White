@@ -712,6 +712,8 @@ def main() -> int:
     manifest_path.write_text(json.dumps(manifest, indent=1))
     print("\n".join(rows))
     print(f"{len(rows)} files, {bad} outside target (peak > {CEIL} dBFS or loudness off {TARGET} by > 1.5)")
+    import make_drop2                     # D240: the author's drop-2 stings, merged back into sfx.json
+    make_drop2.sfx()
     return 0
 
 

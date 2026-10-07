@@ -9,6 +9,26 @@ way the barks were measured.
 start and end on the bar so they loop cleanly; send stems if you have them,
 as with the original loops.
 
+## Status after drop 2 (2026-10-06, D239–D242)
+
+Covered (details and measurements: AUDIO.md, "Drop 2"):
+- [x] `music_rooms`: **Music Rooms** (a free-tempo phrase loop, not on the hall's tempo)
+- [x] `music_tutorial`: **moderato main loopish**
+- [x] `sting_level_up`: one per results screen (the whole squad levels every fight)
+- [x] `sting_pick_reveal`: any picker; fades when the pick is taken
+- [x] `sting_room_hard`
+- [x] `sting_jackpot` and `sting_victory`: **very good event**
+- [x] `sting_defeat` and `sfx_cursed_equip`: **cursed or bad**
+- [x] `sfx_scroll_apply` and `sfx_trade`: **shop purchase** (`sfx_scroll_buy` is moot: scrolls are free, D236)
+- Also used: **MainTheme Arpeggio** (title), **chillin main theme** (the hall),
+  **Low Beat** + **no snare beat** (pre-battle; the kick also joins combat
+  intensity 2 and the boss)
+
+Still missing (short):
+- `music_picks` (optional; the reveal sting covers the moment), `music_encounter` (optional)
+- Combat: weapon swap (holster/draw), the three proc sounds (on-kill, heal, pity), `sfx_immune`, obelisk push/pull, Colossus step/thrust, Horde shuffle, Being hum, Blank step, the seven big-cast element releases
+- Nice to have: a shorter pick-reveal take (this one is a 7 s phrase), and stings in the loop's key (F# minor / A major); the drop's stings centre on C
+
 ## Music cues (loops)
 - `music_rooms.wav`: the room-choice screen. A short, tense "choose your door" loop that can sit on top of the hall's tempo.
 - `music_picks.wav` (optional): the perk and skill pick screen, a light reward sting or a short loop.

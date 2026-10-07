@@ -53,6 +53,9 @@ static func take_turn(b: BWBattle) -> void:
 	if BWObelisk.is_objective(u):
 		b.obelisk_turn(u)                             # D140: the pulse, then the turn passes
 		return
+	if BWTwins.is_twin(u):
+		BWTwins.ai_turn(b, u)                         # D257: the Twins' phase-aware turn
+		return
 	_consider_swap(b, u)                              # D181: draw the carried weapon if it scores better
 	var best := _best_target(b, u, u.pos)
 	if not best.is_empty() and b.objective_mode() and u.team == "player":
@@ -249,13 +252,15 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 	var best_score := -INF
 	var keys := reach.keys()
 	keys.sort()
+	var wfc := BWWeather.forecast(b)                  # D253: the next tick's telegraphed hazards
 	for h in keys:
 		if not reach[h].stop:
 			continue
 		var score := 0.0
 		var t := _best_target(b, u, h)
+		var hz := BWWeather.hazard_pct(b, u, h, wfc) if not wfc.is_empty() else 0.0
 		if not t.is_empty():
-			score = 10000.0 + t.score
+			score = 10000.0 + t.score - hz * u.max_hp() / 100.0
 		elif b.objective_mode():
 			score = -objective_approach(b, u, h)          # D145
 		else:
@@ -263,6 +268,7 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 			for f in foes:
 				nearest = mini(nearest, BWHex.distance(h, f.pos))
 			score = -nearest
+			score -= hz * 0.3                             # D253: ~3 hexes of approach for a 10% hazard
 		score -= reach[h].cost * 0.01
 		if score > best_score:
 			best_score = score

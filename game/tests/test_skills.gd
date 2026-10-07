@@ -518,11 +518,11 @@ func test_uppercut_knockback_and_slam(t) -> void:
 	t.eq(b3.skill_preview(me3, "uppercut", "", Vector2i(8, 4)).knockback.slam, "", "map edge: no slam")
 	var me4 := _u("me", "fists", "fire")
 	var rooted := _foe("r")
-	rooted.abilities["passive"] = { "id": "rooted", "rank": 1 }
+	rooted.abilities["passive"] = { "id": "unbowed", "rank": 1 }
 	var b4 := _duel(me4, [rooted], [E])
 	b4.refresh_effects()
 	b4.board.set_cell(Vector2i(6, 4), "jagged")
-	t.eq(b4.skill_preview(me4, "uppercut", "", E).knockback.slam, "", "immune (Rooted): braced, no slam")
+	t.eq(b4.skill_preview(me4, "uppercut", "", E).knockback.slam, "", "immune (Unbowed, D245: Rooted merged in): braced, no slam")
 	# Rebound: 2 hexes; a wall 2 out stops the second hex and slams
 	var me5 := _fists(_u("me", "fists", "fire", { "dex": 100 }), "gauntlets", "rebound")
 	var foe5 := _foe("f", { "con": 300 })

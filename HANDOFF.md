@@ -23,6 +23,10 @@
 
 - **Playtest 1 fixes (D233–D238):** the first perk is drawn at random (no picker after the roster; the hall names it); a **discard pile** under the gear grid (thrown away when the battle starts); **sorting** (Newest/Element/Slot/Tier) in the gear panel and shop; **scrolls are free**; ground-aimed skills that hurt nobody play **without a cutscene** (and a blast that hurts nobody gets no slow beat). Renders `design/art/playtest1_*.png` (`tools/playtest1_shots.gd`). Not committed. L-23.
 
+- **The Twins, fight 7 (D255–D260):** a fixed boss (no room choice, no weather, boss music) on `court.json`, built on a reusable phase framework (`BWPhases`); paint, own-colour heal, the beam (10% + Blinded/Shrouded, thunder breaks it), the swap at 50%, the rage 2 cycles after a fall; a pick for everyone on a win. Sim fight 7: 56%, the rest of the curve 68–93%. `--combat twins --autoplay`; renders `design/art/twins_*.png`. L-24.
+
+- **Weather (D249–D254):** Rain, Ashfall, Eclipse, Blizzard, Gale tag ~25% of rooms from fight 5 (not Obelisks/Twins/Giant); shown on the room card, a HUD plate, ink particles and next-tick telegraphs; acts at the cycle tick (`BWWeather`); Hard + weather pays +1 drop; the AI steps off telegraphed hazards. `--weather <kind>`; rules design/WEATHER.md; renders `design/art/weather_*.png`. Sim: no weather swings >15 points. L-25.
+
 ## Do this first
 1. **The author plays a full run** (`game\run.bat`), then sends notes. Most open items are AWAITING PLAY (`LEDGER.md` L-1, L-3, L-20).
 2. **Cheap OWED items while waiting:** L-10 (art docs name pass), L-8 (VFX polish). The author's read of the element kanji (D231) at play distance.

@@ -207,7 +207,7 @@ func _gear() -> void:
 	var u: BWUnit = run.squad[0]
 	var fl := run.make_item("flamberge", "C", "cleaving")
 	fl.imbue = "wind"
-	fl.imbue_enchant = "whistling"
+	fl.imbue_enchant = "gusting"
 	run.inventory.append(fl)
 	run.equip(u, fl, "second")
 	for i in 3:

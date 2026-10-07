@@ -173,6 +173,15 @@ one.**
 
 ### The Twins (Noon and Dusk)
 
+> **Built (D255–D260, 2026-10-07).** Fight 7, fixed. The phase framework is
+> `BWPhases` (src/core/phases.gd), the boss `BWTwins` (src/core/twins.gd),
+> the look `BWTwinsLook`, the VFX and plate `BWTwinsFX`, the map
+> `court.json`, the codex's Bosses tab, glossary Beam and Rage. Numbers as
+> built: paint +2 on radius 1 (rage: radius 2); heal 2% per point of own
+> colour (×2 after the swap); beam when more than 4 apart, 10% max HP +
+> Blinded / Shrouded once per turn; thunder breaks it for a cycle and jolts
+> both 5%; HP 2.2× their D137 HP, stats ×1.15 (sim-tuned, D259).
+
 - **Look:** two tall figures (scale about 1.6, 1 hex each). Noon is white
   with a halo-ring head. Dusk is black with white contour and a hollow ring
   head (the Well's motif). They mirror each other's pose.
@@ -244,7 +253,7 @@ range per lane.
 | 9 | Hare (flee AI) | M | — |
 | 10 | Escort | L | 7 |
 | 11 | Standard maps (5) | S each | — |
-| 12 | Phase framework, then the Twins at fight 7 | M + M | — |
+| 12 | Phase framework, then the Twins at fight 7 (**built**, D255–D260) | M + M | — |
 | 13 | The other big maps (4) | M each | 6 |
 | 14 | The Procession | L | 12 |
 | 15 | Run wiring (big rooms 5–7, all big 8–10) and a sim pass | M | 6, 12 |

@@ -642,3 +642,17 @@ to win (D140).
 Renders: `design/art/obelisks_map.png`, `obelisks_lantern.png`,
 `obelisks_well.png`, `obelisks_push.png`, `obelisks_pull.png`,
 `obelisks_ui.png`, `obelisks_forecast.png` (`tools/obelisk_shots.gd`).
+
+## 11. The Court (`court.json`, 13×13, 127 cells, 80 seeded), the Twins' map (D256)
+
+Fight 7 is always the Twins (no room choice, no weather). A disc of radius 6
+round the centre hex (6, 6): the rim (radius 6) and a one-hex dais at the
+centre are elevation 1, the rest 0. **Seeded** (D134): radius 2–5 west of the
+centre column is light 1, east is dark 1 (40 each); the centre column and the
+ring round the dais are neutral. Enemy spawns (3, 2) Noon on the light side and
+(9, 2) Dusk on the dark, six apart, so the beam runs along row 2 from the
+first turn; the squad deploys on rows 10–11. The seeds are the Twins' heal
+until play changes them: light on seeded dark is dark 1 and decays (ELEMENTS
+§5.6), so painting the opposite colour starves them. Renders:
+`design/art/twins_*.png` (`tools/twins_shots.gd`).
+

@@ -9,6 +9,7 @@ extends Node
 ##   --boss                      fight the Giant instead
 ##   --encounter <kind> [--fight n]  a special encounter (horde|colossus|blank|being, D208)
 ##                               against a squad levelled and geared to fight n (default 5)
+##   --weather <kind>            D249: the fight's weather (rain|ashfall|eclipse|blizzard|gale)
 ##   --shot <dir> [--every s] [--count n]   save n real rendered frames, then quit
 ##   --screen <title|roster|prep|rooms|prebattle|downtime|results>   open one screen on a sample run
 ##   --ui-probe                  drive combat with synthetic input and check it responds
@@ -20,6 +21,9 @@ extends Node
 ##   --audio-capture [dir]       record a scripted 61 s run (title, roster, combat, boss)
 ##                               from the Master bus to <dir>/capture.wav + capture.json
 ##                               (default design/audio); analyse with tools/audio/analyse_capture.py
+##   --drop2 --audio-capture [dir]   D242: the drop-2 run (title, hall, rooms, pre-battle, picker,
+##                               shop, cursed, jackpot, tutorial, combat, boss, victory, defeat) ->
+##                               capture_drop2.wav/.json; tools/audio/analyse_drop2.py
 ##   --seed N                    D154: the roster roll's seed (BWRosterGen): the roster screen
 ##                               opens on it, a new run and every tool use it; also the
 ##                               --combat fight seed. Probes, shots and the self-test
@@ -59,6 +63,7 @@ func _ready() -> void:
 			n.process_mode = Node.PROCESS_MODE_ALWAYS
 	if "--audio-capture" in args:
 		var ac := BWAudioCapture.new()
+		ac.drop2 = "--drop2" in args                # D242: the author's drop 2 cues and stings
 		ac.out_dir = _arg(args, "--audio-capture", ProjectSettings.globalize_path("res://").path_join("../design/audio").simplify_path())
 		add_child(ac)
 		return
@@ -86,7 +91,7 @@ func _ready() -> void:
 		var tut := BWTutorial.new()
 		tut.finished.connect(func(_c): get_tree().quit())
 		add_child(tut)
-		BWMusic.play("combat")
+		BWMusic.play("tutorial")
 		return
 	if "--screen" in args:
 		_one_screen(_arg(args, "--screen", "title"))
@@ -164,8 +169,25 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 				u.equipment[BWUnit.SECOND] = run.make_item(str(m[0].id), "E")
 				u.expertise[wc] = int(u.expertise.get(u.weapon_class, 0))
 				u.sync_weapon()
-	if boss:
+	var twins := _arg(OS.get_cmdline_user_args(), "--boss", "") == "twins" or map_name in [BWRun.TWINS_MAP, "twins"]
+	if boss and not twins:
 		enemies = [BWRun.new().make_boss()]
+	if twins:
+		# D256: the Twins: a run at fight 7, its first three levelled and geared to it, on the court
+		var trun := BWRun.start(BWData.table("roster").slice(0, 6).map(func(r): return str(r.id)), seed_value)
+		var tn := BWRun.TWINS_FIGHT
+		for u in trun.squad:
+			BWProgression.level_up(u, tn - u.level)
+			BWPicks.auto_resolve(u)
+			for slot in BWRun.ARMOR_SLOTS:
+				var bases: Array = BWData.table("equipment").filter(func(r): return r.slot == slot)
+				u.equipment[slot] = trun.make_item(str(bases[absi(hash(u.id + slot)) % bases.size()].id), trun.tier_for(tn))
+			u.equipment["main_hand"] = trun.make_item(u.weapon_model, trun.tier_for(tn))
+		trun.fight = tn
+		players = trun.squad.slice(0, 3)
+		trun.prepare_for_battle(players)
+		enemies = trun.enemies_for(tn)
+		map_name = BWRun.TWINS_MAP
 	var enc := _arg(OS.get_cmdline_user_args(), "--encounter", "")
 	if enc in BWEncounters.KINDS:
 		# D208: a run at fight n: its first three, levelled and geared to the fight, vs the encounter
@@ -184,13 +206,14 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 		enemies = BWEncounters.build(run, n, enc)
 	var s := BWCombatScreen.new()
 	s.configure("res://maps/%s.json" % map_name, players, enemies, [], seed_value)
+	s.weather_kind = _arg(OS.get_cmdline_user_args(), "--weather", "")   # D249
 	s.autoplay = autoplay
 	s.finished.connect(func(w, _b): print("battle over: ", w))
 	if autoplay and not "--shot" in OS.get_cmdline_user_args():
 		# D195 check: an autoplay fight exits on its own once it is over (verification runs)
 		s.finished.connect(func(_w, _b): get_tree().create_timer(2.0).timeout.connect(get_tree().quit))
 	add_child(s)
-	BWMusic.play("boss" if boss else "combat")
+	BWMusic.play("boss" if boss or twins else "combat")
 
 
 ## Development shortcut: one screen on a sample run (first six of the roster,
@@ -227,6 +250,8 @@ func _one_screen(which: String) -> void:
 			s.set("report", report)
 	if s:
 		add_child(s)
+		var cue: String = { "title": "title", "roster": "roster", "prebattle": "prebattle", "rooms": "rooms" }.get(which, "rest")
+		BWMusic.play(cue)                          # D239: each screen with its own cue
 
 
 func _start_game() -> void:

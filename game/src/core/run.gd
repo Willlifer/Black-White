@@ -18,6 +18,10 @@ const DEPLOY := 3
 ## in `map_order` and saved, so a loaded run plays the same maps.
 const OBJECTIVE_FIGHT := 4
 const OBJECTIVE_MAP := "obelisks"
+## D256: fight 7 is always the Twins (BWTwins) on their round court: no room
+## choice, no weather, the boss music; a win gives every squad unit a pick.
+const TWINS_FIGHT := 7
+const TWINS_MAP := "court"
 const MAP_POOL := ["arena", "paintball", "bridge", "lake", "chapel", "ravine", "catacombs", "tinderbox", "forge"]
 ## Every battle map (the pool plus the objective map).
 const MAPS := ["arena", "paintball", "bridge", "lake", "obelisks", "chapel", "ravine", "catacombs", "tinderbox", "forge"]
@@ -101,7 +105,11 @@ var _branch_day := -1
 ## 8 (D203): the shop's seven imbuement `scrolls`; an older save rolls them.
 ## 9 (D206): an imbue carries an element enchantment (`imbue_enchant`); older
 ## imbued weapons roll one on load.
-const SAVE_VERSION := 9
+## 10 (D247): the consolidation (D243-D246): merged enchantment and ability
+## ids map to the row they joined, Warded takes the old resist row's element
+## (`ward`), and pure cuts re-roll within their old family and tier
+## (migrate_v10).
+const SAVE_VERSION := 10
 const OLDEST_LOADABLE := 5
 
 var rng := RandomNumberGenerator.new()
@@ -199,6 +207,8 @@ func map_for(n: int) -> String:
 		return "arena"
 	if n == OBJECTIVE_FIGHT:
 		return OBJECTIVE_MAP
+	if n == TWINS_FIGHT:
+		return TWINS_MAP
 	if map_order.is_empty():
 		map_order = shuffled_maps(seed_value)
 		if map_queue.is_empty() and room_log.is_empty():
@@ -229,6 +239,11 @@ func objective_for(n: int) -> Dictionary:
 	return BWBoard.load_file("res://maps/%s.json" % map_for(n)).objective
 
 
+## D256: the current fight is the Twins.
+func is_twins() -> bool:
+	return fight == TWINS_FIGHT
+
+
 func is_boss() -> bool:
 	return fight >= BOSS_FIGHT
 
@@ -255,6 +270,8 @@ func make_item(base_id: String, tier: String, enchant_id: String = "?") -> Dicti
 		"tier": tier, "stats": stats, "enchant": "", "worn": {},
 	}
 	item.enchant = _roll_enchant(base_id, tier) if enchant_id == "?" else enchant_id
+	if item.enchant == BWEffects.WARDED:
+		item["ward"] = roll_ward(seed_value, str(item.uid))     # D243: own rng, the run's stream unmoved
 	# D182: a C, B or A weapon also rolls an elemental imbue (its own rng off
 	# the item's uid, so the run's rng stream and every older roll are unchanged).
 	if str(base.slot) == "main_hand" and TIERS.find(tier) >= TIERS.find(IMBUE_TIER):
@@ -275,11 +292,112 @@ static func roll_imbue_enchant(p_seed: int, uid: String, element: String, tier: 
 	var pool: Array = []
 	for e in BWData.table("enchantments"):
 		var w := ench_weight(e, tier)
-		if w > 0 and str(e.element) == element:
+		if w > 0 and of_element(e, element):
 			pool.append([str(e.id), w])
 	var r := RandomNumberGenerator.new()
 	r.seed = hash("imbue_ench|%d|%s" % [p_seed, uid])
 	return _weighted(pool, r)
+
+
+## D247 save v10 (the D243-D246 consolidation). Merged enchantment ids -> the
+## row they joined; the four old resist rows -> Warded of their element
+## (Stubborn: a rolled one).
+const ENCH_MERGED := {
+	"smouldering": "kindled", "umbral": "abyssal", "hallowed": "dawning", "deepwater": "brimming",
+	"frozen": "glacial", "lingering": "gusting", "jolting": "arcing", "sapping": "conductor",
+	"fireproof": "warded", "grounded": "warded", "windbreak": "warded", "nightforged": "warded", "stubborn": "warded",
+	"resonance": "conducting", "serrated": "keen", "piercing_strikes": "longshot", "channelling": "cleaving",
+	"hooking": "impact", "stampede": "jousting", "parry_shield": "guarding",
+	"wake_fire": "wake", "wake_water": "wake", "wake_dark": "wake", "wake_light": "wake",
+	"tag_team": "pursuit", "inspiring": "feast", "graze": "steady_hand", "rerouted": "steady_hand",
+	"shieldwall": "lockstep", "evasive_roll": "disengage", "lifeline": "bodyguard", "rally_cry": "sheltering",
+}
+const WARD_FROM := { "fireproof": "fire", "grounded": "thunder", "windbreak": "wind", "nightforged": "dark" }
+## Pure cuts (and rows folded into abilities): [family, tier] they re-roll in.
+const ENCH_CUT := {
+	"whistling": ["elemental", "E"], "hearth_fire": ["recovery", "E"], "hearth_water": ["recovery", "E"],
+	"hearth_dark": ["recovery", "E"], "hearth_light": ["recovery", "E"], "second_breath": ["recovery", "E"],
+	"high_ground": ["momentum", "D"], "vengeance": ["defensive", "C"], "fury": ["defensive", "E"],
+	"banner": ["team", "C"], "relay": ["team", "D"], "tending": ["team", "C"],
+}
+## Merged ability ids -> the ability they joined (D245).
+const ABILITY_MERGED := {
+	"enrage": "bloodied", "light_footed": "second_wind", "ward": "iron_wall", "brace": "iron_wall",
+	"tumble": "poise", "encore": "crowd_pleaser", "ring_guard": "guardian", "grace": "mana_veil",
+	"keep_warm": "mana_veil", "heads_up": "scouts_lead", "fletchers_eye": "deadeye", "rooted": "unbowed",
+	"arena_born": "flair", "supple": "acrobat", "flutter": "leap_ready", "woven_rings": "bastion",
+	"shoulder_check": "bastion", "steel_under_cloth": "crosstrained", "nimble_strength": "crosstrained",
+	"insight": "crosstrained", "visor": "hardened", "drift": "sure_stride",
+}
+
+
+static func migrate_v10(items: Array, p_seed: int) -> void:
+	for it in items:
+		if not it is Dictionary:
+			continue
+		var uid := str(it.get("uid", ""))
+		var ench := str(it.get("enchant", ""))
+		if ench != "" and BWData.row("enchantments", ench).is_empty():
+			if ENCH_MERGED.has(ench):
+				it["enchant"] = str(ENCH_MERGED[ench])
+				if it.enchant == BWEffects.WARDED:
+					it["ward"] = str(WARD_FROM.get(ench, roll_ward(p_seed, uid)))
+			else:
+				var ft: Array = ENCH_CUT.get(ench, ["", str(it.get("tier", "E"))])
+				it["enchant"] = _reroll_cut(str(it.get("base", "")), str(ft[0]), str(ft[1]), str(it.get("tier", "E")), p_seed, uid)
+				if it.enchant == BWEffects.WARDED:
+					it["ward"] = roll_ward(p_seed, uid)
+		var imb := str(it.get("imbue_enchant", ""))
+		if imb != "" and BWData.row("enchantments", imb).is_empty():
+			var to := str(ENCH_MERGED.get(imb, ""))
+			if to != "" and of_element(BWData.row("enchantments", to), str(it.get("imbue", ""))):
+				it["imbue_enchant"] = to
+			else:
+				it["imbue_enchant"] = roll_imbue_enchant(p_seed, uid, str(it.get("imbue", "")), str(it.get("tier", "C")))
+
+
+## A cut row's replacement on `base`: its old family at its old tier, else that
+## family at anything the item's tier unlocks, else any row the item could roll.
+static func _reroll_cut(base: String, family: String, tier: String, item_tier: String, p_seed: int, uid: String) -> String:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("v10|%d|%s" % [p_seed, uid])
+	for pass_i in 3:
+		var pool: Array = []
+		for e in BWData.table("enchantments"):
+			if not base in BWData.list(e.applies_to):
+				continue
+			var ok := false
+			match pass_i:
+				0: ok = str(e.family) == family and str(e.tier) == tier
+				1: ok = str(e.family) == family and ench_weight(e, item_tier) > 0
+				2: ok = ench_weight(e, item_tier) > 0
+			if ok:
+				pool.append([str(e.id), 1])
+		if not pool.is_empty():
+			return _weighted(pool, r)
+	return ""
+
+
+## D247: learned, ranks and the equipped choice follow merged abilities (a
+## merged pair keeps the higher rank; duplicates collapse).
+func migrate_abilities_v10() -> void:
+	for id in learned:
+		var out: Array = []
+		for ab in learned[id]:
+			var to := str(ABILITY_MERGED.get(str(ab), str(ab)))
+			if not BWData.row("abilities", to).is_empty() and not to in out:
+				out.append(to)
+		learned[id] = out
+	for id in ability_ranks:
+		var ranks := {}
+		for ab in ability_ranks[id]:
+			var to := str(ABILITY_MERGED.get(str(ab), str(ab)))
+			ranks[to] = maxi(int(ranks.get(to, 0)), int(ability_ranks[id][ab]))
+		ability_ranks[id] = ranks
+	for id in equipped_ability:
+		var eq: Dictionary = equipped_ability[id]
+		for type in eq.keys():
+			eq[type] = str(ABILITY_MERGED.get(str(eq[type]), str(eq[type])))
 
 
 ## D206 save v9: weapons imbued before the imbue carried an enchantment get one.
@@ -287,6 +405,19 @@ static func migrate_imbues(items: Array, p_seed: int) -> void:
 	for it in items:
 		if it is Dictionary and str(it.get("imbue", "")) != "" and str(it.get("imbue_enchant", "")) == "":
 			it["imbue_enchant"] = roll_imbue_enchant(p_seed, str(it.get("uid", "")), str(it.imbue), str(it.get("tier", "C")))
+
+
+## D243: does an enchantment row belong to `element`'s pool (scrolls, imbues,
+## attuned armour)? Its element column, or Warded, which takes any element.
+static func of_element(row: Dictionary, element: String) -> bool:
+	return str(row.get("element", "")) == element or str(row.get("id", "")) == BWEffects.WARDED
+
+
+## D243: a Warded drop's element, from the run seed and the item's uid alone.
+static func roll_ward(p_seed: int, uid: String) -> String:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("ward|%d|%s" % [p_seed, uid])
+	return BWFormulas.ELEMENTS[r.randi() % BWFormulas.ELEMENTS.size()]
 
 
 static func roll_imbue(p_seed: int, uid: String) -> String:
@@ -345,6 +476,8 @@ static func item_name(item: Dictionary) -> String:
 	var named := plain
 	if not ench.is_empty():
 		named = str(ench.name_pattern).replace("{item}", plain)
+		if str(ench.id) == BWEffects.WARDED and str(item.get("ward", "")) != "":
+			named = named.replace("Warded", "%s-Warded" % str(item.ward).capitalize())   # D243
 		if BWEffects.cursed(ench):
 			named += " " + CURSE_MARK             # D201: a cursed row shows its mark
 	return "%s [%s]" % [named, item.get("tier", "E")]
@@ -360,6 +493,8 @@ static func item_element(item: Dictionary) -> String:
 	var imb := str(item.get("imbue", ""))
 	if imb != "":
 		return imb
+	if str(item.get("enchant", "")) == BWEffects.WARDED:
+		return str(item.get("ward", ""))                 # D243: its ward is its colour
 	return str(BWData.row("enchantments", item.get("enchant", "")).get("element", ""))
 
 
@@ -425,7 +560,7 @@ func roll_scrolls() -> void:
 		var pool: Array = []
 		for e in BWData.table("enchantments"):
 			var w := ench_weight(e, tier)
-			if w > 0 and str(e.element) == el:
+			if w > 0 and of_element(e, el):
 				pool.append([str(e.id), w])
 		var r := RandomNumberGenerator.new()
 		r.seed = hash("scroll|%d|%d|%s" % [seed_value, fight, el])
@@ -473,6 +608,10 @@ static func apply_scroll(scroll: Dictionary, item: Dictionary) -> void:
 		item["imbue_enchant"] = str(scroll.enchant)
 	else:
 		item["enchant"] = str(scroll.enchant)
+		if item.enchant == BWEffects.WARDED:
+			item["ward"] = str(scroll.element)       # D243: a Warded scroll wards its own element
+		else:
+			item.erase("ward")
 
 
 # ---------------------------------------------------------------- trash (D234)
@@ -657,6 +796,8 @@ func enemies_for(n: int, room: Dictionary = {}) -> Array:
 	# the Standard one until a choice is made)
 	if room.is_empty() and n < BOSS_FIGHT:
 		room = BWRooms.room_for(self, n)
+	if n == TWINS_FIGHT:
+		return BWTwins.build(self, n)                  # D256: the mid-run boss
 	if str(room.get("encounter", "")) != "":
 		return BWEncounters.build(self, n, str(room.encounter))   # D208: a special encounter
 	var build := BWRooms.enemy_build(n, str(room.get("kind", BWRooms.STANDARD)))
@@ -746,10 +887,14 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 	report["map"] = str(room.get("map", ""))
 	if room.has("encounter"):
 		report["encounter"] = str(room.encounter)
+	if str(room.get("weather", "")) != "":
+		report["weather"] = str(room.weather)          # D249
 	if won:
 		var hard: bool = report.room == BWRooms.HARD
 		var enc: bool = room.has("encounter")         # D208: an encounter pays as a three-enemy Hard room
 		var drops := (DEPLOY if enc else defeated.size()) + (BWRooms.HARD_EXTRA_DROPS if hard else 0)
+		if hard and str(room.get("weather", "")) != "":
+			drops += BWWeather.HARD_EXTRA_DROPS        # D249: a Hard room in weather pays one more
 		for i in drops:
 			var item := random_item(BWRooms.loot_tier(self, report.room))   # D188: Hard pays a tier up
 			inventory.append(item)
@@ -772,6 +917,8 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 			add_trust(deployed[i].id, deployed[j].id, 1)
 	last_enemies = enemies.filter(func(e): return e.encounter == "").map(func(e): return e.to_dict())   # D208: encounter bodies don't join
 	# D179/D194: every fight, won or lost, levels every squad unit, deployed or benched (no XP).
+	if won and fight == TWINS_FIGHT:
+		report["twins_reward"] = BWTwins.reward(self)  # D258: a pick each (two cards, D174)
 	report["levels"] = {}
 	if won or BWProgression.LEVEL_ON_LOSS:
 		for u in squad:
@@ -1215,7 +1362,7 @@ func _find_weapon(rep: Dictionary, wc: String, tier: String) -> Dictionary:
 func _find_armour(rep: Dictionary, el: String, tier: String) -> Dictionary:
 	var pairs: Array = []
 	for e in BWData.table("enchantments"):
-		if str(e.element) != el or ench_weight(e, tier) <= 0:
+		if not of_element(e, el) or ench_weight(e, tier) <= 0:
 			continue
 		for b in BWData.list(e.applies_to):
 			if str(BWData.row("equipment", b).get("slot", "main_hand")) != "main_hand":
@@ -1224,6 +1371,8 @@ func _find_armour(rep: Dictionary, el: String, tier: String) -> Dictionary:
 		return {}
 	var p: Array = pairs[rng.randi() % pairs.size()]
 	var a := make_item(p[0], tier, p[1])
+	if a.enchant == BWEffects.WARDED:
+		a["ward"] = el                               # D243
 	inventory.append(a)
 	rep.items.append(a)
 	return a
@@ -1384,16 +1533,29 @@ static func from_dict(d: Dictionary) -> BWRun:
 	migrate_imbues(r.inventory, r.seed_value)              # D206 (save v9)
 	for u in r.squad:
 		migrate_imbues(u.equipment.values(), r.seed_value)
+	if version < 10:                                       # D247 (save v10)
+		for list in [r.inventory, r.trash]:
+			migrate_v10(list, r.seed_value)
+		for u in r.squad:
+			migrate_v10(u.equipment.values(), r.seed_value)
 	r.trust = d.trust.duplicate()
 	r.last_enemies = d.last_enemies.duplicate(true)
 	r.shop = d.shop.duplicate(true)
 	migrate_imbues(r.shop, r.seed_value)                   # D206
 	r.scrolls = Array(d.get("scrolls", [])).duplicate(true)      # D203 (save v8)
+	if version < 10:
+		migrate_v10(r.shop, r.seed_value)                  # D247
+		for sc in r.scrolls:
+			if BWData.row("enchantments", str(sc.get("enchant", ""))).is_empty():
+				r.scrolls = []                             # a scroll of a gone row: re-roll the seven
+				break
 	if r.scrolls.size() != BWFormulas.ELEMENTS.size():
 		r.roll_scrolls()
 	r.learned = d.learned.duplicate(true)
 	r.ability_ranks = d.ability_ranks.duplicate(true)
 	r.equipped_ability = d.equipped_ability.duplicate(true)
+	if version < 10:
+		r.migrate_abilities_v10()                          # D247
 	r._uid = int(d.uid)
 	r.stats = _load_stats(d.get("stats", {}), version, r.fight)
 	return r

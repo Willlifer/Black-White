@@ -49,7 +49,8 @@ These are durable and easy to get wrong:
 
 - **The author verifies by playing** and by looking at renders. Show images and say what you looked at. Never claim visuals you didn't see.
 - **Extend the established style; don't reinvent it.** It's B/W, low poly, with inked outlines; hair and element FX carry the only colour.
-- **No "−hit" debuffs.** They feel bad. Statuses should change options instead (no skills, no crit, reach, move).
+- **Go easy on "−hit" and dodge stacking** (the author: "not a hard rule, just don't go crazy on dodges or combat will feel bad"). Modest values are fine; prefer statuses that change options (no skills, no crit, reach, move).
+- **Builds want rule-changers, not small numbers.** The author's playstyle is combo and kiting. Passives that only add a few percent feel ignorable; each element needs keystones that define an archetype (Element Overhaul, design/ELEMENTS-v3.md).
 - **No announced personalities.** Personality is discovered; element and weapon carry it.
 - **Randomness wants agency.** Random rolls are welcome, but offer a choice where a build is at stake (e.g. Branch out's two cards).
 - **"If we win, we win."** The Giant isn't forced to be unbeatable.

@@ -598,6 +598,7 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 		_fc_rows.add_child(row)
 	for n in fc.get("notes", []):                # D86/D87 riders, named; D125 terms hover
 		_fc_rows.add_child(_note_line(str(n)))
+	_forceful_toggle(att, what)                  # D244
 	var after := Label.new()
 	after.text = "HP %d → %d on a clean hit" % [dfn.hp, maxi(0, dfn.hp - int(fc.damage.value))]
 	after.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
@@ -611,6 +612,32 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	_forecast.visible = true
 	_menu.visible = false
 	_hovered.panel.visible = false
+
+
+## D244 Forceful: a basic attack's knock is the player's call, push or pull,
+## a toggle in the forecast (BWBattle._knockback_hit reads fx.force_pull).
+func _forceful_toggle(att: BWUnit, what: String) -> void:
+	if what != "" or att.team != "player":
+		return
+	var row: Dictionary = {}
+	for e in BWEffects.list(att, "knockback"):
+		if int(BWEffects.p(e, "choice", 0)) == 1:
+			row = e
+			break
+	if row.is_empty():
+		return
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	var label := func() -> String:
+		return "%s: %s 1 (click to %s)" % [row.name, "pull" if att.fx.get("force_pull", false) else "push",
+			"push" if att.fx.get("force_pull", false) else "pull"]
+	b.text = label.call()
+	b.pressed.connect(func():
+		att.fx["force_pull"] = not att.fx.get("force_pull", false)
+		b.text = label.call())
+	_fc_rows.add_child(b)
 
 
 ## D125: one forecast note ("◆ Shatter: +15% ..."), its terms hoverable.

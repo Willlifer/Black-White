@@ -146,6 +146,8 @@ func _card(i: int) -> PanelContainer:
 	key.add_theme_font_size_override("font_size", BWStyle.F_SUB)
 	key.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	head.add_child(key)
+	if str(room.get("weather", "")) != "":         # D252: the weather tag
+		v.add_child(BWWeatherIcon.strip(str(room.weather)))
 	# the map
 	var frame := PanelContainer.new()
 	var fsb := StyleBoxFlat.new()
@@ -156,7 +158,7 @@ func _card(i: int) -> PanelContainer:
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(frame)
 	var tr := TextureRect.new()
-	tr.custom_minimum_size = Vector2(CARD_W - 30, THUMB_H)
+	tr.custom_minimum_size = Vector2(CARD_W - 30, THUMB_H - (60.0 if str(room.get("weather", "")) != "" else 0.0))   # D252: room for the weather line
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE

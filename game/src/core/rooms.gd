@@ -55,13 +55,13 @@ const CHOICE_FROM := 3
 
 ## Fight n offers a choice of rooms (fight 3 on; not the Obelisks, not the Giant).
 static func has_choice(n: int) -> bool:
-	return n >= CHOICE_FROM and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT
+	return n >= CHOICE_FROM and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT   # D256: the Twins are fixed
 
 
 ## D208: fight n plays a map off the queue (every fight but the Obelisks and
 ## the Giant): the opening fights without a choice, then every choice fight.
 static func queued(n: int) -> bool:
-	return n >= 1 and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT
+	return n >= 1 and n <= BWRun.FIGHTS and n != BWRun.OBJECTIVE_FIGHT and n != BWRun.TWINS_FIGHT
 
 
 ## The two rooms for the run's current fight, rolled once and stored on the
@@ -111,10 +111,12 @@ static func roll(run: BWRun, n: int) -> Array:
 	var std_ids := _draw_ids(run, n, [], false)
 	var hard_ids := _draw_ids(run, n, std_ids, true)
 	var enc := BWEncounters.kind_for(run, n)           # D208: a third of the Hard rooms are encounters
-	return [
+	var rooms := [
 		{ "kind": STANDARD, "map": maps[0], "enemies": std_ids, "fight": n },
 		BWEncounters.room(n, enc, maps[1]) if enc != "" else { "kind": HARD, "map": maps[1], "enemies": hard_ids, "fight": n },
 	]
+	BWWeather.tag_rooms(run, n, rooms)                 # D249: a weather tag on ~25% of rooms from fight 5
+	return rooms
 
 
 ## [standard map, hard map] for fight n from queue `q`: the front two; with
@@ -186,6 +188,8 @@ static func close_fight(run: BWRun) -> Dictionary:
 	run.room_log[str(n)] = { "kind": str(room.kind), "map": str(room.map) }
 	if str(room.get("encounter", "")) != "":
 		run.room_log[str(n)]["encounter"] = str(room.encounter)   # D208
+	if str(room.get("weather", "")) != "":
+		run.room_log[str(n)]["weather"] = str(room.weather)       # D249
 	run.room_offer = {}
 	return room
 
@@ -215,6 +219,8 @@ static func loot_tier(run: BWRun, kind: String) -> String:
 static func reward_text(run: BWRun, room: Dictionary) -> String:
 	var kind := str(room.get("kind", STANDARD))
 	var tier := loot_tier(run, kind)
+	if kind == HARD and str(room.get("weather", "")) != "":
+		return "Win: 5 drops at tier %s (two extra: Hard, weather)" % tier   # D249
 	if kind == HARD:
 		return "Win: 4 drops at tier %s (one extra, a tier up)" % tier
 	return "Win: 3 drops at tier %s" % tier
@@ -234,6 +240,8 @@ static func load_state(r: BWRun, d: Dictionary) -> void:
 			r.room_log[str(k)] = { "kind": str(e.get("kind", STANDARD)), "map": str(e.get("map", "")) }
 			if str(e.get("encounter", "")) != "":
 				r.room_log[str(k)]["encounter"] = str(e.encounter)
+			if str(e.get("weather", "")) != "":
+				r.room_log[str(k)]["weather"] = str(e.weather)          # D249
 		var o: Dictionary = d.get("room_offer", {})
 		if not o.is_empty():
 			r.room_offer = { "fight": int(o.fight), "chosen": int(o.get("chosen", -1)), "rooms": Array(o.rooms).map(
@@ -255,6 +263,8 @@ static func _load_room(x: Dictionary, fight: int) -> Dictionary:
 		"enemies": Array(x.enemies).map(func(id): return str(id)) }
 	if str(x.get("encounter", "")) != "":
 		out["encounter"] = str(x.encounter)          # D208
+	if str(x.get("weather", "")) != "":
+		out["weather"] = str(x.weather)              # D249
 	return out
 
 
@@ -273,6 +283,8 @@ static func hard_note() -> String:
 
 
 static func _fixed_map(n: int) -> String:
+	if n == BWRun.TWINS_FIGHT:
+		return BWRun.TWINS_MAP                    # D256: the Twins' court
 	return BWRun.OBJECTIVE_MAP if n == BWRun.OBJECTIVE_FIGHT else "arena"
 
 

@@ -27,6 +27,8 @@ game/tools/audio/bwdsp.py            shared DSP: WAV io, filters (incl. circular
 game/tools/audio/make_sfx.py         106 SFX WAVs + audio/sfx/sfx.json (variations, bus, levels, peak time)
 game/tools/audio/make_music.py       16 layer WAVs in 3 tempo sets + audio/music/layers/layers.json
 game/tools/audio/analyse_capture.py  capture analysis + PNGs
+game/tools/audio/make_drop2.py       the author's drop 2: trims, levels, merges into both manifests ("Drop 2" below)
+game/tools/audio/analyse_drop2.py    the drop-2 capture analysis -> capture_drop2_report.json
 game/src/game/music.gd               BWMusic: layered, beat-synced, cue/intensity/sting
 game/src/game/voice.gd               BWVoice: barks and grunts (start offset + level per clip, Voice bus)
 game/src/game/audio/audio.gd         BWAudio: buses, effects, per-bus volume settings
@@ -36,7 +38,7 @@ game/src/game/audio/unit_audio.gd    BWUnitAudio: animation markers / clips / fo
 game/src/game/audio/combat_audio.gd  BWCombatAudio: battle events (timed to their replay) → SFX, intensity, stings
 game/src/game/audio/screen_audio.gd  BWScreenAudio: title / roster / downtime moments
 game/src/game/audio/audio_capture.gd BWAudioCapture: the --audio-capture run
-game/tests/test_audio.gd             6 tests, ~940 checks
+game/tests/test_audio.gd             7 tests, ~1200 checks (test_drop2: drop-2 trims, cues, hooks)
 ```
 
 ## SFX
@@ -115,17 +117,21 @@ Measured first (numbers in `layers.json`):
 - **Seams:** every seam step is smaller than the layer's 99th-percentile sample step.
 - **Loudness:** every layer is levelled to −20 dB K-RMS. Peaks are ≤ −1 dBFS without a limiter, because a limiter's gain state wouldn't match across the seam. The drum layers and `air` are peak-bound, which leaves them 0.3–6 dB quieter.
 
-**Cues** (`BWMusic.CUES`, dB per layer; a layer not listed is off):
+**Cues** (`BWMusic.CUES`, dB per layer; a layer not listed is off). Current
+as of drop 2 (D239); `bright` (the loop +12 st) and the 108 BPM `battle` set
+are the author's 10/4 changes:
 
 | Cue | Set | Layers |
 |---|---|---|
-| title | main | full 0, air −15 |
-| roster | slow | full −1, calm −8 |
-| prebattle | main | calm 0, air −12, drums_half −10 |
-| rest | slow | calm 0, voice_pad −9 |
-| combat | main | full −2, drums 0, drums_top −10 · **intensity 1:** full −1, drums_top −5, air −12 · **2:** full 0, drums_top −2, air −8, voice_pad −11 |
-| boss | boss | full 0, drums 0, drums_top −3, air −7, voice_pad −7 |
-| victory / defeat | — | `BWMusic.sting()`: the sting on UI, music ducked −11 dB for its length, back over 1.8 s |
+| title | arpeggio (drop 2) | arpeggio +6 |
+| roster | slow | bright −1, full −7 |
+| rest (prep, picks, results, downtime) | chillin (drop 2) | chillin +6.5 |
+| rooms | rooms (drop 2) | rooms +3 |
+| prebattle | main | low_beat +6.5, kick +2.5 (drop 2) |
+| tutorial | moderato (drop 2) | moderato +4.5 |
+| combat | battle (108) | full −4, bright −3, drums 0, drums_top −10 · **intensity 1:** full −3, bright −2, drums_top −5, air −12 · **2:** full −2, bright −1, drums_top −2, air −8, voice_pad −11, kick −6 |
+| boss | boss | full 0, bright −4, drums 0, drums_top −3, air −7, voice_pad −7, kick −5 |
+| stings | — | `BWMusic.sting(kind)`: one at a time on UI; music ducked −11 dB for the sting's body, back over 1.8 s (see Drop 2) |
 
 How cues play:
 - **Timing:** a cue change lands on the **next bar**, and an intensity change on the **next beat**. Layers fade in over 0.08 s and out over 0.45 s.
@@ -228,6 +234,112 @@ From `capture_report.json`:
 Pictures: `waveform.png` (both channels, RMS/peak, section bands, cue and
 intensity switches, SFX ticks), `spectrogram.png` (log 30 Hz–16 kHz),
 `sfx_sync.png` (250 ms zooms, marker vs sound).
+
+## Drop 2: the author's cues (2026-10-06, D239–D242)
+
+The author's brief: "I tried making it multiuse based on the description"
+(AUDIO-NEEDS.md). Twelve WAVs in `design/audio/`, all 44.1 kHz 16-bit
+stereo, read and never written. `make_drop2.py` writes the game copies; the
+`.asd` files are Ableton's and ignored.
+
+**Measured** (loudness = BS.1770-ish integrated, ungated, mono sum, with the
+max 400 ms momentary in brackets; tempo from onset-grid fits; key from a
+chroma profile, so treat it as a pitch centre):
+
+| File | Length | Lead / trail silence | Peak · RMS · loudness | Tempo · loop | Pitch centre | Character |
+|---|---|---|---|---|---|---|
+| Low Beat | 16.00 s | 0 / 0 | −6.6 · −20.9 · −21.5 (−19.2) | 120.0, exactly 8 bars; the end cuts a held note (seam jump 0.041, 4× the 99th-pct step) | C / E bass (C3, E2 alternating) | dark: 94% of energy < 300 Hz, centroid 154 Hz; beat + bass |
+| MainTheme Arpeggio | 14.00 s | 0.86 / 0 | −3.2 · −23.4 · −22.5 (−18.1) | free (rubato, ~74); 4 phrases 3.25 / 3.06 / 3.03 / 3.79 s; the 13.99 s onset restarts the figure | D major (D–A–C–D) | tonal arpeggio, centroid 386 Hz |
+| Music Rooms | 7.18 s | 0.34 / 0 (decays to −52 dB) | −16.8 · −34.1 · −34.1 (−31.8) | loose ~112 (onset fit rel. 0.35); a phrase and its ring-out, not bar-aligned | C major (C–E–G) | tonal, quiet (+14.7 dB to level) |
+| chillin main theme | 7.50 s | 0.16 / 0 (−55 dB) | −9.3 · −32.6 · −30.8 (−25.5) | 3 chords 2.25 s apart (≈107 if one a bar) | A major-ish (bass F#, D, G, E) | three decaying sustained chords, sparse |
+| moderato main loopish | 8.00 s | 0.84 / 0 | −5.2 · −19.7 · −19.2 (−15.1) | free; a 3.585 s figure (1.31 + 2.27 s), twice; the file ends 12 ms before the third | A major | busy arpeggio, 50% < 300 Hz |
+| no snare beat | 8.00 s | 0 / 0 | −5.5 · −28.4 · −28.7 (−25.0) | 120.0 (onsets within 3.4 ms), exactly 4 bars, clean seam | — (kick ~39 / 78 Hz) | kick only: 98% < 300 Hz, percussive +10.7 dB over harmonic |
+| shop purchase | 7.65 s | 0.87 / 2.15 | −15.2 · −36.1 · −32.9 (−29.4) | — (4 notes in 1.3 s) | C (C–G–C) | soft pluck figure, 2.7 s body + reverb |
+| sting level up | 7.65 s | 0.16 / 2.37 | −15.8 · −34.9 · −31.8 (−28.7) | — | C major (C–G–E) | rising notes, 3.0 s body |
+| sting pick reveal | 8.00 s | 0.62 / 0 (still −41 dB at the end: tail cut) | −7.5 · −27.1 · −27.4 (−24.2) | busy for 7 s (not a 1–3 s sting) | E minor (E/G, D, C) | continuous phrase, 7.1 s body |
+| sting room hard | 7.18 s | 0.15 / 1.96 | −11.5 · −34.3 · −31.0 (−27.9) | — | E with D# (a minor second) | 2.6 s body |
+| cursed or bad | 7.65 s | 0.41 / 2.68 | −10.1 · −34.7 · −30.1 (−26.1) | — | E, D#, G | 1.8 s body |
+| very good event | 7.65 s | 0.80 / 0 (−54 dB) | −9.3 · −27.4 · −26.2 (−23.0) | — | C major | a crescendo peaking ~4.5 s in, 4.9 s body |
+
+Common to all: no clipping (highest peak −3.2 dBFS); nothing above 4 kHz
+(< 0.3% of energy); centroids 128–583 Hz. The stings centre on C; the game's
+loop is F# minor / A major (the stings play over ducked music).
+
+**Where they play:**
+
+| Game file | From | Plays |
+|---|---|---|
+| `layers/drop2/arpeggio.wav` (13.13 s) | MainTheme Arpeggio, 0.86 → 13.99 s | **title** (and the end card) |
+| `layers/drop2/chillin.wav` (6.74 s) | chillin, 3 × 2.248 s from the first chord, ring-out wrapped into the head | **rest**: the hall (prep, picks, results, downtime) |
+| `layers/drop2/moderato.wav` (7.17 s) | moderato, two 3.585 s cycles from the first onset | **tutorial** |
+| `layers/drop2/rooms.wav` (6.85 s) | Music Rooms, from the first onset, with its own decay | **rooms** (the room choice) |
+| `layers/low_beat.wav` (main set) | Low Beat, last 8 ms faded to zero | **prebattle**, alone with the kick: its C/E bass against the loop scores chroma r −0.24 … −0.34 on the four F# bars, so it is not layered under `full` / `bright` |
+| `layers/kick.wav`, `battle/kick.wav`, `boss/kick.wav` | no snare beat ×2; re-timed to 108 / 132.3 by WSOLA anchored on the 16th | prebattle; **combat intensity 2** (−6 dB); **boss** (−5 dB) |
+| `sfx/sting_level_up_1.wav` | sting level up | **results**: one sting per screen, 0.7 s in, when anyone levelled (every fight levels the whole squad, D194, so not once per unit) |
+| `sfx/sting_pick_reveal_1.wav` | sting pick reveal | **any picker opening** (hall, mid-fight, tutorial); fades out over 0.8 s when the pick is taken |
+| `sfx/sting_room_hard_1.wav` | sting room hard | **a Hard room taken** (encounters included) |
+| `sfx/shop_purchase_1.wav` | shop purchase | **shop**: a trade or a scroll used (scrolls are free since D236, so there is no separate "buy") |
+| `sfx/sting_bad_1.wav` | cursed or bad | **a cursed piece put on** (the squad's worn cursed count rises, in the gear panel or through a scroll in the shop); **the defeat sting** |
+| `sfx/sting_good_1.wav` | very good event | **Wander's jackpot** (on its report card); **the victory sting** |
+
+Not mapped: a 3-piece **set bonus** (PASSIVES-v2.md is a draft; nothing in
+code fires one) and a **failed event** (no downtime outcome fails: Wander's
+"Nothing happened" still gives +1). The procedural `sting_victory` /
+`sting_defeat` stay in the manifest, unused.
+
+**Processing:** stings and the shop sound are cut 5 ms before their first
+onset (the first 10 ms frame within 30 dB of the loudest), end where they
+fall 48 dB under it (+50 ms, a 0.15 s fade; 0.35 s when the file ends
+first), and are levelled like the procedural SFX: −16 LUFS-ish momentary,
+peaks ≤ −1 dBFS. `sfx.json` marks them `"drop": 2` with their source, trim
+and `body_s` (until 20 dB under the peak). The music copies get the layers'
+−20 dB K-RMS, peak-bound with no limiter (arpeggio −21.4, chillin −24.5 and
+the kicks −24.8 … −25.6 are peak-bound). A single phrase loop is quieter
+than a stack of layers, so its cue gain is above 0 dB (`BWMusic.MAX_DB` 8).
+`make_music.py` and `make_sfx.py` re-run `make_drop2` at their end, so a
+rebuild keeps drop 2 in both manifests.
+
+**Playback rules (D239, D240):**
+- The four drop-2 loops are `BWMusic.FREE` sets: one layer, their own length,
+  no bar grid. A cue change leaves them on the next frame (the 0.9 s deck
+  crossfade), and any set is entered from its start. Only the four
+  re-timings of the 8-bar loop share a progression.
+- One sting at a time: a new one fades the last out over 0.3 s. The music
+  ducks −11 dB for the sting's `body_s` − 0.3 s, then comes back over 1.8 s.
+  `BWMusic.stop_sting()` (a picker closing) lifts the duck over 1.0 s.
+- Sting mix (`BWSfx.MIX`): good / bad +0.5, level up +1, room hard 0, pick
+  reveal −7 (it runs under the cards), shop −6 (no duck).
+
+**Verified** (87 s capture: `godot --path game -- --drop2 --audio-capture`,
+then `python game/tools/audio/analyse_drop2.py` → `capture_drop2_report.json`.
+Every sting goes through the hook that plays it in the game, except the
+jackpot / victory / defeat, which are called directly):
+
+| Section | Loudness | Momentary max | Peak | Clipped |
+|---|---|---|---|---|
+| title (arpeggio) | −20.4 LUFS | −16.2 | −6.3 dBFS | 0 |
+| rest (chillin) | −22.8 | −14.8 | −3.0 | 0 |
+| rooms | −19.9 | −17.1 | −6.2 | 0 |
+| prebattle (Low Beat + kick) | −20.6 | −15.7 | −6.4 | 0 |
+| tutorial (moderato) | −19.6 | −15.4 | −8.1 | 0 |
+| combat at intensity 2 (+ kick) | −17.6 | −13.5 | −3.3 | 0 |
+| boss (+ kick) | −16.8 | −14.4 | −3.4 | 0 |
+
+Phase 6's title and roster sat at −20.3, combat −19.5, boss −17.9. chillin
+reads low integrated because its chords decay to −50 dB between hits; its
+momentary max is level with the others.
+
+- **Cue changes:** out of a free set in 24–174 ms (the 174 ms is the room
+  screen's first frame); into the boss set on the 108 BPM bar (1.13 s).
+- **Stings:** all eight found in the recording by cross-correlation with
+  their file (score 0.90–1.00), starting −1.5 … +8.8 ms from the frame they
+  were asked for (within a frame). Each body's momentary max sits 0–3 dB
+  under the music it ducked: level up −17.5 vs −14.9, room hard −18.3 vs
+  −17.6, pick reveal −14.8 vs −15.8, cursed −17.5 vs −15.4, jackpot −17.6,
+  victory −17.3, defeat −17.4.
+- **The shop sound** (not ducked) peaks at −14.8 over −16.2 of music. Under
+  the music its match score is only 0.5, so its measured offset (+97 ms)
+  isn't reliable; the log has it starting on the frame of the trade.
 
 ## Swapping in real recordings
 
