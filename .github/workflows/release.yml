@@ -1,0 +1,98 @@
+# Build the Windows exe on every push to main and publish it as a GitHub release for testers.
+# Mirrors build_windows.sh (D395/D466): import, self-test, export preset "Windows Desktop" as ONE exe.
+# A red --self-test stops the run before anything is released.
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7"
+  GODOT_URL: https://github.com/godotengine/godot/releases/download/4.7-stable
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot and export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/AppData/Roaming/Godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-stable-win64
+
+      - name: Install Godot and export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/dl
+          curl -fsSL -o ~/dl/godot.zip "$GODOT_URL/Godot_v${GODOT_VERSION}-stable_win64.exe.zip"
+          unzip -q ~/dl/godot.zip -d ~/godot
+          curl -fsSL -o ~/dl/templates.tpz "$GODOT_URL/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q ~/dl/templates.tpz -d ~/dl/tpl
+          TPL="$APPDATA/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$TPL"
+          cp -r ~/dl/tpl/templates/* "$TPL/"
+
+      - name: Locate Godot
+        run: |
+          GODOT="$(find ~/godot -name '*_console.exe' | head -n1)"
+          [ -n "$GODOT" ] || { echo "Godot console binary not found"; exit 1; }
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+
+      - name: Import project
+        run: '"$GODOT" --headless --path game --import'
+
+      - name: Self-test
+        run: '"$GODOT" --headless --path game -- --self-test'
+
+      - name: Export Windows exe
+        run: |
+          mkdir -p dist
+          "$GODOT" --headless --path game --export-release "Windows Desktop" "$PWD/dist/BlackWhite.exe"
+          [ -f dist/BlackWhite.exe ] || { echo "Export produced no exe"; exit 1; }
+
+      - name: Smoke-test the exe
+        run: |
+          ./dist/BlackWhite.console.exe --headless -- --combat arena --autoplay 2>&1 | tee dist/smoke.log
+          ! grep -q "SCRIPT ERROR" dist/smoke.log
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STAMP="$(date -u +%Y-%m-%d)"
+          SHORT="${GITHUB_SHA::7}"
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          EXE="dist/BlackWhite-${STAMP}-${SHORT}.exe"
+          mv dist/BlackWhite.exe "$EXE"
+          {
+            echo "Automatic build of \`${SHORT}\` (${STAMP})."
+            echo
+            echo "Download **$(basename "$EXE")** and run it. It's one file; the game data is inside."
+            echo "Windows SmartScreen may warn because the exe is unsigned: More info, then Run anyway."
+            echo
+            echo "### Changes"
+            git log -1 --format='%B' "$GITHUB_SHA"
+          } > dist/notes.md
+          gh release create "$TAG" "$EXE" \
+            --target "$GITHUB_SHA" \
+            --title "Black | White ${STAMP} (${SHORT})" \
+            --notes-file dist/notes.md \
+            --latest
