@@ -86,6 +86,10 @@ Godot **4.7 standard** (not .NET), GDScript only. No plugins, no addons.
   `art/source/`, `art/icon/` are left out. A new data file of another extension loaded by path needs adding to the
   preset's include filter. Saves: `%APPDATA%\Godot\app_userdata\Black - White\`.
 - Before the final build: bake animations (`tools/build_anims.gd`) if the game warns "BWAnimClips … stale".
+- CI (D488): `.github/workflows/release.yml` runs on every push to GitHub `main` (the barebones export) or by hand
+  (Actions → Build and release → Run workflow). On `windows-latest` it installs Godot 4.7 + templates, imports, runs
+  `--self-test`, exports "Windows Desktop", smoke-tests `--combat arena --autoplay`, then publishes release
+  `build-<n>` with `BlackWhite-<date>-<sha>.exe`. Red self-test or any `SCRIPT ERROR` = no release.
 
 ## Controls (combat)
 
