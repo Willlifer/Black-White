@@ -5,7 +5,7 @@
 //   2 stasis (ice):     a pale cyan rime pattern, glinting
 // `tier` is 0..1 here (the marker fading in/out); markers have no levels,
 // except gale 2 (D102): the "gale2" material sets `gale_size` 1.0 -> a
-// bigger, faster swirl that fills the hex, a fourth stroke and a gust ring.
+// bigger, faster swirl that fills the hex and a fourth stroke (D406: no ring).
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_mix, depth_draw_never, shadows_disabled;
 
@@ -99,13 +99,7 @@ vec4 gale(vec2 p, float d, float t) {
 		over(acc, ink.rgb, (1.0 - smoothstep(0.012, 0.03, curl)) * step(qr, 0.08));
 		over(acc, glow.rgb, (1.0 - smoothstep(0.006, 0.016, curl)) * step(qr, 0.07));
 	}
-	if (g2 > 0.5) {
-		// gale 2: a broken gust ring racing round the rim
-		float seg = step(0.5, fract((ang / FX_TAU) * 5.0 - t * 1.3));
-		float ring = 1.0 - smoothstep(0.02, 0.045, abs(d - 0.88));
-		over(acc, ink.rgb, ring * seg);
-		over(acc, glow.rgb, (1.0 - smoothstep(0.008, 0.02, abs(d - 0.88))) * seg);
-	}
+	// D406: one gale look, a swirl; no rim ring (gale 2+ is only the bigger swirl)
 	over(acc, glow.rgb, (0.3 + 0.12 * g2) * (1.0 - smoothstep(0.55, 0.95, d)));
 	return acc;
 }

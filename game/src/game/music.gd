@@ -11,6 +11,16 @@ extends Node
 ##   BWMusic.sting("victory")      a sting over ducked music (STINGS); one at a time
 ##   BWMusic.stop_sting()          fade the playing sting out (a picker closed)
 ##
+## D411 (the author, 2026-10-08: "fade the existing track out, play the
+## jingle, then fade it in"): a sting fades the music out (DUCK_OUT), holds it
+## out until the sting has rung out (sfx.json tail_s: 30 dB under its peak),
+## then fades it back in (DUCK_IN). A pure state machine (Duck) drives the
+## Music bus's Amplify every frame: a sting during the fade-in turns it
+## around from where it is, one during the hold extends it, and a screen
+## change mid-duck starts the new track under the same bus duck, so it comes
+## in with everything else. Nothing can stay silent: the duck lifts when the
+## sting is gone, and BWMusic resets the bus on entering and leaving the tree.
+##
 ## Layers (tools/audio/make_music.py; 8 bars each, all the same length):
 ##   full bright calm air drums drums_top drums_half voice_pad, and from the
 ##   author's drop 2 (make_drop2.py) low_beat and kick; plus four free-tempo
@@ -79,15 +89,21 @@ const MAX_DB := 8.0
 ## D240: the author's stings. One at a time: a new one fades out the last.
 ## The procedural sting_victory / sting_defeat stay in the manifest unused.
 ## D392: the pick cards get the 2.3 s cut ("pick": "sting_pick_reveal" switches back);
-## the full 7 s take stays mapped as "pick_long". The stings stay in the author's key (C).
+## the full 7 s take stays mapped as "pick_long".
+## D411: the shop purchase is a sting too (it ducks). D412: all of them play in
+## A; BWSfx.STING_KEY = "C" switches every one back to the author's C originals.
 const STINGS := { "victory": "sting_good", "defeat": "sting_bad", "jackpot": "sting_good", "cursed": "sting_bad",
-	"level_up": "sting_level_up", "pick": "sting_pick_short", "pick_long": "sting_pick_reveal", "room_hard": "sting_room_hard" }
+	"level_up": "sting_level_up", "pick": "sting_pick_short", "pick_long": "sting_pick_reveal", "room_hard": "sting_room_hard",
+	"shop": "shop_purchase" }
 const FADE_IN := 0.08          # a layer coming in (on the beat)
 const FADE_OUT := 0.45         # a layer leaving
 const DECK_IN := 0.1           # a tempo set entering on the bar line
 const DECK_OUT := 0.9
 const START_FADE := 1.2        # the very first cue
-const DUCK_DB := -11.0         # music under a sting
+const DUCK_OUT := 0.3          # D411: the music fades out under a sting (s)
+const DUCK_IN := 1.0           # and back in once the sting has rung out (s)
+const DUCK_FLOOR_DB := -60.0   # "out"
+const DUCK_LEAD := 0.1         # the sting starts this far into the fade (the music already ~7 dB down)
 
 static var runtime_tempo := false
 static var log_enabled := false
@@ -131,6 +147,67 @@ class Deck:
 			stream.set_sync_stream_volume(index[layer], linear_to_db(maxf(a, 0.0001)))
 
 
+## D411: the sting duck. Pure: step(dt) returns the Music bus gain (dB), so
+## the tests drive it without audio. `a` is the music's amplitude (0..1). Out
+## it follows (1 - t)^2 over fade_out s (a fast first drop, so the sting's
+## attack isn't fighting the music); back in it follows sin(t * pi/2) over
+## fade_in s. Each step re-reads its curve position from `a`, so turning
+## around mid-fade is continuous: no jumps either way.
+class Duck:
+	extends RefCounted
+	enum { IDLE, DOWN, HELD, UP }
+	var state := IDLE
+	var a := 1.0
+	var hold := 0.0            # seconds until the music may come back
+	var fade_out := 0.3
+	var fade_in := 1.0
+	var floor_db := -60.0
+
+	## A sting starts: fade out (or keep out) and hold `hold_s` from now. A
+	## newer sting replaces the older one's hold (the older is faded out).
+	func begin(hold_s: float) -> void:
+		hold = maxf(hold_s, 0.0)
+		if state != HELD:
+			state = DOWN if a > 0.0 else HELD
+
+	## The sting is going (stopped, or gone): come back in `after` s at most.
+	func release(after: float = 0.0) -> void:
+		if state == DOWN or state == HELD:
+			hold = minf(hold, maxf(after, 0.0))
+
+	func reset() -> void:
+		state = IDLE
+		a = 1.0
+		hold = 0.0
+
+	func active() -> bool:
+		return state != IDLE
+
+	func step(dt: float) -> float:
+		match state:
+			DOWN:
+				var g := maxf(sqrt(a) - dt / fade_out, 0.0)
+				a = g * g
+				hold -= dt
+				if hold <= 0.0:
+					state = UP
+				elif a <= 0.0:
+					state = HELD
+			HELD:
+				hold -= dt
+				if hold <= 0.0:
+					state = UP
+			UP:
+				var u := minf(asin(clampf(a, 0.0, 1.0)) / (PI * 0.5) + dt / fade_in, 1.0)
+				a = 1.0 if u >= 1.0 else sin(u * PI * 0.5)
+				if u >= 1.0:
+					state = IDLE
+		return level_db()
+
+	func level_db() -> float:
+		return floor_db if a <= db_to_linear(floor_db) else minf(linear_to_db(a), 0.0)
+
+
 var _decks := {}               # key -> Deck
 var _active: Deck
 var _cue := ""
@@ -138,7 +215,39 @@ var _intensity := 0
 var _queue: Array = []         # { deck, at, fn, what }
 var _sting_player: Node        # D240: the sting playing now (one at a time)
 var _sting_kind := ""
-var _duck: Tween
+var duck := Duck.new()         # D411
+var lead := DUCK_LEAD          # the tests set 0 (no timer)
+var _sting_token := 0          # a sting asked for; a newer one (or a stop) cancels a pending start
+var _sting_pending := false
+var _duck_db := 0.0
+
+
+func _init() -> void:
+	duck.fade_out = DUCK_OUT
+	duck.fade_in = DUCK_IN
+	duck.floor_db = DUCK_FLOOR_DB
+
+
+## D411: a fresh instance (or one leaving) never inherits a ducked bus.
+func _enter_tree() -> void:
+	_set_duck_db(0.0)
+
+
+func _exit_tree() -> void:
+	duck.reset()
+	_set_duck_db(0.0)
+
+
+func _set_duck_db(db: float) -> void:
+	_duck_db = db
+	var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
+	if amp:
+		amp.volume_db = db
+
+
+## The Music bus's sting duck now (dB; 0 = none). The tests and the capture read it.
+static func duck_db() -> float:
+	return _inst._duck_db if _inst else 0.0
 
 
 static func ensure(parent: Node) -> void:
@@ -375,31 +484,45 @@ func _sting(kind: String) -> void:
 		return
 	_stop_sting(0.3, false)                          # D240: one sting at a time, never stacked
 	var name: String = STINGS[kind]
-	var p := BWSfx.ui(name, { "tag": "sting", "stack": true })
-	_sting_player = p
 	_sting_kind = kind
-	var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
-	if amp == null:
-		return
-	# duck for the sting's body (manifest body_s: until it falls 20 dB under
-	# its peak), not its long reverb tail; else the old length - 1.2 s
-	var hold := 2.0
+	_sting_token += 1
+	var hold := sting_hold(name) + lead
+	duck.begin(hold)                                 # D411: out, hold until it has rung out, back in
+	_log({ "type": "sting", "kind": kind, "sfx": BWSfx.resolve(name), "hold_s": hold, "lead_s": lead })
+	if lead > 0.0 and is_inside_tree():
+		_sting_pending = true                        # "fade the existing track out, play the jingle"
+		get_tree().create_timer(lead).timeout.connect(_sting_start.bind(_sting_token, name))
+	else:
+		_sting_start(_sting_token, name)
+
+
+func _sting_start(token: int, name: String) -> void:
+	if token != _sting_token:
+		return                                       # replaced or stopped while the music faded
+	_sting_pending = false
+	_sting_player = BWSfx.ui(name, { "tag": "sting", "stack": true })
+	_log({ "type": "sting_start", "kind": _sting_kind, "sfx": BWSfx.resolve(name) })
+
+
+## D411: how long the music stays out under a sting, from its start: until
+## it falls 30 dB under its peak (sfx.json tail_s), so the fade-in rises over
+## the last of its reverb. Older manifests: body_s + 1 s, else length - 1 s.
+static func sting_hold(name: String) -> float:
 	var lv: Array = BWSfx.info(name).get("levels", [])
-	if not lv.is_empty() and (lv[0] as Dictionary).has("body_s"):
-		hold = maxf(float(lv[0].body_s) - 0.3, 0.5)
-	elif p is AudioStreamPlayer and (p as AudioStreamPlayer).stream:
-		hold = maxf((p as AudioStreamPlayer).stream.get_length() - 1.2, 0.5)
-	if _duck and _duck.is_valid():
-		_duck.kill()
-	_duck = create_tween()
-	_duck.tween_property(amp, "volume_db", DUCK_DB, 0.15)
-	_duck.tween_interval(hold)
-	_duck.tween_property(amp, "volume_db", 0.0, 1.8).set_trans(Tween.TRANS_SINE)
-	_log({ "type": "sting", "kind": kind, "sfx": name })
+	if not lv.is_empty():
+		var l0: Dictionary = lv[0]
+		if l0.has("tail_s"):
+			return float(l0.tail_s)
+		if l0.has("body_s"):
+			return float(l0.body_s) + 1.0
+		if l0.has("seconds"):
+			return maxf(float(l0.seconds) - 1.0, 0.5)
+	return 2.0
 
 
 ## Fade the playing sting out (a picker closed, a newer sting); `release`
-## also lifts the music duck at once instead of waiting it out.
+## also brings the music back in (D411: over DUCK_IN, starting while the
+## sting fades) instead of waiting out its hold.
 static func stop_sting(fade: float = 0.6, kind: String = "") -> void:
 	if _inst and (kind == "" or kind == _inst._sting_kind):
 		_inst._stop_sting(fade, true)
@@ -409,15 +532,29 @@ func _stop_sting(fade: float, release: bool) -> void:
 	var p := _sting_player
 	_sting_player = null
 	_sting_kind = ""
+	_sting_token += 1                                # a pending start never plays
+	_sting_pending = false
 	if p != null and is_instance_valid(p) and p.is_inside_tree():
 		BWSfx.loop_stop(p, fade)
 	if release:
-		var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
-		if amp:
-			if _duck and _duck.is_valid():
-				_duck.kill()
-			_duck = create_tween()
-			_duck.tween_property(amp, "volume_db", 0.0, 1.0).set_trans(Tween.TRANS_SINE)
+		duck.release(fade * 0.5)
+
+
+## D411: drive the bus duck. A sting that is gone (freed, or never started:
+## no manifest entry, a skipped play) can't hold the music out.
+func _step_duck(delta: float) -> void:
+	if not duck.active():
+		if _duck_db != 0.0:
+			_set_duck_db(0.0)
+		return
+	var gone := _sting_player != null and not is_instance_valid(_sting_player)      # freed under us
+	var never := _sting_player == null and _sting_kind != "" and not _sting_pending  # asked for, never played
+	if duck.state != Duck.UP and (gone or never):
+		duck.release(0.0)
+	var was := duck.state
+	_set_duck_db(duck.step(delta))
+	if duck.state != was:
+		_log({ "type": "duck", "state": ["idle", "down", "held", "up"][duck.state], "db": _duck_db })
 
 
 # ---------------------------------------------------------------- the grid
@@ -434,6 +571,7 @@ func _schedule(d: Deck, quant: String, what: String, fn: Callable) -> void:
 
 
 func _process(delta: float) -> void:
+	_step_duck(delta)
 	var i := 0
 	while i < _queue.size():
 		var q: Dictionary = _queue[i]

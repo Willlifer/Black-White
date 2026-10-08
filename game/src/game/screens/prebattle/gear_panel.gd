@@ -27,6 +27,11 @@ extends PanelContainer
 ## inventory only. Both show the changes first (Apply / Cancel, Esc cancels);
 ## after Apply, "Undo optimize" puts everything back (one step, until the
 ## gear is changed by hand).
+## D403: Optimize ranks a unit's focus element first, then its other learned
+## elements; the preview notes why ("Fire set 3/3", "Water (2nd)").
+## D404: "Unequip all [U]" beside it takes every squad unit's armour and
+## second weapon off (the main hand stays); "Unequip" under the sets line
+## does this unit. Both confirm in the same box and share the one-step Undo.
 
 signal changed
 signal closed
@@ -60,12 +65,19 @@ var _trash_btn: Button
 var _opt_all: Button               # D315-D318
 var _opt_unit: Button
 var _undo_btn: Button
+var _unequip_all: Button           # D404
+var _unequip_unit: Button
+var _plan_kind := "optimize"       # the plan on preview: "optimize" / "unequip"
+var _undo_kind := "optimize"
 var _preview: PanelContainer
 var _preview_text: RichTextLabel
 var _preview_title: Label
 var _plan := {}                    # the plan on preview
 var _undo_snap := {}               # BWAutoEquip.apply's snapshot (one step)
 var _applying := false
+## D404: the header's filter and action buttons (with Unequip all the row
+## outgrew the hall's panel at F_SMALL).
+const HEADER_FONT := BWStyle.F_SMALL - 3
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -73,12 +85,15 @@ var give_enabled := false
 func _init(p_run: BWRun) -> void:
 	run = p_run
 	add_theme_stylebox_override("panel", BWStyle.box_style())
+	# D404: a host that anchors the panel to the right edge (the hall's prep)
+	# has it widen leftward when the header outgrows it, never off screen
+	grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	add_child(v)
 	# header
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 8)
+	hb.add_theme_constant_override("separation", 6)                # D404: a 4th action fits the hall's header
 	v.add_child(hb)
 	_header = hb
 	_title = Label.new()
@@ -90,7 +105,7 @@ func _init(p_run: BWRun) -> void:
 		b.text = f[1]
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		b.add_theme_font_size_override("font_size", HEADER_FONT)
 		b.pressed.connect(func(): _filter = f[0]; _fill_grid())
 		hb.add_child(b)
 		_filter_btns[f[0]] = b
@@ -98,7 +113,7 @@ func _init(p_run: BWRun) -> void:
 	_opt_all.name = "optimize_all"
 	_opt_all.text = "Optimize all [O]"
 	_opt_all.focus_mode = Control.FOCUS_NONE
-	_opt_all.add_theme_font_size_override("font_size", BWStyle.F_SMALL)   # the hall's 1050 px header fits
+	_opt_all.add_theme_font_size_override("font_size", HEADER_FONT)   # the hall's 1050 px header fits
 	_opt_all.tooltip_text = "Hand out the whole squad's gear, most-used unit first:\nits element and weapon first, then the higher tier. It may take\npieces from units used less. You see the changes before they apply."
 	var sc_ev := InputEventKey.new()
 	sc_ev.keycode = KEY_O
@@ -108,9 +123,24 @@ func _init(p_run: BWRun) -> void:
 	_opt_all.shortcut_in_tooltip = false
 	_opt_all.pressed.connect(optimize_all)
 	hb.add_child(_opt_all)
+	_unequip_all = Button.new()                        # ---- D404
+	_unequip_all.name = "unequip_all"
+	_unequip_all.text = "Unequip all [U]"
+	_unequip_all.focus_mode = Control.FOCUS_NONE
+	_unequip_all.add_theme_font_size_override("font_size", HEADER_FONT)
+	_unequip_all.tooltip_text = "Take the whole squad's armour and second weapons off, into the\ninventory (cursed pieces too). Main-hand weapons stay, so nobody\nis left without one. You confirm first; Undo puts it back."
+	var u_ev := InputEventKey.new()
+	u_ev.keycode = KEY_U
+	var u_sc := Shortcut.new()
+	u_sc.events = [u_ev]
+	_unequip_all.shortcut = u_sc
+	_unequip_all.shortcut_in_tooltip = false
+	_unequip_all.pressed.connect(unequip_all)
+	hb.add_child(_unequip_all)
 	var close := Button.new()
 	close.text = "Close  [Esc]"
 	close.focus_mode = Control.FOCUS_NONE
+	close.add_theme_font_size_override("font_size", HEADER_FONT)
 	close.pressed.connect(func(): closed.emit())
 	hb.add_child(close)
 	# body
@@ -190,12 +220,20 @@ func _init(p_run: BWRun) -> void:
 	_opt_unit.tooltip_text = "Fill this unit's slots from the loose inventory (never from another unit):\nits element and weapon first, then the higher tier."
 	_opt_unit.pressed.connect(optimize_unit)
 	orow.add_child(_opt_unit)
+	_unequip_unit = Button.new()                       # ---- D404: this unit
+	_unequip_unit.name = "unequip_unit"
+	_unequip_unit.text = "Unequip"
+	_unequip_unit.focus_mode = Control.FOCUS_NONE
+	_unequip_unit.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_unequip_unit.tooltip_text = "Take this unit's armour and second weapon off, into the inventory.\nThe main-hand weapon stays."
+	_unequip_unit.pressed.connect(unequip_unit)
+	orow.add_child(_unequip_unit)
 	_undo_btn = Button.new()
 	_undo_btn.name = "undo_optimize"
 	_undo_btn.text = "Undo optimize"
 	_undo_btn.focus_mode = Control.FOCUS_NONE
 	_undo_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
-	_undo_btn.tooltip_text = "Put everyone's gear back as it was before the last Optimize"
+	_undo_btn.tooltip_text = "Put everyone's gear back as it was before the last Optimize or Unequip"
 	_undo_btn.visible = false
 	_undo_btn.pressed.connect(undo_optimize)
 	orow.add_child(_undo_btn)
@@ -902,6 +940,7 @@ func _build_preview() -> void:
 func optimize_all() -> void:
 	if preview_open():
 		return
+	_plan_kind = "optimize"
 	_show_plan(BWAutoEquip.plan_all(run), "Optimize all")
 
 
@@ -909,7 +948,25 @@ func optimize_all() -> void:
 func optimize_unit() -> void:
 	if unit == null or preview_open():
 		return
+	_plan_kind = "optimize"
 	_show_plan(BWAutoEquip.plan_unit(run, unit), "Optimize %s" % unit.name)
+
+
+## D404 Unequip all [U]: every squad unit's armour and second weapon to the
+## inventory (the main hand stays). One line to confirm, Apply / Cancel.
+func unequip_all() -> void:
+	if preview_open():
+		return
+	_plan_kind = "unequip"
+	_show_plan(BWAutoEquip.plan_unequip(run), "Unequip all")
+
+
+## D404 Unequip: this unit only.
+func unequip_unit() -> void:
+	if unit == null or preview_open():
+		return
+	_plan_kind = "unequip"
+	_show_plan(BWAutoEquip.plan_unequip(run, [unit]), "Unequip %s" % unit.name)
 
 
 func preview_open() -> bool:
@@ -918,18 +975,22 @@ func preview_open() -> bool:
 
 func _show_plan(plan: Dictionary, title: String) -> void:
 	if BWAutoEquip.empty(plan):
-		_msg.text = "Nothing to change: the best pieces are already on."
+		_msg.text = "Nothing to take off: only main-hand weapons are on." if _plan_kind == "unequip" \
+			else "Nothing to change: the best pieces are already on."
 		return
 	_plan = plan
 	var n: int = plan.changes.size()
-	_preview_title.text = "%s · %d change%s" % [title, n, "" if n == 1 else "s"]
-	_preview_text.text = preview_bbcode(run, plan)
+	if _plan_kind == "unequip":
+		_preview_title.text = title
+		_preview_text.text = unequip_line(run, plan)
+	else:
+		_preview_title.text = "%s · %d change%s" % [title, n, "" if n == 1 else "s"]
+		_preview_text.text = preview_bbcode(run, plan)
 	_preview.visible = true
 	_fit_preview()
 	_fit_preview.call_deferred()                       # again once the text has wrapped at its width
-	_opt_all.disabled = true
-	_opt_unit.disabled = true
-	BWEsc.push(_preview, cancel_preview, { "name": "optimize preview" })
+	_set_buttons_disabled(true)
+	BWEsc.push(_preview, cancel_preview, { "name": "unequip confirm" if _plan_kind == "unequip" else "optimize preview" })
 
 
 ## Size the scroll to the wrapped text (up to 440 px) and centre the box on the panel.
@@ -946,25 +1007,35 @@ func cancel_preview() -> void:
 	_preview.visible = false
 	_plan = {}
 	BWEsc.remove(_preview)
-	_opt_all.disabled = false
-	_opt_unit.disabled = false
+	_set_buttons_disabled(false)
+
+
+func _set_buttons_disabled(on: bool) -> void:
+	for b in [_opt_all, _opt_unit, _unequip_all, _unequip_unit]:
+		b.disabled = on
 
 
 func apply_preview() -> void:
 	if _plan.is_empty():
 		return
 	var plan := _plan
+	var kind := _plan_kind
 	cancel_preview()
 	var snap := BWAutoEquip.apply(run, plan)
 	_sel = {}
 	_show_give({}, "")
 	var n: int = plan.changes.size()
-	_msg.text = "Optimized: %d change%s. Undo optimize puts it all back." % [n, "" if n == 1 else "s"]
+	if kind == "unequip":
+		var k: int = plan.get("freed", []).size()
+		_msg.text = "Took off %d piece%s (main hands stay). Undo unequip puts them back." % [k, "" if k == 1 else "s"]
+	else:
+		_msg.text = "Optimized: %d change%s. Undo optimize puts it all back." % [n, "" if n == 1 else "s"]
 	doll.refresh()
 	refresh()
 	_applying = true
 	changed.emit()
 	_applying = false
+	_undo_kind = kind
 	_set_undo(snap)
 
 
@@ -989,6 +1060,7 @@ func _set_undo(snap: Dictionary) -> void:
 	_undo_snap = snap
 	if _undo_btn != null:
 		_undo_btn.visible = not snap.is_empty()
+		_undo_btn.text = "Undo unequip" if _undo_kind == "unequip" else "Undo optimize"
 
 
 func can_undo() -> bool:
@@ -1025,13 +1097,16 @@ static func preview_bbcode(p_run: BWRun, plan: Dictionary) -> String:
 					names.get(to, to) if to != "" else "inventory"])
 				continue
 			var col := BWGearText.hex(BWGearText.readable(BWGearText.item_color(c.item)))
-			var note := ""
+			var notes: PackedStringArray = []
 			if str(c.from) != "" and str(c.from) != u.id:
-				note = " (from %s)" % names.get(str(c.from), str(c.from))
+				notes.append("from %s" % names.get(str(c.from), str(c.from)))
 			elif str(c.slot) == "main_hand" and str(c.from) == u.id:
-				note = " (drawn)"
+				notes.append("drawn")
 			elif str(c.slot) == BWUnit.SECOND:
-				note = " (carried)"
+				notes.append("carried")
+			var note := "" if notes.is_empty() else " (%s)" % ", ".join(notes)
+			if str(c.get("reason", "")) != "":                # D403: why
+				note += " – %s" % str(c.reason)
 			parts.append("[color=#%s]+%s[/color] [color=#%s][lb]%s[rb]%s[/color]" % [col,
 				BWGearText.plain_name(c.item), dim, str(c.item.get("tier", "E")), note])
 		lines.append("[b]%s[/b]:  %s" % [u.name, "  ·  ".join(parts)])
@@ -1039,3 +1114,21 @@ static func preview_bbcode(p_run: BWRun, plan: Dictionary) -> String:
 	if freed > 0:
 		lines.append("[color=#%s]%d piece%s back to the inventory.[/color]" % [dim, freed, "" if freed == 1 else "s"])
 	return "\n".join(lines)
+
+
+## D404: the unequip confirm's one line: "9 pieces from 5 units go to the
+## inventory (2 cursed). Main-hand weapons stay."
+static func unequip_line(p_run: BWRun, plan: Dictionary) -> String:
+	var freed: Array = plan.get("freed", [])
+	var who := {}
+	for c in plan.get("changes", []):
+		who[c.unit] = true
+	var cur := freed.filter(func(it): return BWAutoEquip.cursed(it)).size()
+	var units := " from %d units" % who.size()
+	if who.size() == 1:
+		for u in p_run.squad:
+			if who.has(u.id):
+				units = " from %s" % u.name
+	return "%d piece%s%s go%s to the inventory%s. Main-hand weapons stay." % [freed.size(),
+		"" if freed.size() == 1 else "s", units, "es" if freed.size() == 1 else "",
+		" (%d cursed)" % cur if cur > 0 else ""]

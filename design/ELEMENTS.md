@@ -101,8 +101,10 @@ Notes:
 ### 2.3 What a marker does
 
 Nothing by being stood on (V8: every gameplay field zero). A marker only acts
-when a **fresh** axis charge lands on its hex (§3.3). Markers last
-`MARK_CYCLES = 3` cycles, then vanish.
+when a **fresh** axis charge lands on its hex (§3.3); a fuse also goes off
+under fresh ice or wind (D405, §3.3). Markers last `MARK_CYCLES = 3` cycles,
+then vanish. The gale is wind's **only** tile: it spreads, and never moves
+anyone (D406, §19).
 
 ### 2.4 Ice: glaze
 
@@ -194,12 +196,31 @@ pay off.
 
 On a hex with no charge, an operator **arms** it: store `marker`, `timer =
 MARK_CYCLES` (3). An operator on a hex that already has a marker **replaces**
-it (newest wins, timer refreshed).
+it (newest wins, timer refreshed), **except on a fuse** (below).
+
+**Every element ignites a fuse (D405, the author 2026-10-08: "Casting an
+element on thunder should ignite it").** A FRESH arrival of any element on a
+fuse sets it off:
+
+| Arriving on a fuse | Result |
+|---|---|
+| fire, light, dark | detonates the new state, as below (fire 1 onto a fuse = 9%) |
+| **ice, wind** | **detonates the fuse** (was: replaced it). The arrival is consumed (no stasis, no gale is left); the empty fuse blasts the base `5%` (credited to the fuse's owner). The ×1.5 shatter still applies to anything glazed that thunder blows |
+| water | **electrifies** instead (the thunder + water rule, D262/D264: the water within 1, §14) |
+| thunder | re-arms it, timer refreshed (as before) |
+
+A propagated arrival (spread, an on-kill paint) never ignites a fuse, and gale
+copies skip markers (§3.4), so containment holds. Static Field's guard
+(D307), Static Blades, Daisy Chain (a fired fuse can chain one more) and Blast
+Rider work unchanged. The blast preview tags the hex **IGNITES FUSE n%**
+(water: **IGNITES FUSE: ELECTRIFIED**), the confirm box says "Ignites the
+fuse: n% blast here, half on the ring", and the fuse's tile card reads "any
+element cast here ignites it (a blast; water electrifies instead)".
 
 **Wind on wind (D95).** Wind arriving on a hex that holds a gale marker
 upgrades it to **gale 2** (`gale_level = 2`, timer refreshed). Wind on a
-gale 2 just refreshes it. When a gale 2 fires, its copies go to radius 2
-(§3.4). Any other operator on a gale replaces it as above.
+gale 2 just refreshes it (Jetstream: a gale 3). When a gale 2 fires, its
+copies go to radius 2 (§3.4). Thunder or ice on a gale replaces it as above.
 
 When a **fresh** axis arrival lands on a marked hex, the arrival is applied
 first (giving the new (h, v)), then the marker fires on that state exactly as
@@ -560,7 +581,7 @@ down is free and unlimited. Forced moves (shoves, charges, pulls) keep D20's cap
 **Updraft (D376/D377)** is part of the wind perk **Tailwind**, not automatic
 for wind units: the holder's jump gets **+1 after every other modifier** (a
 lance 5, a HighGrounder bow 5), and any unit of the holder's team whose turn
-starts on one of the holder's gale markers (a wind field included) gets
+starts on one of the holder's gale markers gets
 **+1 jump that turn** (read at turn start, like the move lock). They stack:
 +2 at most (the holder on its own gale). The Move hover names it: "· Climb 3
 · Updraft +1 (Tailwind)", "Updraft +1 (Tailwind, on Ana's gale)". The Move hover
@@ -1016,7 +1037,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Thunder | Lightning Rod | An arc that would hit an ally within 3 of you hits you instead at 50%. | `lightning_rod` |
 | Wind | Tailwind | +2 move starting on a gale marker; after any wind action, move 1 more. **Updraft** (D376/D377): +1 jump after every other modifier; a unit of your team starting its turn on your gale marker gets +1 jump that turn (you on your own: +2). | `tailwind` |
 | Wind | Eye of the Storm | Immune to displacement; bow, pistol and thrown (daggers beyond 1) attacks on you get −15 hit. | `eye_of_storm` |
-| Wind | Gale Force | +5% damage per hex moved this turn, up to +20%. D307: after moving 4+, your first landed hit on a foe that turn applies your wind mode (within the wind caps). | `attack_mod` |
+| Wind | Gale Force | +5% damage per hex moved this turn, up to +20%. D307: after moving 4+, your first landed hit on a foe that turn pushes it 1 away (D407: there are no wind modes; within the wind caps). | `attack_mod` |
 | Wind | Gust | A foe your wind skill hits (unresisted) is pushed 1 away; if rock or a unit stops it, it slams for 8%. | `gust` |
 | Wind | Slipstream | Allies starting their turn within 2 of you: +1 move. | `slipstream` |
 | Dark | Shadowstep | Once per turn, from a dark hex, step to another dark hex within 3 for 1 move, ignoring the path. | `shadowstep` |
@@ -1202,7 +1223,7 @@ _mods, _plan, use_skill, move, the turn start/end, the tick, _digest),
   unit is the end of at most 2 (shortest pairs first, then setup order).
   Beams are read from the board whenever asked, so they form and break as
   units move.
-- **The tick** (after the vortex pull, before decay): foes on beam hexes
+- **The tick** (after the squall fronts, before decay; D406: no vortex pull): foes on beam hexes
   take **4% + 2% × the lower end's light** (light class, cause
   `light_beam`), once per tick (the strongest beam); allies on beam hexes and
   both ends become **Empowered**.
@@ -1298,14 +1319,17 @@ keystones). Code: `src/core/ks_wind.gd`, `ks_ice.gd`, `ks_water.gd`,
 ### 16.1 Wind keystones (D293)
 
 Code: `src/core/ks_wind.gd` (BWKsWind), hooked from `BWWind`; who holds
-what is `BWKeystones`. Every field move stays inside the wind caps (2 hexes
-a cycle, a field once a turn).
+what is `BWKeystones`. Every wind move stays inside the wind caps (2 hexes
+a cycle; a direct move once per action).
 
-- **Eye of the Vortex:** your Vortex fields pull everyone within 2 in, up to
-  2, step by step toward the centre (each stops before the first blocked
-  hex: no slam), when they fire and at the tick. Only your newest Vortex
-  field acts per tick (fields carry a `born` serial). Board: a dashed ink
-  ring at the field's 2-hex reach.
+- **Eye of the Vortex (reworked D408, Claude):** the Vortex fields it used
+  to empower are gone (D406: a gale only spreads), and the author asked for
+  no tile pulls. It is now a rider on wind SHAPING: **your wind skills' Draw
+  in reaches foes within 2 of the area (not 1) and pulls each up to 2 hexes
+  toward its centre**, one hex at a time, stopping before the first blocked
+  hex (no slam). A direct wind move (once per action, 2 hexes a cycle), so a
+  far foe is dragged into the blast. The confirm box notes "Eye of the
+  Vortex first: n pulled in"; no board ring (there is no field to ring).
 - **Wind Wall:** the D273 action, now granted only by the keystone (the
   `ks:wind_wall` flag and `wall_for_all` are gone). **AI (D304):** every legal
   wall is scored; it raises the best when a ranged foe (reach 3+) threatens 2+
@@ -1316,8 +1340,8 @@ a cycle, a field once a turn).
   is in HP like an attack's, and the heading is passed as the second pick.
 - **Jetstream:** wind by a holder on a gale 2 makes a **gale 3** (copies to
   radius 3; `gale_max` in the paint opts); the copies its paint makes, or its
-  gales make, last 2 cycles; its Gust fields push 2. Board: a gale 3 gets a
-  wide three-armed swirl.
+  gales make, last 2 cycles (D406: the "Gust fields push 2" rider is gone
+  with the fields). Board: a gale 3 looks like a gale 2 (one gale look).
 - **Glaze carry (the D272 TODO; "rink carry" until D398):** a glazed hex never
   fires a gale, so a gale that fires next to glaze carries it instead: its
   **water** copies glaze for 1 cycle (Unsteady ground; a fire or light copy
@@ -1410,16 +1434,20 @@ hooks marked D309/D312 in `BWTiles.apply`, `BWPools.finish`, `BWBattle`
   marker and leaves the hex at 2+). Owner: the caster; a firing gale's owner
   is the gale's. The gale copies its ring as ever; the front starts one ring
   past the copies (ring 2; ring 3/4 for a gale 2/3).
-- **Advance:** at each of the next **3 ticks** (in `BWWind.tick`, after the
-  vortex fields, before the beams and the decay) the front moves one ring
+- **Advance:** at each of the next **3 ticks** (in `BWWind.tick`, before the beams and
+  the decay; D406: no vortex fields) the front moves one ring
   out. Each hex of that ring gets a **propagated +1** of the squall's light
   or dark (source = owner; never fires a marker; skips glazed hexes, pillars,
   walls; seeds and statics follow §5.5/§5.6). The unit on each ring hex is
-  **pushed 1 outward**, both teams, as a wind field move: the wind caps (2
-  hexes a cycle, a field once a turn), dark 3 gravity, a slam (8%) when
+  **pushed 1 outward**, both teams, as an ambient wind move: the wind caps (2
+  hexes a cycle, once a turn), dark 3 gravity, a slam (8%) when
   blocked (onto glaze it just stops). Wind set holders' allies are spared.
-- **Always outward (Claude, D310):** the caster's Gust heading doesn't bend
-  it; a squall is an explosion and the push already goes "away".
+- **Always outward (Claude, D310):** no heading bends it; a squall is an
+  explosion and the push already goes "away".
+- **Kept by D406, flagged:** the squall is the one wind effect left that
+  moves units without an action (its front pushes 1 outward). The author's
+  2026-10-08 "squall stays" kept it; whether it should become spread-only is
+  an open question for the author (LEDGER L-45).
 - Light and dark only. **One squall per owner**; a new one replaces it. One
   action over several light hexes starts one, from the strongest.
 - Interplay: more light means more beam hexes (the beams resolve right after
@@ -1466,8 +1494,8 @@ front's three rings (dark under foes, light under allies, 3% max HP each,
 
 ## 18. Wind shaping (D365-D370, the author's "then what?")
 
-Wind as built, for **skills**. A wind-tagged skill no longer carries the
-abstract Gust / Vortex / Becalm mode; once its target is picked, the confirm
+Wind as built, for **skills** (kept by D406: the author likes it). A
+wind-tagged skill carries no mode; once its target is picked, the confirm
 box shows **WIND SHAPING**, whose options follow the skill's shape. Code:
 `src/core/wind_shape.gd` (BWWindShape), hooked from `BWWind.pre_hit` /
 `after_paint` and `BWBattle.use_skill`; view `combat/wind_shape_view.gd`
@@ -1490,15 +1518,11 @@ box shows **WIND SHAPING**, whose options follow the skill's shape. Code:
   8% slams on both when a push is blocked by rock, a unit, a pillar or a wall.
   Pulls never slam.
 - **Memory:** the last choice per unit and skill (`BWUnit.wind_shapes`, not
-  saved). Unset, an area **draws in** (D383, the author: was Burst out under
-  Gust); lines and single targets follow the unit's basic mode: Gust → Blast
-  out / push straight away; Vortex → Blast out / pull straight in; Becalm →
-  Hold on every shape.
-- **Gales:** a gale the skill lays stores the equivalent mode: Draw in →
-  Vortex field, Hold → Becalm field, the rest → Gust field (Part: heading to
-  the parting side; Push: the push heading; else away from the caster).
-- **Basic attacks and plain paints** keep the three modes (§1 of v3,
-  `BWUnit.wind_mode`), on the forecast's "Wind mode (basic)" toggle.
+  saved). Unset (D407): an area **draws in** (D383), a line **blasts out**, a
+  single target is **pushed straight away**.
+- **Gales:** a gale the skill lays is a plain gale (D406): it only spreads.
+- **Basic attacks** (D407): a landed, unresisted wind basic pushes its target
+  1 away from the attacker. No mode, no toggle.
 
 **Controls** (no extra click; the shaping is set while the box is up, Enter
 or a click on the target fires):
@@ -1517,7 +1541,7 @@ or a click on the target fires):
 **Preview:** fat wind-green arrows (ink-edged) on the line's side, the area's
 rim (inward for Draw in, outward for Burst out) or the target; a tag naming
 the option; a dashed ghost ring where each pushed foe lands; "SLAM 8%" on a
-blocked push; "INTO FIRE n%" / SHOCK / DARK / GUST FIELD where a foe would
+blocked push; "INTO FIRE n%" / SHOCK / DARK where a foe would
 land in a hazard; plus the blast preview's ink move arrows and
 damage stickers (the action is simulated with the shaping).
 
@@ -1528,3 +1552,44 @@ per Becalm; ties keep the stored choice.
 
 **Wind Wall (D370):** kept as is. A keystone action, one wall per unit, 3
 hexes, 2 ticks, cooldown 3: not paintable, not spammable.
+
+## 19. Wind simplified: one tile, the gale (D406-D409, the author 2026-10-08)
+
+The author: "I don't really get how wind works. Simplify wind to just one hex
+type." Then: the gale "should solely spread out whatever is cast on its
+tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
+`wind_shape.gd`; tests `tests/test_simplify_d405.gd`, `test_wind_dark.gd`,
+`test_wind_shape.gd`, `test_keystones_c3.gd`. Renders
+`design/art/simplify_*.png` (`tools/simplify_shots.gd`).
+
+- **The gale is the only wind tile (D406).** Wind on empty ground arms a
+  gale; when a charge lands on it, the charge is copied to its neighbours
+  (§3.4: radius 1; a gale 2, wind on wind, radius 2; Jetstream's gale 3,
+  radius 3), carrying steam, electrified water and glaze as built (§16.1).
+  That is all it does. It stores no mode and no heading, and it never moves
+  anyone: **no** entering pushes, **no** turn-start pushes, **no** tick
+  pulls, **no** Becalm stops. Tile card: "Gale mark: spreads whatever lands
+  here to adjacent hexes" (a gale 2: "to the hexes within 2").
+- **Wind basic attacks (D407):** after a landed, unresisted blow the target
+  is pushed 1 away from the attacker (slams 8% when blocked, the wind caps).
+  The Gust / Vortex / Becalm modes, `BWUnit.wind_mode` and the forecast's
+  mode toggle are gone. Gale Force's 4+-move rider pushes 1 too.
+- **Wind skills keep their SHAPING** (§18): Part left / right, Blast out,
+  Draw in (the area default), Burst out, a single push, Hold. **Becalm**
+  survives as the status Hold lays (Becalmed, then Restless).
+- **Eye of the Vortex (D408):** a Draw in rider, not a tile effect (§16.1).
+- **Kept:** Squall (§17.1; it still pushes its front outward: flagged, L-45),
+  Wind Wall, Jetstream's gale 3 and 2-cycle copies, the glaze carry.
+- **Updraft stays as Tailwind's rider (the one exception, flagged):**
+  Tailwind's holder and its allies starting a turn on the holder's gale get
+  +1 jump (D376/D377), and Tailwind's own "+2 move starting on a gale". These
+  are the perk's riders, not the tile's: the tile's base hover line never
+  mentions them; a Tailwind holder's gale adds an "Updraft (...)" line.
+- **Look (D409):** one gale look, the tile shader's green swirl (a gale 2+
+  the bigger, faster swirl). No chevrons, spirals, calm rings, Eye reach ring
+  or gale-3 ring; the blast preview tags a gale hex just "GALE".
+- **AI (D409):** the wind-mode scoring (`ai_choose` / `ai_refine`) is gone;
+  wind skills still simulate their shaping (D368).
+- **Saves (D409):** nothing to migrate. A run save never held a wind mode
+  (`wind_mode` was never in `BWUnit.to_dict`) or battle tiles; the dropped
+  unit field is simply not read.

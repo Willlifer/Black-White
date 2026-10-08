@@ -193,11 +193,16 @@ static func confirm_lines(sim: Dictionary) -> Array:
 	if sim.is_empty():
 		return out
 	for d in sim.detonations:
-		out.append({ "text": "Detonation: %d%% blast here, half on the ring" % roundi(float(d.pct)), "warn": false })
+		if bool(d.get("fuse", false)):             # D405: any element ignites a fuse
+			out.append({ "text": "Ignites the fuse: %d%% blast here, half on the ring" % roundi(float(d.pct)), "warn": false })
+		else:
+			out.append({ "text": "Detonation: %d%% blast here, half on the ring" % roundi(float(d.pct)), "warn": false })
 	var kinds := {}
 	for h in sim.hexes:
 		for k in sim.hexes[h].kinds:
 			kinds[k] = int(kinds.get(k, 0)) + 1
+		if "fuse" in sim.hexes[h].kinds and "shock" in sim.hexes[h].kinds and not "detonate" in sim.hexes[h].kinds:
+			out.append({ "text": "Ignites the fuse: the water electrifies (within 1)", "warn": false })
 	if kinds.has("gale"):
 		out.append({ "text": "Gale: copies onto %d hexes" % int(kinds.get("spread", 0)), "warn": false })
 	if kinds.has("glaze"):
@@ -321,7 +326,7 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	var mk := str(e.get("marker", ""))
 	if mk != "":
 		var mel := str(BWTiles.MARKER_ELEMENT.get(mk, ""))
-		var lvl := " 2" if mk == "gale" and int(e.get("gale_level", 1)) > 1 else ""
+		var lvl := " %d" % int(e.get("gale_level", 1)) if mk == "gale" and int(e.get("gale_level", 1)) > 1 else ""
 		head.append("[color=#%s]%s%s[/color]" % [_hx(BWLook.element_color(mel)), mk.capitalize(), lvl])
 	if head.is_empty():
 		head.append("Bare ground")
@@ -332,8 +337,10 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	if glaze > 0 and not b.tiles.is_pillar(h):       # D266: a pillar's own line says its ticks
 		lines.append("Glazed: %d cycle%s left, decay paused" % [glaze, "" if glaze == 1 else "s"])
 	if mk != "":
-		var what := { "fuse": "detonates the next fire, water, light or dark laid here",
-			"stasis": "glazes the next charge laid here", "gale": "copies the next charge to its ring" }
+		var what := { "fuse": "any element cast here ignites it (a blast; water electrifies instead)",
+			"stasis": "glazes the next charge laid here",
+			"gale": "spreads whatever lands here to adjacent hexes" if int(e.get("gale_level", 1)) <= 1
+				else "spreads whatever lands here to the hexes within %d" % int(e.get("gale_level", 1)) }   # D405/D406
 		lines.append("%s mark: %s; fades in %d cycle%s" % [mk.capitalize(), what.get(mk, ""), int(e.timer), "" if int(e.timer) == 1 else "s"])
 	elif (hv != 0 or vv != 0) and glaze == 0 and not bool(e.get("permanent", false)) and r.static == null and not b.tiles.shock.has(h):
 		lines.append("Decay: steps down in %d cycle%s" % [int(e.timer), "" if int(e.timer) == 1 else "s"])

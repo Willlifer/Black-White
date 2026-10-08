@@ -629,11 +629,101 @@ func impact(a: Node3D, targets: Array, results: Array) -> void:
 	if int(ctx.get("weight", NONE)) == NONE:
 		return
 	match key:
+		"sunder":
+			_fissure(a, int(ctx.get("weight", SHORT)))     # ---- D415: the ground splits out through the target
 		"elemental_truth":
 			var el := _el(a)
 			release_at(el, d.global_position, 0.65, 0.0)
 			release_at(el, d.global_position, 1.0, 0.17)
 			_quad(8, el, d.global_position + Vector3(0, 1.1, 0), Vector2(2.2, 2.2), 0.4, 0.17)
+
+
+## D415 Sunder: Ley Line's racing line, laid by an impact instead of a cast.
+## An inked crack zig-zags out from the struck hex hex by hex, the element
+## glows along it (Ley Line's segment + ground disc), each tile heaves up a
+## little and settles, and grey grit kicks up. Fire-and-forget: the blow's
+## reactions don't wait on it.
+func _fissure(a: Node3D, w: int) -> void:
+	var el := _el(a)
+	var hexes: Array = ctx.e.get("hexes", [])
+	if hexes.is_empty():
+		return
+	var step := 0.075 if w == FULL else 0.05
+	var prev: Vector3 = (a.global_position + _hex(hexes[0])) * 0.5
+	prev.y = _hex(hexes[0]).y
+	var pts: Array = [prev + Vector3(0, 0.04, 0)]
+	for i in hexes.size():
+		var p := _hex(hexes[i])
+		# the crack wanders a little side to side on its way through each hex
+		var d := (p - prev)
+		d.y = 0.0
+		var side := d.cross(Vector3.UP).normalized() if d.length() > 0.01 else Vector3.RIGHT
+		var mid := prev.lerp(p, 0.5) + side * randf_range(-0.22, 0.22)
+		pts.append(mid + Vector3(0, 0.04, 0))
+		pts.append(p + side * randf_range(-0.12, 0.12) + Vector3(0, 0.04, 0))
+		var seg: Array = pts.slice(pts.size() - 3, pts.size())
+		var from := prev + Vector3(0, 0.1, 0)
+		var to := p + Vector3(0, 0.1, 0)
+		var h: Vector2i = hexes[i]
+		var dl := i * step
+		_later(dl, func():
+			_ink_crack(seg, 0.95 + (hexes.size() - i) * step)
+			_line_seg(from, to, el, 0.8 + (hexes.size() - i) * step)
+			_disc(4, el, to + Vector3(0, -0.07, 0), 0.9, 0.9)
+			_heave(h)
+			_burst_parts(to, "", 5 if w == FULL else 3, 0.0, { "up": 2.2, "spread": 1.6, "g": 9.0, "shape": 2, "life": 0.45, "s0": 0.09, "grey": true }))
+		prev = p
+	_quad(8, el, _hex(hexes[0]) + Vector3(0, 0.2, 0), Vector2(1.5, 1.5), 0.25)
+	if screen and screen.has_method("_shake"):
+		screen.call("_shake", 0.07)
+
+
+## A thin inked crack on the ground through `pts` (black, unshaded), with a
+## short side-split at its far end; fades over `dur`.
+func _ink_crack(pts: Array, dur: float) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_strip_into(st, pts, 0.11, Color.BLACK, Vector3.INF)
+	var n := pts.size()
+	if n >= 2:
+		var tip: Vector3 = pts[n - 1]
+		var d: Vector3 = (pts[n - 1] - pts[n - 2])
+		d.y = 0.0
+		var off := d.rotated(Vector3.UP, randf_range(0.6, 1.0) * (1.0 if randf() < 0.5 else -1.0)).normalized() * 0.32
+		_strip_into(st, [tip - d * 0.4, tip - d * 0.4 + off], 0.06, Color.BLACK, Vector3.INF)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.render_priority = 3
+	mi.material_override = m
+	mi.sorting_offset = 6.0
+	add_child(mi)
+	var tw := create_tween()
+	tw.tween_interval(maxf(dur - 0.3, 0.1))
+	tw.tween_property(m, "albedo_color:a", 0.0, 0.3)
+	tw.tween_callback(mi.queue_free)
+
+
+## A tile (and its overlays) heaves up a little and settles.
+func _heave(h: Vector2i) -> void:
+	var bv: Node = screen.get("board_view") if screen else null
+	if bv == null or not bv.has_method("hex_parts"):
+		return
+	for n in bv.hex_parts(h):
+		var node := n as Node3D
+		if node == null or node.has_meta("heave"):
+			continue
+		node.set_meta("heave", true)
+		var y0 := node.position.y
+		var tw := node.create_tween()
+		tw.tween_property(node, "position:y", y0 + 0.14, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(node, "position:y", y0, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(func(): node.remove_meta("heave"))
 
 
 # ------------------------------------------------------------------ setup beats

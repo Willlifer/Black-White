@@ -1,0 +1,1075 @@
+{
+ "semitones": -3,
+ "ratio": "37/44 = 0.840909 (2^(-3/12) = 0.840896)",
+ "methods": {
+  "pv_basic": {
+   "sting level up": {
+    "onsets": 7,
+    "flux_ratio_db": -10.06,
+    "flux_ratio_worst_db": -11.49,
+    "pre_echo_db": 10.49,
+    "warble_db": 1.211,
+    "stereo_r_diff": 0.7614,
+    "chroma_r": 0.837,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.77
+   },
+   "sting pick reveal": {
+    "onsets": 31,
+    "flux_ratio_db": -5.79,
+    "flux_ratio_worst_db": -10.26,
+    "pre_echo_db": 1.12,
+    "warble_db": 0.143,
+    "stereo_r_diff": 0.4134,
+    "chroma_r": 0.8537,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.79
+   },
+   "sting room hard": {
+    "onsets": 4,
+    "flux_ratio_db": -7.38,
+    "flux_ratio_worst_db": -12.05,
+    "pre_echo_db": 2.33,
+    "warble_db": 0.708,
+    "stereo_r_diff": 0.3647,
+    "chroma_r": 0.8749,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.01
+   },
+   "very good event": {
+    "onsets": 27,
+    "flux_ratio_db": -8.25,
+    "flux_ratio_worst_db": -11.91,
+    "pre_echo_db": 3.28,
+    "warble_db": -0.891,
+    "stereo_r_diff": 0.3385,
+    "chroma_r": 0.898,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.41
+   },
+   "cursed or bad": {
+    "onsets": 7,
+    "flux_ratio_db": -5.95,
+    "flux_ratio_worst_db": -8.29,
+    "pre_echo_db": 0.02,
+    "warble_db": -0.796,
+    "stereo_r_diff": 0.7043,
+    "chroma_r": 0.7635,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.74
+   },
+   "shop purchase": {
+    "onsets": 4,
+    "flux_ratio_db": -11.9,
+    "flux_ratio_worst_db": -14.81,
+    "pre_echo_db": 13.34,
+    "warble_db": 0.012,
+    "stereo_r_diff": 0.7263,
+    "chroma_r": 0.6585,
+    "length_same": true,
+    "contrast_vs_resample_db": -4.55
+   }
+  },
+  "pv_locked": {
+   "sting level up": {
+    "onsets": 7,
+    "flux_ratio_db": -3.72,
+    "flux_ratio_worst_db": -12.24,
+    "pre_echo_db": 0.96,
+    "warble_db": 0.8,
+    "stereo_r_diff": 0.0122,
+    "chroma_r": 0.9989,
+    "length_same": true,
+    "contrast_vs_resample_db": 1.13
+   },
+   "sting pick reveal": {
+    "onsets": 31,
+    "flux_ratio_db": -1.32,
+    "flux_ratio_worst_db": -9.1,
+    "pre_echo_db": -0.94,
+    "warble_db": 0.344,
+    "stereo_r_diff": 0.0191,
+    "chroma_r": 0.983,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.01
+   },
+   "sting room hard": {
+    "onsets": 4,
+    "flux_ratio_db": -4.21,
+    "flux_ratio_worst_db": -11.28,
+    "pre_echo_db": -5.43,
+    "warble_db": 0.546,
+    "stereo_r_diff": 0.0192,
+    "chroma_r": 0.9981,
+    "length_same": true,
+    "contrast_vs_resample_db": 1.76
+   },
+   "very good event": {
+    "onsets": 27,
+    "flux_ratio_db": -1.45,
+    "flux_ratio_worst_db": -12.55,
+    "pre_echo_db": -0.49,
+    "warble_db": -0.33,
+    "stereo_r_diff": 0.0142,
+    "chroma_r": 0.9782,
+    "length_same": true,
+    "contrast_vs_resample_db": 0.3
+   },
+   "cursed or bad": {
+    "onsets": 7,
+    "flux_ratio_db": -0.24,
+    "flux_ratio_worst_db": -3.99,
+    "pre_echo_db": -1.33,
+    "warble_db": 0.486,
+    "stereo_r_diff": 0.0178,
+    "chroma_r": 0.9943,
+    "length_same": true,
+    "contrast_vs_resample_db": 1.38
+   },
+   "shop purchase": {
+    "onsets": 4,
+    "flux_ratio_db": -5.65,
+    "flux_ratio_worst_db": -11.82,
+    "pre_echo_db": 1.84,
+    "warble_db": 0.246,
+    "stereo_r_diff": 0.0101,
+    "chroma_r": 0.9984,
+    "length_same": true,
+    "contrast_vs_resample_db": 1.53
+   }
+  },
+  "wsola": {
+   "sting level up": {
+    "onsets": 7,
+    "flux_ratio_db": -1.1,
+    "flux_ratio_worst_db": -1.35,
+    "pre_echo_db": 0.28,
+    "warble_db": 0.692,
+    "stereo_r_diff": 0.0172,
+    "chroma_r": 0.9874,
+    "length_same": true,
+    "contrast_vs_resample_db": -1.92
+   },
+   "sting pick reveal": {
+    "onsets": 31,
+    "flux_ratio_db": -0.23,
+    "flux_ratio_worst_db": -4.6,
+    "pre_echo_db": 0.17,
+    "warble_db": 0.47,
+    "stereo_r_diff": 0.0216,
+    "chroma_r": 0.9783,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.16
+   },
+   "sting room hard": {
+    "onsets": 4,
+    "flux_ratio_db": -0.7,
+    "flux_ratio_worst_db": -1.48,
+    "pre_echo_db": -0.11,
+    "warble_db": 0.444,
+    "stereo_r_diff": 0.0197,
+    "chroma_r": 0.9921,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.05
+   },
+   "very good event": {
+    "onsets": 27,
+    "flux_ratio_db": -1.04,
+    "flux_ratio_worst_db": -3.52,
+    "pre_echo_db": 0.5,
+    "warble_db": 0.101,
+    "stereo_r_diff": 0.0184,
+    "chroma_r": 0.9795,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.69
+   },
+   "cursed or bad": {
+    "onsets": 7,
+    "flux_ratio_db": 1.62,
+    "flux_ratio_worst_db": -1.11,
+    "pre_echo_db": 0.4,
+    "warble_db": 0.353,
+    "stereo_r_diff": 0.0193,
+    "chroma_r": 0.9883,
+    "length_same": true,
+    "contrast_vs_resample_db": -2.45
+   },
+   "shop purchase": {
+    "onsets": 4,
+    "flux_ratio_db": -1.84,
+    "flux_ratio_worst_db": -3.09,
+    "pre_echo_db": 0.36,
+    "warble_db": 0.18,
+    "stereo_r_diff": 0.0104,
+    "chroma_r": 0.9999,
+    "length_same": true,
+    "contrast_vs_resample_db": -1.05
+   }
+  },
+  "pv_transient": {
+   "sting level up": {
+    "onsets": 7,
+    "flux_ratio_db": -0.92,
+    "flux_ratio_worst_db": -1.52,
+    "pre_echo_db": -1.08,
+    "warble_db": 0.77,
+    "stereo_r_diff": 0.0105,
+    "chroma_r": 0.9949,
+    "length_same": true,
+    "contrast_vs_resample_db": 0.57
+   },
+   "sting pick reveal": {
+    "onsets": 31,
+    "flux_ratio_db": -0.46,
+    "flux_ratio_worst_db": -3.7,
+    "pre_echo_db": -0.36,
+    "warble_db": 0.288,
+    "stereo_r_diff": 0.0178,
+    "chroma_r": 0.9774,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.66
+   },
+   "sting room hard": {
+    "onsets": 4,
+    "flux_ratio_db": -0.41,
+    "flux_ratio_worst_db": -2.31,
+    "pre_echo_db": -1.99,
+    "warble_db": 0.528,
+    "stereo_r_diff": 0.0165,
+    "chroma_r": 0.9919,
+    "length_same": true,
+    "contrast_vs_resample_db": 0.49
+   },
+   "very good event": {
+    "onsets": 27,
+    "flux_ratio_db": -0.89,
+    "flux_ratio_worst_db": -4.78,
+    "pre_echo_db": -0.94,
+    "warble_db": -0.371,
+    "stereo_r_diff": 0.0139,
+    "chroma_r": 0.9614,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.23
+   },
+   "cursed or bad": {
+    "onsets": 7,
+    "flux_ratio_db": 0.77,
+    "flux_ratio_worst_db": -1.64,
+    "pre_echo_db": -1.17,
+    "warble_db": 0.507,
+    "stereo_r_diff": 0.0171,
+    "chroma_r": 0.9981,
+    "length_same": true,
+    "contrast_vs_resample_db": -0.13
+   },
+   "shop purchase": {
+    "onsets": 4,
+    "flux_ratio_db": -1.13,
+    "flux_ratio_worst_db": -1.51,
+    "pre_echo_db": -0.91,
+    "warble_db": 0.194,
+    "stereo_r_diff": 0.0092,
+    "chroma_r": 0.9998,
+    "length_same": true,
+    "contrast_vs_resample_db": 1.05
+   }
+  }
+ },
+ "keys": {
+  "sting level up": {
+   "before": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "E",
+     "F"
+    ],
+    "key": "C major",
+    "key_r": 0.913,
+    "next": [
+     "C minor (0.66)",
+     "A minor (0.49)"
+    ],
+    "in_A_major_pct": 22.4,
+    "in_C_major_pct": 96.9,
+    "chroma": [
+     0.4749,
+     0.0042,
+     0.0057,
+     0.0059,
+     0.1573,
+     0.0749,
+     0.0098,
+     0.2157,
+     0.0057,
+     0.0216,
+     0.0049,
+     0.0193
+    ]
+   },
+   "after": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "D"
+    ],
+    "key": "A major",
+    "key_r": 0.909,
+    "next": [
+     "A minor (0.69)",
+     "D major (0.48)"
+    ],
+    "in_A_major_pct": 93.9,
+    "in_C_major_pct": 79.5,
+    "chroma": [
+     0.0188,
+     0.1169,
+     0.0962,
+     0.0158,
+     0.2083,
+     0.0062,
+     0.0241,
+     0.0084,
+     0.0365,
+     0.4468,
+     0.012,
+     0.0099
+    ]
+   }
+  },
+  "sting pick reveal": {
+   "before": {
+    "centre": "B",
+    "top_pcs": [
+     "B",
+     "G",
+     "E",
+     "A"
+    ],
+    "key": "E minor",
+    "key_r": 0.859,
+    "next": [
+     "G major (0.84)",
+     "C major (0.59)"
+    ],
+    "in_A_major_pct": 66.2,
+    "in_C_major_pct": 89.5,
+    "chroma": [
+     0.1137,
+     0.0063,
+     0.1168,
+     0.009,
+     0.1607,
+     0.0278,
+     0.0697,
+     0.1744,
+     0.0071,
+     0.125,
+     0.0133,
+     0.1763
+    ]
+   },
+   "after": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "G#",
+     "C#",
+     "A"
+    ],
+    "key": "E major",
+    "key_r": 0.847,
+    "next": [
+     "C# minor (0.84)",
+     "A major (0.67)"
+    ],
+    "in_A_major_pct": 83.1,
+    "in_C_major_pct": 51.9,
+    "chroma": [
+     0.0328,
+     0.1302,
+     0.0463,
+     0.0714,
+     0.1726,
+     0.0143,
+     0.1122,
+     0.037,
+     0.1543,
+     0.1242,
+     0.0134,
+     0.0913
+    ]
+   }
+  },
+  "sting room hard": {
+   "before": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "E",
+     "G",
+     "D#"
+    ],
+    "key": "C major",
+    "key_r": 0.88,
+    "next": [
+     "E minor (0.63)",
+     "C minor (0.62)"
+    ],
+    "in_A_major_pct": 31.4,
+    "in_C_major_pct": 87.8,
+    "chroma": [
+     0.3195,
+     0.0038,
+     0.0091,
+     0.0838,
+     0.2226,
+     0.0559,
+     0.0074,
+     0.2223,
+     0.0218,
+     0.0333,
+     0.005,
+     0.0155
+    ]
+   },
+   "after": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "C"
+    ],
+    "key": "A major",
+    "key_r": 0.883,
+    "next": [
+     "A minor (0.70)",
+     "C# minor (0.56)"
+    ],
+    "in_A_major_pct": 84.0,
+    "in_C_major_pct": 73.2,
+    "chroma": [
+     0.1001,
+     0.1772,
+     0.0662,
+     0.0203,
+     0.211,
+     0.0227,
+     0.0387,
+     0.006,
+     0.0208,
+     0.3139,
+     0.0108,
+     0.0123
+    ]
+   }
+  },
+  "very good event": {
+   "before": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "G",
+     "D",
+     "C"
+    ],
+    "key": "C major",
+    "key_r": 0.802,
+    "next": [
+     "E minor (0.74)",
+     "G major (0.73)"
+    ],
+    "in_A_major_pct": 53.7,
+    "in_C_major_pct": 93.7,
+    "chroma": [
+     0.1355,
+     0.0059,
+     0.1415,
+     0.0127,
+     0.1846,
+     0.1198,
+     0.0099,
+     0.1664,
+     0.0068,
+     0.0815,
+     0.0282,
+     0.1072
+    ]
+   },
+   "after": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "D",
+     "C#",
+     "A"
+    ],
+    "key": "A major",
+    "key_r": 0.815,
+    "next": [
+     "E major (0.69)",
+     "C# minor (0.62)"
+    ],
+    "in_A_major_pct": 86.4,
+    "in_C_major_pct": 64.5,
+    "chroma": [
+     0.0429,
+     0.1331,
+     0.1423,
+     0.0212,
+     0.154,
+     0.012,
+     0.071,
+     0.0381,
+     0.1078,
+     0.1321,
+     0.0216,
+     0.124
+    ]
+   }
+  },
+  "cursed or bad": {
+   "before": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "E",
+     "D#"
+    ],
+    "key": "C major",
+    "key_r": 0.823,
+    "next": [
+     "C minor (0.66)",
+     "E minor (0.63)"
+    ],
+    "in_A_major_pct": 31.0,
+    "in_C_major_pct": 82.8,
+    "chroma": [
+     0.2926,
+     0.0041,
+     0.0132,
+     0.1266,
+     0.2187,
+     0.0468,
+     0.009,
+     0.2214,
+     0.0292,
+     0.0235,
+     0.003,
+     0.0118
+    ]
+   },
+   "after": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "C"
+    ],
+    "key": "A major",
+    "key_r": 0.826,
+    "next": [
+     "A minor (0.69)",
+     "C# minor (0.61)"
+    ],
+    "in_A_major_pct": 80.4,
+    "in_C_major_pct": 73.3,
+    "chroma": [
+     0.1299,
+     0.1936,
+     0.0569,
+     0.0189,
+     0.2118,
+     0.0318,
+     0.0239,
+     0.0037,
+     0.0187,
+     0.2755,
+     0.0114,
+     0.0239
+    ]
+   }
+  },
+  "shop purchase": {
+   "before": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "E",
+     "G",
+     "F"
+    ],
+    "key": "C major",
+    "key_r": 0.875,
+    "next": [
+     "C minor (0.61)",
+     "A minor (0.53)"
+    ],
+    "in_A_major_pct": 26.8,
+    "in_C_major_pct": 97.7,
+    "chroma": [
+     0.5144,
+     0.0029,
+     0.0044,
+     0.0047,
+     0.2088,
+     0.0615,
+     0.0074,
+     0.1472,
+     0.0038,
+     0.022,
+     0.0039,
+     0.0191
+    ]
+   },
+   "after": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "C#",
+     "E",
+     "D"
+    ],
+    "key": "A major",
+    "key_r": 0.871,
+    "next": [
+     "A minor (0.60)",
+     "F# minor (0.53)"
+    ],
+    "in_A_major_pct": 95.2,
+    "in_C_major_pct": 72.3,
+    "chroma": [
+     0.0115,
+     0.2069,
+     0.0562,
+     0.0161,
+     0.145,
+     0.005,
+     0.0249,
+     0.0069,
+     0.0202,
+     0.4926,
+     0.0086,
+     0.0061
+    ]
+   }
+  }
+ },
+ "picked": "pv_transient",
+ "plucks": {
+  "pv_basic": {
+   "onset_err_ms": [
+    3.9,
+    9.5,
+    8.3
+   ],
+   "rise_ms": [
+    2.6,
+    20.1,
+    44.4
+   ]
+  },
+  "pv_locked": {
+   "onset_err_ms": [
+    -0.2,
+    5.0,
+    5.0
+   ],
+   "rise_ms": [
+    13.8,
+    15.0,
+    15.3
+   ]
+  },
+  "wsola": {
+   "onset_err_ms": [
+    7.7,
+    -2.9,
+    -2.6
+   ],
+   "rise_ms": [
+    0.6,
+    0.5,
+    0.4
+   ]
+  },
+  "pv_transient": {
+   "onset_err_ms": [
+    1.5,
+    1.3,
+    1.1
+   ],
+   "rise_ms": [
+    0.4,
+    0.4,
+    0.5
+   ]
+  }
+ },
+ "summary": {
+  "pv_basic": {
+   "flux_ratio_db": -8.222,
+   "flux_ratio_worst_db": -11.468,
+   "pre_echo_db": 5.097,
+   "warble_db": 0.065,
+   "stereo_r_diff": 0.551,
+   "chroma_r": 0.814,
+   "contrast_vs_resample_db": -2.212,
+   "onset_err_ms": [
+    3.9,
+    9.5,
+    8.3
+   ],
+   "rise_ms": [
+    2.6,
+    20.1,
+    44.4
+   ]
+  },
+  "pv_locked": {
+   "flux_ratio_db": -2.765,
+   "flux_ratio_worst_db": -10.163,
+   "pre_echo_db": -0.898,
+   "warble_db": 0.349,
+   "stereo_r_diff": 0.015,
+   "chroma_r": 0.992,
+   "contrast_vs_resample_db": 1.015,
+   "onset_err_ms": [
+    -0.2,
+    5.0,
+    5.0
+   ],
+   "rise_ms": [
+    13.8,
+    15.0,
+    15.3
+   ]
+  },
+  "wsola": {
+   "flux_ratio_db": -0.548,
+   "flux_ratio_worst_db": -2.525,
+   "pre_echo_db": 0.267,
+   "warble_db": 0.373,
+   "stereo_r_diff": 0.018,
+   "chroma_r": 0.988,
+   "contrast_vs_resample_db": -2.053,
+   "onset_err_ms": [
+    7.7,
+    -2.9,
+    -2.6
+   ],
+   "rise_ms": [
+    0.6,
+    0.5,
+    0.4
+   ]
+  },
+  "pv_transient": {
+   "flux_ratio_db": -0.507,
+   "flux_ratio_worst_db": -2.577,
+   "pre_echo_db": -1.075,
+   "warble_db": 0.319,
+   "stereo_r_diff": 0.014,
+   "chroma_r": 0.987,
+   "contrast_vs_resample_db": 0.182,
+   "onset_err_ms": [
+    1.5,
+    1.3,
+    1.1
+   ],
+   "rise_ms": [
+    0.4,
+    0.4,
+    0.5
+   ]
+  }
+ },
+ "game_files": {
+  "sting_level_up": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "E",
+     "F"
+    ],
+    "key": "C major",
+    "key_r": 0.913,
+    "in_A_major_pct": 22.4,
+    "in_C_major_pct": 97.0
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "D"
+    ],
+    "key": "A major",
+    "key_r": 0.909,
+    "in_A_major_pct": 93.9,
+    "in_C_major_pct": 79.5
+   }
+  },
+  "sting_pick_reveal": {
+   "C": {
+    "centre": "B",
+    "top_pcs": [
+     "B",
+     "G",
+     "E",
+     "A"
+    ],
+    "key": "E minor",
+    "key_r": 0.863,
+    "in_A_major_pct": 66.1,
+    "in_C_major_pct": 89.5
+   },
+   "A": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "G#",
+     "C#",
+     "A"
+    ],
+    "key": "C# minor",
+    "key_r": 0.846,
+    "in_A_major_pct": 83.3,
+    "in_C_major_pct": 51.8
+   }
+  },
+  "sting_room_hard": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "E",
+     "D#"
+    ],
+    "key": "C major",
+    "key_r": 0.877,
+    "in_A_major_pct": 31.1,
+    "in_C_major_pct": 87.8
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "C"
+    ],
+    "key": "A major",
+    "key_r": 0.88,
+    "in_A_major_pct": 84.2,
+    "in_C_major_pct": 73.3
+   }
+  },
+  "sting_good": {
+   "C": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "G",
+     "D",
+     "C"
+    ],
+    "key": "C major",
+    "key_r": 0.802,
+    "in_A_major_pct": 53.7,
+    "in_C_major_pct": 93.7
+   },
+   "A": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "D",
+     "C#",
+     "A"
+    ],
+    "key": "A major",
+    "key_r": 0.815,
+    "in_A_major_pct": 86.4,
+    "in_C_major_pct": 64.5
+   }
+  },
+  "sting_bad": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "E",
+     "D#"
+    ],
+    "key": "C major",
+    "key_r": 0.82,
+    "in_A_major_pct": 30.9,
+    "in_C_major_pct": 82.6
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "C#",
+     "C"
+    ],
+    "key": "A major",
+    "key_r": 0.822,
+    "in_A_major_pct": 80.2,
+    "in_C_major_pct": 73.5
+   }
+  },
+  "shop_purchase": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "E",
+     "G",
+     "F"
+    ],
+    "key": "C major",
+    "key_r": 0.875,
+    "in_A_major_pct": 26.8,
+    "in_C_major_pct": 97.8
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "C#",
+     "E",
+     "D"
+    ],
+    "key": "A major",
+    "key_r": 0.871,
+    "in_A_major_pct": 95.2,
+    "in_C_major_pct": 72.3
+   }
+  },
+  "ph_proc_onkill": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "F#",
+     "G",
+     "E"
+    ],
+    "key": "C major",
+    "key_r": 0.72,
+    "in_A_major_pct": 38.2,
+    "in_C_major_pct": 72.3
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "F#",
+     "G",
+     "C#"
+    ],
+    "key": "F# minor",
+    "key_r": 0.729,
+    "in_A_major_pct": 79.6,
+    "in_C_major_pct": 66.6
+   }
+  },
+  "ph_proc_heal": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "F",
+     "B",
+     "G"
+    ],
+    "key": "C major",
+    "key_r": 0.726,
+    "in_A_major_pct": 9.7,
+    "in_C_major_pct": 96.5
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "D",
+     "G#",
+     "G"
+    ],
+    "key": "A major",
+    "key_r": 0.714,
+    "in_A_major_pct": 91.7,
+    "in_C_major_pct": 86.1
+   }
+  },
+  "ph_proc_pity": {
+   "C": {
+    "centre": "C",
+    "top_pcs": [
+     "C",
+     "G",
+     "F",
+     "B"
+    ],
+    "key": "C major",
+    "key_r": 0.86,
+    "in_A_major_pct": 9.1,
+    "in_C_major_pct": 95.5
+   },
+   "A": {
+    "centre": "A",
+    "top_pcs": [
+     "A",
+     "E",
+     "D",
+     "G#"
+    ],
+    "key": "A major",
+    "key_r": 0.854,
+    "in_A_major_pct": 92.5,
+    "in_C_major_pct": 90.1
+   }
+  },
+  "sting_pick_short": {
+   "C": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "G",
+     "C",
+     "B"
+    ],
+    "key": "E minor",
+    "key_r": 0.915,
+    "in_A_major_pct": 52.0,
+    "in_C_major_pct": 94.6
+   },
+   "A": {
+    "centre": "E",
+    "top_pcs": [
+     "E",
+     "C#",
+     "G#",
+     "A"
+    ],
+    "key": "C# minor",
+    "key_r": 0.884,
+    "in_A_major_pct": 89.8,
+    "in_C_major_pct": 52.7
+   }
+  }
+ }
+}

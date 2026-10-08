@@ -77,7 +77,7 @@ var turn_hook: Callable          # (u: BWUnit) -> true when it played (passed) t
 var weather_kind := ""           # BWWeather.KINDS, "" = none
 var weather_view: BWWeatherView
 var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate, intro)
-var wind_view: BWWindView       # ---- D269-D276: fields, walls, gravity, Rot marks
+var wind_view: BWWindView       # ---- D269-D276: walls, gravity, Rot marks (D406: no fields)
 var wind_shape: BWWindShapeView # ---- D365-D370: the wind shaping step on a wind skill's confirm
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
@@ -169,7 +169,7 @@ func _ready() -> void:
 	name_labels = BWNameLabels.new()      # ---- D344: names only where they fit (focus full size)
 	add_child(name_labels)
 	name_labels.setup(self)
-	ui.wind_changed = _wind_mode_changed  # the forecast's mode toggle re-opens the forecast
+	ui.wind_changed = _wind_mode_changed  # a shaping change re-opens the confirm
 	ui.wind_strip = wind_shape.strip      # ---- D365: a wind skill's confirm shows WIND SHAPING instead
 	BWPortraits.prewarm(battle.units)     # D156: hits the pre-battle's renders; the stones, direct runs
 	for u in battle.units:
@@ -334,6 +334,8 @@ func _on_hover(h: Vector2i) -> void:
 				# splash: "this will be hit", in the skill's element (V8's amber)
 				_show_options([], pv.hexes + pv.get("ring", []), _skill.element)
 				board_view.highlight([h], "target")
+				if not (pv.get("shove", {}) as Dictionary).is_empty():   # ---- D414: where the pushed foe ends
+					board_view.highlight([pv.shove.to], "attack")
 				if not (pv.get("notes", []) as Array).is_empty():     # D87: the skill's rider in words
 					ui.hint("%s — %s" % [_skill.row.get("name", _skill.key), "  ·  ".join(pv.notes)])
 				return
@@ -367,7 +369,6 @@ func _on_click(h: Vector2i) -> void:
 		return
 	if target and target.team != u.team and (not u.acted or "basic" in u.follow_up) and battle.in_range(u, target):
 		_pending_target = target
-		ui.wind_action = battle.basic_element(u) == "wind"   # ---- D269: the mode toggle
 		ui.show_forecast(u, target, battle.forecast_basic(u, target))
 		board_view.clear_highlights()
 		board_view.highlight([target.pos], "target")
@@ -481,7 +482,7 @@ func _aim_skill(u: BWUnit, h: Vector2i) -> void:
 		_skill.erase("first")                    # nothing to choose (a braced foe): straight to the forecast
 		_open_confirm(u, pv, h)
 		return
-	# D269: wind on empty ground still confirms, so its mode (the field's) can be picked
+	# D365: a wind skill still confirms with no forecast, so its shaping can be picked
 	if pv.forecasts.is_empty() and (pv.get("strike", {}) as Dictionary).is_empty() and str(_skill.element) != "wind":
 		var k: String = _skill.key
 		var el: String = _skill.element
@@ -492,8 +493,8 @@ func _aim_skill(u: BWUnit, h: Vector2i) -> void:
 	_open_confirm(u, pv, h)
 
 
-## D269: the forecast's wind mode toggle was flipped: show the forecast (and,
-## through BWReadability, the blast preview) again with the new mode.
+## D365: the wind shaping changed: show the confirm (and, through
+## BWReadability, the blast preview) again with it.
 func _wind_mode_changed() -> void:
 	var u := battle.current()
 	if u == null or not ui.forecast_open():
@@ -519,7 +520,7 @@ func _seconds(u: BWUnit) -> Array[Vector2i]:
 func _open_confirm(u: BWUnit, pv: Dictionary, h: Vector2i, choice: Vector2i = BWBattle.NOWHERE) -> void:
 	var nm := str(_skill.row.get("name", _skill.key))
 	wind_shape.begin(u, _skill, h, pv)                  # ---- D365: wind shaping (before the box is built)
-	ui.wind_action = str(_skill.element) == "wind"      # ---- D269: the mode toggle
+	ui.wind_action = str(_skill.element) == "wind"      # ---- D365: the shaping strip
 	var ids: Array = pv.forecasts.keys()
 	var at: Array = ids.map(func(id): return battle._unit(str(id)).pos)
 	var strike: Dictionary = pv.get("strike", {})
@@ -685,7 +686,8 @@ func _play(e: Dictionary) -> void:
 						await vfx.dive(_views[e.unit], e.path)
 					else:
 						await _animate_leap(_views[e.unit], e.path)
-				"charge", "shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
+				"charge": await _animate_charge(e)          # ---- D414: the long run, the pushed foe ahead of it
+				"shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.12)
 				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
 		"swap":                                             # ---- D181: put away, draw
@@ -863,7 +865,7 @@ func _play(e: Dictionary) -> void:
 				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze":   # ---- D285-D292
 			if elements_view:
 				await elements_view.on_event(e)
-		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "eye_pull", "riptide", "event_horizon":   # ---- D293-D299
+		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "riptide", "event_horizon":   # ---- D293-D299
 			if ks_view:
 				await ks_view.on_event(e)
 		"wave_incoming", "spawn", "wave", "escape", "divider_break", "divider_open", "divider_breach", "divider_gust":   # ---- D327-D333
@@ -1129,6 +1131,42 @@ func _animate_leap(v: BWUnitView, path: Array) -> void:
 	v.pose_named("kneel")
 	await get_tree().create_timer(0.12).timeout
 	v.idle()
+
+
+## D414: Charge runs up to 7 hexes, so the step shrinks with the run (about
+## 0.3 s whatever its length, never slower than the old 0.07 s a hex), and a
+## foe pushed along (the "shove" move queued right behind it) slides ahead of
+## the runner in step: it starts when the runner reaches it and ends one hex
+## ahead of where the run stops.
+static func charge_step(hexes: int) -> float:
+	return clampf(0.3 / maxf(hexes, 1.0), 0.045, 0.07)
+
+
+func _animate_charge(e: Dictionary) -> void:
+	var path: Array = e.path
+	var step := charge_step(path.size() - 1)
+	var sh: Dictionary = {}
+	if not _queue.is_empty() and str(_queue[0].get("type", "")) == "move" and str(_queue[0].get("kind", "")) == "shove" \
+			and _views.has(_queue[0].unit):
+		sh = _queue.pop_front()
+		if readability:
+			readability.played(sh)
+	var extra := 0.0
+	if not sh.is_empty():
+		var spath: Array = sh.path
+		var at := path.find(spath[0])
+		var delay := maxf(at - 1, 0) * step
+		var sv: BWUnitView = _views[sh.unit]
+		var tw := create_tween()
+		tw.tween_interval(delay)
+		tw.tween_callback(func(): sv.pose_named("hit"))
+		for i in range(1, spath.size()):
+			tw.tween_property(sv, "position", _unit_pos(spath[i]), step)
+		tw.tween_callback(sv.idle)
+		extra = maxf(delay + (spath.size() - 1) * step - (path.size() - 1) * step, 0.0)
+	await _animate_slide(_views[e.unit], path, step)
+	if extra > 0.0:
+		await get_tree().create_timer(extra + 0.02).timeout
 
 
 ## Charge (fast) and shove (pushed): a straight slide hex to hex, no hop.

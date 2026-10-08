@@ -1,8 +1,8 @@
 extends SceneTree
 ## D293-D299 review renders of the wind, ice, water and dark keystones on the
 ## real combat screen (needs a window):
-##   [SHOTS=<dir>] [ONLY=eye,freeze,glacier,tidal,doom,rot,twins] godot --path . --resolution 1920x1080 --script res://tools/keystones_c3_shots.gd
-## → design/art/v3_c3_eye_1|2.png (Eye of the Vortex: the field, the pull),
+##   [SHOTS=<dir>] [ONLY=freeze,glacier,tidal,doom,rot,twins] godot --path . --resolution 1920x1080 --script res://tools/keystones_c3_shots.gd
+## (D408: the v3_c3_eye_* frames are retired)
 ##   v3_c3_freeze.png (Flash Freeze: the ice shell, FROZEN x2), v3_c3_glacier_1|2.png
 ##   (a Glacier pillar ∞, its shatter), v3_c3_tidal_1|2.png (the wave mid-run, after),
 ##   v3_c3_doom_1|2.png (the DOOM mark, the burst), v3_c3_rot.png (ROT / marks on the
@@ -85,31 +85,8 @@ func _go() -> void:
 	var spots := _open(b, f, 30)
 	s.rig.pitch = deg_to_rad(50.0)
 
-	if _want("eye"):
-		BWKeystones.grant(wnd, "eye_of_vortex")
-		var c: Vector2i = spots[0]
-		_park(players + enemies, c, 4)
-		_place(wnd, _at(b, c, 3))
-		var ring2 := BWHex.ring(c, 2)
-		var k := 0
-		for h in ring2:
-			if k < 3 and b.board.is_passable(h) and b.unit_at(h) == null:
-				_place(enemies[k], h)
-				k += 1
-		var e := b.tiles._entry(0, 0, "gale", wnd.id, "cast")
-		e["mode"] = "vortex"
-		e["born"] = 1
-		b.tiles.entries[c] = e
-		await _settle()
-		_look(BWLook.world(c, b.board.elevation(c)), 17.0, 62.0)
-		await _wait(2.5)
-		await _shot("v3_c3_eye_1")
-		b.cycle += 1
-		BWWind.tick(b)
-		s._after_events()
-		await _wait(0.9)
-		await _shot("v3_c3_eye_2")
-		await _idle()
+	# D408: Eye of the Vortex is a Draw in rider now (no Vortex field to frame);
+	# its old "eye" frames are retired. A Draw in preview: tools/wind_shape_shots.gd ONLY=rain.
 
 	if _want("freeze"):
 		BWKeystones.grant(ice, "flash_freeze")

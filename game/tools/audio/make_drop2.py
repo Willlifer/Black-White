@@ -3,6 +3,7 @@ trimmed and levelled into game copies. Deterministic. The originals in
 design/audio/ are only read, never written.
 
     python game/tools/audio/make_drop2.py          # music + stings, then --import
+    python game/tools/audio/make_drop2.py --stings # the stings and placeholders only
 
 make_music.py and make_sfx.py call music() / sfx() at their end, so a rebuild
 of either keeps these in the manifests.
@@ -28,6 +29,12 @@ the procedural SFX: -16 LUFS-ish momentary, peaks <= -1 dBFS):
   event), sting_bad (cursed or bad), shop_purchase. Leading silence trimmed
   to 5 ms before the first onset, the reverb tail cut where it falls 48 dB
   under the loudest 10 ms, then faded.
+
+D412 (the author, 2026-10-08: "some clashes between A and C"): every sting
+is retuned -3 semitones into A (retune.py: phase vocoder with transient
+handling, length kept) before that same trim and level. The author's C
+originals go through the same pipeline as <name>_c (manifest "alt_of";
+BWSfx.STING_KEY = "C" plays them).
 """
 from __future__ import annotations
 
@@ -39,6 +46,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bwdsp as d  # noqa: E402
+import retune  # noqa: E402
 
 SR = d.SR
 GAME = Path(__file__).resolve().parents[2]
@@ -67,6 +75,14 @@ def load(name):
     sr, x = d.load(SRC / f"{name}.wav")
     assert sr == SR, (name, sr)
     return x if x.shape[1] == 2 else np.repeat(x, 2, axis=1)
+
+
+def load_keyed(name, key="A"):
+    """D412: the author's file in the game's key. "A": retuned -3 st
+    (retune.shifted, cached); "C": the original as he made it."""
+    if key == "A" and name in retune.SOURCES:
+        return retune.shifted(name)
+    return load(name)
 
 
 def frames(x, win=0.01):
@@ -235,30 +251,45 @@ def music() -> dict:
 
 # ------------------------------------------------------------------ stings
 
+def tail_s(f, n, below=30.0):
+    """End of the last 10 ms frame within `below` dB of the loudest (s):
+    where the reverb tail has mostly gone, so BWMusic can bring the music
+    back in over what is left (D411)."""
+    return round((int(np.where(f > f.max() - below)[0][-1]) + 1) * n / SR, 3)
+
+
 def sfx() -> dict:
     path = SFX / "sfx.json"
     manifest = json.loads(path.read_text())
     out = {}
-    for name, (src, what) in STINGS.items():
-        x = load(src)
-        on = first_onset(x)
-        end = min(len(x) / SR, ring_end(x) + 0.05)
-        truncated = end >= len(x) / SR - 0.01           # still ringing when the file ends
-        y = x[int(max(0.0, on - 0.005) * SR): int(end * SR)]
-        y = fades(y, 0.002, 0.35 if truncated else 0.15)
-        y, gain = d.normalise(y, TARGET_SFX, ceil_db=CEIL)
-        d.save(SFX / f"{name}_1.wav", y)
-        f, n = frames(y)
-        lv = {"peak_db": round(d.peak_db(y), 2), "loudness": round(d.loudness(y), 2), "rms_db": round(d.rms_db(y), 2),
-              "seconds": round(len(y) / SR, 3), "peak_s": round(int(np.argmax(f)) * n / SR, 3),
-              "body_s": round((int(np.where(f > f.max() - 20)[0][-1]) + 1) * n / SR, 3)}   # BWMusic ducks for this long
-        manifest["sounds"][name] = {"variants": 1, "bus": "UI", "loop": False, "levels": [lv], "drop": 2,
-                                    "source": f"design/audio/{src}.wav", "for": what,
-                                    "trim": {"lead_cut_s": round(max(0.0, on - 0.005), 3), "end_s": round(end, 3),
-                                             "fade_out_s": 0.35 if truncated else 0.15, "gain_db": round(gain, 2)}}
-        out[name] = manifest["sounds"][name]
-        print(f"  {name:18s} {lv['seconds']:5.2f}s  loud {lv['loudness']:6.2f}  peak {lv['peak_db']:6.2f}  "
-              f"(cut {on - 0.005:.3f}s lead, end {end:.2f}s{' truncated' if truncated else ''}, gain {gain:+.1f} dB)")
+    for base, (src, what) in STINGS.items():
+        for key in ("A", "C"):                          # D412: A plays; the C originals stay as <name>_c
+            name = base if key == "A" else base + "_c"
+            x = load_keyed(src, key)
+            on = first_onset(x)
+            end = min(len(x) / SR, ring_end(x) + 0.05)
+            truncated = end >= len(x) / SR - 0.01           # still ringing when the file ends
+            y = x[int(max(0.0, on - 0.005) * SR): int(end * SR)]
+            y = fades(y, 0.002, 0.35 if truncated else 0.15)
+            y, gain = d.normalise(y, TARGET_SFX, ceil_db=CEIL)
+            d.save(SFX / f"{name}_1.wav", y)
+            f, n = frames(y)
+            lv = {"peak_db": round(d.peak_db(y), 2), "loudness": round(d.loudness(y), 2), "rms_db": round(d.rms_db(y), 2),
+                  "seconds": round(len(y) / SR, 3), "peak_s": round(int(np.argmax(f)) * n / SR, 3),
+                  "body_s": round((int(np.where(f > f.max() - 20)[0][-1]) + 1) * n / SR, 3),   # 20 dB under the peak
+                  "tail_s": tail_s(f, n)}                                                      # D411: the duck holds until here
+            row = {"variants": 1, "bus": "UI", "loop": False, "levels": [lv], "drop": 2,
+                   "source": f"design/audio/{src}.wav", "for": what, "key": key,
+                   "trim": {"lead_cut_s": round(max(0.0, on - 0.005), 3), "end_s": round(end, 3),
+                            "fade_out_s": 0.35 if truncated else 0.15, "gain_db": round(gain, 2)}}
+            if key == "A":
+                row["retune"] = {"semitones": retune.SEMITONES, "method": retune.METHOD}
+            else:
+                row["alt_of"] = base
+            manifest["sounds"][name] = row
+            out[name] = row
+            print(f"  {name:20s} {lv['seconds']:5.2f}s  loud {lv['loudness']:6.2f}  peak {lv['peak_db']:6.2f}  body {lv['body_s']:.2f} tail {lv['tail_s']:.2f}  "
+                  f"(cut {on - 0.005:.3f}s lead, end {end:.2f}s{' truncated' if truncated else ''}, gain {gain:+.1f} dB)")
     path.write_text(json.dumps(manifest, indent=1))
     return out
 
@@ -268,7 +299,8 @@ def main() -> int:
     sfx()
     import make_placeholders              # D393: keeps sting_pick_short + ph_* in sfx.json
     make_placeholders.build()
-    music()
+    if "--stings" not in sys.argv:        # D412: `--stings` rebuilds the stings + placeholders only
+        music()
     return 0
 
 

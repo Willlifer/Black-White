@@ -3,8 +3,8 @@ extends RefCounted
 ## BWWindOrder.hoist on the combat screen's queue). Draw in: the motion,
 ## then the hit. Push out: the hit, then the motion. Checked on real event
 ## streams from BWBattle for every shape the rules have (skill Draw in /
-## Burst out / Blast out / Part / single push, Vortex and Gust basics, a
-## Vortex field fired by a paint) and on a synthetic list.
+## Burst out / Blast out / Part / single push, a wind basic's push; D406
+## removed the Vortex basics and fields) and on a synthetic list.
 
 const C := Vector2i(4, 4)
 
@@ -110,44 +110,14 @@ func test_skill_shapes(t) -> void:
 	_hit_first(t, b4, k.id, "Bolt, push")
 
 
-func test_basic_modes(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var f := _u("f", "axe", "fire", { "def": 0 })
-	var b := _duel(me, [f], [_nb(_nb(C, 0), 0)])
-	me.attuned = "wind"
-	me.wind_mode = "vortex"
-	b.attack(me, f)
-	_motion_first(t, b, f.id, "a Vortex basic (pull)")
-	var raw := b.history.map(func(e): return str(e.type))
-	t.ok(raw.find("attack") < raw.rfind("move"), "the rules still resolve the pull after the blow (presentation only)")
+## D407: a wind basic only pushes, so the hit plays first.
+func test_basic_push(t) -> void:
 	var me2 := _u("st", "staff", "wind")
 	var g := _u("g", "axe", "fire", { "def": 0 })
 	var b2 := _duel(me2, [g], [_nb(_nb(C, 0), 0)])
 	me2.attuned = "wind"
-	me2.wind_mode = "gust"
 	b2.attack(me2, g)
-	_hit_first(t, b2, g.id, "a Gust basic (push)")
-
-
-func test_vortex_field_fired_by_a_paint(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var f := _u("f", "axe", "fire")
-	var g := _u("g", "axe", "fire")
-	var h := Vector2i(6, 4)
-	var b := _duel(me, [f, g], [h, Vector2i(8, 8)])
-	me.wind_mode = "vortex"
-	b.paint([h], "wind", me)
-	g.pos = _nb(h, 3)
-	b._turn_serial += 1
-	b.history.clear()
-	b.use_skill(me, "bolt", "fire", h)        # the blow's paint lands on the vortex field and fires it
-	var raw := b.history.map(func(e): return str(e.type))
-	if raw.has("field_fire"):
-		_motion_first(t, b, g.id, "a Vortex field fired by the blow")
-		var played := BWWindOrder.hoist(b.history).map(func(e): return str(e.type))
-		t.ok(played.find("field_fire") < played.find("skill"), "the field's fire comes with its pull")
-	else:
-		t.ok(true, "no field fired on this board (bolt paint rules); the synthetic case covers it")
+	_hit_first(t, b2, g.id, "a wind basic (push)")
 
 
 func test_synthetic(t) -> void:
@@ -156,7 +126,6 @@ func test_synthetic(t) -> void:
 		{ "type": "skill", "unit": "a", "results": [] },
 		{ "type": "attack", "unit": "a", "strike": 1 },
 		{ "type": "tile", "hex": Vector2i.ZERO },
-		{ "type": "field_fire", "mode": "vortex" },
 		{ "type": "move", "unit": "f", "kind": "pull", "wind": true },
 		{ "type": "slam", "unit": "f" },
 		{ "type": "move", "unit": "g", "kind": "push", "wind": true },
@@ -165,7 +134,7 @@ func test_synthetic(t) -> void:
 		{ "type": "move", "unit": "x", "kind": "pull", "wind": true },   # outside any blow's tail
 	]
 	var got := BWWindOrder.hoist(evs).map(func(e): return "%s:%s:%s" % [e.type, e.get("unit", ""), e.get("kind", e.get("mode", ""))])
-	t.eq(got, ["turn:a:", "field_fire::vortex", "move:f:pull", "slam:f:", "skill:a:", "attack:a:", "tile::",
+	t.eq(got, ["turn:a:", "move:f:pull", "slam:f:", "skill:a:", "attack:a:", "tile::",
 		"move:g:push", "move:h:pull", "turn:b:", "move:x:pull"], "pulls (with their slam) go before the blow; pushes stay after")
-	t.eq(evs.size(), 11, "the input is untouched")
+	t.eq(evs.size(), 10, "the input is untouched")
 	t.eq(BWWindOrder.hoist([]), [], "empty in, empty out")

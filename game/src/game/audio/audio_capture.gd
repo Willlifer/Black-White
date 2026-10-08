@@ -22,6 +22,10 @@ const SECTIONS_DROP2 := [["sync", 0.0], ["title", 1.5], ["rest", 10.0], ["rooms"
 
 var drop2 := false
 var placeholders := false            # D394: `--placeholders`: the ph_* sounds and the short pick reveal
+var duck := false                    # D411: `--duck`: the sting duck (music out, sting, back in)
+var _rec_pre: AudioEffectRecord      # D411: the Music bus before its duck (first effect) ...
+var _rec_post: AudioEffectRecord     # ... and after everything on it: post / pre = the gain applied
+var _duck_log: Array = []            # [usec, BWMusic.duck_db()] per frame
 var out_dir := ""
 var _rec: AudioEffectRecord
 var _rec_sfx: AudioEffectRecord      # the SFX bus alone: a clean signal for the marker-sync check
@@ -57,6 +61,9 @@ func _swap(next: Node) -> void:
 
 
 func _run() -> void:
+	if duck:
+		await _run_duck()
+		return
 	if placeholders:
 		await _run_placeholders()
 		return
@@ -168,6 +175,9 @@ func _begin() -> void:
 		await get_tree().process_frame
 	_rec.set_recording_active(true)
 	_rec_sfx.set_recording_active(true)
+	if _rec_pre:                                     # D411: the music stems, in the same mix blocks
+		_rec_pre.set_recording_active(true)
+		_rec_post.set_recording_active(true)
 	_t0 = Time.get_ticks_usec()
 	_mark("record_start")
 	await _until(0.5)
@@ -180,6 +190,16 @@ func _finish(stem: String, sections: Array) -> void:
 	_mark("record_stop")
 	_rec.set_recording_active(false)
 	_rec_sfx.set_recording_active(false)
+	if _rec_pre:
+		_rec_pre.set_recording_active(false)
+		_rec_post.set_recording_active(false)
+		var pre := _rec_pre.get_recording()
+		var post := _rec_post.get_recording()
+		DirAccess.make_dir_recursive_absolute(out_dir)
+		if pre:
+			pre.save_to_wav(out_dir.path_join(stem + "_music_pre.wav"))
+		if post:
+			post.save_to_wav(out_dir.path_join(stem + "_music_post.wav"))
 	var wav := _rec.get_recording()
 	var sfx := _rec_sfx.get_recording()
 	DirAccess.make_dir_recursive_absolute(out_dir)
@@ -191,7 +211,8 @@ func _finish(stem: String, sections: Array) -> void:
 		"record_start_usec": _t0, "mix_rate": AudioServer.get_mix_rate(), "output_latency": AudioServer.get_output_latency(),
 		"sections": sections, "marks": _marks, "sfx": BWSfx.events, "markers": BWUnitAudio.events,
 		"music": _music_log(), "voice": BWVoice.events, "fps": Engine.get_frames_per_second(),
-		"wav_seconds": wav.get_length() if wav else 0.0,
+		"wav_seconds": wav.get_length() if wav else 0.0, "duck_log": _duck_log,
+		"duck_out": BWMusic.DUCK_OUT, "duck_in": BWMusic.DUCK_IN, "duck_floor_db": BWMusic.DUCK_FLOOR_DB,
 	}
 	var f := FileAccess.open(out_dir.path_join(stem + ".json"), FileAccess.WRITE)
 	f.store_string(JSON.stringify(log, " "))
@@ -365,3 +386,78 @@ func _music_log() -> Array:
 			c[k] = v if typeof(v) in [TYPE_STRING, TYPE_FLOAT, TYPE_INT, TYPE_BOOL] else str(v)
 		out.append(c)
 	return out
+
+
+## D411: the sting duck run (`-- --duck --audio-capture <dir>`). The Music bus
+## is recorded twice, before its duck and after it, so post / pre is the
+## gain the duck applied, whatever the music is doing. Over the hall's
+## chillin: one level-up sting (out, hold, back in); a Hard room sting then
+## the cursed sting 1 s later (the duck extends); the shop purchase with a
+## screen change 1 s in (the rooms track starts under the duck); a real
+## picker opened and closed 1 s later (released early); then the combat bed
+## and the victory sting over it. tools/audio/analyse_duck.py reads it.
+const SECTIONS_DUCK := [["sync", 0.0], ["rest", 1.5], ["rooms", 23.0], ["combat", 36.0], ["end", 48.0]]
+
+func _process(_delta: float) -> void:
+	if duck and _t0 > 0:
+		_duck_log.append([Time.get_ticks_usec(), BWMusic.duck_db()])
+
+
+func _run_duck() -> void:
+	BWAudio.ensure_buses()
+	var mb := AudioServer.get_bus_index("Music")
+	_rec_pre = AudioEffectRecord.new()
+	_rec_pre.format = AudioStreamWAV.FORMAT_16_BITS
+	AudioServer.add_bus_effect(mb, _rec_pre, 0)                 # before the Amplify duck
+	_rec_post = AudioEffectRecord.new()
+	_rec_post.format = AudioStreamWAV.FORMAT_16_BITS
+	AudioServer.add_bus_effect(mb, _rec_post)                   # after the duck and the compressor
+	await _begin()
+	var ids := BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+	var run := BWRun.start(ids, 99)
+	await _until(1.5)
+	var blank := Control.new()
+	await _swap(blank)
+	BWMusic.play("rest")
+	_mark("rest")
+
+	await _until(7.0)
+	BWMusic.sting("level_up")
+	_mark("sting_level_up")
+
+	await _until(15.0)
+	BWMusic.sting("room_hard")
+	_mark("sting_room_hard")
+	await _until(16.0)
+	BWMusic.sting("cursed")
+	_mark("sting_cursed_overlap")
+
+	await _until(22.0)
+	var shop := BWShopPanel.new(run)
+	blank.add_child(shop)
+	await get_tree().process_frame
+	shop.changed.emit()                                         # a trade: the shop sting, through the director's hook
+	_mark("sting_shop")
+	await _until(23.0)
+	await _swap(Control.new())                                  # the screen changes mid-duck
+	BWMusic.play("rooms")
+	_mark("rooms")
+
+	await _until(30.0)
+	var u: BWUnit = run.squad[0]
+	var picker := BWPicker.new(u, { "kind": "perk", "element": u.element, "rank": 2 }, "capture")
+	_screen.add_child(picker)
+	_mark("picker_open")
+	await _until(31.0)
+	picker.queue_free()
+	_mark("picker_close")
+
+	await _until(36.0)
+	BWMusic.play("combat")
+	_mark("combat")
+	await _until(40.0)
+	BWMusic.sting("victory")
+	_mark("sting_victory")
+
+	await _until(48.0)
+	_finish("capture_duck", SECTIONS_DUCK)

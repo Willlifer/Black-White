@@ -240,10 +240,9 @@ func test_wind_divider(t) -> void:
 	var seg: BWObjective = BWObjectives.objects(b2, "divider")[0]
 	u.element = "wind"
 	u.attuned = "wind"
-	BWWind.set_mode(u, BWWind.GUST)
 	if b2.basic_element(u) == "wind":
 		BWSplitFront.new().after_basic(b2, u, seg, { "hit": true })
-		t.ok(not seg.alive(), "a wind basic in Gust mode blows the segment open")
+		t.ok(not seg.alive(), "a wind basic blows the segment open")
 	else:
 		BWSplitFront.new().after_basic(b2, u, seg, { "hit": true })
 		t.ok(seg.alive(), "a non-wind basic doesn't")

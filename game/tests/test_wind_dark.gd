@@ -1,8 +1,9 @@
 extends RefCounted
 ## D269-D276 Element Overhaul, wind and dark (design/ELEMENTS-v3.md and the
-## author's rulings of 2026-10-07): wind modes, fields, caps, wind on every
-## weapon, Wind Wall, Becalmed / Restless; dark's Rot and gravity; the AI's
-## mode choice; determinism.
+## author's rulings of 2026-10-07): caps, wind on every weapon, Wind Wall,
+## Becalmed / Restless; dark's Rot and gravity; determinism. D406/D407 (the
+## author's 2026-10-08 simplification): one wind tile, the gale, that only
+## spreads; no modes, no fields; a wind basic pushes 1.
 
 const C := Vector2i(4, 4)
 
@@ -50,20 +51,47 @@ func _ev(b: BWBattle, type: String) -> Array:
 	return b.history.filter(func(e): return e.type == type)
 
 
-# ------------------------------------------------------------------ modes
+# ------------------------------------------------------------------ D406: one wind tile
 
-func test_modes_and_memory(t) -> void:
-	var u := _u("w", "staff", "wind")
-	t.eq(BWWind.mode(u), "gust", "the default mode is Gust")
-	BWWind.set_mode(u, "vortex")
-	t.eq(u.wind_mode, "vortex", "a mode is stored on the unit")
-	BWWind.set_mode(u, "nonsense")
-	t.eq(u.wind_mode, "vortex", "an unknown mode is refused")
-	t.eq(BWWind.next_mode("gust"), "vortex", "the toggle cycles Gust → Vortex")
-	t.eq(BWWind.next_mode("becalm"), "gust", "→ Becalm → Gust")
-	var b := _duel(u, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
-	t.eq(u.wind_mode, "vortex", "remembered across a battle start (begin_battle keeps it)")
-	t.ok(b != null, "ok")
+## A gale laid by wind is a plain marker: no mode, no heading. Walking onto it,
+## starting a turn on it and the tick move nobody; it only spreads.
+func test_gale_only_spreads(t) -> void:
+	var me := _u("st", "staff", "wind")
+	var f := _u("f", "axe", "fire")
+	var b := _duel(me, [f], [Vector2i(8, 8)])
+	var h := Vector2i(6, 4)
+	b.paint([h], "wind", me)
+	var e := b.tiles.at(h)
+	t.eq(str(e.get("marker", "")), "gale", "wind on bare ground arms a gale")
+	t.ok(not e.has("mode") and not e.has("heading"), "with no stored mode or heading")
+	t.ok(not ("mode" in BWWind), "BWWind has no unit mode any more")
+	f.pos = _nb(_nb(h, 4), 4)
+	_give_turn(b, f)
+	var r := b.reachable(f)
+	t.ok(r.has(h) and r.has(_nb(h, 1)), "a walk may cross the gale")
+	b.move(f, h)
+	t.eq(f.pos, h, "entering a gale moves nobody")
+	b.end_turn()
+	_give_turn(b, f)
+	t.eq(f.pos, h, "nor does starting a turn on it")
+	var g := _u("g", "axe", "fire")
+	var b2 := _duel(me, [g], [_nb(Vector2i(2, 6), 1)])
+	b2.paint([Vector2i(2, 6)], "wind", me)
+	BWWind.tick(b2)
+	t.eq(g.pos, _nb(Vector2i(2, 6), 1), "the tick pulls nobody onto a gale")
+	# what lands on it spreads to the six around, and nobody moves
+	var at := g.pos
+	b2._turn_serial += 1
+	b2.paint([Vector2i(2, 6)], "fire", me)
+	for d in 6:
+		var n := _nb(Vector2i(2, 6), d)
+		if b2.board.exists(n):
+			t.ok(b2.tiles.intensity(n, "fire") > 0, "the gale copied the fire to its ring (%d)" % d)
+	t.eq(g.pos, at, "the gale firing moves nobody")
+	t.ok(_ev(b2, "field_fire").is_empty(), "no field_fire event")
+	# the tile card: the one base line
+	var lines := BWWind.card_lines(b, h)
+	t.ok(lines.is_empty(), "no field line on the card (a Tailwind holder's Updraft is the only extra)")
 
 
 # ------------------------------------------------------------------ wind on every weapon
@@ -75,8 +103,7 @@ func test_wind_cleave_pulls_then_hits(t) -> void:
 	var e := _nb(C, 0)                         # east of C: the arc's centre
 	var far := _nb(e, 0)                       # two east: beside the arc, not in it
 	var b := _duel(me, [f], [far])
-	me.wind_mode = "vortex"
-	var pv := b.skill_preview(me, "cleave", "wind", e)
+	var pv := b.skill_preview(me, "cleave", "wind", e)            # an area draws in by default (D383)
 	t.ok(not pv.is_empty(), "the cleave aims east")
 	t.ok(f.id in pv.units, "the preview counts the foe it will pull into the arc")
 	t.eq(f.pos, far, "the preview moves nobody")
@@ -107,7 +134,6 @@ func test_wind_surge_gust_slams(t) -> void:
 	var dir := BWBattle.pulse_heading(tgt, near, true)
 	var wall := _nb(near, dir)                 # a unit right behind: the slam
 	var b := _duel(me, [f, g], [near, wall])
-	me.wind_mode = "gust"
 	BWWindShape.set_choice(me, "surge", "burst")   # D383: areas default to Draw in; this checks Burst out's slam
 	var hp_g := g.hp
 	var ev := b.use_skill(me, "surge", "wind", tgt)
@@ -122,7 +148,7 @@ func test_wind_becalm_restless(t) -> void:
 	var me := _u("st", "staff", "wind")
 	var f := _u("f", "axe", "fire")
 	var b := _duel(me, [f], [Vector2i(4, 1)])
-	me.wind_mode = "becalm"
+	BWWindShape.set_choice(me, "surge", "hold")     # D407: Becalm comes from the Hold shaping
 	b.use_skill(me, "surge", "wind", Vector2i(4, 1))
 	t.ok(f.statuses.has("becalmed"), "Becalm lands")
 	_give_turn(b, f)
@@ -146,102 +172,11 @@ func test_wind_basic_direct_hit(t) -> void:
 	var f := _u("f", "axe", "fire", { "def": 0 })
 	var b := _duel(me, [f], [_nb(_nb(C, 0), 0)])
 	me.attuned = "wind"
-	me.wind_mode = "vortex"
 	b.expected_rolls = true                    # a sure, unresisted blow
 	var at := f.pos
 	b.attack(me, f)
-	t.eq(f.pos, _nb(C, 0), "a wind basic pulls its target 1 toward the attacker")
+	t.eq(f.pos, _nb(at, 0), "D407: a wind basic pushes its target 1 away from the attacker")
 	t.ok(at != f.pos, "moved")
-
-
-# ------------------------------------------------------------------ fields
-
-func test_gust_field_entry_and_turn_start(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var f := _u("f", "axe", "fire")
-	var b := _duel(me, [f], [Vector2i(8, 8)])
-	me.wind_mode = "gust"
-	var h := Vector2i(6, 4)
-	b.paint([h], "wind", me)
-	var fe := BWWind.field_at(b, h)
-	t.eq(str(fe.get("mode", "")), "gust", "a gale laid by wind stores the caster's mode")
-	t.eq(int(fe.heading), BWBattle.pulse_heading(C, h, true), "a gust field heads away from its caster")
-	# a walk into it stops there, then the field pushes 1 along its heading
-	f.pos = _nb(h, 4)
-	_give_turn(b, f)
-	var r := b.reachable(f)
-	t.ok(r.has(h) and r[h].stop, "the field hex is a stop")
-	b.move(f, h)
-	t.eq(f.pos, _nb(h, int(fe.heading)), "entering a gust field pushes 1 along its heading")
-	# fields never move a unit during a displacement: pushed onto another field, it stays
-	var h2 := f.pos
-	b.paint([_nb(h2, 0)], "wind", me)
-	t.eq(f.pos, h2, "laying a field beside it moves nothing")
-	# turn start on a gust field: pushed
-	var g := _u("g", "axe", "fire")
-	var b2 := _duel(me, [g], [h])
-	b2.paint([h], "wind", me)
-	g.pos = h
-	_give_turn(b2, g)
-	t.ok(g.pos != h, "starting a turn on a gust field pushes 1")
-
-
-func test_vortex_field_tick_and_fire(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var f := _u("f", "axe", "fire")
-	var g := _u("g", "axe", "fire")
-	var h := Vector2i(6, 4)
-	var b := _duel(me, [f, g], [_nb(h, 1), Vector2i(8, 8)])
-	me.wind_mode = "vortex"
-	b.paint([h], "wind", me)
-	t.eq(str(BWWind.field_at(b, h).mode), "vortex", "a vortex field")
-	BWWind.tick(b)
-	t.eq(f.pos, h, "at the tick a unit beside a vortex field is pulled onto it")
-	# a field fires: the charge is copied and the mode applies once in the copy area
-	var h3 := Vector2i(2, 6)
-	b.paint([h3], "wind", me)
-	g.pos = _nb(h3, 3)
-	b._turn_serial += 1                         # a later turn (field: once per turn)
-	b.paint([h3], "fire", me)
-	t.ok(b.tiles.intensity(_nb(h3, 0), "fire") > 0, "the gale copied the fire to its ring")
-	t.eq(g.pos, h3, "and drew the unit in its copy area onto it")
-	t.ok(_ev(b, "field_fire").size() == 1, "one field_fire event")
-
-
-func test_becalm_field_stops_foes_only(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var ally := _u("al", "axe", "fire")
-	var f := _u("f", "axe", "fire")
-	var b := BWBattle.new(_board(), 3)
-	b.setup([me, ally], [f])
-	me.pos = C
-	ally.pos = Vector2i(1, 7)
-	f.pos = Vector2i(1, 1)
-	_give_turn(b, me)
-	me.wind_mode = "becalm"
-	var h := _nb(f.pos, 0)
-	b.paint([h], "wind", me)
-	_give_turn(b, f)
-	var r := b.reachable(f)
-	var beyond := _nb(h, 0)
-	t.ok(r.has(h) and r[h].stop, "a foe may stop on the becalm field")
-	t.ok(not (BWBoard.path_to(r, beyond) as Array).has(h), "but can't walk through it")
-	ally.pos = _nb(h, 3)
-	f.pos = Vector2i(8, 8)
-	_give_turn(b, ally)
-	var ra := b.reachable(ally)
-	var through := false
-	for x in ra:
-		if (BWBoard.path_to(ra, x) as Array).slice(1, -1).has(h):
-			through = true
-	t.ok(through, "its owner's side walks straight through")
-	# a becalm gale firing becalms the foes in its copy area, not the allies
-	f.pos = _nb(h, 5)
-	ally.pos = _nb(h, 4)
-	b._turn_serial += 1
-	b.paint([h], "fire", me)
-	t.ok(f.statuses.has("becalmed"), "the foe in the copy area is Becalmed")
-	t.ok(not ally.statuses.has("becalmed"), "the ally isn't")
 
 
 # ------------------------------------------------------------------ caps
@@ -256,7 +191,7 @@ func test_field_caps(t) -> void:
 		BWWind.push(b, f, 0, 1, "push", me, true, false)
 		if f.pos != at:
 			moved += 1
-	t.eq(moved, 1, "a field moves a unit once per turn")
+	t.eq(moved, 1, "an ambient wind move (a squall) moves a unit once per turn")
 	b._turn_serial += 1
 	BWWind.push(b, f, 0, 1, "push", me, true, false)
 	b._turn_serial += 1
@@ -275,9 +210,8 @@ func test_field_caps(t) -> void:
 	t.eq(BWHex.distance(at3, f.pos), 1, "a direct hit moves a unit once per action")
 
 
-## Two gust fields aimed at each other never loop: entering one pushes onto
-## the other, which doesn't fire (a displacement); 10 cycles of turn starts
-## never move anyone more than 2 hexes a cycle.
+## Two gales side by side never move anyone (D406), and 10 cycles of turns
+## never move anyone more than 2 hexes a cycle by wind.
 func test_no_loops(t) -> void:
 	var me := _u("st", "staff", "wind")
 	var f := _u("f", "axe", "fire")
@@ -285,15 +219,11 @@ func test_no_loops(t) -> void:
 	var a := Vector2i(3, 6)
 	var c := _nb(a, 0)
 	b.tiles.entries[a] = b.tiles._entry(0, 0, "gale", me.id, "cast")
-	b.tiles.entries[a]["mode"] = "gust"
-	b.tiles.entries[a]["heading"] = 0
 	b.tiles.entries[c] = b.tiles._entry(0, 0, "gale", me.id, "cast")
-	b.tiles.entries[c]["mode"] = "gust"
-	b.tiles.entries[c]["heading"] = 3
 	f.pos = _nb(a, 3)
 	_give_turn(b, f)
 	b.move(f, a)
-	t.eq(f.pos, c, "entered A, pushed onto B, and B (a displacement) did nothing")
+	t.eq(f.pos, a, "entered a gale and stayed there")
 	var per := {}
 	var count := func(e):
 		if e.type == "move" and e.get("wind", false):
@@ -323,13 +253,11 @@ func test_weather_gale_composes(t) -> void:
 	b.weather.heading = 0
 	var h := _nb(C, 0)
 	b.tiles.entries[h] = b.tiles._entry(0, 0, "gale", me.id, "cast")
-	b.tiles.entries[h]["mode"] = "gust"
-	b.tiles.entries[h]["heading"] = 2
 	BWWeather.tick(b)
-	t.eq(f.pos, h, "the weather pushes it onto the gust field, and the field doesn't fire (a displacement)")
-	t.eq(int(f.fx.get("wind_hexes", 0)), 0, "weather isn't a field: no budget spent")
+	t.eq(f.pos, h, "the weather pushes it onto the gale, and the gale does nothing")
+	t.eq(int(f.fx.get("wind_hexes", 0)), 0, "weather isn't a wind move: no budget spent")
 	_give_turn(b, f)
-	t.eq(f.pos, _nb(h, 2), "at its turn start the field pushes it once")
+	t.eq(f.pos, h, "D406: its turn start on a gale moves nobody")
 
 
 func test_glaze_stops_a_push(t) -> void:
@@ -490,26 +418,6 @@ func test_gravity(t) -> void:
 
 
 # ------------------------------------------------------------------ AI
-
-func test_ai_mode_choice(t) -> void:
-	var me := _u("st", "staff", "wind")
-	var f := _u("f", "axe", "fire")
-	var slow := _u("s", "lance", "fire")
-	var b := BWBattle.new(_board(9, { Vector2i(6, 4): { "terrain": "jagged" } }), 3)
-	b.setup([f, slow], [me])
-	me.pos = C
-	f.pos = _nb(C, 0)                            # east: a rock right behind it
-	slow.pos = Vector2i(0, 8)
-	t.eq(BWWind.ai_choose(b, me, f, C), "gust", "Gust when the push slams into rock")
-	f.pos = Vector2i(2, 1)
-	b.tiles.entries[Vector2i(2, 2)] = b.tiles._entry(3, 0, "", me.id, "cast")
-	t.eq(BWWind.ai_choose(b, me, f, C), "vortex", "Vortex beside its own fire 3")
-	b.tiles.entries.clear()
-	var fast: BWUnit = f if f.move_range() >= slow.move_range() else slow
-	t.eq(BWWind.ai_choose(b, me, fast, Vector2i(0, 0)), "becalm", "Becalm on the fastest foe")
-	fast.statuses["restless"] = { "armed": true, "keep": true, "turns": 2, "source": "" }
-	t.ok(BWWind.ai_choose(b, me, fast, Vector2i(0, 0)) != "becalm", "never on a Restless one")
-
 
 func _play(seed_value: int) -> String:
 	var players: Array = [_u("p1", "staff", "wind"), _u("p2", "axe", "wind"), _u("p3", "staff", "dark")]

@@ -341,29 +341,44 @@ armour). The bias stays invisible to the player, per the brief.
   reactive, one supportive and one passive at a time (my reading of "can only
   equip one type at a time").
 
-## 6.1 Auto-equip (D315-D318)
+## 6.1 Auto-equip (D315-D318, D403-D404)
 
-The gear panel (pre-battle and the hall's prep) has **Optimize all [O]** in
-its header and **Optimize** under the sets line. Both show the changes first
-(one line per unit: "Della: +Fire Chain Mail [C] (from Bob) · +Iron Helm
-[D]"), with Apply / Cancel (Esc cancels); after Apply, **Undo optimize** puts
-everything back (one step; gone after a change by hand). Code: `BWAutoEquip`
+The gear panel (pre-battle and the hall's prep) has **Optimize all [O]** and
+**Unequip all [U]** in its header, and **Optimize** / **Unequip** (this unit)
+under the sets line. Optimize shows the changes first (one line per unit:
+"Della: +Fire Chain Mail [C] (from Bob) – Fire set 2/3 · +Iron Helm [D]"),
+each gain with its reason; Unequip shows one line ("15 pieces from 5 units
+go to the inventory. Main-hand weapons stay."). Apply / Cancel (Esc cancels);
+after Apply, **Undo optimize** / **Undo unequip** puts everything back (one
+step, shared by both; gone after a change by hand). Code: `BWAutoEquip`
 (`src/core/auto_equip.gd`).
 
 - **Who goes first:** most fights deployed this run, then damage dealt, then
   level, then squad order.
-- **What a unit wants:** its used element (highest affinity; ties go to the
-  focus, then the native element) and its drawn weapon's class.
+- **What a unit wants (D403):** its element priority list, (1) its **focus**
+  element (the chosen focus, else the native one), then (2) its other learned
+  elements (affinity > 0) by affinity rank, ties by points, then element
+  order; and its drawn weapon's class.
 - **Scoring, in order:** the main hand keeps the class; the second weapon
-  slot prefers another class the unit has expertise in; the piece's element
-  is the unit's element; it brings a learned set to 2 or 3 pieces; tier; stat
-  total. A worn piece stays unless another beats it by 3+ stat points.
+  slot prefers another class the unit has expertise in; the piece is the
+  **primary** (focus) element, always above anything secondary, so the
+  primary set fills first; then a **secondary** piece that brings its set to
+  2 or 3 pieces; then a secondary piece by its place (2nd over 3rd); tier;
+  stat total. A worn piece stays unless another beats it by 3+ stat points.
+- **Reasons** in the preview: "Fire set 3/3" (the primary at 2+ pieces),
+  "Fire (focus)", "Water set 2/3 (2nd)", "Water (2nd)"; none for a plain
+  tier pick.
 - **Cursed pieces** are never handed out; one already worn may stay.
 - **Optimize all** may take from units used less, never from units used more.
   A second weapon is never someone's drawn weapon, and nobody is left
   without a weapon. Leftovers go to the inventory; the discard pile is left
   alone.
 - **Optimize** (one unit) takes from the loose inventory only.
+- **Unequip all [U] (D404)** takes every squad unit's armour and second
+  weapon off into the inventory, cursed pieces too. Each unit **keeps its
+  main-hand weapon**, so nobody is weaponless (the main hand can't be emptied
+  by hand either). **Unequip** does the same for one unit. A second press
+  with only main hands on is a no-op.
 
 ## 7. Decisions I made
 

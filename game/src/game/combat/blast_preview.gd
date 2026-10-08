@@ -116,14 +116,16 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 			for d in sim.detonations:
 				if d.hex == h:
 					pct = float(d.pct)
-			_hex_tag(h, "BLAST %d%%" % roundi(pct), BWLook.glow_color("thunder"), 0.3)
+			_hex_tag(h, ("IGNITES FUSE %d%%" if "fuse" in kinds else "BLAST %d%%") % roundi(pct), BWLook.glow_color("thunder"), 0.3)   # D405
 		elif k == "gale":
-			var gm := str((rec.get("after", {}) as Dictionary).get("mode", ""))    # D270: the field's mode
-			_hex_tag(h, "GALE" if gm == "" else "%s GALE" % gm.to_upper(), BWLook.glow_color("wind"), 0.3)
+			_hex_tag(h, "GALE", BWLook.glow_color("wind"), 0.3)        # D406: one gale, no modes
 		elif k == "glaze":
 			_hex_tag(h, "GLAZE", BWLook.glow_color("ice"), 0.3)
 		elif k == "pillar":
 			_hex_tag(h, "PILLAR", BWLook.element_color("ice"), 0.3)
+		elif k == "shock" and "fuse" in kinds:
+			drawn[k] = true                            # D405: water on a fuse electrifies it
+			_hex_tag(h, "IGNITES FUSE: ELECTRIFIED", BWLook.glow_color("thunder"), 0.3)
 		elif k in ["steam", "shock"] and not drawn.has(k):
 			drawn[k] = true                            # D266: one tag per reacting pool
 			_hex_tag(h, "STEAM" if k == "steam" else "ELECTRIFIED", Color(0.5, 0.52, 0.56) if k == "steam" else BWLook.glow_color("thunder"), 0.3)

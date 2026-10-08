@@ -225,18 +225,19 @@ func test_daggerleap_high_ground(t) -> void:
 func test_charge_high_ground(t) -> void:
 	var u := _u("a", "axe")
 	var foe := _u("f", "sword", "enemy")
-	var b := _fight(_board({ C: ["neutral", 1] }), [u], [foe], [C], [C])
-	var nb := _dir(b, C, 7)
-	var line := b.board.ray(C, nb, 7)
+	var b := _fight(_board({ C: ["neutral", 1] }, 17), [u], [foe], [C], [C])
+	var nb := _dir(b, C, 11)
+	var line := b.board.ray(C, nb, 11)
 	foe.pos = line[1]
 	_turn(b, u)
 	var pv := b.skill_preview(u, "charge", "fire", nb)
-	t.eq(pv.dest, line[3], "downhill: reach 4 (ends on the 4th hex)")
-	t.eq(pv.shove.to, line[5], "and the foe is shoved 2 hexes past")
+	t.eq(pv.dest, line[7], "downhill: reach 8 (D414: ends on the 8th hex)")
+	t.eq(pv.shove.to, line[9], "and the foe, pushed along ahead, goes 1 further: 2 past the runner")
 	b.board.set_cell(C, "neutral", 0)
 	var pv2 := b.skill_preview(u, "charge", "fire", nb)
-	t.eq(pv2.dest, line[2], "level: reach 3")
-	t.eq(pv2.shove.to, line[3], "and a 1-hex shove")
+	t.eq(pv2.dest, line[6], "level: reach 7")
+	t.eq(pv2.shove.to, line[7], "and the foe just ahead of the runner")
+	t.eq(pv2.shove.path, line.slice(1, 8), "pushed along hex by hex")
 
 
 func test_vault_and_dive_high_ground(t) -> void:

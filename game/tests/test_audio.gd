@@ -120,7 +120,8 @@ func test_every_referenced_sfx_exists(c) -> void:
 	for n in BWSfx.MIX:
 		c.ok(manifest.has(n), "mixed sound %s exists" % n)
 	for n in manifest:
-		c.ok(BWSfx.MIX.has(n), "sound %s has a mix level" % n)
+		# a C alternate (D412) mixes like the sound it stands in for
+		c.ok(BWSfx.MIX.has(str(manifest[n].get("alt_of", n))), "sound %s has a mix level" % n)
 	c.ok(checked >= 80, "checked %d variation files" % checked)
 
 
@@ -266,7 +267,7 @@ func test_drop2(c) -> void:
 	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
 	var drops := 0
 	for n in manifest:
-		if int(manifest[n].get("drop", 0)) != 2 or manifest[n].has("cut_of"):
+		if int(manifest[n].get("drop", 0)) != 2 or manifest[n].has("cut_of") or manifest[n].has("alt_of"):
 			continue
 		drops += 1
 		var lv: Dictionary = (manifest[n].levels as Array)[0]
@@ -324,14 +325,14 @@ func test_placeholders(c) -> void:
 				c.ok(head_peak(p, 0.03) > floor, "%s_%d: onset trimmed" % [n, v])
 	for n in manifest:
 		if str(n).begins_with("ph_"):
-			c.ok(n in PLACEHOLDERS, "%s is a listed placeholder" % n)
+			c.ok(str(manifest[n].get("alt_of", n)) in PLACEHOLDERS, "%s is a listed placeholder" % n)
 	# the pick cards get the short cut, the long take stays mapped
 	c.eq(str(BWMusic.STINGS.pick), "sting_pick_short", "pick cards: the short pick reveal (D392)")
 	c.eq(str(BWMusic.STINGS.pick_long), "sting_pick_reveal", "the 7 s pick reveal stays mapped")
 	var lv: Dictionary = (manifest.sting_pick_short.levels as Array)[0]
 	c.ok(float(lv.seconds) <= 2.5 and float(lv.seconds) >= 1.5, "short pick reveal %.2f s (<= 2.5)" % float(lv.seconds))
-	# the stings stay the author's originals, in C (author, 2026-10-07)
-	for k in ["victory", "defeat", "jackpot", "cursed", "level_up", "room_hard"]:
+	# the stings are the author's files (retuned to A, D412), not cuts
+	for k in ["victory", "defeat", "jackpot", "cursed", "level_up", "room_hard", "shop"]:
 		c.ok(not manifest[BWMusic.STINGS[k]].has("cut_of") and int(manifest[BWMusic.STINGS[k]].get("drop", 0)) == 2, "sting %s is the author's file" % k)
 	# hooks
 	c.eq(BWCombatAudio.proc_kind("Death Knell: 10% burst around X"), "onkill", "Death Knell -> on-kill")
@@ -397,3 +398,187 @@ func test_barks_and_hooks(c) -> void:
 	c.eq(BWAudioDirector.press_sound("Back"), "ui_cancel", "Back -> cancel")
 	c.eq(BWAudioDirector.press_sound("Shield"), "ui_click", "other -> click")
 	c.eq(BWAudioDirector.press_sound(null), "ui_click", "no label -> click")
+
+
+## D411: the sting duck (the author, 2026-10-08: "fade the existing track
+## out, play the jingle, then fade it in"). The pure state machine first.
+static func _duck() -> BWMusic.Duck:
+	var dk := BWMusic.Duck.new()
+	dk.fade_out = BWMusic.DUCK_OUT
+	dk.fade_in = BWMusic.DUCK_IN
+	dk.floor_db = BWMusic.DUCK_FLOOR_DB
+	return dk
+
+
+## Step `dk` for `secs` at 10 ms; the dB after each step.
+static func _run(dk: BWMusic.Duck, secs: float) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for i in int(round(secs / 0.01)):
+		out.append(dk.step(0.01))
+	return out
+
+
+func test_sting_duck(c) -> void:
+	c.ok(BWMusic.DUCK_OUT >= 0.25 and BWMusic.DUCK_OUT <= 0.4, "fades out in 0.25-0.4 s (%.2f)" % BWMusic.DUCK_OUT)
+	c.ok(BWMusic.DUCK_IN >= 0.8 and BWMusic.DUCK_IN <= 1.2, "fades back in over 0.8-1.2 s (%.2f)" % BWMusic.DUCK_IN)
+	var floor := BWMusic.DUCK_FLOOR_DB
+	# one sting: out, held, back in, restored exactly
+	var dk := _duck()
+	c.eq(dk.step(0.016), 0.0, "idle: the music at full level")
+	dk.begin(2.0)
+	var a := _run(dk, BWMusic.DUCK_OUT + 0.02)
+	c.ok(a[a.size() - 1] <= floor + 0.01, "out within DUCK_OUT (%.1f dB)" % a[a.size() - 1])
+	var mono := true
+	for i in range(1, a.size()):
+		mono = mono and a[i] <= a[i - 1] + 0.0001
+	c.ok(mono, "the fade out only falls")
+	var b := _run(dk, 2.0 - BWMusic.DUCK_OUT - 0.05)
+	c.ok(Array(b).all(func(v): return v <= floor + 0.01), "held out for the sting's hold")
+	var r := _run(dk, BWMusic.DUCK_IN + 0.1)
+	mono = true
+	for i in range(1, r.size()):
+		mono = mono and r[i] >= r[i - 1] - 0.0001
+	c.ok(mono, "the fade in only rises")
+	c.eq(dk.state, BWMusic.Duck.IDLE, "back to idle")
+	c.eq(dk.level_db(), 0.0, "restored to exactly 0 dB")
+	c.ok(Array(a + b + r).all(func(v): return v <= 0.0), "never above the music's own level")
+	# overlap during the hold: the duck extends, no rise in between
+	dk = _duck()
+	dk.begin(2.0)
+	var o1 := _run(dk, 1.0)
+	dk.begin(2.0)
+	var o2 := _run(dk, 1.95)
+	c.ok(Array(o2).all(func(v): return v <= floor + 0.01), "a second sting while held: still out until its own hold ends")
+	var o3 := _run(dk, BWMusic.DUCK_IN + 0.1)
+	c.eq(o3[o3.size() - 1], 0.0, "then back in, fully")
+	# overlap during the fade in: turns around from where it is (no jump up, no stutter)
+	dk = _duck()
+	dk.begin(1.0)
+	_run(dk, 1.0 + BWMusic.DUCK_IN * 0.5)
+	var mid := dk.level_db()
+	c.ok(mid > floor and mid < 0.0, "half way back in (%.1f dB)" % mid)
+	dk.begin(1.0)
+	var t := _run(dk, BWMusic.DUCK_OUT)
+	c.ok(t[0] <= mid + 0.0001, "a sting during the fade in: no step up (%.1f -> %.1f)" % [mid, t[0]])
+	mono = true
+	for i in range(1, t.size()):
+		mono = mono and t[i] <= t[i - 1] + 0.0001
+	c.ok(mono and t[t.size() - 1] <= floor + 0.01, "it falls straight back out")
+	_run(dk, 1.0 + BWMusic.DUCK_IN + 0.1)
+	c.eq(dk.level_db(), 0.0, "and recovers")
+	# release (a picker closed): back in early, never stuck
+	dk = _duck()
+	dk.begin(6.0)
+	_run(dk, 0.5)
+	dk.release(0.4)
+	_run(dk, 0.4 + BWMusic.DUCK_IN + 0.05)
+	c.eq(dk.state, BWMusic.Duck.IDLE, "released: back in long before the 6 s hold")
+	dk.release(0.0)
+	c.eq(dk.state, BWMusic.Duck.IDLE, "a release with nothing ducked does nothing")
+	# a very short sting: comes back before it was fully out, smoothly
+	dk = _duck()
+	dk.begin(0.1)
+	var s1 := _run(dk, 0.1 + BWMusic.DUCK_IN)
+	c.ok(Array(s1).min() > floor, "a 0.1 s sting only dips (%.1f dB)" % Array(s1).min())
+	c.eq(dk.level_db(), 0.0, "and is back")
+	# every sting in the manifest has a hold: past its body, within its file
+	for k in BWMusic.STINGS:
+		var n: String = BWMusic.STINGS[k]
+		var lv: Dictionary = (BWSfx.info(n).levels as Array)[0]
+		var h := BWMusic.sting_hold(n)
+		c.ok(h >= float(lv.body_s) and h <= float(lv.seconds), "%s: hold %.2f s (body %.2f, file %.2f)" % [k, h, float(lv.body_s), float(lv.seconds)])
+	c.ok(BWMusic.STINGS.has("shop"), "the shop purchase is a sting (it ducks, D411)")
+
+
+## D411 on a real BWMusic in the tree: the bus Amplify follows the duck; a
+## screen change mid-duck starts the new track on the Music bus, under the
+## same duck, and nothing is left silent (a gone sting releases it; leaving
+## the tree resets the bus).
+func test_sting_duck_in_tree(c) -> void:
+	BWAudio.ensure_buses()
+	var amp := BWAudio.effect("Music", "AudioEffectAmplify") as AudioEffectAmplify
+	c.ok(amp != null, "the Music bus has its Amplify")
+	if amp == null:
+		return
+	var tree := Engine.get_main_loop() as SceneTree
+	var m := BWMusic.new()
+	tree.root.add_child(m)
+	m.set_process(false)
+	m.lead = 0.0                                     # start stings at once (no timer in a synchronous test)
+	c.eq(amp.volume_db, 0.0, "a fresh BWMusic starts the bus at 0 dB")
+	m._play("rest")
+	var rest_deck: BWMusic.Deck = m._active
+	var live := AudioStreamPlayer.new()              # stands in for the sting's player (headless: no audio out)
+	m.add_child(live)
+	m._sting("level_up")
+	m._sting_player = live
+	for i in 40:
+		m._step_duck(0.01)
+	c.ok(amp.volume_db <= BWMusic.DUCK_FLOOR_DB + 0.01, "the bus is out under the sting (%.1f dB)" % amp.volume_db)
+	# the screen changes mid-duck: the new track starts under the same duck
+	m._play("rooms")
+	var target: BWMusic.Deck = m._deck("rooms", 1.0)
+	m._switch(target, BWMusic.cue_mix("rooms"))
+	c.ok(m._active == target and m._active != rest_deck, "the rooms track took over")
+	c.eq(str(target.player.bus), "Music", "the new track plays through the ducked bus")
+	c.ok(m.duck.active() and m.duck.state != BWMusic.Duck.UP, "the cue change leaves the duck alone")
+	var hold := BWMusic.sting_hold("sting_level_up")
+	for i in int(hold * 100) + int(BWMusic.DUCK_IN * 100) + 20:
+		m._step_duck(0.01)
+	c.eq(amp.volume_db, 0.0, "after the sting the new track is at full level")
+	c.eq(m.duck.state, BWMusic.Duck.IDLE, "duck idle")
+	# a sting whose player is gone can't hold the music out
+	m._sting("room_hard")
+	m._sting_player = null
+	for i in int(BWMusic.DUCK_IN * 100) + 10:
+		m._step_duck(0.01)
+	c.eq(amp.volume_db, 0.0, "a sting that never played: the music is back within DUCK_IN")
+	# a picker closing: the sting fades over 0.8 s and the music starts back half way through it
+	var live2 := AudioStreamPlayer.new()
+	m.add_child(live2)
+	m._sting("pick")
+	m._sting_player = live2
+	for i in 50:
+		m._step_duck(0.01)
+	m._stop_sting(0.8, true)
+	for i in 30:
+		m._step_duck(0.01)
+	c.ok(amp.volume_db <= BWMusic.DUCK_FLOOR_DB + 0.01, "the pick closed: still out while its fade starts")
+	for i in 10 + int(BWMusic.DUCK_IN * 100) + 5:
+		m._step_duck(0.01)
+	c.eq(amp.volume_db, 0.0, "then back in, long before the sting's own hold")
+	# leaving the tree mid-duck resets the bus
+	m._sting("cursed")
+	m._sting_player = live
+	for i in 40:
+		m._step_duck(0.01)
+	c.ok(amp.volume_db < -1.0, "ducked again (%.1f dB)" % amp.volume_db)
+	tree.root.remove_child(m)
+	c.eq(amp.volume_db, 0.0, "BWMusic leaving the tree lifts the duck")
+	m.free()
+
+
+## D412: the stings, the short pick reveal and the procs cut from them play in
+## A; the author's C originals ship beside them as <name>_c.
+func test_stings_in_a(c) -> void:
+	var manifest: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(BWSfx.MANIFEST)) as Dictionary).get("sounds", {})
+	c.eq(BWSfx.STING_KEY, "A", "the stings play in A (the author, 2026-10-08)")
+	var names := ["ph_proc_onkill", "ph_proc_heal", "ph_proc_pity"]
+	for k in BWMusic.STINGS:
+		if not BWMusic.STINGS[k] in names:
+			names.append(BWMusic.STINGS[k])
+	for n in names:
+		c.ok(manifest.has(n) and str(manifest[n].get("key", "")) == "A", "%s is in A" % n)
+		c.eq(BWSfx.resolve(n), n, "%s plays its A file" % n)
+		var alt: String = n + "_c"
+		c.ok(manifest.has(alt) and str(manifest[alt].get("alt_of", "")) == n and str(manifest[alt].get("key", "")) == "C", "%s: the C original is kept as %s" % [n, alt])
+		if manifest.has(alt):
+			c.eq(int(manifest[alt].variants), int(manifest[n].variants), "%s: same variations" % alt)
+			for v in range(1, int(manifest[n].variants) + 1):
+				c.ok(FileAccess.file_exists(BWSfx.path_of(alt, v)) and ResourceLoader.exists(BWSfx.path_of(alt, v)), "%s_%d imported" % [alt, v])
+				# same length to within the trims (the shift keeps duration)
+				var la := float((manifest[n].levels as Array)[v - 1].seconds)
+				var lc := float((manifest[alt].levels as Array)[v - 1].seconds)
+				c.ok(absf(la - lc) <= maxf(0.2, lc * 0.07), "%s_%d: %.2f s vs the original's %.2f s" % [n, v, la, lc])
+		if int(manifest.get(n, {}).get("drop", 0)) == 2 and not manifest[n].has("cut_of"):
+			c.eq(int((manifest[n].get("retune", {}) as Dictionary).get("semitones", 0)), -3, "%s: -3 semitones" % n)

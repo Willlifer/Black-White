@@ -517,6 +517,9 @@ func _entry(h: int, v: int, marker: String, source: String, origin: String, time
 
 
 ## Pure: what would `element` arriving do to entry `e`? (§3.1-§3.3)
+## D405: every element ignites a fuse: fire / light / dark detonate the new
+## state, water electrifies (BWPools.begin overrides that plan), ice and wind
+## detonate the empty fuse, thunder re-arms it.
 ## FX hook: `opts` carries the caster's tile_duration_plus (timer_plus, glaze_plus).
 func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: String, opts: Dictionary = {}) -> Dictionary:
 	var h: int = e.get("h", 0)
@@ -561,6 +564,16 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 	if mk == "":
 		return { "op": "none" }
 	if not charged:
+		if marker == "fuse" and mk != "fuse":
+			# D405: any element ignites a fuse. Ice or wind arriving on one
+			# detonates it (the empty fuse: the DETONATE_BASE_PCT blast) and is
+			# spent; a propagated arrival does nothing (containment, §3.1).
+			if not fresh:
+				return { "op": "none" }
+			var p := _operate(e.duplicate(), "fuse", str(e.get("source", caster)))
+			p["fired"] = true
+			p["ignited"] = element
+			return p
 		var armed := _entry(0, 0, mk, caster, "cast")                    # arm or replace
 		if mk == "gale" and marker == "gale":
 			armed["gale_level"] = mini(int(e.get("gale_level", 1)) + 1, int(opts.get("gale_max", 2)))   # D95: gale 2; D293 Jetstream: gale 3

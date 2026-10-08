@@ -121,8 +121,8 @@ func test_shapes_flat(t) -> void:
 	t.ok(_same(s.pv.hexes, Array(BWHex.ring(C, 1))), "riposte: the duelist's ring")
 
 	s = _shape("axe", "charge", "fire", E)
-	t.eq(s.pv.hexes, [Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4)], "charge: 3 hexes charged through")
-	t.eq(s.pv.dest, Vector2i(7, 4), "charge ends 3 out")
+	t.eq(s.pv.hexes, [Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4), Vector2i(8, 4)], "charge (D414: reach 7): runs to the board's edge")
+	t.eq(s.pv.dest, Vector2i(8, 4), "charge ends at the edge, 4 out")
 
 	# D105: Vault is aimed at a foe 2-3 away; the shape is the takeoff hex
 	s = _shape("lance", "vault", "fire", Vector2i(7, 4), [Vector2i(7, 4)])

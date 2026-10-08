@@ -59,69 +59,51 @@ func _water(b: BWBattle, h: Vector2i, lvl: int, src: String = "") -> void:
 	b.tiles.entries[h] = b.tiles._entry(-lvl, 0, "", src, "cast")
 
 
-func _field(b: BWBattle, h: Vector2i, mode: String, owner: BWUnit, born: int = 1, heading: int = 0) -> void:
-	var e := b.tiles._entry(0, 0, "gale", owner.id, "cast")
-	e["mode"] = mode
-	e["born"] = born
-	if mode == "gust":
-		e["heading"] = heading
-	b.tiles.entries[h] = e
-
-
 # ------------------------------------------------------------------ wind
 
+## D408 Eye of the Vortex (reworked: no Vortex fields since D406): the
+## holder's wind skills' Draw in reaches foes within 2 of the area and pulls
+## each up to 2, step by step, no slam.
 func test_eye_of_the_vortex(t) -> void:
 	var me := _u("w", "staff", "wind", ["eye_of_vortex"])
 	var f := _u("f", "axe", "fire")
-	var g := _u("g", "axe", "fire")
 	var x := Vector2i(4, 2)
-	var b := _duel(me, [f, g], [_nb(x, 0, 2), _nb(x, 3, 2)])
-	me.pos = Vector2i(0, 8)
-	_field(b, x, "vortex", me)
-	b.cycle += 1
-	BWWind.tick(b)
-	t.eq(BWHex.distance(f.pos, x), 0, "a foe 2 out is pulled 2, onto the free centre")
-	t.eq(BWHex.distance(g.pos, x), 1, "the next one stops beside it (the centre is taken: no slam)")
+	var far := _nb(x, 0, 3)                         # 2 beyond Surge's radius-1 area
+	var b := _duel(me, [f], [far])
+	var pv := b.skill_preview(me, "surge", "wind", x)
+	t.ok(not pv.is_empty(), "the surge aims")
+	t.eq(f.pos, far, "the preview moves nobody")
+	t.ok(f.id in pv.units, "the preview counts the foe the Eye will draw in")
+	b.use_skill(me, "surge", "wind", x)
+	t.eq(BWHex.distance(f.pos, x), 1, "a foe 2 beyond the area is pulled 2, into it")
 	t.ok(_ev(b, "slam").is_empty(), "an inward pull never slams")
-	t.ok(not _ev(b, "eye_pull").is_empty(), "the eye_pull event for the view")
-	# a plain Vortex field pulls only units beside it, 1
+	t.ok(b.history.any(func(e): return e.type == "move" and bool(e.get("eye", false))), "the pull is tagged for the view")
+	# without the keystone Draw in reaches 1 beyond the area, pulls 1
 	var plain := _u("p", "staff", "wind")
 	var h := _u("h", "axe", "fire")
-	var b2 := _duel(plain, [h], [_nb(x, 0, 2)])
-	_field(b2, x, "vortex", plain)
-	b2.cycle += 1
-	BWWind.tick(b2)
-	t.eq(BWHex.distance(h.pos, x), 2, "without the keystone a unit 2 out isn't pulled")
-
-
-func test_eye_one_field_per_tick_newest(t) -> void:
-	var me := _u("w", "staff", "wind", ["eye_of_vortex"])
-	var f := _u("f", "axe", "fire")
+	var b2 := _duel(plain, [h], [far])
+	b2.use_skill(plain, "surge", "wind", x)
+	t.eq(h.pos, far, "without the keystone a foe 2 beyond the area isn't pulled")
+	# no tile effect: a gale laid by the holder pulls nobody at the tick
 	var g := _u("g", "axe", "fire")
-	var old := Vector2i(2, 2)
-	var new := Vector2i(6, 6)
-	var b := _duel(me, [f, g], [_nb(old, 0), _nb(new, 3)])
-	me.pos = Vector2i(0, 8)
-	_field(b, old, "vortex", me, 1)
-	_field(b, new, "vortex", me, 2)
-	var f0 := f.pos
-	b.cycle += 1
-	BWWind.tick(b)
-	t.eq(f.pos, f0, "the older field doesn't act")
-	t.eq(g.pos, new, "the newest one does")
+	var b3 := _duel(me, [g], [_nb(Vector2i(2, 6), 0, 2)])
+	b3.paint([Vector2i(2, 6)], "wind", me)
+	var g0 := g.pos
+	b3.cycle += 1
+	BWWind.tick(b3)
+	t.eq(g.pos, g0, "the holder's gale is still only a gale (D406)")
 
 
 func test_eye_respects_the_cap(t) -> void:
 	var me := _u("w", "staff", "wind", ["eye_of_vortex"])
 	var f := _u("f", "axe", "fire")
 	var x := Vector2i(4, 2)
-	var b := _duel(me, [f], [_nb(x, 0, 2)])
-	me.pos = Vector2i(0, 8)
-	_field(b, x, "vortex", me)
+	var far := _nb(x, 0, 3)
+	var b := _duel(me, [f], [far])
 	f.fx["wind_cycle"] = b.cycle
 	f.fx["wind_hexes"] = 1                         # already moved 1 by wind this cycle
-	BWWind.tick(b)
-	t.eq(BWHex.distance(f.pos, x), 1, "only 1 left of the 2-hex cycle budget")
+	b.use_skill(me, "surge", "wind", x)
+	t.eq(BWHex.distance(f.pos, x), 2, "only 1 left of the 2-hex cycle budget")
 
 
 func test_wind_wall_is_the_keystone(t) -> void:
@@ -162,19 +144,6 @@ func test_jetstream_gale_three(t) -> void:
 	b2.tiles.entries[x] = e2
 	b2.paint([x], "wind", p)
 	t.eq(int(b2.tiles.at(x).get("gale_level", 1)), 2, "no keystone: a gale 2 refreshes")
-
-
-func test_jetstream_gust_pushes_two(t) -> void:
-	var me := _u("w", "staff", "wind", ["jetstream"])
-	var f := _u("f", "axe", "fire")
-	var x := Vector2i(2, 4)
-	var b := _duel(me, [f], [x])
-	me.pos = Vector2i(0, 8)
-	_field(b, x, "gust", me, 1, 0)
-	BWWind.turn_start(b, f)
-	t.eq(BWHex.distance(f.pos, x), 2, "your Gust field pushes 2")
-	BWWind.turn_start(b, f)
-	t.eq(BWHex.distance(f.pos, x), 2, "and the 2-hex cycle cap holds")
 
 
 func test_glaze_carry(t) -> void:

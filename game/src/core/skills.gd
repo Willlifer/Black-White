@@ -36,7 +36,7 @@ const TRIDENT_LEN := 2
 const CLEAVE_ARC := 3
 const LEAP_RANGE := 3
 const LEAP_RADIUS := 1
-const CHARGE_LEN := 3
+const CHARGE_LEN := 7                 # D414 (was 3): "It needs it."
 const VAULT_LEN := 2
 const DUALTHROW_RANGE := 4
 

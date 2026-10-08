@@ -240,10 +240,10 @@ func on_ko(b: BWBattle, victim: BWUnit, _by: BWUnit) -> void:
 		_settle(b)
 
 
-## A wind basic in Gust mode aimed at a wall segment blows that hex open.
+## A wind basic (D407: it always gusts) aimed at a wall segment blows that hex open.
 func after_basic(b: BWBattle, u: BWUnit, target: BWUnit, first: Dictionary) -> void:
 	if target is BWObjective and (target as BWObjective).tag == "divider" and target.alive():
-		if b.basic_element(u) == "wind" and BWWind.mode(u) == BWWind.GUST and bool(first.get("hit", false)):
+		if b.basic_element(u) == "wind" and bool(first.get("hit", false)):
 			b._emit({ "type": "divider_gust", "unit": u.id, "hex": target.pos })
 			BWObjectives.break_object(b, target as BWObjective, u, "gust")
 	_settle(b)

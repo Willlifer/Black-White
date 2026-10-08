@@ -559,7 +559,6 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	if u.alive() and not over:
 		_static_field_check(u)                # D93 Static Field: ending a move on its fuse
 		_zone_check(u)                        # D97: ending a move inside an enemy zone
-		BWWind.after_move(self, u, path)      # D270: a gust field pushes, a becalm field stopped it
 	return true
 
 
@@ -667,7 +666,10 @@ func forecast_basic(u: BWUnit, target: BWUnit, share: float = 1.0, share_label: 
 			"label": "Own round (%s): +%d%%" % [rnd, BWSkills.OWN_ROUND_PCT], "tag": "Own round" })
 	if share != 1.0:
 		mods.append({ "stage": "dmg", "label": share_label, "value": share })
-	return _annotate(_guarded(BWFormulas.forecast(u, target, kind, power, el, 0.0, 0.0, 1.0, mods), target), target, u)
+	var fcb := _annotate(_guarded(BWFormulas.forecast(u, target, kind, power, el, 0.0, 0.0, 1.0, mods), target), target, u)
+	if el == "wind":                           # D407: what a wind basic does, in words
+		fcb["notes"] = (fcb.get("notes", []) as Array) + ["Gust: a landed hit pushes it 1 away"]
+	return fcb
 
 
 ## Every modifier on one blow: the ground's, the statuses', then the effects'.
@@ -942,7 +944,7 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 		paint([target_hex], u.attuned, u)
 	_fire_pistol(u, target_hex)
 	BWThunderKeys.after_basic(self, u, target, first, target_hex)   # D290: Static Blades (burst, else arm)
-	BWWind.after_basic(self, u, target, first)  # D271: a wind basic's mode on its target
+	BWWind.after_basic(self, u, target, first)  # D407: a wind basic pushes its target 1 away
 	BWObjectives.after_basic(self, u, target, first)   # D327: a Gust on a wind divider
 	_after_action(u, u.attuned if spell else "", true)
 	_answer(counters)
@@ -1363,7 +1365,7 @@ func skill_relocate(u: BWUnit, p: Dictionary, path: Array, kind: String) -> void
 		u.facing = BWHex.direction_index(start, p.dest)
 	_emit({ "type": "move", "unit": u.id, "path": path, "kind": kind })
 	if not p.shove.is_empty():
-		_emit({ "type": "move", "unit": p.shove.unit.id, "path": [p.shove.from, p.shove.to], "kind": "shove" })
+		_emit({ "type": "move", "unit": p.shove.unit.id, "path": p.shove.get("path", [p.shove.from, p.shove.to]), "kind": "shove" })   # D414: the hexes it was pushed along
 
 
 ## FX hook: aoe_radius_plus skills=1 (Cleaving, Channelling). An AoE skill's
@@ -2140,7 +2142,6 @@ func _begin_turn() -> void:
 		BWBeams.light_heal(self, u, heal, str(st.source))   # D288: Overflow turns the excess into a Ward of Light
 	BWBeams.turn_start(self, u)                    # D287: Dawn, -1 on the longest cooldown on light 2+
 	BWThunderKeys.turn_start(self, u)              # D291: Blast Rider's launch lock lifts
-	BWWind.turn_start(self, u)                     # D270: starting on a gust field pushes 1
 	if over:
 		return
 	if u.alive() and BWKeystoneFx.turn_start(self, u):   # D295 Riptide; D294 Frozen skips the turn
@@ -2246,7 +2247,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	BWOverheat.paint_opts(by, element, o)      # D285: Conflagration
 	BWOverfreeze.paint_opts(self, o)           # D343: a hex / unit overfreezes once per action
 	hexes = BWThunderKeys.filter_rearm(self, by, element, hexes)   # D291: Blast Rider's locked hex
-	var wsnap := BWWind.before_paint(self, hexes)   # D270: the fields about to fire (their mode)
+	var wsnap := BWWind.before_paint(self, hexes)   # the gales about to fire (their owner; D406: no modes)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
 	BWThunderKeys.inject_self_det(self, by, o, r)    # D306: Self-detonate on the holder's own empty fuse
 	BWThunderKeys.after_apply(self, by, element, r)   # D291: Daisy Chain, Blast Rider's self-detonation
@@ -2319,7 +2320,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(g.origin, h), int(BWEffects.p(e, "hexes", 1))])
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
-	BWWind.after_paint(self, by, element, r, wsnap)   # D270: stamp the mode on new gales; fired fields act; copies carry states
+	BWWind.after_paint(self, by, element, r, wsnap)   # D406: fired gales' copies carry steam / shock / glaze
 	BWSquall.after_paint(self, by, r, wsnap)       # D309: a fresh gale on light/dark 2+ starts a squall
 	BWKeystoneFx.after_paint(self, by, r)          # D294 Glacier Wall: its pillars last all battle
 	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
@@ -2911,7 +2912,7 @@ func _gale_force(att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 	if BWFormulas.strips_element(v):
 		return
 	att.fx["gale_force_turn"] = _turn_serial
-	BWWind.apply_mode(self, att, BWWind.mode(att), [v], att.pos, false)
+	BWWind.apply_mode(self, att, BWWind.GUST, [v], att.pos, false)   # D407: no wind modes; Gale Force pushes
 
 
 ## A unit's turn start: per-turn perk state, Frost Ward, Frostbite, Glare's
@@ -3047,7 +3048,6 @@ func _move_rules(u: BWUnit) -> Dictionary:
 	var z := _enemy_zones(u)
 	if not z.is_empty():
 		r["zone"] = z
-	BWWind.stop_rules(self, u, r)             # D270: gust fields and a foe's becalm fields end a walk
 	BWCurse.move_rules(self, u, r)            # D276: a foe's dark 3 is heavy to climb out of
 	return r
 
@@ -3505,7 +3505,8 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 				_note_src(src, out, str(e.unit), "heal", -int(e.amount), false)
 			"detonate":
 				if not e.get("echo", false):
-					out.detonations.append({ "hex": e.hex, "pct": float(e.pct), "radius": int(e.get("radius", 1)) })
+					out.detonations.append({ "hex": e.hex, "pct": float(e.pct), "radius": int(e.get("radius", 1)),
+						"fuse": str((before.get(e.hex, {}) as Dictionary).get("marker", "")) == "fuse" })   # D405: the cast ignites a fuse
 				_hex_kind(hx, before, e.hex, "detonate")
 			"paint":
 				var copies := {}
@@ -3543,6 +3544,8 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 					"hex": e.get("hex", NOWHERE), "target": str(e.get("target", "")) })
 	for h in hx:                                   # fire 2+ freshly cast on grass catches at the cycle's end
 		hx[h].after = tiles.at(h).duplicate()
+		if str((hx[h].before as Dictionary).get("marker", "")) == "fuse" and ("detonate" in hx[h].kinds or "shock" in hx[h].kinds):
+			hx[h].kinds.append("fuse")                 # D405: a fuse the cast ignites (blast, or water electrifies)
 		var a2: Dictionary = hx[h].after
 		if not a2.is_empty() and int(a2.h) >= BWTiles.GRASS_IGNITE_MIN and str(a2.origin) == "cast" \
 				and int(a2.glaze) == 0 and board.terrain(h) == BWBoard.GRASSY:

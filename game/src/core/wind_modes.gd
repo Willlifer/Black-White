@@ -1,50 +1,39 @@
 class_name BWWind
 extends RefCounted
 ## D269-D274 Wind: crowd control (design/ELEMENTS-v3.md §1 with the author's
-## rulings of 2026-10-07). Pure rules; the battle calls the hooks marked
-## "D269" in battle.gd. State lives on the units (`wind_mode`, fx caps) and on
-## BWBattle.wind (walls), ids and numbers only, so clone() copies it.
+## rulings of 2026-10-07), simplified by D406-D408 (2026-10-08, the author: "I
+## don't really get how wind works. Simplify wind to just one hex type").
+## Pure rules; the battle calls the hooks marked "D269" in battle.gd. State
+## lives on the units (fx caps) and on BWBattle.wind (walls, squalls), ids and
+## numbers only, so clone() copies it.
 ##
-## Modes (`BWUnit.wind_mode`, chosen on the forecast, default Gust):
+## There is ONE wind tile: the gale marker (BWTiles). It only spreads: when a
+## charge lands on it, the charge is copied to its neighbours (gale 2: radius
+## 2, Jetstream's gale 3: radius 3), carrying steam / electrified / glaze
+## (carry). No stored mode, no heading, no field effects (D406).
+##
+## Wind MOVES units only from actions:
+##   * a wind SKILL: its SHAPING (BWWindShape, D365-D370): Part / Blast out /
+##     Draw in / Burst out / Push / Hold. Draw in acts before the hits
+##     (pre_hit -> pre_mode), the rest after them (BWWindShape.post).
+##   * a wind BASIC attack: after a landed, unresisted blow, the target is
+##     pushed 1 away from the attacker (after_basic, D407).
+## The three moves apply_mode knows (internal kinds, not a unit setting):
 ##   gust    push 1 away from the origin
 ##   vortex  pull 1 toward the origin
 ##   becalm  Becalmed: move 0 until the end of its next turn (it can still
 ##           act and be displaced); then Restless for 2 turns (immune)
 ##
-## Where a mode applies:
-##   * a wind SKILL (any weapon): BEFORE its hits, to the foes in or beside
-##     its shape (pre_hit). The origin is the shape's centre for ground-aimed
-##     and leap skills, else the caster. Foes pulled into the shape are hit;
-##     foes blown out of it are still hit (the gust carries the blow).
-##   * a wind BASIC attack (an imbue, a staff attuned to wind): on the target
-##     after a landed, unresisted blow (after_basic).
-##   * a gale MARKER laid by wind stores the caster's mode: it is a FIELD.
-##       gust field    a heading (away from the caster); a unit that enters it
-##                     or starts its turn on it is pushed 1 along the heading
-##       vortex field  at the tick, units within 1 are pulled onto it
-##       becalm field  a foe of its owner entering it stops there
-##     When the marker fires (a fresh charge lands), it copies the charge as
-##     ever and applies its mode once to the units in the copy area.
-##
 ## Caps (no loops): wind moves a unit at most CYCLE_HEXES hexes per cycle in
-## all; a field moves it at most once per turn (the tick is its own turn);
-## a direct application (skill or basic) at most once per action; fields only
-## read voluntary entry, turn start, the tick and a gale firing, never a
-## displacement. A push onto glaze stops there (no slides since D397). Dark 3
-## gravity (BWCurse) adds or takes 1 within these caps.
-## Weather Gale (BWWeather) is not a field: it moves outside these caps and
-## never triggers a field.
+## all; an ambient move (`field`: a squall front, Riptide, Event Horizon) at
+## most once per turn (the tick is its own turn); a direct application (skill
+## or basic) at most once per action. A push onto glaze stops there (no slides
+## since D397). Dark 3 gravity (BWCurse) adds or takes 1 within these caps.
+## Weather Gale (BWWeather) moves outside these caps.
 
 const GUST := "gust"
 const VORTEX := "vortex"
 const BECALM := "becalm"
-const MODES := [GUST, VORTEX, BECALM]
-const NAMES := { "gust": "Gust", "vortex": "Vortex", "becalm": "Becalm" }
-const RULES := {
-	"gust": "push 1 away",
-	"vortex": "pull 1 in",
-	"becalm": "move 0 until its next turn ends",
-}
 const CYCLE_HEXES := 2          # wind moves a unit at most this far per cycle
 const SLAM_PCT := 8.0           # D143 / v3 §1: a push stopped by rock, a unit, a pillar or a wall
 const RESTLESS_TURNS := 2       # the ruling: immune to Becalm for 2 turns after it ends
@@ -56,25 +45,6 @@ const WALL_RANGE := 3
 const WALL_TICKS := 2
 ## Lane A hook: extra carriers for gale copies, Callable(b, origin, copies).
 static var carry_hooks: Array = []
-
-
-# ---------------------------------------------------------------- modes
-
-static func mode(u: BWUnit) -> String:
-	if u == null:
-		return GUST
-	var m := str(u.wind_mode)
-	return m if m in MODES else GUST
-
-
-static func set_mode(u: BWUnit, m: String) -> void:
-	if u != null and m in MODES:
-		u.wind_mode = m
-
-
-static func next_mode(m: String) -> String:
-	var i := MODES.find(m)
-	return MODES[(i + 1) % MODES.size()]
 
 
 ## Does `u`'s action carry wind? skill element, or the basic's element.
@@ -243,7 +213,7 @@ static func apply_mode(b: BWBattle, by: BWUnit, m: String, units: Array, origin:
 					dir = BWHex.direction_index(origin, v.pos)
 				if v.pos == origin and dir < 0 and by != null:
 					dir = BWHex.direction_index(by.pos, v.pos)
-				var res := push(b, v, dir, BWKsWind.gust_n(by) if field else 1, "push", by, field, true, reserved, dry)   # D293 Jetstream
+				var res := push(b, v, dir, 1, "push", by, field, true, reserved, dry)
 				if res.moved:
 					out.moves.append({ "unit": v.id, "path": res.path, "kind": "push" })
 			VORTEX:
@@ -284,8 +254,9 @@ static func pre_mode(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, targe
 		shape.append_array(v.footprint())
 	if shape.is_empty():
 		shape = [target_hex]
+	var eye := m == VORTEX and BWKsWind.eye(u)        # D408 Eye of the Vortex: Draw in reaches 2, pulls up to 2
 	var zone := {}
-	for h in BWHex.fringe(shape, 1):
+	for h in BWHex.fringe(shape, BWKsWind.EYE_RADIUS if eye else 1):
 		zone[h] = true
 	var reserved: Array = (p.get("walk", []) as Array).duplicate()
 	if p.dest != u.pos:
@@ -303,7 +274,7 @@ static func pre_mode(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, targe
 	var restore: Array = []
 	for f in cand:
 		restore.append([f, f.pos])
-	var res := apply_mode(b, u, m, cand, origin, false, -1, reserved, dry)
+	var res := BWKsWind.eye_draw(b, u, cand, origin, reserved, dry) if eye else apply_mode(b, u, m, cand, origin, false, -1, reserved, dry)
 	res["restore"] = restore
 	res["origin"] = origin
 	res["mode"] = m
@@ -317,7 +288,7 @@ static func pre_mode(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, targe
 		if hit_hexes.has(f.pos):
 			p.victims.append(f)
 	if not res.moves.is_empty() or not res.becalm.is_empty():
-		var nm := "Draw in" if m == VORTEX else str(NAMES[m])   # D365: only Draw in comes here
+		var nm := ("Eye of the Vortex" if eye else "Draw in") if m == VORTEX else m.capitalize()   # D365: only Draw in comes here
 		(p.notes as Array).append("%s first: %s" % [nm, _summary(res)])
 	return res
 
@@ -343,8 +314,9 @@ static func _summary(res: Dictionary) -> String:
 	return ", ".join(bits)
 
 
-## A wind basic attack: the mode on its target after a landed, unresisted
-## blow (v3 §1 direct hits; a Blank takes no element).
+## D407: a wind basic attack pushes its target 1 away from the attacker
+## after a landed, unresisted blow (v3 §1 direct hits; a Blank takes no
+## element). No mode: the push is the only thing a wind basic does.
 static func after_basic(b: BWBattle, u: BWUnit, target: BWUnit, first: Dictionary) -> void:
 	if b.over or not u.alive() or target == null or not target.alive() or first.is_empty():
 		return
@@ -352,95 +324,28 @@ static func after_basic(b: BWBattle, u: BWUnit, target: BWUnit, first: Dictionar
 		return
 	if BWFormulas.strips_element(target):
 		return
-	apply_mode(b, u, mode(u), [target], u.pos, false)
+	apply_mode(b, u, GUST, [target], u.pos, false)
 
 
-# ---------------------------------------------------------------- fields (gale markers with a mode)
+# ---------------------------------------------------------------- gales (D406: spread only)
 
-## The field on `h`: its tile entry (marker gale with a `mode`), else {}.
-static func field_at(b: BWBattle, h: Vector2i) -> Dictionary:
-	var e := b.tiles.at(h)
-	if str(e.get("marker", "")) != "gale" or not e.has("mode"):
-		return {}
-	return e
-
-
-## Every field hex, sorted (deterministic).
-static func field_hexes(b: BWBattle) -> Array:
-	var out: Array = []
-	for h in b.tiles.entries:
-		if not field_at(b, h).is_empty():
-			out.append(h)
-	out.sort()
-	return out
-
-
-static func _owner(b: BWBattle, e: Dictionary) -> BWUnit:
-	return b._unit(str(e.get("source", "")))
-
-
-## Before a paint: the fields on the painted hexes (their mode is gone once
-## they fire).
+## Before a paint: the gale markers on the painted hexes (their owner is
+## gone once they fire; Jetstream and the squall read it).
 static func before_paint(b: BWBattle, hexes: Array) -> Dictionary:
 	var snap := {}
 	for h in hexes:
-		var f := field_at(b, h)
-		if not f.is_empty():
-			snap[h] = f.duplicate()
+		var e := b.tiles.at(h)
+		if str(e.get("marker", "")) == "gale":
+			snap[h] = e.duplicate()
 	return snap
 
 
-## After a paint: stamp the caster's mode on every gale it laid; each field
-## that fired applies its mode once to the copy area; copies carry the
-## origin's reaction states (steam, electrified; Lane A).
-static func after_paint(b: BWBattle, by: BWUnit, element: String, r: Dictionary, snap: Dictionary) -> void:
-	if element == "wind" and by != null:
-		for h in r.get("changed", []):
-			var e: Dictionary = b.tiles.entries.get(h, {})
-			if str(e.get("marker", "")) == "gale" and str(e.get("source", "")) == by.id:
-				e["mode"] = BWWindShape.field_mode(b, by)   # D367: a skill's gale keeps its shaping's mode
-				b.wind["serial"] = int(b.wind.get("serial", 0)) + 1
-				e["born"] = b.wind.serial                  # D293: Eye of the Vortex acts with the newest
-				if e.mode == GUST:
-					var dir := BWWindShape.field_heading(b, by, h)
-					if dir < 0:
-						dir = BWBattle.pulse_heading(by.pos, h, true) if by.pos != h else by.facing
-					if dir < 0:
-						dir = BWHex.direction_index(by.pos, h)
-					e["heading"] = maxi(dir, 0)
-				else:
-					e.erase("heading")
+## After a paint: the copies of every gale that fired carry the origin's
+## reaction states (steam, electrified, glaze); Jetstream's copies last 2.
+static func after_paint(b: BWBattle, _by: BWUnit, _element: String, r: Dictionary, snap: Dictionary) -> void:
 	for g in r.get("gales", []):
 		carry(b, g.origin, g.copies)
 		BWKsWind.after_gale(b, g, snap)                # D293 Jetstream: your gales' copies last 2
-		if snap.has(g.origin) and not b.over:
-			var f: Dictionary = snap[g.origin]
-			var radius := maxi(1, int(g.get("level", 1)))
-			for c in g.copies:
-				radius = maxi(radius, BWHex.distance(g.origin, c))
-			fire_field(b, f, g.origin, radius)
-
-
-## A field fired: its mode once on every unit in the copy area (a field
-## application: once per turn, the cycle budget). Becalm takes only its
-## owner's foes; Gust and Vortex are the air itself and move everyone.
-static func fire_field(b: BWBattle, f: Dictionary, origin: Vector2i, radius: int) -> void:
-	var owner := _owner(b, f)
-	var m := str(f.mode)
-	var who: Array = []
-	for v in b.units:
-		if not v.alive() or BWObelisk.is_objective(v) or BWHex.distance(origin, v.pos) > radius:
-			continue
-		if m == BECALM and owner != null and v.team == owner.team:
-			continue
-		if BWSets.spares_allies(owner, v):         # D282: the Wind set's fields skip allies
-			continue
-		who.append(v)
-	b._emit({ "type": "field_fire", "hex": origin, "mode": m, "radius": radius })
-	if m == VORTEX and BWKsWind.eye(owner):
-		BWKsWind.eye_pull(b, owner, origin, maxi(radius, BWKsWind.EYE_RADIUS))   # D293 Eye of the Vortex
-		return
-	apply_mode(b, owner, m, who, origin, true, int(f.get("heading", -1)))
 
 
 ## Gale copies carry the origin's reaction state (v3 §1 "Spreading,
@@ -474,79 +379,11 @@ static func carry(b: BWBattle, origin: Vector2i, copies: Array) -> void:
 			(hook as Callable).call(b, origin, copies)
 
 
-## A voluntary walk stopped on `path[-1]`: a gust field pushes it along its
-## heading; a becalm field (its owner's foe) has stopped it there.
-static func after_move(b: BWBattle, u: BWUnit, path: Array) -> void:
-	if b.over or not u.alive() or path.size() < 2:
-		return
-	var h: Vector2i = path[-1]
-	var f := field_at(b, h)
-	if f.is_empty():
-		return
-	if BWSets.spares_allies(_owner(b, f), u):      # D282: the Wind set's fields skip allies
-		return
-	match str(f.mode):
-		GUST:
-			var res := push(b, u, int(f.get("heading", 0)), BWKsWind.gust_n(_owner(b, f)), "push", _owner(b, f), true, true)
-			if res.moved or str(res.stop) in ["rock", "unit"]:
-				b._undo = {}                  # the field acted: the walk can't be taken back
-		BECALM:
-			var o := _owner(b, f)
-			if o == null or o.team != u.team:
-				b._emit({ "type": "field_stop", "unit": u.id, "hex": h, "mode": BECALM })
-
-
-## Turn start on a gust field: pushed 1 along its heading.
-static func turn_start(b: BWBattle, u: BWUnit) -> void:
-	if b.over or not u.alive():
-		return
-	var f := field_at(b, u.pos)
-	if not f.is_empty() and str(f.mode) == GUST and not BWSets.spares_allies(_owner(b, f), u):   # D282
-		push(b, u, int(f.get("heading", 0)), BWKsWind.gust_n(_owner(b, f)), "push", _owner(b, f), true, true)
-
-
-## Walk-stop hexes for BWBattle.reachable (merged into the D97 zone rule):
-## every gust field (entering one ends the walk, then it pushes), and the
-## becalm fields of `u`'s foes.
-static func stop_rules(b: BWBattle, u: BWUnit, r: Dictionary) -> void:
-	var z: Dictionary = r.get("zone", {})
-	var any := false
-	for h in field_hexes(b):
-		var f := field_at(b, h)
-		if str(f.mode) == GUST:
-			z[h] = true
-			any = true
-		elif str(f.mode) == BECALM:
-			var o := _owner(b, f)
-			if o == null or o.team != u.team:
-				z[h] = true
-				any = true
-	if any:
-		r["zone"] = z
-
-
-## The cycle tick (v3 "the new tick", step 2), before the tiles decay:
-## vortex fields pull the units beside them onto them (closest first, a free
-## hex only, no slam), then Lane C's Event Horizon (BWCurse.tick), then the
-## walls count down.
+## The cycle tick (v3 "the new tick", step 2), before the tiles decay: the
+## squall fronts advance, then Lane C's Event Horizon (BWCurse.tick), the
+## keystone ticks, then the walls count down. (D406: no vortex fields.)
 static func tick(b: BWBattle) -> void:
 	b.wind["in_tick"] = true
-	var eyes := BWKsWind.eye_fields(b)                 # D293: one Eye field per holder (the newest)
-	for h in field_hexes(b):
-		var f := field_at(b, h)
-		if str(f.mode) != VORTEX or b.over:
-			continue
-		var fo := _owner(b, f)
-		if BWKsWind.eye(fo):
-			if eyes.get(fo.id, BWBattle.NOWHERE) == h:
-				BWKsWind.eye_pull(b, fo, h)
-			continue
-		var near: Array = []
-		for v in b.units:
-			if v.alive() and not BWObelisk.is_objective(v) and BWHex.distance(v.pos, h) == 1:
-				near.append(v)
-		if not near.is_empty():
-			apply_mode(b, _owner(b, f), VORTEX, near, h, true)
 	if not b.over:
 		BWSquall.tick(b)                              # D309: every squall front advances one ring
 	if not b.over:
@@ -698,82 +535,12 @@ static func hook_board(b: BWBattle) -> void:
 	bd.set_meta("bw_wind_blocker", f)
 
 
-# ---------------------------------------------------------------- AI (D274)
-
-## A cheap mode for an action on `focus` from `origin`: Gust when the push
-## slams it into rock, a unit, a pillar or a wall; Vortex when it stands
-## within 2 of its own side's fire or water 3; Becalm on the fastest foe
-## (not Restless); else Gust.
-static func ai_choose(b: BWBattle, u: BWUnit, focus: BWUnit, origin: Vector2i) -> String:
-	if focus == null:
-		return GUST
-	var dir := BWBattle.pulse_heading(origin, focus.pos, true) if origin != focus.pos else -1
-	if dir >= 0 and not b._immune(focus, "displace"):
-		var pp := b.push_path(focus, dir, 1)
-		if str(pp.stop) in ["rock", "unit"]:
-			return GUST
-	for h in b.tiles.entries:
-		if BWHex.distance(h, focus.pos) > 2:
-			continue
-		if b.tiles.intensity(h, "fire") >= 3 or b.tiles.intensity(h, "water") >= 3:
-			var src := b._unit(str(b.tiles.at(h).get("source", "")))
-			if src != null and src.team == u.team:
-				return VORTEX
-	var fastest: BWUnit = null
-	for f in b.foes_of(u):
-		if BWObelisk.is_objective(f):
-			continue
-		if fastest == null or f.move_range() > fastest.move_range():
-			fastest = f
-	if focus == fastest and not focus.statuses.has("restless") and not focus.statuses.has("becalmed"):
-		return BECALM
-	return GUST
-
-
-## The ≤ 3-combo limit (v3 §11): for the chosen wind skill, simulate each of
-## the three modes once and keep the best (damage to foes minus damage to
-## its own side; ties keep the cheap pick). Sets u.wind_mode.
-static func ai_refine(b: BWBattle, u: BWUnit, key: String, el: String, target: Vector2i) -> void:
-	if el != "wind":
-		return
-	var first := mode(u)
-	var best_m := first
-	var best := -INF
-	var order: Array = [first]
-	for m in MODES:
-		if not m in order:
-			order.append(m)
-	for m in order.slice(0, 3):
-		u.wind_mode = m
-		var sim := b.simulate(u, { "kind": "skill", "key": key, "element": el, "hex": target })
-		if sim.is_empty():
-			continue
-		var sc := 0.0
-		for id in sim.units:
-			var rec: Dictionary = sim.units[id]
-			var d := float(rec.get("damage", 0))
-			sc += -d if bool(rec.get("friendly", false)) else d
-		if sc > best + 0.5:
-			best = sc
-			best_m = m
-	u.wind_mode = best_m
-
-
 ## The tile card's lines for `h` (plain text; the view colours them).
 static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 	var out: Array = []
-	var f := field_at(b, h)
-	if not f.is_empty():
-		match str(f.mode):
-			GUST:
-				out.append("Gust field: entering or starting a turn here pushes 1 along its arrow")
-			VORTEX:
-				out.append("Vortex field: pulls units beside it onto it at the tick")
-			BECALM:
-				out.append("Becalm field: a foe of its owner entering it stops here")
-	var ge := b.tiles.at(h)                        # D377: a Tailwind holder's gale lifts its team
+	var ge := b.tiles.at(h)                        # D377: a Tailwind holder's gale lifts its team (the perk's rider, not the tile)
 	if str(ge.get("marker", "")) == "gale":
-		var o := _owner(b, ge)
+		var o := b._unit(str(ge.get("source", "")))
 		if o != null and BWWeaponMove.has_updraft(o):
 			out.append("Updraft (%s's Tailwind): %s's side starting a turn here gets +1 jump" % [o.name, o.name])
 	if walled(b, h):

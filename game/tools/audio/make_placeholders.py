@@ -10,14 +10,18 @@ in make_sfx.py's style (filtered noise, damped modes, sweeps, saturation):
                   "shop purchase" (pity), the first two notes of "sting level
                   up" (heal proc), the opening hit of "cursed or bad" (on-kill),
                   the Low fish voice takes (Being hum, granular). All read from
-                  design/audio/ or the project folders, never written; the
-                  stings stay in the author's key (C), as he asked.
+                  design/audio/ or the project folders, never written.
+  key (D412)      the parts cut from the stings come from their -3 st retune
+                  (retune.py), so the procs sit in A like the stings; the
+                  low bell is F#2 / A2. The author's C versions are built too,
+                  as <name>_c (manifest "alt_of"; BWSfx.STING_KEY = "C").
   levels          like every SFX: -16 LUFS-ish momentary, peaks <= -1 dBFS,
                   onsets trimmed to 3 ms before the first sound; loops wrap
                   their filters and tails so the seam is clean.
 
 sting_pick_short (D392): "sting pick reveal" trimmed like make_drop2, its
-first <= 2.5 s, the last 0.8 s faded (cos^2) so the phrase releases.
+first <= 2.5 s, the last 0.8 s faded (cos^2) so the phrase releases. In A
+(D412), and sting_pick_short_c from the original.
 """
 from __future__ import annotations
 
@@ -42,6 +46,8 @@ SHORT_MAX = 2.5
 SHORT_FADE = 0.8
 
 _cache: dict = {}
+KEY = "A"                       # D412: the key the sting-made parts are cut in ("C" = the author's originals)
+FROM_STINGS = ["ph_proc_onkill", "ph_proc_heal", "ph_proc_pity"]   # built twice: A, and <name>_c in C
 
 
 def mono(x):
@@ -50,9 +56,9 @@ def mono(x):
 
 def author_part(name, start, length, fade_out=0.05):
     """A slice of one of the author's drop-2 files (mono), from `start` s."""
-    key = (name, start, length)
+    key = (name, start, length, KEY)
     if key not in _cache:
-        x = mono(m2.load(name))
+        x = mono(m2.load_keyed(name, KEY))
         a = int(start * SR)
         y = x[a:a + int(length * SR)].copy()
         y = d.fade(y, 0.001, fade_out)
@@ -111,18 +117,19 @@ def swap_draw(rng, v):
 
 def proc_onkill(rng, v):
     """A knell: the opening hit of "cursed or bad" over the author's kick,
-    pitched down, with a low bell (F#2 / C3) ringing out."""
+    pitched down, with a low bell (F#2 / A2 in A; F#2 / C3 in C) ringing out."""
     dur = 1.6
     y = np.zeros(int(dur * SR))
     hit = author_part("cursed or bad", 0.40, 1.1, 0.4)
     d.place(y, 0.8 * hit, 0.0)
     d.place(y, 0.9 * kick(0.8 if v == 1 else 0.72), 0.0)
-    d.place(y, 0.35 * bell(hz("F#", 2) if v == 1 else hz("C", 3), 1.5, 0.9, rng, 0.6), 0.005)
+    low = hz("F#", 2) if v == 1 else (hz("A", 2) if KEY == "A" else hz("C", 3))
+    d.place(y, 0.35 * bell(low, 1.5, 0.9, rng, 0.6), 0.005)
     return sat(y / np.abs(y).max(), 1.3)
 
 
 def proc_heal(rng, v):
-    """The first two notes of "sting level up" (C -> G), lifted an octave
+    """The first two notes of "sting level up" (A -> E; C -> G in C), lifted an octave
     (v2: the first note only), with a light sparkle on top."""
     src = author_part("sting level up", 0.16, 0.85, 0.25)
     if v == 2:
@@ -137,7 +144,7 @@ def proc_heal(rng, v):
 
 
 def proc_pity(rng, v):
-    """The first pluck of "shop purchase" (a soft C), short, with a wooden
+    """The first pluck of "shop purchase" (a soft A; C in C), short, with a wooden
     tick under it: luck, quietly."""
     p = author_part("shop purchase", 0.865, 0.55, 0.2)
     if v == 2:
@@ -476,7 +483,7 @@ def pick_short():
     """D392: the author's pick reveal, trimmed as make_drop2 trims it, then
     its first <= 2.5 s: cut 20 ms before a strong onset in 1.9-2.5 s if one
     opens a phrase there, else at 2.5 s; the last 0.8 s fade (cos^2)."""
-    x = m2.load("sting pick reveal")
+    x = m2.load_keyed("sting pick reveal", KEY)
     on = m2.first_onset(x)
     y = x[int(max(0.0, on - 0.005) * SR):]
     pt, pv = m2.onsets(y, thr=0.3, gap=0.12)
@@ -491,28 +498,45 @@ def pick_short():
 
 
 def build() -> dict:
+    global KEY
     path = OUT / "sfx.json"
     manifest = json.loads(path.read_text())
     rows = []
-    for name, (fn, count, bus, loop, what) in PH.items():
+    jobs = [(n, "A") for n in PH] + [(n, "C") for n in FROM_STINGS]
+    for name, key in jobs:
+        fn, count, bus, loop, what = PH[name]
+        KEY = key
+        out = name if key == "A" else name + "_c"
         levels = []
         for v in range(1, count + 1):
             y = render(name, v)
-            d.save(OUT / f"{name}_{v}.wav", y)
+            d.save(OUT / f"{out}_{v}.wav", y)
             pk, lu = d.peak_db(y), d.loudness(y)
             levels.append({"peak_db": round(pk, 2), "loudness": round(lu, 2), "rms_db": round(d.rms_db(y), 2),
                            "seconds": round(len(y) / SR, 3), "peak_s": round(ms.envelope_peak(y), 3)})
-            rows.append(f"  {name}_{v:<2} {len(y) / SR:5.2f}s  loud {lu:6.2f}  peak {pk:6.2f}  peak@ {levels[-1]['peak_s']:.3f}s")
-        manifest["sounds"][name] = {"variants": count, "bus": bus, "loop": loop, "levels": levels, "placeholder": True, "for": what}
-    z, trim = pick_short()
-    d.save(OUT / "sting_pick_short_1.wav", z)
-    f, n = m2.frames(z)
-    lv = {"peak_db": round(d.peak_db(z), 2), "loudness": round(d.loudness(z), 2), "rms_db": round(d.rms_db(z), 2),
-          "seconds": round(len(z) / SR, 3), "peak_s": round(int(np.argmax(f)) * n / SR, 3),
-          "body_s": round((int(np.where(f > f.max() - 20)[0][-1]) + 1) * n / SR, 3)}
-    manifest["sounds"]["sting_pick_short"] = {"variants": 1, "bus": "UI", "loop": False, "levels": [lv], "drop": 2, "cut_of": "sting_pick_reveal",
-                                              "source": "design/audio/sting pick reveal.wav", "for": "the pick cards (D392)", "trim": trim}
-    rows.append(f"  sting_pick_short {lv['seconds']:.2f}s  loud {lv['loudness']:.2f}  peak {lv['peak_db']:.2f}  (cut {trim['cut_s']} s)")
+            rows.append(f"  {out}_{v:<2} {len(y) / SR:5.2f}s  loud {lu:6.2f}  peak {pk:6.2f}  peak@ {levels[-1]['peak_s']:.3f}s")
+        row = {"variants": count, "bus": bus, "loop": loop, "levels": levels, "placeholder": True, "for": what}
+        if name in FROM_STINGS:
+            row["key"] = key
+            if key == "C":
+                row["alt_of"] = name
+        manifest["sounds"][out] = row
+    for key in ("A", "C"):
+        KEY = key
+        out = "sting_pick_short" if key == "A" else "sting_pick_short_c"
+        z, trim = pick_short()
+        d.save(OUT / f"{out}_1.wav", z)
+        f, n = m2.frames(z)
+        lv = {"peak_db": round(d.peak_db(z), 2), "loudness": round(d.loudness(z), 2), "rms_db": round(d.rms_db(z), 2),
+              "seconds": round(len(z) / SR, 3), "peak_s": round(int(np.argmax(f)) * n / SR, 3),
+              "body_s": round((int(np.where(f > f.max() - 20)[0][-1]) + 1) * n / SR, 3), "tail_s": m2.tail_s(f, n)}
+        row = {"variants": 1, "bus": "UI", "loop": False, "levels": [lv], "drop": 2, "cut_of": "sting_pick_reveal" + ("" if key == "A" else "_c"),
+               "source": "design/audio/sting pick reveal.wav", "for": "the pick cards (D392)", "trim": trim, "key": key}
+        if key == "C":
+            row["alt_of"] = "sting_pick_short"
+        manifest["sounds"][out] = row
+        rows.append(f"  {out} {lv['seconds']:.2f}s  loud {lv['loudness']:.2f}  peak {lv['peak_db']:.2f}  (cut {trim['cut_s']} s)")
+    KEY = "A"
     path.write_text(json.dumps(manifest, indent=1))
     print("\n".join(rows))
     return manifest

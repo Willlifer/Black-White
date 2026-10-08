@@ -34,11 +34,11 @@ skill lays its element on its shape unless the hook says otherwise.
 | Skill | cd | Shape | Power | Hook | Improve rider |
 |---|---|---|---|---|---|
 | Cleave *(starter)* | 2 | heading, 3-hex arc | 13 | +10% to everyone per foe beyond the first; the element already there carries the swing a ring further | **+** +15% per extra foe |
-| Charge *(starter)* | 2 | heading, run 3 | basic follow-up | Shoves one foe ahead; a foe that can't be shoved slams for 8% (it and what it hits). **High ground (D362):** from 1+ level above the first hex, reach +1 and the shove carries 2 hexes | **+** Reach 4, slam 12% |
+| Charge *(starter)* | 2 | heading, run 7 | basic follow-up | **D414:** pushes one foe along ahead of you; where it can't go on (rock, a unit, a pillar) the run stops behind it and it slams for 8% (it and what it hits); the map edge just stops it. Paints the walk. **High ground (D362):** from 1+ level above the first hex, reach +1 and the shove carries 1 hex further | **+** Reach 8, slam 12% |
 | Reckless Swing | 1 | adjacent foe | 14 | You are Scorched (attacks on you +10%) through your next turn | — |
 | Hook | 2 | foe within 3 | 9 | Pulls it straight in until it's next to you (secondary) | — |
-| Sunder | 3 | adjacent foe | 13 | Ignores 30% DEF, can't glance | — |
-| Earthsplitter | 4 | heading, line 3 | 11 each | Paints the line 1 step; jagged rock stops it | — |
+| Sunder | 3 | adjacent foe, then a fissure | 13 (60% on the fissure) | **D415:** the blow ignores 30% DEF and can't glance; the ground then splits from you through the target, 5 hexes: every hex takes the element (like Ley Line), every other foe on it is hit at 60%. Rock and pillars stop it | — |
+| Earthsplitter | 4 | heading, line 3 | 11 each | **D416:** no paint; each foe on the line is heaved 1 hex back along it (secondary); jagged rock stops the split | — |
 | War Cry | 4 | self (uses the action) | — | +20% STR for your next 2 turns | — |
 
 ## Lance — reach, lines, holding ground

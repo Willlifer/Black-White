@@ -31,7 +31,9 @@ game/tools/audio/make_drop2.py       the author's drop 2: trims, levels, merges 
 game/tools/audio/analyse_drop2.py    the drop-2 capture analysis -> capture_drop2_report.json
 game/tools/audio/make_placeholders.py    ph_* placeholder SFX + the short pick reveal ("Drop 2 cuts + placeholders")
 game/tools/audio/analyse_placeholders.py the placeholder capture analysis -> capture_ph_report.json
-game/src/game/music.gd               BWMusic: layered, beat-synced, cue/intensity/sting
+game/tools/audio/retune.py           the stings' -3 st retune (C -> A), method comparison, chroma keys -> retune_report.json ("Stings retuned to A")
+game/tools/audio/analyse_duck.py     the sting-duck capture analysis -> capture_duck_report.json ("Sting duck")
+game/src/game/music.gd               BWMusic: layered, beat-synced, cue/intensity/sting, the sting duck (Duck)
 game/src/game/voice.gd               BWVoice: barks and grunts (start offset + level per clip, Voice bus)
 game/src/game/audio/audio.gd         BWAudio: buses, effects, per-bus volume settings
 game/src/game/audio/sfx.gd           BWSfx: variation pick, 3D/2D playback, mix table, loops
@@ -40,7 +42,7 @@ game/src/game/audio/unit_audio.gd    BWUnitAudio: animation markers / clips / fo
 game/src/game/audio/combat_audio.gd  BWCombatAudio: battle events (timed to their replay) → SFX, intensity, stings
 game/src/game/audio/screen_audio.gd  BWScreenAudio: title / roster / downtime moments
 game/src/game/audio/audio_capture.gd BWAudioCapture: the --audio-capture run
-game/tests/test_audio.gd             8 tests, ~1600 checks (test_drop2: drop-2 trims, cues, hooks; test_placeholders)
+game/tests/test_audio.gd             11 tests, ~1800 checks (test_drop2; test_placeholders; test_sting_duck(_in_tree); test_stings_in_a)
 ```
 
 ## SFX
@@ -133,7 +135,7 @@ are the author's 10/4 changes:
 | tutorial | moderato (drop 2) | moderato +4.5 |
 | combat | battle (108) | full −4, bright −3, drums 0, drums_top −10 · **intensity 1:** full −3, bright −2, drums_top −5, air −12 · **2:** full −2, bright −1, drums_top −2, air −8, voice_pad −11, kick −6 |
 | boss | boss | full 0, bright −4, drums 0, drums_top −3, air −7, voice_pad −7, kick −5 |
-| stings | — | `BWMusic.sting(kind)`: one at a time on UI; music ducked −11 dB for the sting's body, back over 1.8 s (see Drop 2) |
+| stings | — | `BWMusic.sting(kind)`: one at a time on UI; the music fades out (0.3 s), the sting plays, the music fades back in (1.0 s) once it has rung out (see "Sting duck") |
 
 How cues play:
 - **Timing:** a cue change lands on the **next bar**, and an intensity change on the **next beat**. Layers fade in over 0.08 s and out over 0.45 s.
@@ -145,7 +147,7 @@ How cues play:
 
 ## Buses
 
-Master → limiter at −1 dB. Music (−7): Amplify (sting duck) and a Compressor
+Master → limiter at −1 dB. Music (−7): Amplify (the sting duck, driven every frame by `BWMusic.Duck`) and a Compressor
 sidechained by Voice, which ducks it ~4 dB under barks (ratio 2, threshold −28 dB, 350 ms
 release). MusicStretch (→ Music): PitchShift, used only by the
 `runtime_tempo` option. SFX (−3), Voice (−1), UI (−6).
@@ -306,9 +308,9 @@ rebuild keeps drop 2 in both manifests.
   no bar grid. A cue change leaves them on the next frame (the 0.9 s deck
   crossfade), and any set is entered from its start. Only the four
   re-timings of the 8-bar loop share a progression.
-- One sting at a time: a new one fades the last out over 0.3 s. The music
-  ducks −11 dB for the sting's `body_s` − 0.3 s, then comes back over 1.8 s.
-  `BWMusic.stop_sting()` (a picker closing) lifts the duck over 1.0 s.
+- One sting at a time: a new one fades the last out over 0.3 s. *(Superseded
+  by D411, "Sting duck": the music now fades fully out and back in. Until
+  then it ducked −11 dB for the sting's `body_s` − 0.3 s, back over 1.8 s.)*
 - Sting mix (`BWSfx.MIX`): good / bad +0.5, level up +1, room hard 0, pick
   reveal −7 (it runs under the cards), shop −6 (no duck).
 
@@ -345,10 +347,9 @@ momentary max is level with the others.
 
 ## Drop 2 cuts + placeholders (2026-10-07, D391–D394)
 
-**The stings stay in C, the author's key, for now (D391).** A retune into
-the loop's key (A major / F# minor) was briefed and withdrawn the same day.
-Nothing is pitch-shifted; every sting that plays is the author's file,
-trimmed and levelled as in Drop 2.
+*(D391, "the stings stay in C", is superseded by D412: the author asked for
+A on 2026-10-08. See "Stings retuned to A". The C files below are kept as
+`<name>_c`, bit-identical to what this section built.)*
 
 What was added fills gaps by length and shape only, plus placeholders for
 AUDIO-NEEDS' "Still missing" list. Every placeholder is named `ph_*` so
@@ -371,9 +372,9 @@ one replaces.
 | `sting_pick_short` (1) | **sting pick reveal**: the Drop 2 trim, then its first 2.27 s (cut 20 ms before the onset of its third phrase), the last 0.8 s faded cos² | **every picker** (`BWMusic.STINGS.pick`); fades when the pick is taken. The 7 s take stays mapped as `pick_long` (nothing calls it yet); `"pick": "sting_pick_reveal"` switches back | −7 |
 | `ph_swap_holster` (2) | procedural: a cloth swish, a stick-slip scrape (180 → 90 Hz over 3–8 kHz noise), and a leather/wood seat clack at 0.34 s | a weapon swap starts (`combat_screen._animate_swap`) | −12 |
 | `ph_swap_draw` (2) | procedural: a short scrape out, the blade's ring (metal modes from 2.15 kHz) and a grip thump | the other weapon reaches the hand (the swap's callback) | −12 |
-| `ph_proc_onkill` (2) | the opening hit of **cursed or bad**, the **no snare beat** kick (×0.8 / ×0.72), and a low bell (F#2 / C3) | `enchant`: Death Knell, Relentless, a kill's spread (Wake of Ash) | −7 |
-| `ph_proc_heal` (2) | the first two notes of **sting level up** (C → G), an octave up over the original, plus sparkle | a `heal` caused by an enchantment or Mend-Link (instead of the heal shimmer) | −8 |
-| `ph_proc_pity` (2) | the first pluck of **shop purchase** (v2 up a fifth) and a wood tick | `enchant`: Second Chance, Graze, Follow-Through, Steady Hand | −10 |
+| `ph_proc_onkill` (2) | the opening hit of **cursed or bad** (in A, D412), the **no snare beat** kick (×0.8 / ×0.72), and a low bell (F#2 / A2; C3 in the C alternate) | `enchant`: Death Knell, Relentless, a kill's spread (Wake of Ash) | −7 |
+| `ph_proc_heal` (2) | the first two notes of **sting level up** (A → E in A; C → G in C), an octave up over the original, plus sparkle | a `heal` caused by an enchantment or Mend-Link (instead of the heal shimmer) | −8 |
+| `ph_proc_pity` (2) | the first pluck of **shop purchase** (A; C in C; v2 up a fifth) and a wood tick | `enchant`: Second Chance, Graze, Follow-Through, Steady Hand | −10 |
 | `ph_immune` (3) | procedural: low, heavily damped inharmonic modes (f0 ≈ 240 Hz), a muffled thud, low-passed at 2.4 kHz | `immune` (a blow on a Blank or a Being) | −5 |
 | `ph_obelisk_push` (2) | the kick a fourth down, a 45 Hz sub, and a falling outward rush (1.1 kHz → 160 Hz) in a short room | the Lantern's pulse (`combat_screen._pulse`) | −3 |
 | `ph_obelisk_pull` (2) | a rising inward rush (150 Hz → 1.3 kHz) swelling into the same kick at 0.8 s | the Well's pulse | −3 |
@@ -404,7 +405,7 @@ cutscenes no cast clip plays, so the release sound doesn't either.
 
 **Verified (D394).** `test_audio`'s `test_placeholders` covers the manifest,
 mix, onsets, loop seams, the proc text map, the big-cast rule, the pick
-mapping, and the stings still being the author's files.
+mapping, and the stings being the author's files (retuned, not cut).
 
 The capture: `godot --path game -- --placeholders --audio-capture <dir>`,
 then `python game/tools/audio/analyse_placeholders.py <dir>`. It plays the
@@ -424,6 +425,160 @@ clipped samples, highest peak −3.0 dBFS.
 - **The pick cut** sits at −24.2 momentary under the ducked hall music,
   the same as the 7 s take. Their gains differ by 0.7 dB, and both play at
   −7 because they "run under the cards".
+
+## Sting duck (2026-10-08, D411, D413)
+
+The author: "When playing an audio clip during downtime: fade the existing
+track out, play the jingle, then fade it in."
+
+**What happens.** `BWMusic.sting(kind)` (every sting: level up, the pick
+reveal, room hard, the shop purchase, cursed, jackpot, victory, defeat):
+1. The Music bus fades **out** over `DUCK_OUT` 0.3 s, on a (1 − t)² curve,
+   so most of the drop is early: −7 dB at 0.1 s, −60 dB ("out") at 0.3 s.
+2. The sting starts `DUCK_LEAD` 0.1 s into that fade. Its attack isn't
+   fighting the music, and the delay is under a frame-and-a-half of UI.
+3. The music stays out until the sting has **rung out**: `tail_s` in
+   `sfx.json`, where the sting falls 30 dB under its peak (level up 4.5 s,
+   room hard 4.0, cursed 3.2, shop 3.9, good 6.1, pick 2.3).
+4. It fades back **in** over `DUCK_IN` 1.0 s, on a sine curve, over the
+   last of the sting's reverb.
+
+Combat SFX don't duck, and nor does the combat level-up chime (`ui_levelup`).
+The shop purchase used to play without a duck; it's now `STINGS.shop`.
+
+**Edge cases.** `BWMusic.Duck` is a pure state machine (idle, down, held,
+up). `_process` steps it and writes the Music bus's Amplify. Each step
+re-reads its place on the curve from the current level, so it never jumps.
+- **Overlap:** a sting during the hold replaces the hold, because the older
+  sting is faded out (one at a time, D240). One during the fade-in turns the
+  fade around from where it is: no step up, no stutter.
+- **Screen change mid-duck:** the duck is on the bus, not on a track. The new
+  screen's track starts under the same duck and comes in with the fade-in.
+- **Picker closed:** `stop_sting` fades the sting over 0.8 s, and the music
+  starts back in 0.4 s later instead of waiting out the hold.
+- **Never stuck:** a sting whose player is gone or never started releases
+  the duck. BWMusic resets the bus to 0 dB on entering and leaving the tree.
+
+**Verified.** `test_sting_duck` covers the state machine: out within 0.3 s
+and only falling, held, only rising back in, exactly 0 dB at the end, the
+overlap during the hold, the turn-around during the fade-in, release, a very
+short sting, and every sting's hold. `test_sting_duck_in_tree` uses a real
+BWMusic and the bus: a screen change mid-duck, a never-played sting, the
+picker release, and the reset on leaving the tree.
+
+The capture: `godot --path game -- --duck --audio-capture <dir>`, then
+`python game/tools/audio/analyse_duck.py <dir>`. It records the Music bus
+twice, before its Amplify and after everything on it, so post / pre is the
+gain the duck applied, whatever the chords are doing. The run was 48 s at
+48 kHz over the hall's chillin: **0 clipped samples, highest peak
+−1.56 dBFS.**
+
+| Sting (hook) | Fell 20 dB | Lowest | Rose from | Back within 1 dB | Expected (hold + 1.0) |
+|---|---|---|---|---|---|
+| level up | 0.21 s | −75 dB | 4.63 s | 5.33 s | 5.63 |
+| room hard, then cursed 1 s later | 0.21 s | −62 / −71 | 3.33 s after cursed | 4.03 s after cursed | 4.30 |
+| shop purchase (the director's hook), screen change 1 s in | 0.20 s | −65 | — | — | — |
+| pick (a real picker, closed at 1.0 s) | 0.18 s | −65 | 1.42 s | 2.12 s | 2.40 |
+| victory over the combat bed | 0.21 s | −65 | 6.23 s | 6.93 s | 7.20 |
+
+- **Within 1 dB** comes about 0.3 s before the fade ends: that's the sine
+  curve's last flat stretch.
+- **Overlap:** between the Hard room sting and the end of the cursed hold,
+  the gain never rose above −59.8 dB, so the duck extended.
+- **Screen change:** the rooms track started under the duck (at most
+  −60.3 dB while the shop sting held), then played at full gain (median
+  0.0 dB), at −16.7 dBFS on the bus.
+- **Every sting:** the gain was 0.0 dB before it. BWMusic's own frame log
+  bottoms out at −60 and ends at 0.0.
+
+## Stings retuned to A (2026-10-08, D412, D413)
+
+The author: "I did notice some clashes between A and C. If you can adjust
+that, it may clash less." The loops are in F# minor / A major and the stings
+centred on C. Every drop-2 sting is shifted **−3 semitones**: C major → A
+major, and E minor → C# minor (the iii of A). That covers the six stings,
+the short pick reveal, and the three procs cut from them (`ph_proc_onkill`,
+`ph_proc_heal`, `ph_proc_pity`; the on-kill's C3 bell is now A2). Each is
+regenerated from the retuned source through the same trim and level as
+before.
+
+**The switch.** The author's C versions ship beside the A files as
+`<name>_c` (`sfx.json` `"alt_of"`, `"key": "C"`). They're bit-identical to
+the files that played before. In `game/src/game/audio/sfx.gd`:
+
+```gdscript
+const STING_KEY := "A"     # "C" plays the author's originals everywhere
+```
+
+`BWSfx.resolve()` maps every name with a `_c` twin (the stings, the pick
+cut, the three procs). A C alternate mixes at its A name's `MIX` level.
+Rebuild with `python game/tools/audio/make_drop2.py --stings`, which rebuilds
+the stings and placeholders only, then `--import`.
+
+**Method** (`retune.py`). A time-scale change by 37/44 (2^(−3/12) to within
+0.03 cents) is followed by a polyphase resample by 44/37 back to the
+original length, so the duration is exact. I compared four time-scalers on
+all six sources. "Tonal contrast" is each frame's 95th over 30th percentile
+of the 100 Hz–2 kHz spectrum, against the plain resample: that has the ideal
+spectrum, just 19% slower. Smeared or combed partials lower it. The plucks
+are three synthetic 440 Hz attacks.
+
+| Method | Onset flux (mean / worst) | Pre-echo | Tonal contrast | Stereo r change | Chroma r | Plucks: timing, rise |
+|---|---|---|---|---|---|---|
+| plain PV (per channel, no locking) | −8.2 / −11.5 dB | +5.1 dB | −2.2 dB | 0.55 | 0.81 | +4 … +10 ms, 3–44 ms |
+| locked PV (identity phase locking, transient phase reset, one phase correction from the mid) | −2.8 / −10.2 | −0.9 | +1.0 | 0.015 | 0.992 | 0 … +5 ms, 14–15 ms |
+| WSOLA (`bwdsp.wsola`, 1024) | −0.5 / −2.5 | +0.3 | **−2.1** | 0.018 | 0.988 | −3 … +8 ms, 0.5 ms |
+| **locked PV + transient splice** (picked) | **−0.5 / −2.6** | −1.1 | **+0.2** | **0.014** | 0.987 | **+1.1 … +1.5 ms, 0.4–0.5 ms** |
+
+How to read the table:
+- **Locked PV** keeps the tones but smears every attack by about 15 ms.
+- **WSOLA** keeps the attacks but loses 2 dB of tonal contrast (doubling,
+  combing) and jitters attack timing by up to 8 ms.
+- **The pick** splices the plain resample in around each clear onset, from
+  20 ms before it to 30 ms after. A clear onset is a flux peak at 25% or
+  more of the max, at least 150 ms from the last one. Both splice points sit
+  where the two signals agree best (±6 ms), with 8 ms crossfades. Dense runs
+  are left to the vocoder, because splicing every onset roughened them
+  (chroma r fell to 0.91 in "very good event").
+- **Clicks:** none found. On "very good event" the energy above 5 kHz is
+  −68.6 dB against the source's −67.5: the splices add no broadband energy.
+
+**Pitch centres.** Measured on the shipped files: chroma from an 8192-point
+STFT over 55 Hz–2 kHz, the Krumhansl key, the top pitch classes, and the
+share of chroma energy inside A major / F# minor.
+
+| File | Before (C) | In A maj / F# min | After (A) | In A maj / F# min |
+|---|---|---|---|---|
+| sting_level_up | C major (C G E) | 22% | A major (A E C#) | 94% |
+| sting_pick_reveal | E minor (B G E) | 66% | C# minor (E G# C#) | 83% |
+| sting_pick_short | E minor (E G C) | 52% | C# minor (E C# G#) | 90% |
+| sting_room_hard | C major (C G E) | 31% | A major (A E C#) | 84% |
+| sting_good (very good event) | C major (E G D) | 54% | A major (E D C#) | 86% |
+| sting_bad (cursed or bad) | C major (C G E) | 31% | A major (A E C#) | 80% |
+| shop_purchase | C major (C E G) | 27% | A major (A C# E) | 95% |
+| ph_proc_onkill | C major (C F# G) | 38% | F# minor (A F# G) | 80% |
+| ph_proc_heal | C major (C F B) | 10% | A major (A D G#) | 92% |
+| ph_proc_pity | C major (C G F) | 9% | A major (A E D) | 93% |
+
+Every one now reads as A major, its relative F# minor, or C# minor (the
+iii). That's 80–95% of the energy in the loops' scale, against 9–66% before.
+
+What's left outside the scale:
+- **Room hard and cursed** (80–84%) keep their deliberate rub, now a C
+  natural against C# instead of D# against E.
+- **The on-kill** keeps a G from the unpitched kick.
+
+**Levels.** As before: −16 LUFS-ish momentary, peaks ≤ −1 dBFS. The pick
+reveal reads −16.1 because it's peak-bound. The gains moved by 0.1–0.7 dB
+against the C files, and `BWSfx.MIX` is unchanged.
+
+**Lengths.** These are trim-for-trim the same within 0.07 s, except the
+short pick cut. Its phrase-onset search found a later phrase start in the A
+version: 2.41 s against 2.27 s, still under the 2.5 s cap.
+
+The full numbers are in `design/audio/retune_report.json`, by
+`python game/tools/audio/retune.py` (≈1 min). `retune.py --game` re-measures
+the shipped files only.
 
 ## Swapping in real recordings
 

@@ -79,15 +79,13 @@ func test_kinds_and_options(t) -> void:
 
 func test_memory_and_defaults(t) -> void:
 	var u := _u("w", "staff", "wind")
-	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "unset: an area defaults to Draw in, under Gust too (D383)")
-	u.wind_mode = "vortex"
-	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "Vortex → Draw in")
-	t.eq(int(BWWindShape.choice(u, "bolt").rel), 3, "Vortex → a single push straight back toward the caster")
-	u.wind_mode = "becalm"
-	t.eq(str(BWWindShape.choice(u, "ley_line").opt), "hold", "Becalm → Hold")
+	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "unset: an area defaults to Draw in (D383)")
+	t.eq(str(BWWindShape.choice(u, "ley_line").opt), "blast", "a line to Blast out (D407: no basic mode to follow)")
+	t.eq(str(BWWindShape.choice(u, "bolt").opt), "push", "a single target to Push")
+	t.eq(int(BWWindShape.choice(u, "bolt").rel), 0, "straight away from the caster")
 	BWWindShape.set_choice(u, "ley_line", "part_right")
 	t.eq(str(BWWindShape.choice(u, "ley_line").opt), "part_right", "the last choice is remembered per skill")
-	t.eq(str(BWWindShape.choice(u, "surge").opt), "hold", "and only for that skill")
+	t.eq(str(BWWindShape.choice(u, "surge").opt), "draw", "and only for that skill")
 	BWWindShape.set_choice(u, "ley_line", "draw")
 	t.eq(str(BWWindShape.choice(u, "ley_line").opt), "part_right", "an option of another shape is refused")
 	BWWindShape.set_choice(u, "bolt", "push", -1)
@@ -280,26 +278,18 @@ func test_caps(t) -> void:
 	t.eq(moves.size(), 1, "one wind move per action")
 
 
-func test_gale_takes_the_shaping(t) -> void:
+## D406: whatever the shaping, the gale a skill lays is a plain gale.
+func test_gale_is_plain_whatever_the_shaping(t) -> void:
 	var tgt := Vector2i(4, 1)
-	for row in [["draw", "vortex"], ["burst", "gust"], ["hold", "becalm"]]:
+	for opt in ["draw", "burst", "hold"]:
 		var me := _u("st", "staff", "wind")
 		var b := _duel(me, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
-		me.wind_mode = "gust"
-		BWWindShape.set_choice(me, "surge", row[0])
+		BWWindShape.set_choice(me, "surge", opt)
 		b.use_skill(me, "surge", "wind", tgt)
-		t.eq(str(BWWind.field_at(b, tgt).get("mode", "")), row[1], "%s lays a %s gale" % row)
-	var me2 := _u("st", "staff", "wind")
-	_learn(me2, "ley_line")
-	var b2 := _duel(me2, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
-	BWWindShape.set_choice(me2, "ley_line", "part_right")
-	b2.use_skill(me2, "ley_line", "wind", _nb(C, EAST))
-	var f2 := BWWind.field_at(b2, Vector2i(6, 4))
-	t.eq(str(f2.get("mode", "")), "gust", "Part lays gust gales")
-	t.eq(int(f2.get("heading", -1)), BWWindShape.side_dir(BWWindShape.forward(C, _nb(C, EAST)), -1), "heading to the parting side")
-	t.ok(BWWindShape.active(b2, me2).is_empty(), "the shaping ends with the action")
-	b2.paint([Vector2i(2, 7)], "wind", me2)
-	t.eq(str(BWWind.field_at(b2, Vector2i(2, 7)).get("mode", "")), "gust", "a paint outside a skill keeps the unit's mode")
+		var e := b.tiles.at(tgt)
+		t.eq(str(e.get("marker", "")), "gale", "%s lays a gale" % opt)
+		t.ok(not e.has("mode") and not e.has("heading"), "%s: no mode, no heading" % opt)
+		t.ok(BWWindShape.active(b, me).is_empty(), "the shaping ends with the action")
 
 
 func _run_once(opt: String) -> Array:

@@ -99,11 +99,9 @@ var statuses := {}
 ## D87: heading (0-5, BWHex.CUBE_DIRS) the unit last faced: its last step,
 ## or the last thing it struck. -1 = unknown. Daggerleap reads its back.
 var facing := -1
-## D269: the mode its wind actions carry (BWWind: gust | vortex | becalm),
-## chosen on the forecast, remembered (not reset per battle).
-var wind_mode := "gust"
 ## D365: a wind SKILL's shaping, per skill key: { opt, rel } (BWWindShape),
-## the last one chosen; remembered like wind_mode (not in the save).
+## the last one chosen; remembered, not in the save. (D407: the D269 per-unit
+## wind mode is gone; a wind basic just pushes 1.)
 var wind_shapes := {}
 ## D97 engine hooks for weapon skills (BWSkillDef.zone / overwatch):
 ## zone = { hexes: [Vector2i], skill } — enemy movement entering one of these

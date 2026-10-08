@@ -709,9 +709,10 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	_hovered.panel.visible = false
 
 
-## D269: a wind action's three-way mode toggle (Gust / Vortex / Becalm),
-## when the screen set `wind_action` for this forecast. `wind_changed` re-opens
-## it with the new mode. Consumed once (the next forecast must set it again).
+## D365: a wind skill's WIND SHAPING strip, when the screen set `wind_action`
+## for this forecast (D407: the basics' Gust / Vortex / Becalm toggle is gone;
+## a wind basic just pushes 1). `wind_changed` re-opens it after a change.
+## Consumed once (the next forecast must set it again).
 var wind_action := false
 var wind_changed: Callable
 var wind_strip: Callable           # D365: BWWindShapeView.strip, the WIND SHAPING strip of a wind skill
@@ -725,9 +726,7 @@ func _wind_toggle(att: BWUnit) -> void:
 		return
 	var shaping: Control = wind_strip.call() if wind_strip.is_valid() else null
 	if shaping != null:
-		_fc_rows.add_child(shaping)              # D365: a skill shapes its wind; the mode toggle is for basics
-		return
-	_fc_rows.add_child(BWWindView.toggle_row(att, wind_changed))
+		_fc_rows.add_child(shaping)              # D365: a skill shapes its wind
 
 
 ## D244 Forceful: a basic attack's knock is the player's call, push or pull,
@@ -810,7 +809,7 @@ func show_plan(att: BWUnit, what: String, notes: Array) -> void:
 		c.queue_free()
 	for n in notes:
 		_fc_rows.add_child(_note_line(str(n)))
-	_wind_toggle(att)                            # D269: a gale laid on empty ground keeps the mode
+	_wind_toggle(att)                            # D365: the shaping strip
 	var tip := Label.new()
 	tip.text = "Nothing to roll. Click again or press Enter to confirm."
 	tip.add_theme_font_size_override("font_size", 14)

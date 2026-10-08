@@ -8,28 +8,32 @@ extends RefCounted
 ## Priority (D315): fights deployed this run (BWRun.stats.units[id].fights),
 ## then damage dealt there, then level, then squad order.
 ##
-## A unit's profile (D316):
-##   element  its highest affinity (points come from using an element in
-##            battle, +1 an attack and +3 a KO, and from training it); ties go
-##            to the focus, then the native element. The run's stats keep no
-##            per-element damage, and affinity is the one per-unit "what it
-##            uses" count the rules already keep.
+## A unit's profile (D403, replaces D315's "highest affinity"):
+##   elements its element priority list: (1) its FOCUS element (u.focus():
+##            the chosen focus while it has affinity, else the native one),
+##            then (2) every other element with affinity > 0, by affinity
+##            rank, ties by points, then data order (BWFormulas.ELEMENTS).
+##   element  the primary (elements[0]).
 ##   weapon   the class of its drawn main weapon (u.weapon_class).
 ##   second   the class it has the most expertise in other than `weapon`.
 ##
-## Scoring an item for a slot (D317), highest wins, lexicographic:
+## Scoring an item for a slot (D317, D403), highest wins, lexicographic:
 ##   main hand  its class is the unit's weapon (a sword user keeps a sword:
 ##              expertise sets hit chance and the skill bar)
 ##   second     a different class than the drawn weapon, the unit's
 ##              expertise in it, then the rest
-##   element    the item's element (armour colour, a weapon's imbue) is the
-##              unit's element
-##   set        it brings a learned element to 2 or 3 pieces (head, chest,
-##              legs and the drawn weapon count; BWSets)
+##   primary    the item's element (armour colour, a weapon's imbue) is the
+##              unit's primary: always above anything secondary, so the
+##              primary set fills first
+##   secondary  a secondary element's piece that brings that set to 2 or 3
+##              pieces (head, chest, legs and the drawn weapon count; BWSets),
+##              then the secondary's rank (2nd above 3rd ...)
 ##   tier, then the stat total, then the piece the unit already wears there,
 ##   then the lower uid (determinism).
 ## Cursed pieces (an enchantment or imbue row marked cursed) are only ever
 ## kept by the unit already wearing them: never handed to anyone else.
+## Each change carries a short `reason` for the preview ("Fire set 3/3",
+## "Water (2nd)", D403).
 ##
 ## Optimize all (D318): units in priority order; each takes from the loose
 ## inventory, from what higher units let go, and from units below it
@@ -37,14 +41,20 @@ extends RefCounted
 ## weapon is never another unit's drawn weapon, and is skipped when taking
 ## it would leave a later unit with no weapon. Whatever nobody takes goes to
 ## the inventory; the discard pile is never touched (it isn't the inventory).
+##
+## Unequip all (D404): every squad unit's armour and second weapon go to the
+## inventory, cursed pieces too; the MAIN-hand weapon stays, so nobody is
+## weaponless (BWRun.unequip never empties the main hand either). Same plan
+## shape, so it previews, applies and undoes like an optimize.
 
 const SET_SLOTS := ["main_hand", "chest", "legs", "head"]
 const PASSES := 2
 
 const W_CLASS := 1.0e7
 const W_SECOND_EXP := 1.0e6
-const W_ELEMENT := 1.0e5
-const W_SET := 3.0e4
+const W_ELEMENT := 1.0e5                 # the primary element
+const W_SEC_SET := 4.5e4                 # a secondary piece that makes a 2/3-piece set
+const W_SEC_STEP := 6.0e3                # a secondary match: (8 - its place) steps, 2nd 36k .. 7th 6k
 const W_TIER := 1.0e3
 const W_STAT := 10.0
 const W_KEEP := 2.0 * W_STAT + 1.0     # a piece must beat what's worn there by 3+ stat points to move
@@ -67,7 +77,35 @@ static func priority(run: BWRun) -> Array:
 	return order.map(func(x): return x[0])
 
 
-## The element `u` uses most: highest affinity; ties go to the focus, then the native element.
+## D403: the unit's element priority list: its focus, then the other
+## learned elements (affinity > 0) by rank, then points, then data order.
+static func elements(u: BWUnit) -> Array:
+	var first := u.focus()
+	var rest: Array = []
+	for el in BWFormulas.ELEMENTS:
+		if el != first and int(u.affinity.get(el, 0)) > 0:
+			rest.append(el)
+	rest.sort_custom(func(a, b):
+		var ra := u.affinity_rank(a)
+		var rb := u.affinity_rank(b)
+		if ra != rb:
+			return ra > rb
+		var pa := int(u.affinity.get(a, 0))
+		var pb := int(u.affinity.get(b, 0))
+		if pa != pb:
+			return pa > pb
+		return BWFormulas.ELEMENTS.find(a) < BWFormulas.ELEMENTS.find(b))
+	return ([first] if first != "" else []) + rest
+
+
+## The primary element for Optimize (D403): the focus.
+static func primary(u: BWUnit) -> String:
+	return u.focus()
+
+
+## The element `u` uses most: highest affinity; ties go to the focus, then
+## the native element. No longer Optimize's profile (D403 put the focus
+## first); kept for the shop's featured scroll (D380: "fight mostly with").
 static func used_element(u: BWUnit) -> String:
 	var best := u.focus()
 	var bp := int(u.affinity.get(best, 0))
@@ -93,7 +131,8 @@ static func profile(u: BWUnit) -> Dictionary:
 		if p > sp:
 			sec = c
 			sp = p
-	return { "element": used_element(u), "weapon": wc, "second": sec }
+	var els := elements(u)
+	return { "element": els[0] if not els.is_empty() else "", "elements": els, "weapon": wc, "second": sec }
 
 
 # ---------------------------------------------------------------- scoring
@@ -124,12 +163,15 @@ static func score(u: BWUnit, pf: Dictionary, it: Dictionary, slot: String, count
 			s += W_SECOND_EXP * mini(int(u.expertise.get(wc, 0)) / BWUnit.POINTS_PER_RANK, 5) / 5.0
 			if wc == str(pf.second):
 				s += W_SECOND_EXP * 0.5
-	if el != "" and el == str(pf.element):
+	var place: int = pf.get("elements", [pf.element]).find(el) if el != "" else -1
+	if place == 0:
 		s += W_ELEMENT
-	if slot in SET_SLOTS and el != "" and int(u.affinity.get(el, 0)) > 0:
-		var n := int(counts.get(el, 0)) + 1
-		if n == 2 or n == 3:
-			s += W_SET
+	elif place > 0:
+		s += W_SEC_STEP * (8 - mini(place, 7))
+		if slot in SET_SLOTS:
+			var n := int(counts.get(el, 0)) + 1
+			if n == 2 or n == 3:
+				s += W_SEC_SET
 	s += W_TIER * BWRun.TIERS.find(str(it.get("tier", "E")))
 	s += W_STAT * stat_total(it)
 	if u.equipment.get(slot, {}) == it:
@@ -309,7 +351,8 @@ static func _with_changes(run: BWRun, loadouts: Dictionary) -> Dictionary:
 				changes.append({ "unit": u.id, "slot": slot, "item": {}, "from": "", "out": was })
 				continue
 			var w: Array = where.get(str(it.uid), ["", ""])
-			changes.append({ "unit": u.id, "slot": slot, "item": it, "from": str(w[0]), "from_slot": str(w[1]), "out": was })
+			changes.append({ "unit": u.id, "slot": slot, "item": it, "from": str(w[0]), "from_slot": str(w[1]), "out": was,
+				"reason": reason(u, it, slot, lo) })
 	var freed: Array = []
 	for u in run.squad:
 		for slot in BWRun.GEAR_SLOTS:
@@ -317,6 +360,45 @@ static func _with_changes(run: BWRun, loadouts: Dictionary) -> Dictionary:
 			if not it.is_empty() and not kept.has(str(it.uid)):
 				freed.append(it)
 	return { "loadouts": loadouts, "changes": changes, "freed": freed }
+
+
+## D403: why `it` went in `slot` of the loadout `lo`, briefly: "Fire set 3/3"
+## (the primary at 2+ pieces), "Fire (focus)", "Water set 2/3 (2nd)",
+## "Water (2nd)"; "" for a piece outside the unit's elements (tier / stats).
+static func reason(u: BWUnit, it: Dictionary, slot: String, lo: Dictionary) -> String:
+	var el := BWSets.item_set_element(it)
+	var place := elements(u).find(el) if el != "" else -1
+	if place < 0:
+		return ""
+	var tag := "focus" if place == 0 else ordinal(place + 1)
+	if slot in SET_SLOTS:
+		var n := int(_counts(lo, "").get(el, 0))
+		if n >= 2:
+			return "%s set %d/3%s" % [el.capitalize(), mini(n, 3), "" if place == 0 else " (%s)" % tag]
+	return "%s (%s)" % [el.capitalize(), tag]
+
+
+static func ordinal(n: int) -> String:
+	match n:
+		1: return "1st"
+		2: return "2nd"
+		3: return "3rd"
+	return "%dth" % n
+
+
+## Unequip all (D404): `units` (default the whole squad) keep only their
+## main-hand weapon; armour and the second weapon, cursed or not, go to the
+## inventory.
+static func plan_unequip(run: BWRun, units: Array = []) -> Dictionary:
+	var who: Array = run.squad if units.is_empty() else units
+	var loadouts := {}
+	for v in run.squad:
+		if v in who:
+			var keep: Dictionary = v.equipment.get("main_hand", {})
+			loadouts[v.id] = {} if keep.is_empty() else { "main_hand": keep }
+		else:
+			loadouts[v.id] = v.equipment.duplicate()
+	return _with_changes(run, loadouts)
 
 
 static func empty(plan: Dictionary) -> bool:

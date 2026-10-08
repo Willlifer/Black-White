@@ -29,10 +29,10 @@ extends RefCounted
 ## all apply unchanged. Only foes are moved (the D271 ruling).
 ##
 ## The choice is remembered per unit and skill (`BWUnit.wind_shapes[key] =
-## {opt, rel}`); with nothing stored it follows the unit's basic wind mode
-## (gust → blast / push away, vortex → blast / pull in, becalm → hold;
-## an area draws in under gust and vortex alike, D383). A gale the skill lays takes the shaping's equivalent mode
-## (field_mode). Basic attacks keep the three modes (BWWind).
+## {opt, rel}`); with nothing stored: an area draws in (D383), a line blasts
+## out, a single target is pushed straight away (D407: no basic wind mode to
+## follow any more). A gale the skill lays is a plain gale (D406: it only
+## spreads); a wind basic attack just pushes 1 (BWWind.after_basic).
 
 const LINE := "line"
 const AREA := "area"
@@ -100,17 +100,14 @@ static func options(kind: String) -> Array:
 
 ## The option list as the UI cycles it (single: one Push per heading is too
 ## many to cycle; the push heading is its own control).
-static func default_choice(u: BWUnit, kind: String) -> Dictionary:
-	var m := BWWind.mode(u)
-	if m == BWWind.BECALM:
-		return { "opt": HOLD, "rel": 0 }
+static func default_choice(_u: BWUnit, kind: String) -> Dictionary:
 	match kind:
 		AREA:
 			return { "opt": DRAW, "rel": 0 }                # D383: areas default to Draw in (was Burst out under Gust, D365)
 		LINE:
 			return { "opt": BLAST, "rel": 0 }
 		SINGLE:
-			return { "opt": PUSH, "rel": 3 if m == BWWind.VORTEX else 0 }
+			return { "opt": PUSH, "rel": 0 }
 	return { "opt": HOLD, "rel": 0 }
 
 
@@ -131,11 +128,11 @@ static func set_choice(u: BWUnit, key: String, opt: String, rel: int = 0) -> voi
 	u.wind_shapes[key] = { "opt": opt, "rel": posmod(rel, 6) }
 
 
-## Re-simulation key for the readability cache (mode + every stored shaping).
+## Re-simulation key for the readability cache (every stored shaping).
 static func sig(u: BWUnit) -> String:
 	if u == null:
 		return ""
-	return BWWind.mode(u) + "|" + var_to_str(u.wind_shapes)
+	return var_to_str(u.wind_shapes)
 
 
 # ---------------------------------------------------------------- geometry
@@ -259,7 +256,7 @@ static func pre(b: BWBattle, u: BWUnit, s: Dictionary, p: Dictionary, target_hex
 		var res := BWWind.pre_mode(b, u, s, p, target_hex, BWWind.VORTEX, dry)
 		res["shaping"] = opt
 		return res
-	return { "moves": [], "becalm": [], "restore": [], "origin": centre(u.pos, s, target_hex), "mode": field_equiv(opt), "shaping": opt }
+	return { "moves": [], "becalm": [], "restore": [], "origin": centre(u.pos, s, target_hex), "shaping": opt }
 
 
 ## The live shaping of `by`'s action now ({} outside it).
@@ -268,34 +265,6 @@ static func active(b: BWBattle, by: BWUnit) -> Dictionary:
 	if ctx.is_empty() or by == null or str(ctx.get("unit", "")) != by.id or int(ctx.get("act", -1)) != b._action_serial:
 		return {}
 	return ctx
-
-
-## The field mode a shaping lays (gales the skill paints keep it).
-static func field_equiv(opt: String) -> String:
-	match opt:
-		DRAW: return BWWind.VORTEX
-		HOLD: return BWWind.BECALM
-	return BWWind.GUST
-
-
-## BWWind.after_paint: the mode a gale laid by `by` now stores.
-static func field_mode(b: BWBattle, by: BWUnit) -> String:
-	var ctx := active(b, by)
-	return field_equiv(str(ctx.opt)) if not ctx.is_empty() else BWWind.mode(by)
-
-
-## The heading of a gust gale laid on `h` (-1 = BWWind's default: away from
-## the caster). Part: the parting side; Push: the push heading.
-static func field_heading(b: BWBattle, by: BWUnit, _h: Vector2i) -> int:
-	var ctx := active(b, by)
-	if ctx.is_empty():
-		return -1
-	match str(ctx.opt):
-		PART_LEFT, PART_RIGHT:
-			return side_dir(forward(ctx.from, ctx.target), 1 if str(ctx.opt) == PART_LEFT else -1)
-		PUSH:
-			return int(ctx.get("dir", -1))
-	return -1
 
 
 ## After the hits and the paint (battle.use_skill): every option but Draw in
@@ -420,7 +389,7 @@ static func _hold(b: BWBattle, u: BWUnit, who: Array) -> Array:
 
 
 ## What landing on `h` costs `v` by its next turn (the preview's warning):
-## [[label, pct]]: fire, dark 3, an electrified field, a gust field.
+## [[label, pct]]: fire, dark 3, an electrified field (D406: no gust fields).
 static func hazard(b: BWBattle, v: BWUnit, h: Vector2i) -> Array:
 	var out: Array = []
 	var st := b.tiles.standing(h)
@@ -431,9 +400,6 @@ static func hazard(b: BWBattle, v: BWUnit, h: Vector2i) -> Array:
 	var sh := BWPools.hazard_pct(b, v, h) * 0.5
 	if sh > 0.0:
 		out.append(["SHOCK", sh])
-	var f := BWWind.field_at(b, h)
-	if not f.is_empty() and str(f.mode) == BWWind.GUST:
-		out.append(["GUST FIELD", 0.0])
 	return out
 
 

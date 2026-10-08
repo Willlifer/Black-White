@@ -26,9 +26,16 @@ Covered (details and measurements: AUDIO.md, "Drop 2"):
 
 Still missing (short):
 - `music_picks` (optional; the reveal sting covers the moment), `music_encounter` (optional)
-- The stings' key: they centre on C, and the loop is in F# minor / A major.
-  **This is your call, and it's left as is.** A retune was briefed and
-  withdrawn on 2026-10-07.
+
+## Key: the stings are in A now (2026-10-08, D412)
+
+You asked for A ("I did notice some clashes between A and C"), so every
+drop-2 sting, the short pick reveal and the three procs cut from them were
+shifted −3 semitones (C major → A major, E minor → C# minor), length kept.
+Your C files are kept as `<name>_c`, and `BWSfx.STING_KEY = "C"` brings
+them back. New stings: A major / F# minor will sit with the loops. Details
+are in AUDIO.md, "Stings retuned to A". The music also fades out under
+every sting now and back in after it (D411).
 
 ## Placeholders in the game now: replace me (2026-10-07, D392–D393)
 
@@ -39,9 +46,9 @@ I'll trim it, level it and move the hook over. Details are in AUDIO.md,
 "Drop 2 cuts + placeholders".
 
 - [ ] **replace me**: `sfx_swap_holster` / `sfx_swap_draw` (now `ph_swap_holster`, `ph_swap_draw`)
-- [ ] **replace me**: `sfx_proc_onkill` (now `ph_proc_onkill`: your "cursed or bad" hit, a kick and a low bell)
-- [ ] **replace me**: `sfx_proc_heal` (now `ph_proc_heal`: your level-up's first two notes, an octave up)
-- [ ] **replace me**: `sfx_proc_pity` (now `ph_proc_pity`: your shop purchase's first pluck)
+- [ ] **replace me**: `sfx_proc_onkill` (now `ph_proc_onkill`: your "cursed or bad" hit (in A), a kick and a low bell)
+- [ ] **replace me**: `sfx_proc_heal` (now `ph_proc_heal`: your level-up's first two notes (in A), an octave up)
+- [ ] **replace me**: `sfx_proc_pity` (now `ph_proc_pity`: your shop purchase's first pluck (in A))
 - [ ] **replace me**: `sfx_immune` (now `ph_immune`, a dull clank)
 - [ ] **replace me**: `sfx_obelisk_push` / `sfx_obelisk_pull` (now `ph_obelisk_push`, `ph_obelisk_pull`)
 - [ ] **replace me**: `sfx_colossus_step` / `sfx_colossus_thrust` (now `ph_colossus_step`, `ph_colossus_thrust`)

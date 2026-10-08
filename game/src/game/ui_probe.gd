@@ -567,7 +567,7 @@ func _gear_tooltip_probe() -> void:
 
 
 ## D315-D318: O opens Optimize all's preview, Esc cancels it, Apply hands the
-## gear out, Undo optimize puts it all back.
+## gear out, Undo optimize puts it all back. D404: the same for Unequip all [U].
 func _autoequip_probe() -> void:
 	var ids: Array = BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
 	var run := BWRun.start(ids, 1)
@@ -619,6 +619,29 @@ func _autoequip_probe() -> void:
 	await get_tree().create_timer(0.2).timeout
 	_check(sig.call() == before, "auto-equip: Undo puts everything back")
 	_check(not gp._undo_btn.visible, "auto-equip: one step: the Undo button goes")
+	# D404: U opens Unequip all's confirm (Esc cancels), Apply strips armour
+	# and second weapons with every main hand kept, Undo unequip restores
+	BWAutoEquip.apply(run, BWAutoEquip.plan_all(run))   # dress the squad first
+	gp.refresh()
+	before = sig.call()
+	await _key(KEY_U)
+	_check(gp.preview_open() and BWEsc.top_name() == "unequip confirm", "unequip all: U opens the confirm on the Esc stack")
+	await _key(KEY_ESCAPE)
+	_check(not gp.preview_open() and sig.call() == before, "unequip all: Esc cancels, nothing changes")
+	await _press(_ctl_center(gp._unequip_all), true)
+	await _press(_ctl_center(gp._unequip_all), false)
+	await get_tree().process_frame
+	_check(gp.preview_open(), "unequip all: clicking it opens the confirm")
+	await _press(_ctl_center(apply_btn), true)
+	await _press(_ctl_center(apply_btn), false)
+	await get_tree().create_timer(0.2).timeout
+	var bare := run.squad.all(func(u): return u.equipment.has("main_hand") 		and BWRun.GEAR_SLOTS.all(func(s): return s == "main_hand" or not u.equipment.has(s)))
+	_check(not gp.preview_open() and bare, "unequip all: only main hands stay on")
+	_check(gp._undo_btn.is_visible_in_tree() and gp._undo_btn.text == "Undo unequip", "unequip all: Undo unequip shows")
+	await _press(_ctl_center(gp._undo_btn), true)
+	await _press(_ctl_center(gp._undo_btn), false)
+	await get_tree().create_timer(0.2).timeout
+	_check(sig.call() == before, "unequip all: Undo puts everything back")
 	layer.queue_free()
 	await get_tree().process_frame
 

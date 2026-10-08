@@ -126,8 +126,6 @@ static func _take_one(b: BWBattle) -> void:
 				if not fu.is_empty():
 					b.attack(u, fu.target)
 		elif not best.is_empty():
-			if b.basic_element(u) == "wind":
-				u.wind_mode = BWWind.ai_choose(b, u, best.target, u.pos)   # D274: a wind basic's mode
 			b.attack(u, best.target)
 			if not b.over and u.alive() and "basic" in u.follow_up:
 				var again := _best_target(b, u, u.pos)    # D197 Relentless: the extra attack
@@ -267,8 +265,6 @@ static func _best_skill(b: BWBattle, u: BWUnit, previews: int = -1) -> Dictionar
 			continue
 		for el in row.elements:
 			for h in _cap_targets(b, u, b.skill_targets(u, row.key, el), per):   # D323: big boards only
-				if el == "wind":                              # D274: a cheap mode per target
-					u.wind_mode = BWWind.ai_choose(b, u, _focus(b, u, h), BWWind.skill_origin(u, row, h))
 				var pv := b.skill_preview(u, row.key, el, h)
 				if pv.is_empty():
 					continue
@@ -280,23 +276,8 @@ static func _best_skill(b: BWBattle, u: BWUnit, previews: int = -1) -> Dictionar
 					score += BWOverfreeze.ai_skill(b, u, row.key, el, h, pv)   # D314: Overfreeze bursts (simulated, ice on glazed water only)
 					score += BWSquall.ai_skill(b, u, row.key, el, h, pv)       # D314: a squall's front (simulated, light/dark 2+ only)
 				if score > 0.0 and (best.is_empty() or score > best.score):
-					best = { "key": row.key, "element": el, "target": h, "score": score, "mode": u.wind_mode }
-	if not best.is_empty() and str(best.element) == "wind":
-		u.wind_mode = str(best.mode)
+					best = { "key": row.key, "element": el, "target": h, "score": score }
 	return best
-
-
-## D274: the foe a wind skill aimed at `h` is about: the one on it, else the
-## nearest to it.
-static func _focus(b: BWBattle, u: BWUnit, h: Vector2i) -> BWUnit:
-	var o := b.unit_at(h)
-	if o != null and o.team != u.team:
-		return o
-	var near: BWUnit = null
-	for f in b.foes_of(u):
-		if near == null or BWHex.distance(f.pos, h) < BWHex.distance(near.pos, h):
-			near = f
-	return near
 
 
 static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:

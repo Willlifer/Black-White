@@ -155,7 +155,7 @@ func test_striketwice_reactions(t) -> void:
 	# storm: thunder then wind pushes the ring out 1
 	var me3 := _u("me", "sword", "thunder", { "dex": 100 })
 	me3.affinity["wind"] = 10
-	me3.wind_mode = "becalm"          # D271: a wind cut's mode moves nobody here (the storm is the subject)
+	BWWindShape.set_choice(me3, "striketwice_second", "hold")   # D271/D407: the wind cut moves nobody here (the storm is the subject)
 	var f3 := _foe("f")
 	var n3 := _foe("n3")
 	var b3 := _fight(me3, [f3, n3], [E, side_hex])

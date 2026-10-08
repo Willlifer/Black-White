@@ -561,14 +561,13 @@ func test_l30_riders(t) -> void:
 	t.eq(str(b2.tiles.at(x).get("marker", "")), "fuse", "the fuse stands")
 	_turn(b2, f2)
 	t.eq(b2.paint([x], "fire", f2).detonations.size(), 1, "a foe's fire does")
-	# Gale Force: after moving 4+, the first landed hit applies the mode, once a turn
+	# Gale Force: after moving 4+, the first landed hit pushes 1 (D407), once a turn
 	var g := _u("g", "sword", "fire")
 	g.perks = ["wind_force"]
 	var v := _u("v")
 	var b3 := _fight([g], [v], [C], [_nb(C, E)])
 	_turn(b3, g)
 	g.fx["moved_hexes"] = 4
-	BWWind.set_mode(g, BWWind.GUST)
 	var at := v.pos
 	b3._gale_force(g, v, { "hit": true })
 	t.eq(v.pos, _nb(at, E), "Gale Force: the hit pushes it 1 (Gust)")

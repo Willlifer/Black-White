@@ -286,8 +286,13 @@ func test_earthsplitter_line(t) -> void:
 	var pv := b.skill_preview(me, "earthsplitter", "fire", E)
 	t.eq(pv.hexes, line, "3 hexes ahead")
 	t.eq(pv.units.size(), 2, "both foes on the line")
-	_use(t, b, me, "earthsplitter", "fire", E)
-	t.ok(line.all(func(h): return b.tiles.carries(h, "fire")), "the line takes the element")
+	var ev := _use(t, b, me, "earthsplitter", "fire", E)
+	t.ok(not line.any(func(h): return b.tiles.carries(h, "fire")), "D416: the line is not painted (Sunder's is)")
+	for r in ev.results:
+		var v: BWUnit = b._unit(str(r.target))
+		var was: Vector2i = line[0] if r.target == "a" else line[2]
+		var back: Vector2i = BWHex.neighbors(was)[0]
+		t.eq(v.pos, back if r.result.secondary else was, "%s heaved 1 back iff the secondary landed" % r.target)
 
 
 func test_war_cry_two_turns(t) -> void:
@@ -318,9 +323,14 @@ func test_cleave_plus(t) -> void:
 func test_charge_plus(t) -> void:
 	var me := _u("me", "axe", "fire")
 	me.skill_ranks["charge"] = 2
-	var b := _fight(me, [_foe()], [Vector2i(9, 9)])
+	var b := BWBattle.new(_board(15), 7)
+	var f := _foe()
+	b.setup([me], [f])
+	me.pos = C
+	f.pos = Vector2i(14, 14)
+	_give_turn(b, me)
 	var pv := b.skill_preview(me, "charge", "fire", E)
-	t.eq(pv.dest, _line(4)[3], "reach 4")
+	t.eq(pv.dest, _line(8)[7], "reach 8 (D414)")
 	t.ok(pv.notes.any(func(n): return str(n).begins_with("Charge+")), "named")
 	var me2 := _u("me", "axe", "fire")
 	me2.skill_ranks["charge"] = 2
@@ -332,3 +342,110 @@ func test_charge_plus(t) -> void:
 	var slams := _events(b2, "tile_damage").filter(func(e): return e.cause == "slam")
 	t.eq(slams.size(), 2, "the caught foe slams into the next")
 	t.eq(int(slams[0].amount), BWTiles.tile_damage(x, 12, ""), "slam 12%")
+
+
+# ------------------------------------------------------------------ D414-D416: the axe pass
+
+func _fight_big(me: BWUnit, foes: Array, at: Array, n: int = 15) -> BWBattle:
+	var b := BWBattle.new(_board(n), 7)
+	b.setup([me], foes)
+	me.pos = C
+	for i in foes.size():
+		foes[i].pos = at[i]
+	_give_turn(b, me)
+	return b
+
+
+func test_charge_seven_pushes_along(t) -> void:
+	var line := _line(9)
+	var me := _u("me", "axe", "fire")
+	var f := _foe("f")
+	var b := _fight_big(me, [f], [line[1]])
+	var pv := b.skill_preview(me, "charge", "fire", E)
+	t.eq(pv.dest, line[6], "D414: the run is 7")
+	t.eq(pv.shove.to, line[7], "the caught foe is pushed along, ending just ahead of the runner")
+	b.use_skill(me, "charge", "fire", E)
+	t.eq(me.pos, line[6], "charged 7")
+	t.eq(f.pos, line[7], "pushed 6")
+	var sh: Array = _events(b, "move").filter(func(e): return e.kind == "shove")
+	t.eq(sh.size(), 1, "one shove move")
+	t.eq(sh[0].path, line.slice(1, 8), "its path is every hex it was pushed along")
+	t.eq(_events(b, "slam").size(), 0, "no slam when the run just ends")
+	# rock partway: it is pushed up to the rock and slams there; the run stops behind it
+	var me2 := _u("me", "axe", "fire")
+	var f2 := _foe("f")
+	var b2 := _fight_big(me2, [f2], [line[1]])
+	b2.board.set_cell(line[4], "jagged")
+	var pv2 := b2.skill_preview(me2, "charge", "fire", E)
+	t.ok(pv2.notes.any(func(n): return str(n).begins_with("Slam: f")), "the preview names the slam on the stop")
+	b2.use_skill(me2, "charge", "fire", E)
+	t.eq(f2.pos, line[3], "pushed to the rock")
+	t.eq(me2.pos, line[2], "the run stops behind it")
+	var sl := _events(b2, "tile_damage").filter(func(e): return e.cause == "slam")
+	t.eq(sl.map(func(e): return e.unit), ["f"], "it slams the rock on the stop")
+	# a second unit down the line: both slam
+	var me3 := _u("me", "axe", "fire")
+	var f3 := _foe("f")
+	var g3 := _foe("g")
+	var b3 := _fight_big(me3, [f3, g3], [line[1], line[5]])
+	b3.use_skill(me3, "charge", "fire", E)
+	t.eq(f3.pos, line[4], "pushed up to the unit")
+	t.eq(me3.pos, line[3], "the run stops behind it")
+	t.eq(g3.pos, line[5], "the one it hits stays")
+	var sl3 := _events(b3, "tile_damage").filter(func(e): return e.cause == "slam")
+	t.eq(sl3.map(func(e): return e.unit), ["f", "g"], "both slam")
+	# the map's edge: it just stops there (open air, no slam)
+	var me4 := _u("me", "axe", "fire")
+	var f4 := _foe("f")
+	var b4 := _fight(me4, [f4], [line[1]])           # 11 wide: the edge is 6 out
+	b4.use_skill(me4, "charge", "fire", E)
+	t.eq(f4.pos, line[5], "pushed to the edge")
+	t.eq(me4.pos, line[4], "the run stops behind it")
+	t.eq(_events(b4, "slam").size(), 0, "the edge is open air")
+
+
+func test_ai_charges_into_reach(t) -> void:
+	var line := _line(9)
+	var axe := _equip(_u("axe", "axe", "fire"), ["charge"])
+	var foe := _u("p", "sword", "water", { "con": 300 })
+	var b := BWBattle.new(_board(15), 7)
+	b.setup([foe], [axe])
+	axe.pos = C
+	foe.pos = line[7]                       # 8 out: a move (4) leaves it 4 away, out of a swing
+	_give_turn(b, axe)
+	BWAI.take_turn(b)
+	var used := _events(b, "skill").map(func(e): return e.skill)
+	t.ok("charge" in used, "the AI charges to reach the foe (%s)" % [used])
+	t.ok(_events(b, "attack").any(func(e): return e.unit == "axe"), "and swings on the follow-up")
+
+
+func test_sunder_fissure(t) -> void:
+	var line := _line(6)
+	var me := _equip(_u("me", "axe", "fire"), ["sunder"])
+	var f := _foe("f", { "def": 20 })
+	var g := _foe("g", { "def": 20 })
+	var h := _foe("h", { "def": 20 })
+	var b := _fight(me, [f, g, h], [line[0], line[2], line[4]])
+	var pv := b.skill_preview(me, "sunder", "fire", E)
+	t.eq(pv.hexes, line.slice(0, 5), "D415: the fissure runs from you through the target, 5 hexes")
+	t.eq(pv.units, ["f", "g", "h"], "the target and every foe on the line")
+	var ff: Dictionary = pv.forecasts["f"]
+	var fg: Dictionary = pv.forecasts["g"]
+	t.near(float(_mod(ff, "Sunder (30%)").get("value", 0)), 0.3, 0.001, "the blow ignores 30% DEF")
+	t.eq(_mod(fg, "Sunder (30%)"), {}, "the fissure's graze doesn't")
+	t.eq(fg.glance.value > 0.0, true, "and can glance")
+	t.near(float(_mod(fg, "Sunder fissure").get("value", 0)), 0.6, 0.001, "60% power on the line")
+	t.ok(pv.notes.any(func(n): return str(n).begins_with("Fissure: 5")), "the preview names the fissure")
+	var ev := _use(t, b, me, "sunder", "fire", E)
+	t.eq(ev.results.size(), 3, "three blows")
+	t.ok(line.slice(0, 5).all(func(x): return b.tiles.carries(x, "fire")), "every hex of the line takes the element")
+	t.ok(not b.tiles.carries(line[5], "fire"), "and no further")
+	# rock stops the split
+	var me2 := _equip(_u("me", "axe", "fire"), ["sunder"])
+	var b2 := _fight(me2, [_foe("f"), _foe("h")], [line[0], line[4]])
+	b2.board.set_cell(line[3], "jagged")
+	var pv2 := b2.skill_preview(me2, "sunder", "fire", E)
+	t.eq(pv2.hexes, line.slice(0, 3), "rock stops the fissure")
+	t.eq(pv2.units, ["f"], "the foe past the rock is safe")
+	b2.use_skill(me2, "sunder", "fire", E)
+	t.ok(not b2.tiles.carries(line[4], "fire"), "nothing painted past the rock")

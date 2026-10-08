@@ -108,7 +108,7 @@ func _hook_picker(p: BWPicker) -> void:
 
 ## D240: the gear panel and the shop. A change that leaves the squad wearing
 ## more cursed pieces than before -> the cursed sting; any other shop change
-## (a trade, a scroll used) -> the purchase sound.
+## (a trade, a scroll used) -> the purchase sting (D411: it ducks the music).
 func _hook_gear(panel: Node) -> void:
 	if panel.has_meta("bw_audio"):
 		return
@@ -120,7 +120,7 @@ func _hook_gear(panel: Node) -> void:
 		if n > int(state.cursed):
 			BWMusic.sting("cursed")
 		elif shop:
-			BWSfx.ui("shop_purchase", { "tag": "shop" })
+			BWMusic.sting("shop")                       # D411: a sting now, so the music ducks under it
 		state.cursed = n)
 
 

@@ -101,8 +101,8 @@ func test_mixed_markers_glaze(t) -> void:
 	bv.refresh_tiles()
 	_settle(bv)
 	t.near(float(bv._fx_anim[C].mark.crack), 1.0, 0.001, "last cycle cracks")
-	var m := Vector2i(2, 2)
 	for mk in ["thunder", "wind", "ice"]:
+		var m := Vector2i(2, 2) + Vector2i(["thunder", "wind", "ice"].find(mk) * 2, 0)   # D405: ice / wind on a fuse would ignite it
 		bv.tiles.apply([m], mk, "a")
 		bv.refresh_tiles()
 		_settle(bv)

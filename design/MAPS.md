@@ -900,7 +900,7 @@ squads of 3."
   - **Wind Wall:** a Wind Wall with no countdown: blocks moves and skills both
     ways, **basic attacks pierce** (the D269 ruling). Each hex holds a wall
     segment (60 HP, both sides may strike it): deal 60 to a hex, or land a
-    **wind basic in Gust mode** on it, and that hex opens.
+    **wind basic** on it (D407: every wind basic gusts), and that hex opens.
 - One hex open (ice, wind) or all three out (fire): the fronts can merge.
 - **The enemy breaks through** (D330): at the start of round 4, if it is
   behind on either front (fewer standing there, or as many with less HP), it

@@ -1,5 +1,5 @@
 extends RefCounted
-## D315-D318: auto-equip (BWAutoEquip). Priority, element matching, set
+## D315-D318, D403-D404: auto-equip (BWAutoEquip). Priority, element matching, set
 ## completion, stealing only from lower priority, cursed pieces, the
 ## per-unit no-steal Optimize, determinism, apply and undo.
 
@@ -69,13 +69,33 @@ func test_priority_order(t) -> void:
 func test_used_element(t) -> void:
 	var r := _bare()
 	var u: BWUnit = r.squad[0]
-	t.eq(BWAutoEquip.used_element(u), u.element, "fresh: the native element")
+	t.eq(BWAutoEquip.primary(u), u.element, "fresh: the native element")
 	var other := "water" if u.element != "water" else "fire"
-	u.affinity[other] = int(u.affinity.get(u.element, 0)) + 5
-	t.eq(BWAutoEquip.used_element(u), other, "the highest affinity wins")
-	u.affinity[u.element] = int(u.affinity[other])
+	u.affinity[other] = int(u.affinity.get(u.element, 0)) + 50
+	t.eq(BWAutoEquip.primary(u), u.element, "D403: a higher affinity doesn't displace the focus (native)")
+	t.eq(BWAutoEquip.used_element(u), other, "the most-used element (the featured scroll's) is still the highest affinity")
 	u.focus_element = other
-	t.eq(BWAutoEquip.used_element(u), other, "a tie goes to the focus")
+	t.eq(BWAutoEquip.primary(u), other, "the chosen focus is the primary")
+
+
+## D403: focus, then the other learned elements by rank, points, data order.
+func test_element_priority_list(t) -> void:
+	var r := _bare()
+	var u: BWUnit = r.squad[0]
+	var rest: Array = BWFormulas.ELEMENTS.filter(func(e): return e != u.element)
+	var a: String = rest[0]
+	var b: String = rest[1]
+	var c: String = rest[2]
+	var d: String = rest[3]
+	u.affinity = { u.element: 10, a: 12, b: 35, c: 12, d: 0 }
+	u.focus_element = a
+	t.eq(BWAutoEquip.elements(u), [a, b, c, u.element], "focus, then rank 3, then rank 1 by points (12 over 10)")
+	u.affinity[c] = 10
+	var tie := [u.element, c] if BWFormulas.ELEMENTS.find(u.element) < BWFormulas.ELEMENTS.find(c) else [c, u.element]
+	t.eq(BWAutoEquip.elements(u), [a, b] + tie, "a points tie goes to data order")
+	t.ok(not d in BWAutoEquip.elements(u), "an unlearned element isn't listed")
+	u.focus_element = ""
+	t.eq(BWAutoEquip.elements(u)[0], u.element, "no focus chosen: the native element leads")
 
 
 # ---------------------------------------------------------------- D317 scoring
@@ -83,7 +103,7 @@ func test_used_element(t) -> void:
 func test_element_match_beats_tier(t) -> void:
 	var r := _bare()
 	var u: BWUnit = r.squad[0]
-	var el := BWAutoEquip.used_element(u)
+	var el := BWAutoEquip.primary(u)
 	var other := "dark" if el != "dark" else "light"
 	var m_it := _armour(r, "vest", "E", el)
 	var high := _armour(r, "chain_mail", "A", other)
@@ -127,7 +147,7 @@ func test_second_prefers_expertise(t) -> void:
 func test_set_completion(t) -> void:
 	var r := _bare()
 	var u: BWUnit = r.squad[0]
-	var el := BWAutoEquip.used_element(u)
+	var el := BWAutoEquip.primary(u)
 	# another learned element with a head piece worn: a second piece makes its 2-set
 	var other := "ice" if el != "ice" else "wind"
 	u.affinity[other] = 1
@@ -293,3 +313,134 @@ func test_apply_and_undo(t) -> void:
 	var snap2 := BWAutoEquip.apply(r, BWAutoEquip.plan_all(r))
 	r.trash_item(r.inventory[0])
 	t.ok(not BWAutoEquip.undo(r, snap2), "undo refused after a discard")
+
+
+# ---------------------------------------------------------------- D403 primary then secondary
+
+## A unit with a focus `pri` and a learned `sec` (2nd); returns [u, pri, sec].
+## pri is the focus (rank 2), sec has more affinity (rank 3) so it is 2nd,
+## the native element (rank 1) is 3rd.
+func _two_elements(r: BWRun) -> Array:
+	var u: BWUnit = r.squad[0]
+	var free: Array = BWFormulas.ELEMENTS.filter(func(e): return e != u.element)
+	var pri: String = free[0]
+	var sec: String = free[1]
+	u.affinity = { u.element: 10, pri: 20, sec: 30 }
+	u.focus_element = pri
+	return [u, pri, sec]
+
+
+func test_primary_then_secondary(t) -> void:
+	var r := _bare()
+	var x := _two_elements(r)
+	var u: BWUnit = x[0]
+	var pri: String = x[1]
+	var sec: String = x[2]
+	t.eq(BWAutoEquip.elements(u).slice(0, 2), [pri, sec], "focus first though the 2nd has more affinity")
+	var p_head := _armour(r, "wizard_hat", "E", pri)
+	var s_head := _armour(r, "wizard_hat", "A", sec)
+	var s_chest := _armour(r, "chain_mail", "A", sec)
+	var plain_legs := _armour(r, "platelegs", "A", "")
+	var s_legs := _armour(r, "chaps", "E", sec)
+	r.inventory = [s_head, s_chest, plain_legs, p_head, s_legs]
+	var plan := BWAutoEquip.plan_unit(r, u)
+	var lo: Dictionary = plan.loadouts[u.id]
+	t.eq(lo.head.uid, p_head.uid, "the primary's piece over a higher-tier secondary")
+	t.eq(lo.chest.uid, s_chest.uid, "a slot the primary can't fill: the secondary")
+	t.eq(lo.legs.uid, s_legs.uid, "the secondary set's 2nd piece over a plain higher tier")
+	var reasons := {}
+	for c in plan.changes:
+		reasons[c.slot] = str(c.get("reason", ""))
+	t.eq(reasons.get("head", ""), "%s (focus)" % pri.capitalize(), "reason: the focus")
+	t.eq(reasons.get("chest", ""), "%s set 2/3 (2nd)" % sec.capitalize(), "reason: a secondary set")
+
+
+func test_primary_set_first(t) -> void:
+	var r := _bare()
+	var x := _two_elements(r)
+	var u: BWUnit = x[0]
+	var pri: String = x[1]
+	var sec: String = x[2]
+	# the secondary could make a 3-piece set at tier A; the primary has head
+	# and legs at tier E: the primary set takes them, the secondary the chest
+	var pieces := {
+		"s_head": _armour(r, "wizard_hat", "A", sec), "s_chest": _armour(r, "chain_mail", "A", sec),
+		"s_legs": _armour(r, "platelegs", "A", sec),
+		"p_head": _armour(r, "wizard_hat", "E", pri), "p_legs": _armour(r, "chaps", "E", pri) }
+	r.inventory = pieces.values()
+	var plan := BWAutoEquip.plan_unit(r, u)
+	var lo: Dictionary = plan.loadouts[u.id]
+	t.eq(lo.head.uid, pieces.p_head.uid, "primary head")
+	t.eq(lo.legs.uid, pieces.p_legs.uid, "primary legs: the primary set before a secondary 3-piece")
+	t.eq(lo.chest.uid, pieces.s_chest.uid, "the secondary fills the chest")
+	for c in plan.changes:
+		if c.slot in ["head", "legs"]:
+			t.eq(str(c.reason), "%s set 2/3" % pri.capitalize(), "reason on %s" % c.slot)
+	# with a primary chest too: a 3/3 reason
+	var p_chest := _armour(r, "vest", "E", pri)
+	r.inventory.append(p_chest)
+	plan = BWAutoEquip.plan_unit(r, u)
+	t.eq(plan.loadouts[u.id].chest.uid, p_chest.uid, "the primary completes its 3-piece")
+	t.ok(plan.changes.all(func(c): return str(c.reason) == "%s set 3/3" % pri.capitalize()), "every change reads %s set 3/3" % pri.capitalize())
+	var bb := BWGearPanel.preview_bbcode(r, plan)
+	t.ok(bb.contains("%s set 3/3" % pri.capitalize()), "the preview shows the reason")
+
+
+# ---------------------------------------------------------------- D404 unequip all
+
+func _dressed() -> BWRun:
+	var r := _bare()
+	var classes := BWRun.weapon_classes()
+	for i in r.squad.size():
+		var u: BWUnit = r.squad[i]
+		u.equipment["chest"] = _armour(r, "vest", "D", "")
+		u.equipment["legs"] = _armour(r, "chaps", "E", "")
+		var oc: String = classes.filter(func(c): return c != u.weapon_class)[0]
+		u.equipment[BWUnit.SECOND] = r.make_item(_base_of(oc), "E", "")
+	r.squad[1].equipment["head"] = r.make_item("wizard_hat", "C", _cursed())
+	r.inventory = [_armour(r, "platemail", "B", "")]
+	return r
+
+
+func test_unequip_all_keeps_main_hand(t) -> void:
+	var r := _dressed()
+	var cursed_head: Dictionary = r.squad[1].equipment.head
+	var hands := r.squad.map(func(u): return str(u.equipment.main_hand.uid))
+	var total := r.inventory.size()
+	for u in r.squad:
+		total += u.equipment.size()
+	var plan := BWAutoEquip.plan_unequip(r)
+	t.eq(plan.freed.size(), 3 * r.squad.size() + 1, "chest, legs, second each, plus the cursed head")
+	var snap := BWAutoEquip.apply(r, plan)
+	t.ok(not snap.is_empty(), "applied")
+	for i in r.squad.size():
+		var u: BWUnit = r.squad[i]
+		t.eq(u.equipment.keys().filter(func(k): return k in BWRun.GEAR_SLOTS), ["main_hand"], "%s wears only its main hand" % u.name)
+		t.eq(str(u.equipment.main_hand.uid), hands[i], "%s keeps the same weapon" % u.name)
+		t.eq(u.weapon_class, str(u.equipment.main_hand.weight), "%s's class unchanged" % u.name)
+	t.ok(cursed_head in r.inventory, "the cursed piece comes off too")
+	var after := r.inventory.size()
+	for u in r.squad:
+		after += u.equipment.size()
+	t.eq(after, total, "no piece lost or doubled")
+	t.ok(BWAutoEquip.empty(BWAutoEquip.plan_unequip(r)), "a second Unequip all is a no-op")
+	var line := BWGearPanel.unequip_line(r, plan)
+	t.ok(line.contains("Main-hand weapons stay") and line.contains("(1 cursed)"), "the confirm line: %s" % line)
+	t.ok(BWAutoEquip.undo(r, snap), "undo")
+	t.eq(r.squad[1].equipment.get("head", {}).get("uid", ""), cursed_head.uid, "undo: the cursed head is back on")
+	for u in r.squad:
+		t.ok(u.equipment.has("chest") and u.equipment.has(BWUnit.SECOND), "undo: %s dressed again" % u.name)
+	t.eq(r.inventory.size(), 1, "undo: the inventory as it was")
+
+
+func test_unequip_unit_only(t) -> void:
+	var r := _dressed()
+	var u: BWUnit = r.squad[2]
+	var plan := BWAutoEquip.plan_unequip(r, [u])
+	for c in plan.changes:
+		t.eq(c.unit, u.id, "every change is on the unit")
+	t.eq(plan.freed.size(), 3, "its chest, legs and second weapon")
+	var snap := BWAutoEquip.apply(r, plan)
+	t.ok(u.equipment.has("main_hand") and not u.equipment.has("chest"), "the unit keeps its main hand only")
+	t.ok(r.squad[3].equipment.has("chest"), "another unit is untouched")
+	t.ok(BWAutoEquip.undo(r, snap) and u.equipment.has("chest"), "undo puts it back")

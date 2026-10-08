@@ -4,17 +4,18 @@ extends RefCounted
 ## §16.1). Pure rules on top of BWWind (src/core/wind_modes.gd), which calls
 ## the hooks here. Who holds what is BWKeystones (Lane C1).
 ##
-## Eye of the Vortex  your Vortex fields pull EVERYONE within 2, up to 2 hexes,
-##                    toward the centre, both when they fire and at the tick.
-##                    Each unit steps in one hex at a time and stops at the
-##                    first blocked hex: no slam on an inward pull. Only ONE of
-##                    your Vortex fields acts per tick: the newest.
+## Eye of the Vortex  (D408, reworked: the Vortex fields are gone, D406, and a
+##                    gale only spreads) your wind skills' DRAW IN reaches
+##                    foes within 2 of the area (not 1) and pulls each up to 2
+##                    hexes toward its centre, one hex at a time, stopping at
+##                    the first blocked hex: no slam on an inward pull. Still
+##                    a direct wind move (once per action, 2 hexes a cycle).
 ## Wind Wall          the existing action (skill def wind_wall), now granted by
 ##                    the keystone (the D273 flag is gone).
 ## Jetstream          wind on a gale 2 makes a gale 3 (copies to radius 3);
 ##                    the copies of your gales (or that your paint makes) last
-##                    2 cycles; your Gust fields push 2. Every field move stays
-##                    inside BWWind's caps (2 hexes per cycle, once per turn).
+##                    2 cycles. (D406: the "Gust fields push 2" rider is gone
+##                    with the fields.)
 ## Glaze carry (D293, the D272 TODO; D398 dropped the "rink" name): a glazed
 ## hex never fires a gale (wind on glaze does nothing, ELEMENTS-v3 §2), so
 ## glaze can't be the origin. A gale that fires NEXT TO glaze (a glazed,
@@ -29,7 +30,6 @@ const EYE_RADIUS := 2
 const EYE_PULL := 2
 const JET_GALE_MAX := 3
 const JET_COPY_CYCLES := 2
-const JET_GUST := 2
 const GLAZE_CARRY := 1
 
 
@@ -39,11 +39,6 @@ static func eye(u: BWUnit) -> bool:
 
 static func jet(u: BWUnit) -> bool:
 	return u != null and BWKeystones.has(u, JET)
-
-
-## How far a Gust FIELD laid by `owner` pushes.
-static func gust_n(owner: BWUnit) -> int:
-	return JET_GUST if jet(owner) else 1
 
 
 ## BWBattle.paint: a Jetstream painter's wind on a gale 2 makes a gale 3, and
@@ -90,57 +85,41 @@ static func carry_glaze(b: BWBattle, origin: Vector2i, copies: Array) -> void:
 			e["glaze_carry"] = true
 
 
-# ---------------------------------------------------------------- Eye of the Vortex
+# ---------------------------------------------------------------- Eye of the Vortex (D408)
 
-## The newest Vortex field of every Eye holder: owner id -> hex.
-static func eye_fields(b: BWBattle) -> Dictionary:
-	var best := {}
-	var born := {}
-	for h in BWWind.field_hexes(b):
-		var f := BWWind.field_at(b, h)
-		if str(f.mode) != BWWind.VORTEX:
-			continue
-		var o := b._unit(str(f.get("source", "")))
-		if not eye(o):
-			continue
-		var n := int(f.get("born", 0))
-		if not best.has(o.id) or n > int(born[o.id]) or (n == int(born[o.id]) and h > best[o.id]):
-			best[o.id] = h
-			born[o.id] = n
-	return best
-
-
-## Everyone within `radius` of `centre` is pulled in up to EYE_PULL hexes,
-## closest first (ties in setup order), a field move under BWWind's caps.
-static func eye_pull(b: BWBattle, owner: BWUnit, centre: Vector2i, radius: int = EYE_RADIUS) -> Array:
+## Draw in for an Eye holder (BWWind.pre_mode): each candidate (foes within
+## EYE_RADIUS of the area) is pulled up to EYE_PULL hexes toward `centre`,
+## closest first (ties in setup order). `dry`: positions only (the preview
+## restores them). Returns { moves, becalm } like BWWind.apply_mode.
+static func eye_draw(b: BWBattle, by: BWUnit, cand: Array, centre: Vector2i, reserved: Array = [], dry: bool = false) -> Dictionary:
+	var out := { "moves": [], "becalm": [] }
 	var rows: Array = []
-	for v in b.units:
-		if not v.alive() or BWObelisk.is_objective(v) or maxi(v.size, 1) > 1 or v.pos == centre:
+	for v in cand:
+		if v == null or not v.alive() or BWObelisk.is_objective(v) or maxi(v.size, 1) > 1 or v.pos == centre:
 			continue
-		var d := BWHex.distance(centre, v.pos)
-		if d <= radius:
-			rows.append([d, b.units.find(v), v])
+		rows.append([BWHex.distance(centre, v.pos), b.units.find(v), v])
 	rows.sort_custom(func(a, c) -> bool: return a[0] < c[0] if a[0] != c[0] else a[1] < c[1])
-	var moved: Array = []
 	for r in rows:
 		if b.over:
 			break
-		if pull_in(b, r[2], centre, EYE_PULL, owner):
-			moved.append((r[2] as BWUnit).id)
-	if not moved.is_empty() or not rows.is_empty():
-		b._emit({ "type": "eye_pull", "hex": centre, "unit": owner.id if owner != null else "", "units": moved })
-	return moved
+		var path := pull_in(b, r[2], centre, EYE_PULL, by, reserved, dry)
+		if path.size() > 1:
+			out.moves.append({ "unit": (r[2] as BWUnit).id, "path": path, "kind": "pull" })
+	return out
 
 
 ## Step `v` toward `centre` one hex at a time, up to `n`, stopping before the
-## first blocked hex (no slam). A field move (once per turn, the cycle budget).
-## True when it moved.
-static func pull_in(b: BWBattle, v: BWUnit, centre: Vector2i, n: int, by: BWUnit) -> bool:
-	if not BWWind.field_ready(b, v):
-		return false
+## first blocked or reserved hex (no slam). A direct wind move (once per
+## action, the cycle budget). Returns the path walked ([start] = no move).
+static func pull_in(b: BWBattle, v: BWUnit, centre: Vector2i, n: int, by: BWUnit, reserved: Array = [], dry: bool = false) -> Array:
+	if not BWWind.direct_ready(b, v, dry):
+		return [v.pos]
 	if b._immune(v, "displace"):
-		b._emit({ "type": "displace_resisted", "unit": v.id, "kind": "pull" })
-		return false
+		if not dry:
+			b._emit({ "type": "displace_resisted", "unit": v.id, "kind": "pull" })
+		return [v.pos]
+	if not dry and b._negate(v, "displacement"):
+		return [v.pos]
 	var m := mini(n, BWWind.budget(b, v))
 	var path: Array = [v.pos]
 	var cur := v.pos
@@ -149,16 +128,18 @@ static func pull_in(b: BWBattle, v: BWUnit, centre: Vector2i, n: int, by: BWUnit
 		if d < 0:
 			break
 		var nxt: Vector2i = BWHex.neighbors(cur)[d]
-		if b.board.step_cost(cur, nxt) < 0 or not b.can_stand(v, nxt):
+		if nxt in reserved or b.board.step_cost(cur, nxt) < 0 or not b.can_stand(v, nxt):
 			break
 		cur = nxt
 		path.append(cur)
-	BWWind._spend(b, v, true, path.size() - 1)
+	if not dry:
+		BWWind._spend(b, v, false, path.size() - 1)
 	if path.size() < 2:
-		return false
+		return path
 	v.pos = cur
-	b._emit({ "type": "move", "unit": v.id, "path": path, "kind": "pull", "wind": true, "eye": true })
-	return true
+	if not dry:
+		b._emit({ "type": "move", "unit": v.id, "path": path, "kind": "pull", "wind": true, "eye": true })
+	return path
 
 
 # ---------------------------------------------------------------- AI: Wind Wall

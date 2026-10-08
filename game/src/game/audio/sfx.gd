@@ -45,6 +45,11 @@ const MIX := {
 	"ph_cast_fire": -5.0, "ph_cast_water": -5.0, "ph_cast_ice": -5.0, "ph_cast_thunder": -6.0,
 	"ph_cast_wind": -5.0, "ph_cast_light": -6.0, "ph_cast_dark": -4.0,
 }
+## D412: the drop-2 stings, the short pick reveal and the three procs cut from
+## them are retuned -3 st into the loops' key (A major / F# minor; the author,
+## 2026-10-08). The author's C originals ship beside them as <name>_c
+## (sfx.json "alt_of"). The one-line switch: "C" plays the originals everywhere.
+const STING_KEY := "A"
 ## Pitch jitter per play (± fraction) so repeats don't machine-gun. 0 in captures.
 static var jitter := 0.035
 ## Two plays of the same sound closer than this are merged (except steps).
@@ -92,7 +97,15 @@ static func names() -> Array:
 
 
 static func info(name: String) -> Dictionary:
-	return ensure()._manifest.get(name, {})
+	return ensure()._manifest.get(resolve(name), {})
+
+
+## D412: the file set a name plays under STING_KEY: `name`, or its C original
+## `name_c` when STING_KEY is "C" and one exists.
+static func resolve(name: String) -> String:
+	if STING_KEY == "C" and ensure()._manifest.has(name + "_c"):
+		return name + "_c"
+	return name
 
 
 static func variants(name: String) -> int:
@@ -168,6 +181,7 @@ func _stream(path: String, loop: bool) -> AudioStream:
 
 
 func _play(name: String, where: Variant, opts: Dictionary) -> Node:
+	name = resolve(name)
 	if not _manifest.has(name):
 		push_warning("BWSfx: no sound '%s'" % name)
 		return null
@@ -196,7 +210,8 @@ func _play(name: String, where: Variant, opts: Dictionary) -> Node:
 		var pos: Variant = where.global_position if where is Node3D and is_instance_valid(where) else where
 		get_tree().create_timer(delay).timeout.connect(func(): _play(name, pos, args))
 		return null
-	var gain := float(MIX.get(name, -6.0)) + float(opts.get("gain_db", 0.0))
+	# a C alternate (D412) mixes like the sound it stands in for
+	var gain := float(MIX.get(str(_manifest[name].get("alt_of", name)), -6.0)) + float(opts.get("gain_db", 0.0))
 	var pitch := float(opts.get("pitch", 1.0)) * (1.0 + _rng.randf_range(-jitter, jitter))
 	var bus := str(opts.get("bus", _manifest[name].get("bus", "SFX")))
 	var p: Node

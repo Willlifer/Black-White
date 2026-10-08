@@ -210,7 +210,10 @@ static func make_run() -> BWRun:
 			"gail":
 				_learn(u, "bow", ["pinning_shot", "arcing_shot"])
 		u.sync_weapon()
-		u.wind_mode = "becalm"      # D271: the lessons' wind moves nobody (they predate wind modes)
+		# D271/D407: the lessons' wind skills move nobody (they predate wind
+		# shaping): Hold, as the old Becalm mode did. A wind basic pushes 1.
+		u.wind_shapes = { "saturate": { "opt": "hold", "rel": 0 }, "pinning_shot": { "opt": "hold", "rel": 0 },
+			"surge": { "opt": "hold", "rel": 0 }, "arcing_shot": { "opt": "hold", "rel": 0 } }
 	return run
 
 

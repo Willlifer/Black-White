@@ -1,10 +1,7 @@
 extends SceneTree
 ## D269-D276 review renders of wind and dark on the real combat screen (needs a window):
-##   [SHOTS=<dir>] [ONLY=fields,toggle,cleave,wall,rot,gravity] godot --path . --resolution 1920x1080 --script res://tools/wind_dark_shots.gd
-## → design/art/v3_wind_fields.png (a gust, a vortex and a becalm field),
-##   v3_wind_toggle.png (the forecast's mode toggle + the pull arrows),
-##   v3_wind_becalm_preview.png (the toggle flipped to Becalm: the preview's marks),
-##   v3_wind_cleave_1..3.png (a wind Cleave: aimed, the pull, the swing),
+##   [SHOTS=<dir>] [ONLY=cleave,wall,rot,gravity] godot --path . --resolution 1920x1080 --script res://tools/wind_dark_shots.gd
+## → design/art/v3_wind_cleave_1..3.png (a wind Cleave: aimed, the pull, the swing),
 ##   v3_wind_wall.png, v3_dark_rot.png (marks over units + the card), v3_dark_gravity.png.
 var out := ""
 var s: BWCombatScreen
@@ -86,50 +83,8 @@ func _go() -> void:
 	s.rig.pitch = deg_to_rad(50.0)
 	s.rig.dist = 17.0
 
-	if _want("fields"):
-		var c: Vector2i = spots[6]
-		var hs := _open(b, c, 3)
-		stf.wind_mode = "gust"
-		b.paint([hs[0]], "wind", stf)
-		stf.wind_mode = "vortex"
-		b.paint([hs[1]], "wind", stf)
-		stf.wind_mode = "becalm"
-		b.paint([hs[2]], "wind", stf)
-		await _settle()
-		var mid := (BWLook.world(hs[0], 0) + BWLook.world(hs[1], 0) + BWLook.world(hs[2], 0)) / 3.0
-		s.rig.follow(mid, true)
-		s.rig.dist = 13.0
-		await _wait(0.8)
-		print("fields: ", s.wind_view.shown.fields)
-		await _shot("v3_wind_fields")
-		b.tiles.entries.erase(hs[0])
-		b.tiles.entries.erase(hs[1])
-		b.tiles.entries.erase(hs[2])
-		s.board_view.refresh_tiles()
-
-	if _want("toggle"):
-		_turn(stf)
-		var t: Vector2i = enemies[0].pos
-		_place(enemies[1], _free_near(b, t, 2))
-		stf.wind_mode = "vortex"
-		var tgt := _surge_target(b, stf, enemies[0])
-		s._skill = { "key": "surge", "element": "wind", "row": BWSkills.get_skill("surge") }
-		s._aim_skill(stf, tgt)
-		s.rig.follow(BWLook.world(tgt, b.board.elevation(tgt)), true)
-		s.rig.dist = 15.0
-		await _wait(1.0)
-		print("toggle: forecast open ", s.ui.forecast_open(), " preview ", s.readability.preview.last.get("moves", []))
-		await _shot("v3_wind_toggle")
-		var bt := s.ui.find_child("Mode_becalm", true, false) as Button
-		if bt:
-			bt.button_pressed = true
-			bt.pressed.emit()
-		await _wait(1.0)
-		print("becalm mode: ", stf.wind_mode)
-		await _shot("v3_wind_becalm_preview")
-		s._on_action("cancel")
-		s._on_action("cancel")
-		await _wait(0.3)
+	# D406/D407: the "fields" and "toggle" frames are gone with the wind fields and modes
+	# (the one gale look: tools/simplify_shots.gd).
 
 	if _want("cleave"):
 		_turn(axe)
@@ -141,7 +96,7 @@ func _go() -> void:
 		if b.unit_at(e) != null and b.unit_at(e) != enemies[2]:
 			_place(b.unit_at(e), _free_near(b, axe.pos, 4))
 		_place(enemies[2], far)
-		axe.wind_mode = "vortex"
+		axe.wind_shapes.erase("cleave")                 # an area draws in by default (D383)
 		s._skill = { "key": "cleave", "element": "wind", "row": BWSkills.get_skill("cleave") }
 		s._aim_skill(axe, e)
 		s.rig.follow(BWLook.world(e, b.board.elevation(e)), true)

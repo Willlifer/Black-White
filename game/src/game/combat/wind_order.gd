@@ -6,12 +6,11 @@ extends RefCounted
 ## then the motion.
 ##
 ## The rules already emit a skill's Draw in before its hits (BWWind.pre_mode)
-## and every push after them (BWWindShape.post, gust fields). Two pulls still
-## land after the blow in the event stream: a Vortex basic's pull on its
-## target (BWWind.after_basic) and a Vortex field the blow's paint fires
-## (field_fire + its pulls, Eye of the Vortex's eye_pull). hoist() moves
-## those in front of the blow they belong to, with the slams that
-## follow each pulled unit. Pushes are never moved.
+## and every push after them (BWWindShape.post, a wind basic's push). Since
+## D406 (no wind fields, no Vortex basics) no wind pull lands after its blow;
+## hoist() still moves any wind pull it finds in a blow's tail in front of
+## that blow, with the slams that follow each pulled unit (a safety net).
+## Pushes are never moved.
 ##
 ## The combat screen calls hoist() on its queue before it drains it.
 
@@ -57,8 +56,6 @@ static func hoist(events: Array) -> Array:
 						break
 				j = k
 				continue
-			if (t == "field_fire" and str(q.get("mode", "")) == "vortex") or t == "eye_pull":
-				take.append(j)
 			j += 1
 		if take.is_empty():
 			i += 1

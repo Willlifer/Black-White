@@ -8,8 +8,8 @@ extends Node3D
 ##                faces, black contours, a frosted foot ring) and a "x2" tag
 ##   Doomed       an ink ring of thorns on the ground under it, and a "DOOM n"
 ##                countdown tag (n = turns of its own until the burst)
-##   gale 3       Jetstream's gale 3 marker: a wide three-armed ink swirl with
-##                a ring, so it reads past the gale 2's single mark
+##   (gale 3      D406: no own mark any more; every gale is the tile shader's
+##                one swirl, gale 2+ the bigger one)
 ##   Unsteady     (D397, any unit on glaze or holding the status) a thin
 ##                ice-blue ring at its feet, broken by short ink cracks, that
 ##                rocks gently: bad footing, read at a glance
@@ -24,7 +24,7 @@ extends Node3D
 ##   doomed/doom  "DOOMED" over it; the burst: a dark ink ring blast, a shake
 ##   frozen/thaw  an ice flash; shards on the thaw; "FROZEN: skips" on a skip
 ##   pillar_shatter  ice shards flung out to the six neighbours
-##   eye_pull / riptide / event_horizon  a quick ring at the centre, a feed line
+##   riptide / event_horizon  a quick ring at the centre, a feed line
 
 const INK := Color(0.02, 0.02, 0.03)
 const LIFT := 0.05
@@ -117,10 +117,6 @@ func _signature(b: BWBattle) -> String:
 			parts.append("d%s%s%d" % [u.id, u.pos, doom_left(b, u)])
 		if BWUnsteady.unsteady(b, u):
 			parts.append("u%s%s" % [u.id, u.pos])
-	for h in _gale3(b):
-		parts.append("g%s" % h)
-	for h in BWKsWind.eye_fields(b).values():
-		parts.append("e%s" % h)
 	return "|".join(parts)
 
 
@@ -148,17 +144,9 @@ func rebuild() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := 0
+	# D406: a gale 3 no longer gets its own ringed swirl (one gale look: the
+	# tile shader's swirl), and the Eye of the Vortex has no field to ring.
 	shown = { "frozen": [], "doomed": {}, "gale3": _gale3(b), "unsteady": [] }
-
-	for h in shown.gale3:
-		_swirl3(st, _top(h))
-		n += 1
-	shown["eye"] = BWKsWind.eye_fields(b).values()
-	for h in shown.eye:
-		var step := (screen.board_view.top_center(BWHex.neighbors(h)[0]) - screen.board_view.top_center(h))
-		step.y = 0
-		_reach(st, _top(h), step.length() * (BWKsWind.EYE_RADIUS + 0.5))   # Eye of the Vortex: its 2-hex reach
-		n += 1
 	for u in b.units:
 		if u.alive() and BWKsDark.doomed(u):
 			shown.doomed[u.id] = doom_left(b, u)
@@ -317,37 +305,6 @@ static func _cracks(st: SurfaceTool, c: Vector3) -> void:
 		_ribbon(st, p2, p3, 0.022, INK)
 
 
-## A dashed ink ring at `r` hexes with small inward ticks (the Eye's reach).
-func _reach(st: SurfaceTool, c: Vector3, rad: float) -> void:
-	var seg := 48
-	for i in seg:
-		if i % 2 == 1:
-			continue
-		var a0 := TAU * i / seg
-		var a1 := TAU * (i + 1) / seg
-		var d0 := Vector3(cos(a0), 0, sin(a0))
-		var d1 := Vector3(cos(a1), 0, sin(a1))
-		_quad(st, c + d0 * (rad - 0.05), c + d0 * (rad + 0.05), c + d1 * (rad + 0.05), c + d1 * (rad - 0.05), INK)
-		if i % 6 == 0:
-			var s := Vector3(-d0.z, 0, d0.x) * 0.09
-			_tri(st, c + d0 * (rad - 0.06) + s, c + d0 * (rad - 0.06) - s, c + d0 * (rad - 0.3), INK)
-
-
-func _swirl3(st: SurfaceTool, c: Vector3) -> void:
-	c += Vector3(0, 0.006, 0)
-	_ring(st, c, 0.86, 0.05, INK)
-	for arm in 3:
-		var prev := Vector3.ZERO
-		for i in 19:
-			var t := float(i) / 18.0
-			var a := arm * TAU / 3.0 + t * 1.8 * PI
-			var r := 0.82 * (1.0 - t) + 0.06
-			var p := c + Vector3(cos(a) * r, 0, sin(a) * r)
-			if i > 0:
-				_ribbon(st, prev, p, 0.07 * (1.0 - t) + 0.02, INK)
-			prev = p
-
-
 # ---------------------------------------------------------------- one-shots
 
 func on_event(e: Dictionary) -> void:
@@ -409,10 +366,6 @@ func on_event(e: Dictionary) -> void:
 			screen.board_view.refresh_tiles()
 			screen.ui.feed("[b]Break Pillar[/b]: the ice bursts, %d%% to the six around" % int(e.pct))
 			await get_tree().create_timer(0.3).timeout
-		"eye_pull":
-			if not (e.units as Array).is_empty():
-				blast(screen.board_view.top_center(e.hex), Color(0.85, 0.85, 0.9), 2.4, true)
-				screen.ui.feed("[b]Eye of the Vortex[/b] draws %d in" % (e.units as Array).size())
 		"riptide":
 			screen.ui.feed("[b]Riptide[/b]: %s drags %d through the water" % [screen._name(str(e.unit)), (e.units as Array).size()])
 		"event_horizon":

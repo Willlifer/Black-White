@@ -25,6 +25,8 @@ extends Node
 ##   --drop2 --audio-capture [dir]   D242: the drop-2 run (title, hall, rooms, pre-battle, picker,
 ##                               shop, cursed, jackpot, tutorial, combat, boss, victory, defeat) ->
 ##                               capture_drop2.wav/.json; tools/audio/analyse_drop2.py
+##   --duck --audio-capture [dir]    D411: the sting duck run -> capture_duck*.wav/.json;
+##                               tools/audio/analyse_duck.py
 ##   --seed N                    D154: the roster roll's seed (BWRosterGen): the roster screen
 ##                               opens on it, a new run and every tool use it; also the
 ##                               --combat fight seed. Probes, shots and the self-test
@@ -66,6 +68,7 @@ func _ready() -> void:
 		var ac := BWAudioCapture.new()
 		ac.drop2 = "--drop2" in args                # D242: the author's drop 2 cues and stings
 		ac.placeholders = "--placeholders" in args  # D394: the ph_* placeholders + short pick reveal
+		ac.duck = "--duck" in args                  # D411: the sting duck (music stems before / after it)
 		ac.out_dir = _arg(args, "--audio-capture", ProjectSettings.globalize_path("res://").path_join("../design/audio").simplify_path())
 		add_child(ac)
 		return
