@@ -98,7 +98,7 @@ static func steps() -> Array:
 		{ "id": "shatter_foe", "lesson": 5, "actor": "gail", "fresh": true, "wait": "forecast", "act": { "kind": "attack", "target": "bob" }, "hl": { "unit": "bob" },
 			"text": "Gail's turn. Click Bob: his tile is glazed now." },
 		{ "id": "shatter", "lesson": 5, "actor": "gail", "wait": "act", "act": { "kind": "attack", "target": "bob" }, "hl": { "ui": "notes" },
-			"text": "Any blow on a glazed tile gets Shatter, +15%. Press Enter to shoot." },
+			"text": "On glaze Bob is Unsteady (-10 avoid, -15 glance) and every blow gets Shatter, +15%. Press Enter to shoot." },
 		{ "id": "spark_aim", "lesson": 5, "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "bolt", "element": "thunder", "target": "rui" }, "hl": { "ui": "skill" },
 			"text": "Spark: a thunder hit on a unit standing on bare ground deals +10%. Pick Bolt, Thunder, for Rui." },
 		{ "id": "spark", "lesson": 5, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "bolt", "element": "thunder", "target": "rui" }, "hl": { "unit": "rui" },

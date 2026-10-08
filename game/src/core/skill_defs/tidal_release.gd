@@ -2,7 +2,7 @@ extends BWSkillDef
 ## D295 Tidal Release, water's keystone ACTION (design/ELEMENTS-v3.md §4):
 ## cooldown 4. Click a pool hex within 3, then the heading (the second pick,
 ## D109). The pool drains; a wave runs along the line (length = the pool's
-## size, max 6) pushing every unit on it 3 along it (slams, slides on ice);
+## size, max 6) pushing every unit on it 3 along it (slams; onto glaze it just stops);
 ## the line gets water 2. Rules: BWKsWater.
 
 const NOWHERE := Vector2i(-9999, -9999)
@@ -11,7 +11,7 @@ const NOWHERE := Vector2i(-9999, -9999)
 func _init() -> void:
 	define({
 		"key": "tidal_release", "name": "Tidal Release", "weapon": "keystone", "clip": "cast",
-		"desc": "Cooldown 4. Pick a pool hex within 3 and a heading: the pool drains and a wave (the pool's size, max 6) runs along the line, pushing everyone on it 3 (slams, slides on ice); the line gets water 2",
+		"desc": "Cooldown 4. Pick a pool hex within 3 and a heading: the pool drains and a wave (the pool's size, max 6) runs along the line, pushing everyone on it 3 (slams; onto glaze it just stops); the line gets water 2",
 		"targeting": "hex", "needs_element": false, "range": BWKsWater.TIDAL_RANGE, "cd": 4, "second_pick": "hex",
 		"power": 0, "min_range": 0, "keystone": true,
 	}, 9020)

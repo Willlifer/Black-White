@@ -8,7 +8,7 @@ extends BWSkillDef
 ## Click the first hex (empty, within 3), then the second (the line's
 ## heading): a line of 3 empty hexes stands for 2 ticks. One wall per unit (a
 ## new one takes the old down). Cooldown 3. The walls are BWBattle.wind; the
-## board's blocker reads them (moves, pushes, slides, charges), skill targets
+## board's blocker reads them (moves, pushes, charges), skill targets
 ## are filtered (BWWind.filter_targets), sight is untouched (basics pierce).
 
 const NOWHERE := Vector2i(-9999, -9999)

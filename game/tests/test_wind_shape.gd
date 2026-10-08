@@ -238,7 +238,7 @@ func test_single_push_heading_and_hold(t) -> void:
 	t.ok(g.statuses.has("becalmed"), "Becalmed")
 
 
-func test_single_push_slides_onto_ice(t) -> void:
+func test_single_push_stops_on_ice(t) -> void:
 	var me := _u("st", "staff", "wind")
 	var f := _u("f", "axe", "fire")
 	var at := Vector2i(4, 2)
@@ -251,9 +251,10 @@ func test_single_push_slides_onto_ice(t) -> void:
 		b.tiles.entries[h] = e
 	BWWindShape.set_choice(me, "bolt", "push", 0)
 	var sim := b.simulate(me, { "kind": "skill", "key": "bolt", "element": "wind", "hex": at })
-	t.ok((sim.moves as Array).any(func(m): return m.kind == "slide"), "the preview shows the slide onto the ice")
+	t.ok(not (sim.moves as Array).any(func(m): return m.kind == "slide"), "the preview shows no slide (D397)")
 	b.use_skill(me, "bolt", "wind", at)
-	t.ok(BWHex.distance(at, f.pos) >= 2, "pushed onto the glaze, it slides on")
+	t.eq(f.pos, ice, "pushed onto the glaze, it stops there")
+	t.ok(BWUnsteady.unsteady(b, f), "and stands Unsteady")
 
 
 # ------------------------------------------------------------------ caps, fields, determinism

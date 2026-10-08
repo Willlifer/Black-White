@@ -2,8 +2,8 @@ class_name BWIceWaterView
 extends Node3D
 ## D266 the ice/water spine on the board (design/ELEMENTS-v3.md §11 "Board
 ## marks"), redrawn from BWTiles by BWBoardView.refresh_tiles:
-##   * RINK SHEEN: every slippery hex (glazed, not a pillar) gets sliding
-##     glints and ink speed lines over its frost (shaders/icewater mode 0);
+##   * GLAZE SHEEN: every glazed hex a unit can stand on (Unsteady ground,
+##     D397) gets glints and ink lines over its frost (shaders/icewater mode 0);
 ##   * PILLAR: an inked ice column, white facets with an ice-cyan band and
 ##     black contours, its ticks left floating over it;
 ##   * STEAM: white ink puffs with a grey contour over each steam hex
@@ -92,7 +92,7 @@ func refresh() -> void:
 	var t := bv.tiles
 	var want_sheen := {}
 	for h in t.entries:
-		if bv.board.exists(h) and BWSlides.slippery(t, h):
+		if bv.board.exists(h) and BWUnsteady.on_glaze(t, h):
 			want_sheen[h] = true
 	_sync(_sheen, want_sheen, _make_sheen)
 	var want_p := {}

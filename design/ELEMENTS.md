@@ -116,6 +116,8 @@ glazed:
   Frozen water is walkable ice. Freezing a flooded river to cross it is the
   intended play;
 - glazed tiles never ignite grass and never accept gale copies.
+- **a unit standing on glaze is Unsteady** (−10 avoid, −15 glance; D397,
+  §14.1). Glaze isn't slippery: the D261 slides are gone.
 
 ### 2.5 Life is gone, and so are Purge and Ward
 
@@ -788,6 +790,11 @@ conduction ×(1 + 0.1 × water). If the same action then lays thunder on that
 hex, the detonation is separate tile damage with its own ×1.5 shatter (§3.2):
 the hit's Shatter and the blast's ×1.5 both apply, to different numbers.
 
+**Shatter and Unsteady (D397).** A unit on glaze is also Unsteady (§14.1):
+−10 avoid and −15 glance on top of Shatter's +15%. Fault Lines' Shatter
+(+30%) also lands on a foe standing on a stasis marker (D400); a stasis
+marker is never Unsteady.
+
 | Name | Value |
 |---|---|
 | `CHAIN_FRACTION` | 0.5 |
@@ -997,10 +1004,10 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Fire | Kindling | +5/+10/+15% damage when you or the target stands on fire (the higher level). | `stand_on_mod` either |
 | Fire | Wildfire | Your fresh fire at 2+ is `wild`: on the next tick it seeds fire 1 onto every neighbour whose fire axis is neutral, once per cast (origin flips to spread). Wild seeds never dry wet ground and never seed again. D307: your Overheat ring hexes at 2+ are wild too (spread origin; the flag is spent at the tick). | `wildfire` |
 | Fire | Coal Engine | Allies (you included) starting their turn on fire 1/2/3: +1/+2/+3 move that turn. | `start_move` team |
-| Ice | Skate | Glazed and stasis hexes cost 1 even on mud; +1 move starting on one. | `skate` |
+| Ice | Ice Legs (was Skate, D400) | Never Unsteady (§14.1); glazed and stasis hexes cost 1 even on mud; +1 move starting on one. | `skate` |
 | Ice | Rime Armour | −10% damage taken on a glazed or stasis hex; Shatter doesn't apply to you. | `rime_armour` |
 | Ice | Fault Lines | Your Shatter is +30% (base 15) and your Shatter hit breaks the glaze (glaze → 0, the charge stays). | `fault_lines` |
-| Ice | Frostbite | A foe starting its turn on glaze you laid (`glaze_source`) is Drenched for that turn. | `frostbite` |
+| Ice | Frostbite | A foe starting its turn on glaze you laid (`glaze_source`) is Pinned for that turn (D400; was Drenched). | `frostbite` |
 | Ice | Frost Ward | On your 1st turn and every 2nd turn after (the card shows "Frost Ward recharging" between), the nearest unwarded ally within 2 (else you) gains a Frost Ward (a status that keeps until it breaks; one per unit). It negates the next elemental effect on its holder, then breaks (`ward_break`). | `frost_ward` |
 | Thunder | Bolt Step | After any action that detonated a tile: move 2 more. | `bolt_step` |
 | Thunder | Grounded | Chain arcs reaching you deal half; detonation splash on you is halved again. Still conductive. | `grounded` |
@@ -1052,38 +1059,60 @@ AI scores hexes with forecasts made from that hex, so it flanks.
 
 ---
 
-## 14. The ice/water spine (D261-D268, Element Overhaul)
+## 14. The ice/water spine (D261-D268, Element Overhaul; ice reworked D397-D402)
 
 Built from `ELEMENTS-v3.md` §2 and §4 with the author's rulings of
-2026-10-07. Code: `src/core/slides.gd` (BWSlides), `src/core/pools.gd`
-(BWPools, which also owns pillars); hooks in `BWTiles.apply` / `tick`,
-`BWBoard.blocker` / `sight_blocker`, `BWBattle.reachable` / `move` /
-`_displace`. View: `BWIceWaterView` (`src/game/combat/icewater_view.gd`,
-`shaders/icewater.gdshader`). Tests: `tests/test_icewater.gd`. Renders:
-`design/art/v3_icewater_*.png` (`tools/icewater_shots.gd`).
+2026-10-07. On 2026-10-07 the author ruled the slides out ("ice does not
+feel good. I would remove rink as a status, have ice apply 'unsteady
+footing', dropping dodge and glance chance for units on the tile"): glaze is
+**bad footing**, not a slide (D397). Code: `src/core/unsteady.gd`
+(BWUnsteady), `src/core/pools.gd` (BWPools, which also owns pillars); hooks in
+`BWTiles.apply` / `tick`, `BWBoard.blocker` / `sight_blocker`,
+`BWBattle._mods` / `move`. View: `BWIceWaterView`
+(`src/game/combat/icewater_view.gd`, `shaders/icewater.gdshader`) and the
+crack ring in `BWKeystoneView`. Tests: `tests/test_icewater.gd`,
+`tests/test_unsteady.gd`. Renders: `design/art/ice2_*.png`
+(`tools/icewater_shots.gd`, `tools/ice2_card_shots.gd`), older
+`v3_icewater_*.png`.
 
-### 14.1 Slides (D261)
+### 14.1 Unsteady footing (D397-D399; the D261 slides are gone)
 
-- **Slippery** = glazed charge that isn't a pillar (stasis doesn't slip).
-- A unit that **enters** one (walking, pushed, pulled, shoved) slides on in
-  its direction of travel, free, one hex at a time:
-  - next hex non-ice standable: it slides onto it and **stops there**;
-  - next hex lower (a ledge of any height): onto it, stop, no fall damage;
-  - next hex blocked (rock, a unit, a pillar or wall, a rise of 1+): stop
-    before it; if it slid 1+ that's a **slam: 8% to it and to the unit hit**;
-  - the map edge: stop, no slam; `SLIDE_MAX` 6 slide hexes.
-- **A walk that slides ends there; then the unit may move 1 more hex**
-  (once a turn). `reachable()` lists the slide's END hex (cost = the step
-  onto the ice); ice hexes are never stops. A slam can't be undone.
-- Crossing damage applies on slide hexes. Order in an action: hit, paint,
-  pushes, slides, slams.
-- Skate holders and multi-hex units never slide.
+- **Unsteady:** a unit whose centre hex is **glazed** (glaze > 0, not a
+  pillar) has **−10 avoid** and **−15 glance chance** against every blow,
+  both teams, while it stands there (`AVOID_PCT`, `GLANCE_PCT`). Avoid may
+  go below 0 (the attacker's hit rises); glance stops at 0.
+- **Stasis markers don't count** (Claude, D397): ice armed on empty ground
+  has no sheet yet (glaze 0). Pillars are glazed but nobody stands on them.
+- **It stacks with Shatter** (§8.5, +15% damage on glaze): a unit on glaze
+  is easier to hit, glances less and takes more.
+- **Glaze is plain ground to walk on.** Walking onto glaze costs the hex's
+  normal move (glazed water still has no water penalty, §2.4); pushes and
+  pulls onto glaze stop there like on any ground. No slide, no slam from a
+  slide, no +1 move after one; `reachable()` lists glazed hexes as stops.
+- **Immune:** Ice Legs (the perk, was Skate) and **Sure-Footed** (the
+  keystone, was Skater): the holder and its allies within 2.
+- **Sure-Footed's rider:** a foe that **walks** off the holder's glaze
+  (started on it, ends off glaze) keeps the **Unsteady status** until the end
+  of its next turn (same numbers, "stepped off the ice"). A push off doesn't
+  count (Claude: it's a step, not a shove).
+- **Forecast:** named lines "Unsteady footing −10 avoid" / "Unsteady footing
+  −15 glance" (in the avoid and glance hovers too), a "Unsteady" tag in the
+  cutscene; an immune unit on glaze shows "Unsteady footing: Ice Legs ignores
+  it". **Tile card:** "Unsteady: a unit standing here has −10 avoid and −15
+  glance chance (Shatter: hits on it +15%)". **Move hover:** "ends on glaze:
+  Unsteady (−10 avoid, −15 glance)". **Board:** the glaze sheen stays; an
+  Unsteady unit gets a thin ice ring at its feet broken by ink cracks that
+  rocks gently.
+- **AI (D401):** standing Unsteady counts as a 4% hazard in its hex score
+  (`BWUnsteady.AI_HAZARD`, none for Ice Legs / Sure-Footed cover); a foe on
+  glaze is already worth more through the forecast's expected damage
+  (higher hit, fewer glances, Shatter). The slide scoring is gone.
 
 ### 14.2 Pillars (D262, D263)
 
 - A fresh glaze (ice, or a Blizzard mark) on **empty** water 3 raises a
   pillar: impassable, blocks line of sight (`has_los` reads it, so basic
-  ranged attacks and `los` skills do), stops slides and pushes (slam).
+  ranged attacks and `los` skills do), stops pushes (slam).
 - 3 ticks (decay frozen), then water 3 again. Fire melts it; thunder
   shatters it (34.5% centre, 17% ring). 4 per caster (a fifth melts the
   oldest). Re-icing doesn't refresh it.
@@ -1096,12 +1125,13 @@ Built from `ELEMENTS-v3.md` §2 and §4 with the author's rulings of
 - **Fire: steam** over the whole pool for 2 ticks. It blocks sight through
   it (not between hexes within 2), and a unit in steam can be single-targeted
   only from within 2.
-- **Ice: rink** within radius 1 of the cast hex: those pool hexes glaze;
-  empty water 3 among them become pillars.
+- **Ice: glaze** within radius 1 of the cast hex: those pool hexes glaze
+  (Unsteady ground, §14.1; the "rink" name is gone, D398); empty water 3
+  among them become pillars.
 - **Thunder: electrified** within radius 1 of the cast hex (always, even a
   1-hex puddle; water arriving on a fuse too; glazed water still shatters):
   - 15% thunder at an occupant's turn start (after fire, before the drain)
-    and Staggered; 5% on entering, once per walk or slide; conductive;
+    and Staggered; 5% on entering, once per walk or push; conductive;
   - each unit's ramp per field: full, 25%, then immune;
   - 2 ticks (decay frozen), then it discharges (each hex steps down 1 water;
     a static scars a tick);
@@ -1111,12 +1141,12 @@ Built from `ELEMENTS-v3.md` §2 and §4 with the author's rulings of
 
 ### 14.4 Readability (D266)
 
-Blast preview: slide arrow + ghost ring + "SLIDE" / "SLAM 8%", the reacting
-pool hatched with a dashed outline and a "STEAM" / "ELECTRIFIED" tag, a
-rising "PILLAR". Move hover: the arrow runs over the ice, the hint names the
-slide and any slam. Tile card: Rink, Pillar, Steam, Electrified (with the
-occupant's next shock), Pool. Board: a slippery sheen, the inked ice pillar
-with its ticks, steam puffs, the electrified outline with timer pips.
+Blast preview: the reacting pool hatched with a dashed outline and a
+"STEAM" / "ELECTRIFIED" tag, a rising "PILLAR" (the D266 slide ghosts went
+with the slides, D397). Move hover: "ends on glaze: Unsteady". Tile card:
+Unsteady, Pillar, Steam, Electrified (with the occupant's next shock), Pool.
+Board: the glaze sheen, the Unsteady crack ring under a unit, the inked ice
+pillar with its ticks, steam puffs, the electrified outline with timer pips.
 
 ## 15. Fire, light and thunder (D285-D292, Element Overhaul)
 
@@ -1126,7 +1156,7 @@ Rider without the full ring). Code: `src/core/overheat.gd` (BWOverheat),
 `src/core/beams.gd` (BWBeams), `src/core/thunder_keys.gd` (BWThunderKeys);
 hooks marked D285-D291 in `BWTiles.apply`, `BWBattle` (paint, _tile_hurt,
 _mods, _plan, use_skill, move, the turn start/end, the tick, _digest),
-`BWEnchant.land`, `BWSlides` and `BWAI`. Keystones are read through
+`BWEnchant.land` and `BWAI`. Keystones are read through
 `BWKeystones.has` (or the dev flag `u.fx["ks:<id>"]`). View:
 `BWElementsView` (`src/game/combat/elements_view.gd`). Tests:
 `tests/test_fire_light_thunder.gd`. Renders: `design/art/v3_fire_*`,
@@ -1158,7 +1188,7 @@ _mods, _plan, use_skill, move, the turn start/end, the tick, _digest),
   eruption chains (the preview tags "×2").
 - **Trailblazer:** every hex the holder leaves on a walk gets propagated
   fire 1 (the start hex included, the end hex not), up to 4 a turn; no
-  crossing burns on walks or slides. Undoing the move removes the trail.
+  crossing burns on walks. Undoing the move removes the trail.
 - **Phoenix Heart:** its own fire (standing, crossing, Overheat) never hurts
   it; standing on fire 3 (anyone's) at turn start heals 12% instead; once a
   battle, a KO (a blow or ground damage) while it stands on fire leaves it at
@@ -1288,20 +1318,22 @@ a cycle, a field once a turn).
   radius 3; `gale_max` in the paint opts); the copies its paint makes, or its
   gales make, last 2 cycles; its Gust fields push 2. Board: a gale 3 gets a
   wide three-armed swirl.
-- **Rink carry (the D272 TODO):** a glazed hex never fires a gale, so a gale
-  that fires next to a rink carries it instead: its **water** copies glaze for
-  1 cycle (a fire or light copy stays unglazed; never a pillar).
+- **Glaze carry (the D272 TODO; "rink carry" until D398):** a glazed hex never
+  fires a gale, so a gale that fires next to glaze carries it instead: its
+  **water** copies glaze for 1 cycle (Unsteady ground; a fire or light copy
+  stays unglazed; never a pillar). Kept (Claude, D398): wind spreading bad
+  footing is the wind/ice combo the slides used to be.
 
 ### 16.2 Ice keystones (D294)
 
 Code: `src/core/ks_ice.gd` (BWKsIce); defs `flash_freeze`, `glacier_shatter`.
 
-- **Skater:** never slides (pushed or pulled onto ice it stops there; a walk
-  crosses ice like ground, so "where to stop on the slide line" is where the
-  walk ends). Its first 4 ice hexes entered each turn cost 0 (climbs are
-  free since D375), then 1; the count rides the walk search's state. **Skate** (the
-  perk) stays the cheap version: it never slides and ice costs it 1; with
-  both, Skater's free hexes come first.
+- **Sure-Footed** (id `skater` kept for saves; was Skater, D399): the holder
+  and its allies within 2 are never Unsteady on glaze; a foe that walks off
+  the holder's glaze stays Unsteady until the end of its next turn (§14.1).
+  The free ice hexes went with the slides (glaze costs like ground now).
+  **Ice Legs** (the perk, was Skate) is the personal version: never
+  Unsteady, glaze costs 1 even on mud.
 - **Flash Freeze:** an action, once a battle (gone from the menu once spent),
   range 3, a foe: **Frozen** (a status kept until thawed). It skips its next
   turn (the turn starts, the ground acts, then it ends); a boss (the Twins, the
@@ -1315,7 +1347,7 @@ Code: `src/core/ks_ice.gd` (BWKsIce); defs `flash_freeze`, `glacier_shatter`.
   pillar within your weapon's reach. Any of your skills whose shape covers one
   of your pillars raised before that action breaks it too. The break: 12% ice
   to everyone on the six neighbours, both teams, then a push of 1 away (onto
-  ice they slide); the hex is left bare.
+  glaze they just stop, D400); the hex is left bare.
 
 ### 16.3 Water keystones (D295)
 
@@ -1326,7 +1358,7 @@ Code: `src/core/ks_water.gd` (BWKsWater); def `tidal_release`.
   loses its water; an electrified field there ends). A wave runs from that hex
   along the heading, length = the pool's size (max 6), stopping at the edge or
   rock. Everyone on the line is pushed 3 along it, front first; blocked, a slam
-  (8% both); onto glaze, a slide. The line then gets water 2. AI: a line that
+  (8% both); onto glaze it just stops. The line then gets water 2. AI: a line that
   pushes 2+ foes and no friend.
 - **Riptide:** at the holder's turn start, each foe in unglazed water 2-4 away
   is pulled 1 toward it, closest first (a field move).
@@ -1385,7 +1417,7 @@ hooks marked D309/D312 in `BWTiles.apply`, `BWPools.finish`, `BWBattle`
   walls; seeds and statics follow §5.5/§5.6). The unit on each ring hex is
   **pushed 1 outward**, both teams, as a wind field move: the wind caps (2
   hexes a cycle, a field once a turn), dark 3 gravity, a slam (8%) when
-  blocked, a slide on ice. Wind set holders' allies are spared.
+  blocked (onto glaze it just stops). Wind set holders' allies are spared.
 - **Always outward (Claude, D310):** the caster's Gust heading doesn't bend
   it; a squall is an explosion and the push already goes "away".
 - Light and dark only. **One squall per owner**; a new one replaces it. One
@@ -1407,13 +1439,14 @@ hooks marked D309/D312 in `BWTiles.apply`, `BWPools.finish`, `BWBattle`
   **12% ice** (Shattering's potency of the centre's glazer applies) to every
   unit on the hex and its six neighbours, both teams, **once per unit per
   action** however many centres reach it.
-- Then the hex and its ring become a **radius-1 rink** as a propagated
-  arrival: charged unglazed hexes glaze, empty ground gets a thin ice sheet
-  (water 1, glazed); already-glazed, marked hexes, pillars and walls are left.
-- **No pillar (Claude, D313):** it just shattered; even empty water 3 stays a
-  flat rink. Ice on a pillar doesn't overfreeze (Glacier Wall and thunder
+- Then the hex and its ring **glaze** as a propagated arrival (D398: no
+  "rink" any more): charged unglazed hexes glaze, empty ground gets a thin ice
+  sheet (water 1, glazed); already-glazed, marked hexes, pillars and walls are
+  left. Whoever stands in the seven hexes is Unsteady (§14.1).
+- **No pillar (Claude, D313):** it just shattered; even empty water 3 stays
+  flat glaze. Ice on a pillar doesn't overfreeze (Glacier Wall and thunder
   break pillars).
-- Once per hex per action; the rink is propagated, so nothing chains.
+- Once per hex per action; the glaze is propagated, so nothing chains.
   Thunder on glazed water still detonates with the x1.5 shatter. Blizzard
   glazes directly and never overfreezes.
 - **Readability:** forecast "Overfreeze: ..." (skills and ice basics), the
@@ -1451,9 +1484,9 @@ box shows **WIND SHAPING**, whose options follow the skill's shape. Code:
   area, the line, the target): move 0 until the end of its next turn, then
   Restless.
 - **Order:** Draw in is before the hits; everything else lands after the hits
-  and the paint (hit, paint, pushes, slides, slams). Only foes are moved.
+  and the paint (hit, paint, pushes, slams). Only foes are moved.
 - **Unchanged rules:** every move goes through `BWWind.push`: once per action,
-  2 hexes a cycle (D272), dark 3 gravity (D276), slides onto glaze (D261) and
+  2 hexes a cycle (D272), dark 3 gravity (D276) and
   8% slams on both when a push is blocked by rock, a unit, a pillar or a wall.
   Pulls never slam.
 - **Memory:** the last choice per unit and skill (`BWUnit.wind_shapes`, not
@@ -1485,7 +1518,7 @@ or a click on the target fires):
 rim (inward for Draw in, outward for Burst out) or the target; a tag naming
 the option; a dashed ghost ring where each pushed foe lands; "SLAM 8%" on a
 blocked push; "INTO FIRE n%" / SHOCK / DARK / GUST FIELD where a foe would
-land in a hazard; plus the blast preview's ink move arrows, slide ghosts and
+land in a hazard; plus the blast preview's ink move arrows and
 damage stickers (the action is simulated with the shaping).
 
 **AI (D368):** at most 4 options per skill, each simulated once (single:

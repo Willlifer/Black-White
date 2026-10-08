@@ -13,7 +13,7 @@ extends Node3D
 ##       single  the mouse around the target aims the push; ← / → turn it;
 ##               Tab, ↑ / ↓ toggle Hold; the wheel turns it
 ##   * the board shows it at a glance, over the blast preview (which already
-##     draws every unit's move, slide ghost and damage): wind arrows on the
+##     draws every unit's move and damage): wind arrows on the
 ##     line's side / the area's rim / the target, a tag naming the option,
 ##     a dashed ghost ring where each pushed foe lands, "SLAM 8%" on every
 ##     blocked push and "INTO FIRE 12%" (shock, dark, a gust field) where a

@@ -10,7 +10,7 @@ extends RefCounted
 ## land after the blow in the event stream: a Vortex basic's pull on its
 ## target (BWWind.after_basic) and a Vortex field the blow's paint fires
 ## (field_fire + its pulls, Eye of the Vortex's eye_pull). hoist() moves
-## those in front of the blow they belong to, with the slides and slams that
+## those in front of the blow they belong to, with the slams that
 ## follow each pulled unit. Pushes are never moved.
 ##
 ## The combat screen calls hoist() on its queue before it drains it.
@@ -44,13 +44,13 @@ static func hoist(events: Array) -> Array:
 				break
 			if is_pull(q):
 				take.append(j)
-				# its own slide / slam right behind it rides along
+				# its own slam right behind it rides along
 				var uid := str(q.get("unit", ""))
 				var k := j + 1
 				while k < out.size():
 					var r: Dictionary = out[k]
 					var rt := str(r.get("type", ""))
-					if str(r.get("unit", "")) == uid and (rt == "slam" or (rt == "move" and str(r.get("kind", "")) == "slide")):
+					if str(r.get("unit", "")) == uid and rt == "slam":
 						take.append(k)
 						k += 1
 					else:

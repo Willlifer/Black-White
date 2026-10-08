@@ -1,24 +1,25 @@
-# Handoff — 2026-10-07 (the Element Overhaul has landed; the roster pool)
+# Handoff — 2026-10-07 (ice reworked: Unsteady footing; the Element Overhaul has landed)
 
 **Where:** `C:\Users\ferth\Documents\Black White`. The game is in `game/` (Godot 4.7, GDScript). Phases 0–6 are done; we're in Phase 7 (balance and polish from playtests).
 
 **Git:**
-- `main` is the full internal history; everything through `9c9117d` (schedule, Horde rework, weapon movement, wind shaping) is committed. D379-D386 (below) are **uncommitted** on top.
+- `main` is the full internal history; everything through `5c85528` (roster pool, featured scroll, boot screen, VFX/anim pass, audio placeholders, Windows build) is committed. **D397-D402 (the ice rework) are uncommitted** on top.
 - The GitHub remote `origin` (`Willlifer/Black-White`) gets a **barebones export** on branch `github` (no `design/art/` renders, references, raw audio, `archive/`, the concept docx). Re-export in the `../bw-export` worktree, never by switching branches here: `git checkout main -- . ':!design/art/*.png' ':!design/art/*.gif' ':!design/audio/*.wav' ':!design/audio/*.png' ':!archive' ':!Visual References' ':!BlackWhite Loop Project' ':!Low fish Beat Project' ':!Audio Barks' ':!BlackWhite Loop.wav' ':!Drum Beat.wav' ':!Black and white concept..docx'`, `git rm` anything deleted on main, commit, `git push origin github:main`. Last export: internal `aa5ef11` → `cc156eb` (2026-10-06).
 
-**Green as of 2026-10-07 (D379-D386):** `--self-test` 755/755 in 66 suites, `--ui-probe`, `--flow-probe`, `--tutorial-probe` exit 0 (the tutorial probe's save check fails if another process writes `user://run.json` mid-run; re-run alone).
+**Green as of 2026-10-07 (D397-D402):** `--self-test` 763/763 in 67 suites (one stray `SCRIPT ERROR` in test_rules_d94 `test_enemy_curve`, a roster-row lookup, not ice; it still passes), `--ui-probe` (99/99; one timing flake on a first run), `--flow-probe`, `--tutorial-probe` exit 0; autoplay lake and catacombs 0 SCRIPT ERROR; `build_windows.sh` built `dist/BlackWhite-2026-10-07.zip`.
 
-## Latest (uncommitted): rolling pool, featured scroll, boot screen, wind default, 3v3 ease (D379-D386, LEDGER L-43)
-- **Pool (D379/D382/D386):** 27 more identities (17 pre-D149 names + the author's 10; Shyvana fire) in `roster.csv` (`pool` 1). Randomize / game start hands 3-5 back-row seats to them (front row core, Rem kept); enemies draw from all 47 outside the squad (`BWRun.reserve_rows`, duplicates `"id~2"` if short); saves keep both. Tests/tools/sims roll the core 20. design/ROSTER.md.
-- **Featured scroll (D380/D384):** `BWRun.featured_scroll` (strength column, set completion, used element, items) marks one scroll + a reason line. **Boot screen (D381):** `BWBootScreen` over the shader warm; `BWLoadingScreen` deleted (L-15, L-10 closed).
-- **D383** areas default to Draw in. **D385** 3v3 rooms ×0.93 at 1/2/3/6/9: Standard 71 → 75% (24 runs). Renders `pool_*.png`, `featured_shop.png`, `wind2_rain_default.png`. D375-D378 are committed (`5e2df32`).
+## Latest (uncommitted): ice rework, Unsteady footing (D397-D402, LEDGER L-44)
+- **The author:** "ice does not feel good. I would remove rink as a status, have ice apply 'unsteady footing'". **No slides** (`slides.gd` deleted): walks and pushes onto glaze just stop. A unit on glaze (not stasis, not a pillar) is **Unsteady: −10 avoid, −15 glance**, both teams, stacking with Shatter (+15%). `BWUnsteady` (`src/core/unsteady.gd`), ELEMENTS.md §14.1.
+- **Shown:** forecast notes "Unsteady footing −10 avoid / −15 glance", the tile card, the move hover, a cracked ice ring under the unit (`BWKeystoneView`). "Rink" gone: pool ice and Overfreeze just glaze; gales carry glaze (kept, D398).
+- **Picks:** Skater → **Sure-Footed** (id kept; you + allies within 2 immune, a foe walking off your glaze stays Unsteady to the end of its next turn), Skate → **Ice Legs**, Frostbite Pins on your glaze, Fault Lines' Shatter on stasis, slam riders gone (D399/D400). AI: Unsteady is a 4% hazard (D401). No save migration (D402). Renders `design/art/ice2_*.png`.
+- Earlier (committed in `5c85528`): the rolling pool, featured scroll, boot screen, 3v3 ease (D379-D386, L-43), VFX/anim (D387-D390), audio placeholders (D391-D394), the Windows build (D395-D396).
 ## What landed: the Element Overhaul (design/ELEMENTS-v3.md, the author's rulings at its top)
-- **Spine (D261–D268):** ice slides and pillars, pools, steam, rinks, electrified water. ELEMENTS.md §14.
+- **Spine (D261–D268):** pillars, pools, steam, electrified water (the ice slides and rinks were removed by D397/D398). ELEMENTS.md §14.
 - **Wind and dark (D269–D276):** wind modes (Gust/Vortex/Becalm) on every weapon, fields, caps, Wind Wall; dark's Rot (curse) and gravity (void).
 - **C1 (D277–D284):** the rank ladder (keystones at ranks 3 and 6, max 2), 21 keystones in `data/keystones.csv`, enemy keystones by stage, 28 perks, 2/3-piece element sets, save v11.
 - **C2 (D285–D292):** fire Overheat, light beams/Empowered/Dawn, Prism, Overflow, Magnify, Static Blades, Blast Rider, Daisy Chain. ELEMENTS.md §15. **C3 (D293–D300):** wind, ice, water and dark keystones; the Twins float. ELEMENTS.md §16 (renumbered from §14.5–14.9, D305).
 - **Final pass (D301–D308):** no BBCode leaks on cards (D301), the keystone cap (D302), summed recap lines and the banner fix (D303), AI Wind Walls (D304), docs (D305), Self-detonate (D306), the L-30 riders (D307).
-- **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, rink, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
+- **Squall + Overfreeze (D309-D314, ELEMENTS.md §17):** wind on light/dark 2+ sends a 3-tick front (+1, push 1 out); fresh ice on glazed water shatters (12%, glaze, no pillar). LEDGER L-35; renders `v3_squall_*`, `v3_overfreeze_*` (`tools/squall_shots.gd`).
 - **Auto-equip (D315-D318, L-35):** gear panel **Optimize all [O]** / **Optimize** with a diff preview, Apply / Cancel and one-step Undo (`BWAutoEquip`, `test_auto_equip`, renders `autoequip_*.png`).
 ## Also landed: 6v6 modes, Split Front + Stop the Horde (D327-D334, LEDGER L-38)
 - Schedule: superseded by D353 (below). Shared `BWObjectives` (objects, verdicts, waves, exits; the castle lane builds on it). Maps `splitfront.json` (seeded fire/ice/wind divider, round-4 enemy break-through), `horde.json`. design/MAPS.md §15-16. Sim: Split Front 70%; `--combat splitfront --mode splitfront [--divider ice]`, `--combat horde --mode horde`; renders `mode_split_*.png` (`tools/mode_shots.gd`). **Horde rework (D347-D352, uncommitted):** protect the **Lil Fella** (`BWLilFella`: half the squad's best HP, flees on its own turn, only enemy sources hurt it; no exit any more); grunts act as one **group turn** (`BWUnit.group_turn`, generic: `BWTurnQueue` block, `BWBattle._group_open`, mode hook `group_order`), played back at once (`_play_group`). 70% / 76% at fights 8 / 10, rounds 9 (was 12-13); autoplay 37 s a round (was 58). `castle_sim MODE=horde CAMPAIGN=dir`; renders `horde2_*.png`.
@@ -30,8 +31,8 @@
 ## Also landed: wind shaping (D365-D370, ELEMENTS.md §18, LEDGER L-40; 6v6 infra D319-D324 is L-36)
 - A wind skill's confirm box shows **WIND SHAPING**: lines Part left/right (mouse side or the arrow toward it) / Blast out, areas Draw in / Burst out, single targets a push heading (mouse round the target, ←/→), Hold on all; Tab/wheel cycle; Enter fires. Live arrows, ghosts, SLAM, INTO FIRE. AI simulates ≤ 4. Basics keep Gust/Vortex/Becalm. Wind Wall kept (D370: not spammable). Renders `design/art/wind2_*.png`; ui-probe parts a Ley Line right with →. Self-test fails only in the schedule / movement lanes' files.
 ## Do this first
-1. **Commit** D379-D386 (see Git above).
-2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team. Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34, L-41 (climbs, Updraft), L-42 (fight 4: the shared-pool stones).
+1. **Commit** D397-D402 (see Git above).
+2. **The author plays a full run** (`game\run.bat`) with keystone builds: dagger Blast Rider, a light beam team, a Rot/Doom team, and an **ice team** for the Unsteady rework (L-44). Most rows are AWAITING PLAY: LEDGER L-24 (Twins), L-31, L-33, L-34, L-41 (climbs, Updraft), L-42 (fight 4: the shared-pool stones).
 3. Cheap OWED items while waiting: L-13 (the bow sling yoke, the planted staff); the author looks at `vfx2_*.png` (L-43). Keep `HANDOFF.md` ≤ 40 lines; rewrite it each session.
 ## Known exposures
 - Review renders (`design/art/*.png|gif`, ~250 MB+) are only in the local repo and on this disk. Back up `.git` (`git bundle create D:\backup\bw.bundle --all`).

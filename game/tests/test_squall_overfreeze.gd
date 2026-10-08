@@ -247,10 +247,16 @@ func test_overfreeze_burst(t) -> void:
 	t.eq(_hurt(b, foe, "overfreeze"), b._tile_dmg(foe, 12.0, "ice"), "12% to the unit on the hex")
 	t.eq(_hurt(b, al, "overfreeze"), b._tile_dmg(al, 12.0, "ice"), "12% to an ally on the ring (both teams)")
 	t.eq(_hurt(b, far, "overfreeze"), 0, "nothing 2 away")
-	t.ok(b.tiles.is_glazed(C), "the centre is a rink")
+	t.ok(b.tiles.is_glazed(C), "the centre is glazed")
 	t.ok(b.tiles.is_glazed(_nb(C, 0)) and b.tiles.intensity(_nb(C, 0), "water") == 1, "empty ground gets a glazed ice sheet")
 	t.ok(b.tiles.is_glazed(_nb(C, 3)), "a charged ring hex glazes")
-	t.ok(BWSlides.slippery(b.tiles, _nb(C, 0)), "and it's slippery")
+	t.ok(BWUnsteady.on_glaze(b.tiles, _nb(C, 0)), "and it's Unsteady ground (D398, no rink)")
+	if foe.alive():
+		t.ok(BWUnsteady.unsteady(b, foe), "the foe left on the centre is Unsteady")
+	if al.alive():
+		t.ok(BWUnsteady.unsteady(b, al), "and so is the ally on the ring (both teams)")
+	for n in (r.get("overfreeze", []) as Array):
+		t.ok(not str(n).to_lower().contains("rink"), "no rink in the result")
 	t.eq(str(b.tiles.at(_nb(C, 4)).marker), "fuse", "a marked hex is untouched")
 	t.ok(not b.tiles.is_glazed(_nb(C, 4)), "and not glazed")
 	t.eq(_ev(b, "overfreeze").size(), 1, "one overfreeze event")
@@ -263,7 +269,7 @@ func test_overfreeze_conditions(t) -> void:
 	var b := _fight([me], [foe], [Vector2i(0, 12)], [Vector2i(12, 12)])
 	_lay(b, C, -2)
 	var r := b.paint([C], "ice", me)
-	t.ok(not r.has("overfreeze"), "unglazed water just glazes (the rink path)")
+	t.ok(not r.has("overfreeze"), "unglazed water just glazes (the pool path)")
 	r = b.paint([C], "ice", me, 1, false, { "propagated": true })
 	t.ok(not r.has("overfreeze"), "a propagated ice arrival never overfreezes")
 	_lay(b, C, 2)

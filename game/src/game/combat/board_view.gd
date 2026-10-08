@@ -39,7 +39,7 @@ const STATIC_SORT := 0.45  # over faces (0.30-0.35) and marks (0.40), under high
 ## charge, so the ring goes and never comes back.
 var _seed := {}           # Vector2i -> MeshInstance3D
 var kanji: BWKanjiLayer   # D231
-var icewater: BWIceWaterView   # D266: rinks, pillars, steam, electrified fields
+var icewater: BWIceWaterView   # D266: glaze sheen, pillars, steam, electrified fields
 
 
 func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:

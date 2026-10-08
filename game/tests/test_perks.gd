@@ -245,7 +245,8 @@ func test_rime_armour(t) -> void:
 	var fc := b.forecast_basic(foe, me)
 	t.near(float(_mod(fc, "Shatter").get("value", 0)), 1.0, 0.001, "Shatter doesn't apply")
 	t.near(float(_mod(fc, "Rime Armour (").get("value", 0)), 0.95, 0.001, "-5% per glaze level on my glaze (D281, Permafrost folded in)")
-	t.eq(BWPerkRules.slam_pct(b, me, foe.id, 8.0, false), 0.0, "no slam damage on glaze")
+	t.eq(BWPerkRules.slam_pct(b, me, foe.id, 8.0, false), 8.0, "D400: no more no-slam clause")
+	t.ok(BWUnsteady.unsteady(b, me), "Rime Armour doesn't lift Unsteady")
 
 
 func test_fault_lines(t) -> void:
@@ -258,13 +259,26 @@ func test_fault_lines(t) -> void:
 		b.tiles.apply([E], "ice", "x")
 		_turn(b, me)
 		t.near(float(_mod(b.forecast_basic(me, foe), "Shatter").get("value", 0)), 1.30, 0.001, "Shatter doubled: +30%")
-		t.eq(BWPerkRules.slam_pct(b, foe, me.id, 8.0, false), 16.0, "slams I cause: +8%")
+		t.eq(BWPerkRules.slam_pct(b, foe, me.id, 8.0, false), 8.0, "D400: no more +8% slams")
 		var res := b.attack(me, foe)
 		if res.hit:
 			t.ok(b.tiles.is_glazed(E), "D281: the hit no longer breaks the glaze")
 			done = true
 			break
 	t.ok(done, "a hit landed")
+
+
+## D400: Fault Lines' new rider: its Shatter lands on a foe on a stasis marker.
+func test_fault_lines_stasis(t) -> void:
+	var me := _u("me", "sword", "ice", {}, ["ice_fault"])
+	var plain := _u("p", "sword", "ice")
+	var foe := _foe()
+	var b := _fight([me, plain], [foe], [C, Vector2i(6, 5)], [E])
+	b.tiles.apply([E], "ice", "x")
+	t.eq(str(b.tiles.at(E).get("marker", "")), "stasis", "a stasis marker under the foe")
+	t.near(float(_mod(b.forecast_basic(me, foe), "Shatter").get("value", 0)), 1.30, 0.001, "Fault Lines: Shatter +30% on stasis")
+	t.ok(_mod(b.forecast_basic(plain, foe), "Shatter").is_empty(), "without it, stasis has no Shatter")
+	t.ok(_mod(b.forecast_basic(me, foe), "Unsteady").is_empty(), "and stasis is never Unsteady")
 
 
 func test_frostbite(t) -> void:
@@ -274,8 +288,15 @@ func test_frostbite(t) -> void:
 	b.tiles.apply([E], "water", "x")
 	b.tiles.apply([E], "ice", me.id)
 	_turn(b, foe)
-	t.ok(foe.statuses.has("drenched"), "a foe starting on my glaze is Drenched")
-	t.eq(foe.move_range(), 3, "-1 move this turn")
+	t.ok(foe.statuses.has("pinned"), "D400: a foe starting on my glaze is Pinned")
+	t.ok(not foe.statuses.has("drenched"), "not Drenched any more")
+	t.eq(foe.move_range(), 2, "-2 move this turn (axe 4)")
+	var foe2 := _foe("g")
+	var b2 := _fight([_u("p", "staff", "ice")], [foe2], [C], [E])
+	b2.tiles.apply([E], "water", "x")
+	b2.tiles.apply([E], "ice", "p")
+	_turn(b2, foe2)
+	t.ok(not foe2.statuses.has("pinned"), "someone else's glaze: no Pin")
 
 
 func test_frost_ward(t) -> void:

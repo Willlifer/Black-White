@@ -1,7 +1,8 @@
 extends RefCounted
-## D261-D266 the ice/water spine (design/ELEMENTS-v3.md §2, §4, rulings of
-## 2026-10-07): slides (BWSlides), pillars, pools, steam, rinks and
-## electrified fields (BWPools).
+## D262-D266 the ice/water spine (design/ELEMENTS-v3.md §2, §4, rulings of
+## 2026-10-07): pillars, pools, steam, pool glaze and electrified fields
+## (BWPools). D397 removed the D261 slides: glaze is ground (Unsteady footing,
+## tests/test_unsteady.gd).
 
 const W := 0     # heading east (same row, col + 1)
 
@@ -49,7 +50,7 @@ func _turn(b: BWBattle, u: BWUnit) -> void:
 	b._begin_turn()
 
 
-## Glazed water `hv` on each hex (a rink), or plain water when glaze 0.
+## Glazed water `hv` on each hex, or plain water when glaze 0.
 func _lay(t: BWTiles, hexes: Array, h: int = -1, glaze: int = 2, v: int = 0) -> void:
 	for x in hexes:
 		var e := t._entry(h, v, "", "", "cast")
@@ -68,60 +69,9 @@ func _events(b: BWBattle, type: String) -> Array:
 	return b.history.filter(func(e): return str(e.type) == type)
 
 
-# ------------------------------------------------------------------ slides
+# ------------------------------------------------------------------ glaze is ground (D397: no slides)
 
-func test_slide_path_rules(t) -> void:
-	var bd := _board(13)
-	var tl := BWTiles.new(bd)
-	var u := _u("a")
-	# stops ON the first non-ice hex
-	_lay(tl, _row(6, 3, 5))
-	var sp := BWSlides.slide_path(bd, tl, u, Vector2i(3, 6), W)
-	t.eq(sp.path, [Vector2i(3, 6), Vector2i(4, 6), Vector2i(5, 6), Vector2i(6, 6)], "slides to the first ground hex and stops on it")
-	t.eq(sp.stop, "ground", "stop: ground")
-	t.ok(not sp.slam, "no slam on ground")
-	# not slippery: no slide
-	t.eq(BWSlides.slide_path(bd, tl, u, Vector2i(7, 6), W).path.size(), 1, "dry ground: no slide")
-	# cap 6
-	_lay(tl, _row(2, 0, 12))
-	var cap := BWSlides.slide_path(bd, tl, u, Vector2i(0, 2), W)
-	t.eq(cap.path.size(), BWSlides.SLIDE_MAX + 1, "a slide terminates at %d hexes" % BWSlides.SLIDE_MAX)
-	t.eq(cap.stop, "cap", "stop: cap")
-	# map edge: no slam
-	var edge := BWSlides.slide_path(bd, tl, u, Vector2i(9, 2), W)
-	t.eq(edge.path[-1], Vector2i(12, 2), "the edge stops it on the last hex")
-	t.eq(edge.stop, "edge", "stop: edge")
-	t.ok(not edge.slam, "the edge is no slam")
-	# a rise of 1 blocks and slams
-	var bd2 := _board(13, { Vector2i(6, 4): 1 })
-	var tl2 := BWTiles.new(bd2)
-	_lay(tl2, _row(4, 3, 5))
-	var rise := BWSlides.slide_path(bd2, tl2, u, Vector2i(3, 4), W)
-	t.eq(rise.path[-1], Vector2i(5, 4), "a rise stops it before")
-	t.ok(rise.slam, "and it slams")
-	# a ledge drops it onto the lower hex
-	var bd3 := _board(13, { Vector2i(3, 4): 2, Vector2i(4, 4): 2, Vector2i(5, 4): 0 })
-	var tl3 := BWTiles.new(bd3)
-	_lay(tl3, [Vector2i(3, 4), Vector2i(4, 4), Vector2i(5, 4), Vector2i(6, 4)])
-	var ledge := BWSlides.slide_path(bd3, tl3, u, Vector2i(3, 4), W)
-	t.eq(ledge.path[-1], Vector2i(5, 4), "off the ledge onto the lower hex")
-	t.eq(ledge.stop, "ledge", "stop: ledge (no further, even on ice)")
-	# rock slams
-	var bd4 := _board(13, {}, { Vector2i(6, 4): "jagged" })
-	var tl4 := BWTiles.new(bd4)
-	_lay(tl4, _row(4, 3, 5))
-	var rock := BWSlides.slide_path(bd4, tl4, u, Vector2i(3, 4), W)
-	t.eq([rock.path[-1], rock.stop, rock.slam], [Vector2i(5, 4), "rock", true], "rock: stop before, slam")
-	# entered and immediately blocked: no slam (slid 0)
-	var none := BWSlides.slide_path(bd4, tl4, u, Vector2i(5, 4), W)
-	t.eq([none.path.size(), none.slam], [1, false], "blocked at once: no slide, no slam")
-	# Skate never slides
-	var sk := _u("s", "sword", "ice", ["ice_skate"])
-	sk.begin_battle()
-	t.eq(BWSlides.slide_path(bd, tl, sk, Vector2i(3, 6), W).path.size(), 1, "Skate: stops on the first ice hex")
-
-
-func test_walk_slides_and_extra_move(t) -> void:
+func test_walk_onto_glaze_is_ground(t) -> void:
 	var bd := _board()
 	var a := _u("a")
 	var f := _u("f")
@@ -129,81 +79,35 @@ func test_walk_slides_and_extra_move(t) -> void:
 	_lay(b.tiles, _row(6, 3, 6))
 	_turn(b, a)
 	var r := b.reachable(a)
-	t.ok(r.has(Vector2i(7, 6)) and r[Vector2i(7, 6)].stop, "reachable lists the slide's end hex")
-	t.ok(r[Vector2i(7, 6)].has("slide"), "with its slide")
 	for h in _row(6, 3, 6):
-		t.ok(not (r.has(h) and r[h].stop), "an ice hex isn't a stop: %s" % h)
-	t.eq(int(r[Vector2i(7, 6)].cost), 1, "6 hexes for 1 move")
-	t.ok(b.move(a, Vector2i(7, 6)), "the move goes")
-	t.eq(a.pos, Vector2i(7, 6), "it ends on the ground past the rink")
+		t.ok(r.has(h) and r[h].stop, "a glazed hex is a stop: %s" % h)
+		t.ok(not r[h].has("slide"), "no slide entry: %s" % h)
+	t.eq(int(r[Vector2i(3, 6)].cost), 1, "one glazed hex costs 1, like ground")
+	t.eq(int(r[Vector2i(5, 6)].cost), 3, "three cost 3: no fast lane")
+	t.ok(b.move(a, Vector2i(4, 6)), "the move goes")
+	t.eq(a.pos, Vector2i(4, 6), "it stops where it chose, on the ice")
 	var mv := _events(b, "move")
-	t.eq(mv.size(), 2, "a walk event and a slide event")
-	t.eq(str(mv[1].get("kind", "")), "slide", "the second is the slide")
-	t.eq(mv[0].path, [Vector2i(2, 6), Vector2i(3, 6)], "the walk is the step onto the ice")
-	t.ok(b.can_move(a), "a slide ends the walk, then +1 move")
-	var r2 := b.reachable(a)
-	var far := 0
-	for h in r2:
-		if r2[h].stop and not r2[h].has("slide"):
-			far = maxi(far, BWHex.distance(a.pos, h))
-	t.eq(far, 1, "the extra move is 1 hex (on foot)")
-	t.ok(r2.has(Vector2i(2, 6)) and r2[Vector2i(2, 6)].has("slide"), "1 move back onto the rink slides all the way back")
-	t.ok(b.move(a, Vector2i(8, 6)), "it takes the extra hex")
-	t.ok(not b.can_move(a), "then the walk is spent")
+	t.eq(mv.size(), 1, "one walk event, no slide event")
+	t.ok(_events(b, "slam").is_empty(), "no slam")
+	t.ok(not b.can_move(a), "no +1 move after walking on ice")
 
 
-func test_slide_slam_and_bonus_once(t) -> void:
-	var bd := _board()
-	var a := _u("a")
-	var f := _u("f")
-	var b := _fight(bd, [a], [f], [Vector2i(2, 6)], [Vector2i(7, 6)])
-	_lay(b.tiles, _row(6, 3, 6))
-	_turn(b, a)
-	var hp_a := a.hp
-	var hp_f := f.hp
-	t.ok(b.move(a, Vector2i(6, 6)), "slides into the foe's hex line")
-	t.eq(a.pos, Vector2i(6, 6), "stops before the unit")
-	t.eq(_events(b, "slam").size(), 1, "one slam")
-	t.eq(hp_a - a.hp, BWTiles.tile_damage(a, BWSlides.SLAM_PCT, ""), "8% to the slider")
-	t.eq(hp_f - f.hp, BWTiles.tile_damage(f, BWSlides.SLAM_PCT, ""), "8% to the unit it hit")
-	t.ok(not b.can_undo_move(a), "a slam can't be taken back")
-	# the bonus is once a turn: a second slide gives no more
-	_lay(b.tiles, [Vector2i(6, 7), Vector2i(7, 7)])
-	b.tiles.entries.erase(Vector2i(6, 6))
-	var r := b.reachable(a)
-	var slid := false
-	for h in r:
-		if r[h].has("slide"):
-			slid = true
-			t.ok(b.move(a, h), "the extra move slides again")
-			break
-	t.ok(slid, "a slide was on offer for the extra move")
-	t.ok(not b.can_move(a), "no second +1 move in a turn")
-
-
-func test_push_onto_ice_slides(t) -> void:
-	var bd := _board()
+func test_push_onto_glaze_stops(t) -> void:
+	var bd := _board(13, {}, { Vector2i(9, 6): "jagged" })
 	var a := _u("a")
 	var f := _u("f")
 	var b := _fight(bd, [a], [f], [Vector2i(3, 6)], [Vector2i(4, 6)])
-	_lay(b.tiles, _row(6, 5, 7))
-	b.tiles.entries[Vector2i(6, 6)].h = 3                      # glazed fire: a grill on a slide
+	_lay(b.tiles, _row(6, 5, 8))
 	var hp := f.hp
 	b._displace(f, W, 1, "knockback")
-	t.eq(f.pos, Vector2i(8, 6), "pushed onto the rink, it slides off the far side")
-	var mv := _events(b, "move")
-	t.eq(str(mv[-1].get("kind", "")), "slide", "a slide event after the push")
-	t.eq(hp - f.hp, BWTiles.tile_damage(f, BWTiles.FIRE_CROSS_PCT * 3, "fire"), "crossing damage on the slide (frozen fire 3)")
-	# the order: push, then slide, then slam into a pillar-free rock
-	var bd2 := _board(13, {}, { Vector2i(9, 6): "jagged" })
-	var c := _u("c")
-	var g := _u("g")
-	var b2 := _fight(bd2, [c], [g], [Vector2i(3, 6)], [Vector2i(4, 6)])
-	_lay(b2.tiles, _row(6, 5, 8))
-	b2._displace(g, W, 1, "knockback")
-	t.eq(g.pos, Vector2i(8, 6), "stops before the rock")
-	var kinds: Array = b2.history.map(func(e): return str(e.type) + ":" + str(e.get("kind", e.get("cause", ""))))
-	t.eq(kinds.slice(0, 4), ["move:knockback", "move:slide", "slam:", "tile_damage:slam"], "push, slide, slam")
+	t.eq(f.pos, Vector2i(5, 6), "pushed 1 onto the glaze, it stops there")
+	t.eq(_events(b, "move").size(), 1, "the push only, no slide")
+	t.ok(_events(b, "slam").is_empty(), "no slam")
+	t.eq(f.hp, hp, "no damage")
+	t.ok(BWUnsteady.unsteady(b, f), "and now it's Unsteady")
+	# a wind push onto glaze stops too
+	BWWind.push(b, f, W, 1, "push", a, false, true)
+	t.eq(f.pos, Vector2i(6, 6), "a wind push: 1 hex, no slide")
 
 
 # ------------------------------------------------------------------ pillars
@@ -259,12 +163,10 @@ func test_pillar_cap_and_slam(t) -> void:
 	var standing := hexes.filter(func(h): return b.tiles.is_pillar(h))
 	t.eq(standing.size(), BWPools.PILLAR_MAX, "at most 4 pillars per caster")
 	t.ok(not b.tiles.is_pillar(hexes[0]), "the fifth melts the oldest")
-	# a slide into a pillar slams
+	# a push into a pillar stops (and slams like rock)
 	_lay(b.tiles, [Vector2i(8, 4)], -3, 0)
 	b.tiles.apply([Vector2i(8, 4)], "ice", "z")
 	_lay(b.tiles, _row(4, 6, 7))
-	var sp := BWSlides.slide_path(bd, b.tiles, a, Vector2i(6, 4), W)
-	t.eq([sp.path[-1], sp.stop, sp.slam], [Vector2i(7, 4), "pillar", true], "a pillar stops a slide: slam")
 	a.pos = Vector2i(7, 4)
 	t.eq(b.push_path(a, W, 1).stop, "rock", "a pillar stops a push (it slams like rock)")
 
@@ -319,7 +221,7 @@ func test_steam_pool(t) -> void:
 	t.ok(b.tiles.steam.is_empty(), "gone after 2 ticks")
 
 
-func test_rink_radius_one(t) -> void:
+func test_ice_on_pool_glazes_radius_one(t) -> void:
 	var bd := _board()
 	var a := _u("a", "staff", "ice")
 	var b := _fight(bd, [a], [_u("f")], [Vector2i(0, 0)], [Vector2i(12, 12)])
@@ -334,10 +236,11 @@ func test_rink_radius_one(t) -> void:
 	t.eq(glazed.size(), 7, "ice on a pool glazes only radius 1 of the cast hex")
 	for h in glazed:
 		t.ok(BWHex.distance(h, Vector2i(6, 6)) <= 1, "glazed within 1: %s" % h)
-	t.ok(b.tiles.is_pillar(Vector2i(7, 6)), "empty water 3 in the rink becomes a pillar")
+	t.ok(b.tiles.is_pillar(Vector2i(7, 6)), "empty water 3 in the glazed ring becomes a pillar")
 	t.ok(not b.tiles.is_pillar(Vector2i(6, 8)), "water 3 outside radius 1 doesn't")
 	t.ok(Vector2i(7, 6) in r.pools.pillars, "reported")
-	t.ok(BWSlides.slippery(b.tiles, Vector2i(6, 7)), "a rink hex is slippery")
+	t.ok(BWUnsteady.on_glaze(b.tiles, Vector2i(6, 7)), "a glazed pool hex is Unsteady ground")
+	t.ok(Vector2i(6, 7) in r.pools.glaze, "reported as glaze (no rink)")
 
 
 func test_electrified(t) -> void:
@@ -442,8 +345,8 @@ func test_preview_and_determinism(t) -> void:
 		return [b.history.map(func(e): return str(e)), str(b.tiles.entries), str(b.tiles.pillars), a.pos, a.hp, f.hp]
 	var r1: Array = run.call()
 	var r2: Array = run.call()
-	t.eq(r1, r2, "same seed, same slides, pillars and pools")
-	# the blast preview sees a push-slide and its slam
+	t.eq(r1, r2, "same seed, same walks, pillars and pools")
+	# the blast preview sees a push onto glaze stop there: no slide, no slam
 	var bd2 := _board(13, {}, { Vector2i(9, 6): "jagged" })
 	var c := _u("c")
 	var g := _u("g")
@@ -453,12 +356,13 @@ func test_preview_and_determinism(t) -> void:
 	cl.history.clear()
 	cl._displace(cl._unit("g"), W, 1, "knockback")
 	var dg := cl._digest(c, b2.tiles.entries.duplicate(true), { "g": g.hp, "c": c.hp })
-	t.ok(dg.moves.any(func(m): return str(m.kind) == "slide"), "the digest carries the slide")
-	t.eq((dg.get("slams", []) as Array).size(), 1, "and the slam")
+	t.ok(not dg.moves.any(func(m): return str(m.kind) == "slide"), "the digest carries no slide")
+	t.eq(dg.moves.size(), 1, "just the knockback")
+	t.eq((dg.get("slams", []) as Array).size(), 0, "and no slam")
 	t.eq(g.pos, Vector2i(4, 6), "the real battle is untouched")
 
 
-## D308: a reach tree whose parents loop (a slide end replaced a hex other
+## D308: a reach tree whose parents loop (a D261 slide end replaced a hex other
 ## routes walked through) once hung BWBoard.path_to in the campaign sim:
 ## path_to is bounded and returns no path rather than spinning.
 func test_path_to_never_hangs(t) -> void:

@@ -10,6 +10,9 @@ extends Node3D
 ##                countdown tag (n = turns of its own until the burst)
 ##   gale 3       Jetstream's gale 3 marker: a wide three-armed ink swirl with
 ##                a ring, so it reads past the gale 2's single mark
+##   Unsteady     (D397, any unit on glaze or holding the status) a thin
+##                ice-blue ring at its feet, broken by short ink cracks, that
+##                rocks gently: bad footing, read at a glance
 ## Unit tags sit on the unit's HP bar (bar_mark), so they follow its clamp
 ## below the turn order (D217) and its cull behind HUD panels (D230).
 ##
@@ -31,7 +34,10 @@ var _mesh: MeshInstance3D
 var _sig := ""
 var _tags := {}            # unit id -> Label3D
 var _shells := {}          # unit id -> MeshInstance3D (the ice)
-var shown := {}            # probes / review: { frozen: [ids], doomed: {id: n}, gale3: [hexes] }
+var shown := {}            # probes / review: { frozen: [ids], doomed: {id: n}, gale3: [hexes], unsteady: [ids] }
+var _rings := {}           # D397: unit id -> MeshInstance3D, the Unsteady crack ring (rocked in _process)
+var _t := 0.0
+static var _crack_mesh: ArrayMesh
 static var _mat: StandardMaterial3D
 
 
@@ -84,9 +90,14 @@ static func make_tag(size: int = 24) -> Label3D:
 	return l
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if screen == null or screen.battle == null:
 		return
+	_t += delta
+	var k := 0
+	for id in _rings:                                       # D397: the cracked ice rocks a little
+		(_rings[id] as Node3D).rotation = Vector3(0.06 * sin(_t * 2.6 + k), 0.0, 0.06 * sin(_t * 2.1 + 1.3 + k))
+		k += 1
 	var b := screen.battle
 	var sig := _signature(b)
 	if sig != _sig and not screen._busy:
@@ -104,6 +115,8 @@ func _signature(b: BWBattle) -> String:
 			parts.append("f%s%s" % [u.id, u.pos])
 		if BWKsDark.doomed(u):
 			parts.append("d%s%s%d" % [u.id, u.pos, doom_left(b, u)])
+		if BWUnsteady.unsteady(b, u):
+			parts.append("u%s%s" % [u.id, u.pos])
 	for h in _gale3(b):
 		parts.append("g%s" % h)
 	for h in BWKsWind.eye_fields(b).values():
@@ -135,7 +148,8 @@ func rebuild() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := 0
-	shown = { "frozen": [], "doomed": {}, "gale3": _gale3(b) }
+	shown = { "frozen": [], "doomed": {}, "gale3": _gale3(b), "unsteady": [] }
+
 	for h in shown.gale3:
 		_swirl3(st, _top(h))
 		n += 1
@@ -152,7 +166,23 @@ func rebuild() -> void:
 			n += 1
 		if u.alive() and BWKsIce.frozen(u):
 			shown.frozen.append(u.id)
+		if BWUnsteady.unsteady(b, u):
+			shown.unsteady.append(u.id)
 	_mesh.mesh = st.commit() if n > 0 else null
+	for id in _rings.keys():                                # D397: the Unsteady crack rings
+		if not id in shown.unsteady:
+			(_rings[id] as Node).queue_free()
+			_rings.erase(id)
+	for u in b.units:
+		if u.id in shown.unsteady:
+			if not _rings.has(u.id):
+				var mi := MeshInstance3D.new()
+				mi.mesh = crack_mesh()
+				mi.material_override = material()
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				add_child(mi)
+				_rings[u.id] = mi
+			(_rings[u.id] as Node3D).position = _top(u.pos)
 	# the ice shells
 	for id in _shells.keys():
 		if not id in shown.frozen:
@@ -247,6 +277,44 @@ func _thorns(st: SurfaceTool, c: Vector3) -> void:
 		var s := Vector3(-d.z, 0, d.x)
 		_tri(st, c + d * 0.62 + s * 0.07, c + d * 0.62 - s * 0.07, c + d * 0.86, INK)
 	_ring(st, c, 0.48, 0.035, col)
+
+
+## D397 Unsteady: a thin ice ring at the feet, broken by short ink cracks
+## that run out across it (a cracked ice sheet), with ink rims.
+static func crack_mesh() -> ArrayMesh:
+	if _crack_mesh == null:
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_cracks(st, Vector3.ZERO)
+		_crack_mesh = st.commit()
+	return _crack_mesh
+
+
+static func _cracks(st: SurfaceTool, c: Vector3) -> void:
+	var ice := Color(BWLook.element_color("ice"), 0.9)
+	var r := 0.5
+	var seg := 30
+	for i in seg:
+		if i % 6 == 5:
+			continue                                   # gaps where it's cracked through
+		var a0 := TAU * i / seg
+		var a1 := TAU * (i + 1) / seg
+		var d0 := Vector3(cos(a0), 0, sin(a0))
+		var d1 := Vector3(cos(a1), 0, sin(a1))
+		_quad(st, c + d0 * (r - 0.05), c + d0 * (r + 0.05), c + d1 * (r + 0.05), c + d1 * (r - 0.05), ice)
+		_quad(st, c + d0 * (r + 0.05), c + d0 * (r + 0.075), c + d1 * (r + 0.075), c + d1 * (r + 0.05), INK)
+		_quad(st, c + d0 * (r - 0.075), c + d0 * (r - 0.05), c + d1 * (r - 0.05), c + d1 * (r - 0.075), INK)
+	for k in 6:                                        # zig-zag cracks across the ring
+		var a := TAU * (k + 0.37) / 6.0
+		var d := Vector3(cos(a), 0, sin(a))
+		var s := Vector3(-d.z, 0, d.x)
+		var p0 := c + d * (r - 0.16)
+		var p1 := c + d * (r - 0.02) + s * 0.05
+		var p2 := c + d * (r + 0.1) - s * 0.03
+		var p3 := c + d * (r + 0.2) + s * 0.04
+		_ribbon(st, p0, p1, 0.035, INK)
+		_ribbon(st, p1, p2, 0.03, INK)
+		_ribbon(st, p2, p3, 0.022, INK)
 
 
 ## A dashed ink ring at `r` hexes with small inward ticks (the Eye's reach).
@@ -518,7 +586,7 @@ func shards(at: Vector3, n: int, reach: float) -> void:
 
 # ---------------------------------------------------------------- geometry
 
-func _ribbon(st: SurfaceTool, a: Vector3, b: Vector3, w: float, col: Color) -> void:
+static func _ribbon(st: SurfaceTool, a: Vector3, b: Vector3, w: float, col: Color) -> void:
 	var d := b - a
 	d.y = 0
 	if d.length() < 0.0001:
@@ -548,13 +616,13 @@ func _edge(st: SurfaceTool, a: Vector3, b: Vector3, w: float) -> void:
 	_quad(st, a - s + o, b - s + o, b + s + o, a + s + o, INK)
 
 
-func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color) -> void:
+static func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color) -> void:
 	for p in [a, b, c]:
 		st.set_color(col)
 		st.add_vertex(p)
 
 
-func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color) -> void:
+static func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color) -> void:
 	for p in [a, b, c, a, c, d]:
 		st.set_color(col)
 		st.add_vertex(p)

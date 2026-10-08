@@ -126,7 +126,7 @@ static func after_move(b: BWBattle, u: BWUnit) -> void:
 static func turn_end(b: BWBattle, u: BWUnit) -> void:
 	if not active(b):
 		return
-	for v in b.side("enemy"):              # a pushed or slid grunt on the exit leaves too
+	for v in b.side("enemy"):              # a pushed grunt on the exit leaves too
 		_escape_check(b, v)
 	if not b.over:
 		handler(b).turn_end(b, u)

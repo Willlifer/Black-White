@@ -177,37 +177,37 @@ func test_jetstream_gust_pushes_two(t) -> void:
 	t.eq(BWHex.distance(f.pos, x), 2, "and the 2-hex cycle cap holds")
 
 
-func test_rink_carry(t) -> void:
+func test_glaze_carry(t) -> void:
 	var me := _u("w", "staff", "fire")
 	var b := _duel(me, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
 	var x := Vector2i(4, 2)
 	b.tiles.entries[x] = b.tiles._entry(0, 0, "gale", me.id, "cast")
-	var rink := _nb(x, 3)
-	_water(b, rink, 1)
-	b.tiles.entries[rink].glaze = 2
+	var ice := _nb(x, 3)
+	_water(b, ice, 1)
+	b.tiles.entries[ice].glaze = 2
 	var r := b.paint([x], "water", me)
 	var glazed := 0
 	for g in r.gales:
 		for c in g.copies:
-			if int(b.tiles.at(c).get("glaze", 0)) == BWKsWind.RINK_CARRY:
+			if int(b.tiles.at(c).get("glaze", 0)) == BWKsWind.GLAZE_CARRY:
 				glazed += 1
-	t.ok(glazed > 0, "a gale firing beside a rink carries the rink to its copies (%d)" % glazed)
+	t.ok(glazed > 0, "a gale firing beside glaze carries the glaze to its water copies (%d)" % glazed)
 	t.ok(b.tiles.pillars.is_empty(), "carried glaze never raises a pillar")
 	b.tiles.entries.clear()
 	b.tiles.entries[x] = b.tiles._entry(0, 0, "gale", me.id, "cast")
-	_water(b, rink, 1)
-	b.tiles.entries[rink].glaze = 2
+	_water(b, ice, 1)
+	b.tiles.entries[ice].glaze = 2
 	var r3 := b.paint([x], "fire", me)
-	t.ok(r3.gales.all(func(g): return (g.copies as Array).all(func(c): return int(b.tiles.at(c).glaze) == 0)), "fire copies stay unglazed (a rink is glazed water)")
+	t.ok(r3.gales.all(func(g): return (g.copies as Array).all(func(c): return int(b.tiles.at(c).glaze) == 0)), "fire copies stay unglazed (only water copies take it)")
 	b.tiles.entries.clear()
 	b.tiles.entries[x] = b.tiles._entry(0, 0, "gale", me.id, "cast")
 	var r2 := b.paint([x], "water", me)
-	t.ok(r2.gales.all(func(g): return (g.copies as Array).all(func(c): return int(b.tiles.at(c).glaze) == 0)), "no rink beside it: no glaze")
+	t.ok(r2.gales.all(func(g): return (g.copies as Array).all(func(c): return int(b.tiles.at(c).glaze) == 0)), "no glaze beside it: no glaze")
 
 
 # ------------------------------------------------------------------ ice
 
-func test_skater(t) -> void:
+func test_sure_footed(t) -> void:
 	var me := _u("s", "axe", "ice", ["skater"])
 	var b := _duel(me, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
 	me.pos = Vector2i(1, 4)
@@ -218,14 +218,12 @@ func test_skater(t) -> void:
 		line.append(h)
 		_water(b, h, 1)
 		b.tiles.entries[h].glaze = 2
-	t.ok(not BWSlides.slides(me), "a Skater never slides")
 	var r := b.reachable(me)
-	t.ok(r.has(line[0]) and r[line[0]].stop, "it may stop on the first ice hex")
-	t.eq(int(r[line[3]].cost), 0, "the first 4 ice hexes cost 0")
-	t.eq(int(r[line[4]].cost), 1, "the 5th costs 1")
+	t.ok(r.has(line[0]) and r[line[0]].stop, "it may stop on the first ice hex (anyone may now)")
+	t.eq(int(r[line[3]].cost), 4, "D399: no free ice hexes any more, glaze costs like ground")
 	b.move(me, line[2])
-	t.eq(BWKsIce.free_left(b, me), 1, "3 free hexes spent")
-	# a push onto ice doesn't slide it
+	t.ok(not BWUnsteady.unsteady(b, me), "Sure-Footed: never Unsteady on glaze")
+	# a push onto ice stops it there, like everyone
 	var b2 := _duel(_u("x", "axe", "fire"), [me], [Vector2i(2, 2)])
 	var on := _nb(me.pos, 0)
 	_water(b2, on, 1)
@@ -233,7 +231,7 @@ func test_skater(t) -> void:
 	_water(b2, _nb(on, 0), 1)
 	b2.tiles.entries[_nb(on, 0)].glaze = 2
 	b2._displace(me, 0, 1, "push")
-	t.eq(me.pos, on, "pushed onto ice, a Skater stops on it")
+	t.eq(me.pos, on, "pushed onto ice, it stops on it")
 
 
 func test_flash_freeze(t) -> void:
@@ -284,11 +282,16 @@ func test_glacier_wall(t) -> void:
 	t.ok(b.skills_for(me).any(func(r): return r.key == "glacier_shatter"), "the Break Pillar row")
 	var f0 := f.hp
 	var a0 := a.hp
+	for k in 3:                                    # D400: glaze behind the foe: the push stops on it, no slide
+		var g := _nb(_nb(x, 0), 0, k + 1)
+		_water(b, g, 1)
+		b.tiles.entries[g].glaze = 2
 	BWKsIce.shatter(b, me, x)
 	t.ok(not b.tiles.is_pillar(x), "shattered")
 	t.ok(f.hp < f0 and a.hp < a0, "12% to the neighbours, both teams")
 	t.eq(f0 - f.hp, b._tile_dmg(f, BWKsIce.SHATTER_PCT, "ice"), "12% (ice)")
-	t.eq(BWHex.distance(f.pos, x), 2, "and pushed 1 away")
+	t.eq(BWHex.distance(f.pos, x), 2, "and pushed 1 away, onto the glaze, where it stops (no slide)")
+	t.ok(_ev(b, "slam").is_empty(), "no slam")
 	# still capped at 4
 	var hs: Array = [Vector2i(0, 6), Vector2i(2, 6), Vector2i(4, 6), Vector2i(6, 6), Vector2i(8, 6)]
 	for h in hs:

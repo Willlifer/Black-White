@@ -3,7 +3,7 @@ extends BWSkillDef
 ## "target your own pillar with a basic" (design/ELEMENTS-v3.md §2; the
 ## pillar has no HP, so the basic is this row). Your own pillar within your
 ## weapon's reach: it shatters, 12% (ice) to all six neighbours, both teams,
-## and a push of 1 away (onto ice they slide). Spends the action. Any of your
+## and a push of 1 away (onto glaze they just stop, D400). Spends the action. Any of your
 ## skills whose shape covers your pillar shatters it too (BWKsIce.after_skill).
 
 

@@ -338,7 +338,7 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 		var score := 0.0
 		var t := _best_target(b, u, h)
 		var hz := BWWeather.hazard_pct(b, u, h, wfc) if not wfc.is_empty() else 0.0
-		hz += BWPools.hazard_pct(b, u, h, reach[h])     # D264/D261: an electrified pool, a slide's slam
+		hz += BWPools.hazard_pct(b, u, h, reach[h])     # D264/D401: an electrified pool, standing Unsteady on glaze
 		if not t.is_empty():
 			score = 10000.0 + t.score - hz * u.max_hp() / 100.0
 		elif b.objective_mode():

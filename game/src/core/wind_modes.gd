@@ -30,8 +30,8 @@ extends RefCounted
 ## all; a field moves it at most once per turn (the tick is its own turn);
 ## a direct application (skill or basic) at most once per action; fields only
 ## read voluntary entry, turn start, the tick and a gale firing, never a
-## displacement. Slides onto glaze are Lane A's BWSlides.after_push (their own
-## cap of 6). Dark 3 gravity (BWCurse) adds or takes 1 within these caps.
+## displacement. A push onto glaze stops there (no slides since D397). Dark 3
+## gravity (BWCurse) adds or takes 1 within these caps.
 ## Weather Gale (BWWeather) is not a field: it moves outside these caps and
 ## never triggers a field.
 
@@ -176,17 +176,9 @@ static func push(b: BWBattle, v: BWUnit, dir: int, n: int, kind: String, by: BWU
 	if out.gravity != 0:
 		e["gravity"] = out.gravity
 	b._emit(e)
-	var slid := _slide(b, v, dir, by)
-	if slam and not slid and stop in ["rock", "unit"] and v.alive() and not b.over:
+	if slam and stop in ["rock", "unit"] and v.alive() and not b.over:
 		_slam(b, v, dir, by)
 	return out
-
-
-## Lane A's slide (BWSlides.after_push: onto glaze it slides on, cap 6,
-## then slams). True when it slid.
-static func _slide(b: BWBattle, v: BWUnit, dir: int, by: BWUnit) -> bool:
-	var sp: Dictionary = BWSlides.after_push(b, v, dir, by.id if by != null else "")
-	return (sp.get("path", []) as Array).size() > 1
 
 
 ## A wind push stopped short: SLAM_PCT to it and to the unit it hit.
@@ -196,14 +188,14 @@ static func _slam(b: BWBattle, v: BWUnit, dir: int, by: BWUnit) -> void:
 	var src := by.id if by != null else ""
 	b._emit({ "type": "slam", "unit": v.id, "by": src, "into": "unit" if o != null else "rock",
 		"name": "Gust", "target": o.id if o != null else "", "hex": v.pos })
-	var pv := BWPerkRules.slam_pct(b, v, src, SLAM_PCT, true)      # D281: Crosswind, Fault Lines, Rime Armour
+	var pv := BWPerkRules.slam_pct(b, v, src, SLAM_PCT, true)      # D281: Crosswind
 	if pv > 0.0:
 		b._tile_hurt(v, b._tile_dmg(v, pv, ""), "slam", src)
 	if o != null and o != v and o.alive() and not b.over:
 		var po := BWPerkRules.slam_pct(b, o, src, SLAM_PCT, true)
 		if po > 0.0:
 			b._tile_hurt(o, b._tile_dmg(o, po, ""), "slam", src)
-	BWPerkRules.after_slam(b, v, src, true, nxt if b.tiles.pillars.has(nxt) else Vector2i(-9999, -9999))   # D281: Crosswind Becalms
+	BWPerkRules.after_slam(b, v, src, true)       # D281: Crosswind Becalms
 
 
 ## Becalm `v` (a foe of `by`): Restless refuses it. `dry`: would it land?
@@ -453,8 +445,8 @@ static func fire_field(b: BWBattle, f: Dictionary, origin: Vector2i, radius: int
 
 ## Gale copies carry the origin's reaction state (v3 §1 "Spreading,
 ## extended"): steam (1 tick) and electrified (joins the origin's field) from
-## Lane A's BWTiles.steam / shock / fields when they exist; rink glaze is a
-## D293: rink glaze (a gale beside a rink, BWKsWind.carry_rink). Plus any
+## Lane A's BWTiles.steam / shock / fields when they exist; glaze is a
+## D293/D398 glaze carry (a gale beside glaze, BWKsWind.carry_glaze). Plus any
 ## `carry_hooks` Lane A registers.
 static func carry(b: BWBattle, origin: Vector2i, copies: Array) -> void:
 	if copies.is_empty():
@@ -476,7 +468,7 @@ static func carry(b: BWBattle, origin: Vector2i, copies: Array) -> void:
 					shock[c] = fid
 					if fr.has("hexes") and not c in fr.hexes:
 						(fr.hexes as Array).append(c)
-	BWKsWind.carry_rink(b, origin, copies)       # D293: a gale beside a rink glazes its copies (1 cycle)
+	BWKsWind.carry_glaze(b, origin, copies)      # D293/D398: a gale beside glaze glazes its water copies (1 cycle)
 	for hook in carry_hooks:
 		if (hook as Callable).is_valid():
 			(hook as Callable).call(b, origin, copies)

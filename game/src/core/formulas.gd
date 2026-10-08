@@ -227,7 +227,7 @@ static func glance_chance(dfn: BWUnit, mods: Array = []) -> Dictionary:
 	if gm[1] != "":
 		f += "  [a glance deals %s]" % gm[1]
 		v += "  [%.0f%%]" % (gm[0] * 100.0)
-	return calc("Glance", minf(100.0, (BASE_GLANCE + d + g[0]) * x[0]), f, v)
+	return calc("Glance", clampf((BASE_GLANCE + d + g[0]) * x[0], 0.0, 100.0), f, v)   # D397: Unsteady can take it to 0, never below
 
 
 ## Share of damage a glance lets through: 50%, or less with glance_red mods
@@ -506,7 +506,7 @@ static func resolve(fc: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 
 ## Read-only calcs for the derived numbers BWUnit computes (move_range(),
 ## speed()), so the pre-battle sheet can show their formulas on hover.
-## D93: turn-start move perks (Coal Engine, Sunpath, Skate, Tailwind,
+## D93: turn-start move perks (Coal Engine, Sunpath, Ice Legs, Tailwind,
 ## Slipstream), after-action move (Bolt Step, Tailwind) and the move
 ## statuses are listed by name from BWUnit.move_notes().
 ## D359: the base is the class drawn at turn start ("Move 5 (Daggers) +1

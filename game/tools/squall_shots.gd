@@ -5,7 +5,7 @@ extends SceneTree
 ##   v3_squall_light.png (mid-advance: the front sweeping over ring 2, the next ring's swirls),
 ##   v3_squall_light_after.png (the spread light and the moving front marks), v3_squall_dark*.png (the same on dark),
 ##   v3_overfreeze_preview.png (an ice Surge aimed at glazed water: the burst's seven hexes, OVERFREEZE 12%),
-##   v3_overfreeze.png (the burst playing), v3_overfreeze_after.png (the rink, no pillar).
+##   v3_overfreeze.png (the burst playing), v3_overfreeze_after.png (the glaze left, no pillar).
 var out := ""
 var s: BWCombatScreen
 var only: PackedStringArray

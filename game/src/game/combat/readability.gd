@@ -342,8 +342,8 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 		lines.append("Static (%s): returns every cycle%s" % [_hv_words(sv.x, sv.y), "; spent, back after the next tick" if r.scarred else ""])
 	if r.seeded:
 		lines.append("Seeded: holds until play changes it")
-	for sl in r.get("spine", []):                  # D266: rink, pillar, steam, electrified, pool
-		var scol := { "Pillar": BWLook.element_color("ice"), "Rink": BWLook.element_color("ice"),
+	for sl in r.get("spine", []):                  # D266/D397: unsteady glaze, pillar, steam, electrified, pool
+		var scol := { "Pillar": BWLook.element_color("ice"), "Unsteady": BWLook.element_color("ice"),
 			"Electrified": BWLook.element_color("thunder"), "Steam": Color(0.75, 0.77, 0.8), "Pool": BWLook.element_color("water") }
 		lines.append("[color=#%s][b]%s[/b][/color]: %s" % [_hx(scol.get(str(sl[0]), Color.WHITE)), str(sl[0]), str(sl[1])])
 	# what it does

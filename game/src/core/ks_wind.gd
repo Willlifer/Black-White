@@ -15,12 +15,12 @@ extends RefCounted
 ##                    the copies of your gales (or that your paint makes) last
 ##                    2 cycles; your Gust fields push 2. Every field move stays
 ##                    inside BWWind's caps (2 hexes per cycle, once per turn).
-## Rink carry (D293, the D272 TODO): a glazed hex never fires a gale (wind on
-## glaze does nothing, ELEMENTS-v3 §2), so a rink can't be the origin. A gale
-## that fires NEXT TO a rink (a slippery hex beside the origin) carries the
-## rink instead: its WATER copies glaze for RINK_CARRY cycle (a rink is
-## glazed water: a fire or light copy stays unglazed; slippery, never a
-## pillar: pillars need a fresh ice cast).
+## Glaze carry (D293, the D272 TODO; D398 dropped the "rink" name): a glazed
+## hex never fires a gale (wind on glaze does nothing, ELEMENTS-v3 §2), so
+## glaze can't be the origin. A gale that fires NEXT TO glaze (a glazed,
+## standable hex beside the origin) carries it instead: its WATER copies glaze
+## for GLAZE_CARRY cycle (a fire or light copy stays unglazed; Unsteady ground,
+## never a pillar: pillars need a fresh ice cast).
 
 const EYE := "eye_of_vortex"
 const WALL := "wind_wall"
@@ -30,7 +30,7 @@ const EYE_PULL := 2
 const JET_GALE_MAX := 3
 const JET_COPY_CYCLES := 2
 const JET_GUST := 2
-const RINK_CARRY := 1
+const GLAZE_CARRY := 1
 
 
 static func eye(u: BWUnit) -> bool:
@@ -69,25 +69,25 @@ static func after_gale(b: BWBattle, g: Dictionary, snap: Dictionary) -> void:
 			e.timer = maxi(int(e.timer), JET_COPY_CYCLES)
 
 
-## Rink carry (BWWind.carry): a gale that fired beside a rink glazes its copies.
-static func carry_rink(b: BWBattle, origin: Vector2i, copies: Array) -> void:
-	var rink := false
+## Glaze carry (BWWind.carry): a gale that fired beside glaze glazes its water copies.
+static func carry_glaze(b: BWBattle, origin: Vector2i, copies: Array) -> void:
+	var near := false
 	var src := ""
 	for n in b.board.neighbors(origin):
-		if BWSlides.slippery(b.tiles, n) and not n in copies:
-			rink = true
+		if BWUnsteady.on_glaze(b.tiles, n) and not n in copies:
+			near = true
 			src = str(b.tiles.at(n).get("glaze_source", ""))
 			break
-	if not rink:
+	if not near:
 		return
 	for c in copies:
 		var e: Dictionary = b.tiles.entries.get(c, {})
 		if e.is_empty() or b.tiles.pillars.has(c) or str(e.get("marker", "")) != "" or int(e.h) >= 0:
 			continue
 		if int(e.glaze) <= 0:
-			e.glaze = RINK_CARRY
+			e.glaze = GLAZE_CARRY
 			e["glaze_source"] = src
-			e["rink_carry"] = true
+			e["glaze_carry"] = true
 
 
 # ---------------------------------------------------------------- Eye of the Vortex
@@ -144,7 +144,6 @@ static func pull_in(b: BWBattle, v: BWUnit, centre: Vector2i, n: int, by: BWUnit
 	var m := mini(n, BWWind.budget(b, v))
 	var path: Array = [v.pos]
 	var cur := v.pos
-	var last := -1
 	for i in m:
 		var d := BWBattle.pulse_heading(centre, cur, false)
 		if d < 0:
@@ -153,14 +152,12 @@ static func pull_in(b: BWBattle, v: BWUnit, centre: Vector2i, n: int, by: BWUnit
 		if b.board.step_cost(cur, nxt) < 0 or not b.can_stand(v, nxt):
 			break
 		cur = nxt
-		last = d
 		path.append(cur)
 	BWWind._spend(b, v, true, path.size() - 1)
 	if path.size() < 2:
 		return false
 	v.pos = cur
 	b._emit({ "type": "move", "unit": v.id, "path": path, "kind": "pull", "wind": true, "eye": true })
-	BWWind._slide(b, v, last, by)
 	return true
 
 

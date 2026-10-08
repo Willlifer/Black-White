@@ -20,7 +20,7 @@ extends RefCounted
 ##   * pushes the unit on it 1 outward (away from the origin), both teams, as a
 ##     wind FIELD move: inside the wind caps (2 hexes a cycle, a field once a
 ##     turn), with dark 3 gravity, a slam (8%) when blocked by rock, a unit, a
-##     pillar or a wall, and a slide onto ice.
+##     pillar or a wall (onto glaze it just stops, D397).
 ## The ring is always outward (Claude, D310): a squall is an explosion, so the
 ## caster's Gust heading doesn't bend it; the push already goes "away".
 ## Light and dark only (fire has Overheat and wildfire, water has pools).

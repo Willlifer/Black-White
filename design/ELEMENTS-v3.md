@@ -11,6 +11,7 @@
 **Ice**
 - Approved as drafted, with **no rink cap** beyond the pool rule below.
 - **After a slide, the unit gets +1 move** (its walk ends, then it may move 1 more hex). That replaces the hard stop.
+- **SUPERSEDED (later on 2026-10-07, D397-D402):** "ice does not feel good. I would remove rink as a status, have ice apply 'unsteady footing', dropping dodge and glance chance for units on the tile." Slides and rinks are gone; glaze is **Unsteady footing** (−10 avoid, −15 glance, stacks with Shatter). Skater → **Sure-Footed**, Skate → **Ice Legs**; Rime Armour, Fault Lines and Frostbite lost their slam riders. As built: `ELEMENTS.md` §14.1, §16.2. Read §2's slides, the slam riders in §10 and the slide AI in §11 as history.
 
 **Light**
 - **Dawn Relay is REMOVED** (too strong).
@@ -51,7 +52,9 @@
 
 **Status:** the ice/water spine (§2 slides and pillars, §4 pools, steam,
 rinks and electrified water, with the rulings above; build order items 2-4)
-is **BUILT**, D261-D268; its rules as built are `ELEMENTS.md` §14. Fire
+is **BUILT**, D261-D268; its rules as built are `ELEMENTS.md` §14. **Ice
+reworked D397-D402:** the slides and rinks were REMOVED; glaze is Unsteady
+footing (`ELEMENTS.md` §14.1). Fire
 (§5), light (§3, with the rulings) and thunder's keystones (§7) are **BUILT**,
 D285-D292: `ELEMENTS.md` §15. §9 (the ladder, keystone cards, enemy
 keystones; `data/keystones.csv`, `BWKeystones`) and §10 (the 28 perks, the
@@ -175,6 +178,11 @@ Also bow-wind (Split Arrow with a mode on each arrow).
 ---
 
 ## 2. Ice: the architect
+
+> **Status (D397-D402): the slides below are REMOVED.** Glaze is Unsteady
+> footing (−10 avoid, −15 glance on a unit standing on it); pushes and walks
+> onto glaze just stop. Pillars are unchanged. Skater is now Sure-Footed.
+> As built: `ELEMENTS.md` §14.1, §16.2.
 
 *It builds the map: rinks to slide on, pillars to hide behind, slides
 that throw people into walls.*
@@ -590,11 +598,13 @@ noted.
 **Ice**
 
 - **Skate**: glaze costs 1, and you may stop on the first ice hex you
-  enter.
+  enter. *(D400: now **Ice Legs**: never Unsteady, glaze costs 1.)*
 - **Rime Armour**: v2, plus you and allies on your glaze take no slam
-  damage.
-- **Fault Lines**: Shatter ×2, and slams you cause +8%.
+  damage. *(D400: the no-slam clause is gone.)*
+- **Fault Lines**: Shatter ×2, and slams you cause +8%. *(D400: the slam
+  rider is gone; your Shatter also lands on stasis markers.)*
 - **Frostbite**: v2, plus a foe that slams into your pillar is Pinned.
+  *(D400: now a foe starting its turn on your glaze is Pinned.)*
 
 **Thunder**
 

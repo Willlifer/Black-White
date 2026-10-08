@@ -10,7 +10,7 @@ extends RefCounted
 ##                hex, its length the pool's size (max WAVE_MAX), stopping at
 ##                the map edge or rock. Every unit on the line is pushed
 ##                WAVE_PUSH along it, front first (a block slams 8% to both;
-##                onto glaze it slides). Then the line gets water WAVE_WATER.
+##                onto glaze it just stops). Then the line gets water WAVE_WATER.
 ## Riptide        at the start of your turn, every foe standing in water
 ##                (unglazed) within RIPTIDE_RADIUS is pulled 1 toward you,
 ##                closest first: a field move under BWWind's caps.
@@ -103,7 +103,7 @@ static func _drain(t: BWTiles, h: Vector2i) -> void:
 
 
 ## The wave's push: WAVE_PUSH along `dir`; blocked, it slams (8% both);
-## onto glaze it slides on (BWSlides.after_push).
+## onto glaze it stops like on any ground (D397).
 static func wave_push(b: BWBattle, v: BWUnit, dir: int, n: int, by: BWUnit) -> void:
 	if not v.alive() or b.over:
 		return
@@ -115,13 +115,10 @@ static func wave_push(b: BWBattle, v: BWUnit, dir: int, n: int, by: BWUnit) -> v
 	n = BWCurse.gravity_step(b, v, dir, n)
 	var pp := b.push_path(v, dir, n)
 	var path: Array = pp.path
-	var slid := false
 	if path.size() >= 2:
 		v.pos = path[-1]
 		b._emit({ "type": "move", "unit": v.id, "path": path, "kind": "push", "wave": true })
-		var sp := BWSlides.after_push(b, v, dir, by.id if by != null else "")
-		slid = (sp.get("path", []) as Array).size() > 1
-	if not slid and str(pp.stop) in ["rock", "unit"] and v.alive() and not b.over:
+	if str(pp.stop) in ["rock", "unit"] and v.alive() and not b.over:
 		var nxt: Vector2i = BWHex.neighbors(v.pos)[dir]
 		var o := b.unit_at(nxt)
 		var src := by.id if by != null else ""

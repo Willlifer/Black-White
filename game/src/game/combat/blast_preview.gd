@@ -16,10 +16,9 @@ extends Node3D
 ##   paint      the element's colour, sparse; erase: grey, sparse
 ##   ignite     a dashed fire rim (fire 2+ on grass catches at cycle end)
 ##   D266 pools  the pool that reacts: steam (grey hatch, dashed rim, "STEAM"),
-##              electrified (thunder hatch, dashed rim, "ELECTRIFIED"), rink
+##              electrified (thunder hatch, dashed rim, "ELECTRIFIED"), pool
 ##              glaze; a pillar that rises: ice hatch, heavy ink rim, "PILLAR"
-##   slides     D266: an ink arrow along the slide, a dashed ghost ring on the
-##              end hex, "SLIDE" there or "SLAM 8%" where it slams
+##              (D397: the slide ghosts and "SLIDE" / "SLAM" tags are gone)
 ##   arcs       a purple dashed arch from the conductive unit to the one
 ##              it would jump to, an arrow head over the receiver
 ##   units      a tag over every unit whose HP would change: "−31" exact,
@@ -130,18 +129,10 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 			_hex_tag(h, "STEAM" if k == "steam" else "ELECTRIFIED", Color(0.5, 0.52, 0.56) if k == "steam" else BWLook.glow_color("thunder"), 0.3)
 	for c in sim.chains:
 		_arc(st, c.hex, c.to_hex)
-	var slam_at := {}
-	for sl in sim.get("slams", []):
-		slam_at[str(sl.unit)] = sl
 	for mv in sim.get("moves", []):
 		var path: Array = mv.path
 		if path.size() >= 2 and str(mv.kind) != "leap":
 			_shove(st, path[0], path[path.size() - 1])
-		if str(mv.kind) == "slide" and path.size() >= 2:  # D266: the slide's ghost and its slam
-			var end: Vector2i = path[path.size() - 1]
-			_rim(st, end, INK, RIM_W * 1.3, true)
-			var sl: Dictionary = slam_at.get(str(mv.unit), {})
-			_hex_tag(end, "SLAM %d%%" % int(BWSlides.SLAM_PCT) if not sl.is_empty() else "SLIDE", BWLook.element_color("ice"), 0.75)
 	for ev in sim.get("events", []):                # D270: Becalm marks (still ink rings + a tag)
 		if str(ev.get("type", "")) == "becalm":
 			var bh: Vector2i = ev.hex

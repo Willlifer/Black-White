@@ -3,20 +3,15 @@ extends RefCounted
 ## D294 ice's keystones (design/ELEMENTS-v3.md §2 "Keystones", ELEMENTS.md
 ## §16.2). Pure rules; the battle calls the hooks marked "D294".
 ##
-## Skater         never slides unless it chooses to: a push or pull onto ice
-##                stops on the ice (BWSlides.slides is false for it), and a
-##                walk crosses ice like ground, so "where to stop on the slide
-##                line" is simply where the walk ends. Its first FREE_ICE ice
-##                hexes entered each turn cost 0 move (then the normal 1).
-##                Skate (the perk) is the cheap version: it already never
-##                slides; with both, Skater's free hexes come first, then
-##                Skate's cost (1).
+## Sure-Footed    (id "skater", kept for saves; D399) you and allies within 2
+##                ignore Unsteady footing; a foe that walks off your glaze stays
+##                Unsteady until the end of its next turn. The rules live in
+##                BWUnsteady (sure_cover, after_walk).
 ## Flash Freeze   an action keystone (skill def flash_freeze), once a battle,
 ##                range 3, a foe: FROZEN (a status that keeps until thawed):
 ##                  * it skips its next turn (a boss doesn't, Claude: the
 ##                    Twins, the Giant, the Colossus);
-##                  * it can't be displaced (only a slide could move it, and
-##                    a slide needs a push first, so in practice it holds);
+##                  * it can't be displaced;
 ##                  * it counts as standing on glaze for Shatter (+15%);
 ##                  * its next hit taken is x2, and that hit thaws it;
 ##                  * unhit, it thaws at the first tick after its skipped
@@ -25,14 +20,13 @@ extends RefCounted
 ##                or shattered. Shatter your own pillar: the menu's Break Pillar
 ##                row (a basic aimed at it: the pillar has no HP to hit) or any
 ##                of your skills whose shape covers it. SHATTER_PCT ice to all
-##                six neighbours, both teams, and a push of 1 away (onto ice
-##                they slide). The hex is left bare.
+##                six neighbours, both teams, and a push of 1 away (onto glaze
+##                they stop like on any ground, D400). The hex is left bare.
 
 const SKATER := "skater"
 const FREEZE := "flash_freeze"
 const GLACIER := "glacier_wall"
 const SHATTER_KEY := "glacier_shatter"
-const FREE_ICE := 4
 const FREEZE_RANGE := 3
 const FREEZE_MULT := 2.0
 const SHATTER_PCT := 12.0
@@ -45,60 +39,6 @@ static func has(u: BWUnit, id: String) -> bool:
 
 static func is_boss(u: BWUnit) -> bool:
 	return u != null and (maxi(u.size, 1) > 1 or str(u.encounter) in ["twin", "colossus"])
-
-
-# ---------------------------------------------------------------- Skater
-
-## Does `u` slide? (BWSlides.slides asks.)
-static func never_slides(u: BWUnit) -> bool:
-	return has(u, SKATER)
-
-
-## Ice hexes still free for `u` this turn.
-static func free_left(b: BWBattle, u: BWUnit) -> int:
-	if not has(u, SKATER):
-		return 0
-	if int(u.fx.get("skater_turn", -1)) != b._turn_serial:
-		return FREE_ICE
-	return maxi(0, FREE_ICE - int(u.fx.get("skater_used", 0)))
-
-
-static func is_ice(b: BWBattle, h: Vector2i) -> bool:
-	return b.tiles.is_glazed(h) and not b.tiles.is_pillar(h)
-
-
-## BWBattle._move_rules: the walk search learns the free ice hexes.
-static func move_rules(b: BWBattle, u: BWUnit, r: Dictionary) -> void:
-	var n := free_left(b, u)
-	if n > 0:
-		r["skater"] = n
-
-
-## BWBattle._reach_fx: a step onto ice while free hexes are left costs
-## nothing (D375: climbs are free). The count rides the state key's bits 3+ (value 8 per hex).
-## Returns [cost, state] (unchanged when it doesn't apply).
-static func step(b: BWBattle, rules: Dictionary, h: Vector2i, n: Vector2i, sc: int, state: int) -> Array:
-	if not rules.has("skater") or not is_ice(b, n):
-		return [sc, state]
-	var used := state >> 3
-	if used >= int(rules.skater):
-		return [sc, state]
-	return [0, state + 8]                          # D375: climbs are free too
-
-
-## After a walk: spend the free ice hexes it crossed.
-static func after_walk(b: BWBattle, u: BWUnit, path: Array) -> void:
-	if not has(u, SKATER):
-		return
-	var left := free_left(b, u)
-	var used := 0
-	for i in range(1, path.size()):
-		if used < left and is_ice(b, path[i]):
-			used += 1
-	if int(u.fx.get("skater_turn", -1)) != b._turn_serial:
-		u.fx["skater_turn"] = b._turn_serial
-		u.fx["skater_used"] = 0
-	u.fx["skater_used"] = int(u.fx.get("skater_used", 0)) + used
 
 
 # ---------------------------------------------------------------- Frozen
@@ -242,7 +182,7 @@ static func after_skill(b: BWBattle, u: BWUnit, p: Dictionary) -> void:
 
 
 ## Shatter `u`'s pillar at `h`: SHATTER_PCT (ice) to every unit on the six
-## neighbours, both teams, then each is pushed 1 away (it slides on ice).
+## neighbours, both teams, then each is pushed 1 away (no slide, D400).
 static func shatter(b: BWBattle, u: BWUnit, h: Vector2i) -> Array:
 	if not b.tiles.is_pillar(h):
 		return []

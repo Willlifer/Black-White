@@ -24,8 +24,8 @@ extends RefCounted
 ##             hold   the foes it touches are Becalmed (move 0; Restless after)
 ##
 ## Everything but Draw in lands after the hits and the paint (§7.3: hit,
-## paint, pushes, slides, slams), through BWWind.push: the D272 caps (once per
-## action, 2 hexes a cycle), dark 3 gravity, slides onto glaze and 8% slams
+## paint, pushes, slams), through BWWind.push: the D272 caps (once per
+## action, 2 hexes a cycle), dark 3 gravity and 8% slams
 ## all apply unchanged. Only foes are moved (the D271 ruling).
 ##
 ## The choice is remembered per unit and skill (`BWUnit.wind_shapes[key] =

@@ -1,13 +1,15 @@
 extends SceneTree
 ## D266 review renders of the ice/water spine on the real combat screen (needs
-## a window):
-##   RES=1920x1080 [SHOTS=<dir>] [ONLY=slide,walk,pillar,steam,shock,rink] godot --path . --script res://tools/icewater_shots.gd
-## v3_icewater_slide.png   Demeter aims an ice Charge: the shove onto the rink,
-##                         the slide's ink arrow, its ghost ring and "SLAM 8%"
-##                         where it ends against a pillar
-## v3_icewater_slam.png    the same, played: the foe slid into the pillar
-## v3_icewater_walk.png    Kira hovers a hex past a rink: the walk arrow runs on
-##                         across the ice, the end hex marked, the slide hint
+## a window); D397-D401 replaced the slide scenes with Unsteady footing:
+##   RES=1920x1080 [SHOTS=<dir>] [ONLY=unsteady,overfreeze,pillar,steam,shock,pool] godot --path . --script res://tools/icewater_shots.gd
+## ice2_unsteady_hover.png  Wilona hovers Gail standing on glaze: the crack
+##                         ring under Gail, the damage sticker
+## ice2_unsteady_forecast.png  the confirm box: "Unsteady footing -10 avoid /
+##                         -15 glance" lines and Shatter
+## ice2_unsteady_tile.png  the tile hover on a glazed hex: the Unsteady line
+## ice2_overfreeze.png     an ice Surge on glazed water: the burst done, the
+##                         seven hexes left glazed (no rink, no pillar), the
+##                         units on them Unsteady (crack rings), the tile card
 ## v3_icewater_pillar.png  an ice pillar between Wilona's bow and a foe: no
 ##                         shot (no pulse on the foe), the pillar's tile card
 ## v3_icewater_steam.png   fire on a lake: steam over the whole pool, a unit in
@@ -17,7 +19,7 @@ extends SceneTree
 ## v3_icewater_shock.png   the field live after two of the foe's turn starts:
 ##                         the crackling outline, the timer pips, the card
 ##                         with the ramp ("next shock immune")
-## v3_icewater_rink.png    ice on the lake: radius 1 glazed with the sheen,
+## ice2_pool_glaze.png     ice on the lake: radius 1 glazed with the sheen,
 ##                         two pillars risen from its water 3
 var out := ""
 var s: BWCombatScreen
@@ -92,7 +94,7 @@ func _go() -> void:
 		C = _centre()
 	print("centre ", C)
 	var only := OS.get_environment("ONLY").split(",", false)
-	for k in ["slide", "walk", "pillar", "steam", "shock", "rink"]:
+	for k in ["unsteady", "overfreeze", "pillar", "steam", "shock", "pool"]:
 		if only.is_empty() or k in only:
 			await call("_" + k)
 	quit()
@@ -216,63 +218,62 @@ func _click(h: Vector2i) -> void:
 
 # ---------------------------------------------------------------- scenes
 
-## Demeter -> foe -> rink (3) -> pillar: the Charge shoves the foe onto the
-## ice, it slides and slams the pillar.
-func _slide() -> void:
-	var d0 := _west(C, 3)                            # Demeter charges 3: ends on C, Rui lands C+1
-	var foe := _west(C, 2)
-	var rink: Array = [_east(C, 1), _east(C, 2)]
-	var pil := _east(C, 3)
-	_reset({ demeter: d0, rui: foe })
-	_lay(rink, -1, 2)
-	_lay([pil], -3)
-	s.battle.tiles.apply([pil], "ice", demeter.id)
+## Wilona 3 west of Gail, Gail on glaze: hover Gail for the forecast.
+func _unsteady() -> void:
+	var w0 := _west(C, 2)
+	var foe := _east(C, 1)
+	_reset({ wilona: w0, gail: foe, rui: _east(C, 4) })
+	_lay([foe, _east(C, 2), BWHex.neighbors(foe)[1], BWHex.neighbors(foe)[5]], -1, 2)
 	s.board_view.refresh_tiles(true)
-	await _turn(demeter)
-	await _cam(C, -10.0, 19.0, 50.0)
-	s.ui.skill_chosen.emit("charge", "ice")
+	await _turn(wilona)
+	await _cam(C, -25.0, 12.0, 50.0)
+	await _move_mouse(foe)
+	await _wait(1.2)
+	var fc := s.battle.forecast_basic(wilona, gail)
+	print("unsteady: notes ", fc.notes, " avoid ", fc.avoid.value, " glance ", fc.glance.value,
+		" rings ", s.ks_view.shown.get("unsteady", []))
+	await _shot("ice2_unsteady_hover")
+	await _click(foe)                               # the confirm box: the forecast's named lines
+	await _wait(1.0)
+	await _shot("ice2_unsteady_forecast")
+	s.ui.hide_forecast()
+	s._pending_target = null
+	await _wait(0.3)
+	wilona.acted = true                             # no attack preview: the hover shows the tile card
+	s._show_options()
+	await _move_mouse(_east(C, 2))
 	await _wait(0.3)
 	await _move_mouse(foe)
-	await _wait(0.8)
-	var sim: Dictionary = s.readability.preview.last
-	print("slide preview: moves ", sim.get("moves", []), " slams ", sim.get("slams", []))
-	await _shot("v3_icewater_slide")
-	await _click(foe)
-	await _wait(0.5)
-	s._on_action("confirm")
-	var t := 0
-	var shot := false
-	while (s._busy or t < 5) and t < 4000:
-		await process_frame
-		t += 1
-		if not shot and s.battle.history.any(func(e): return str(e.type) == "slam") \
-				and not s._queue.any(func(e): return str(e.type) == "slam"):
-			await _wait(0.12)
-			await _shot("v3_icewater_slam")
-			shot = true
-	print("slam: rui at ", rui.pos, " hp ", rui.hp, "/", rui.max_hp(), " pillar ", s.battle.tiles.is_pillar(pil))
-	if not shot:
-		await _shot("v3_icewater_slam")
+	await _wait(1.0)
+	print("unsteady card: ", s.readability.card_text())
+	await _shot("ice2_unsteady_tile")
 
 
-## Kira west of a rink of 4: hover the hex past it.
-func _walk() -> void:
-	var k0 := _west(C, 2)
-	var rink: Array = [_east(k0, 1), _east(k0, 2), _east(k0, 3), _east(k0, 4)]
-	_reset({ kira: k0, bob: BWHex.neighbors(_east(C, 3))[1] })
-	_lay(rink, -1, 2)
+## Glazed water round C, Kira's ice on it: Overfreeze bursts and leaves glaze.
+func _overfreeze() -> void:
+	var k0 := _west(C, 3)
+	_reset({ kira: k0, bob: C, gail: BWHex.neighbors(C)[1], rui: _east(C, 4) })
+	var lake: Array = []
+	for h in BWHex.area(C, 1):
+		lake.append(h)
+	_lay(lake, -1, 1)
 	s.board_view.refresh_tiles(true)
 	await _turn(kira)
-	await _cam(_east(k0, 3), -25.0, 14.0, 55.0)
-	var r := s.battle.reachable(kira)
-	var end := Vector2i(-1, -1)
-	for h in r:
-		if r[h].has("slide") and (end.x < 0 or BWHex.distance(h, k0) > BWHex.distance(end, k0)):
-			end = h
-	print("walk: slide ends ", end, " ", r.get(end, {}).get("slide", {}).get("stop", ""))
-	await _move_mouse(end)
-	await _wait(0.6)
-	await _shot("v3_icewater_walk")
+	await _cam(C, -20.0, 13.0, 52.0)
+	var r := s.battle.paint([C], "ice", kira)
+	s.board_view.refresh_tiles()
+	for u in [bob, gail]:
+		s._views[u.id].refresh()
+	kira.acted = true
+	s._show_options()
+	await _move_mouse(_east(C, 1))
+	await _wait(0.3)
+	await _move_mouse(BWHex.neighbors(C)[0])
+	await _wait(1.2)
+	var glazed := lake.filter(func(h): return s.battle.tiles.is_glazed(h))
+	print("overfreeze: ", r.get("overfreeze", []), " glazed ", glazed.size(), "/7 pillars ", s.battle.tiles.pillars.size(),
+		" bob unsteady ", BWUnsteady.unsteady(s.battle, bob), " card ", s.readability.card_text())
+	await _shot("ice2_overfreeze")
 
 
 ## Wilona 3 west of a foe, a pillar between.
@@ -357,8 +358,8 @@ func _shock() -> void:
 	await _shot("v3_icewater_shock")
 
 
-## Ice on the lake (two water 3 beside the cast hex): radius 1 rinks.
-func _rink() -> void:
+## Ice on the lake (two water 3 beside the cast hex): radius 1 glazes.
+func _pool() -> void:
 	var lake := _lake()
 	var k0 := _west(C, 3)
 	_reset({ kira: k0 })
@@ -371,5 +372,5 @@ func _rink() -> void:
 	await _cam(C, -20.0, 14.0, 52.0)
 	await _move_mouse(BWHex.neighbors(C)[4])
 	await _wait(1.2)
-	print("rink: pillars ", s.battle.tiles.pillars.keys(), " card ", s.readability.card_text())
-	await _shot("v3_icewater_rink")
+	print("pool glaze: pillars ", s.battle.tiles.pillars.keys(), " card ", s.readability.card_text())
+	await _shot("ice2_pool_glaze")

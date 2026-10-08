@@ -277,14 +277,14 @@ static func _grunt_turn(b: BWBattle, u: BWUnit) -> void:
 
 ## D349: may the Lil Fella stand on `h`? Never on a hazard: fire, a dark 3
 ## drain, a live shock field, a fuse (whoever laid it: it can't read the
-## source), nor a hex a slide would carry it from.
+## source). (D397: glaze no longer slides it, so ice is fine.)
 static func hazard(b: BWBattle, h: Vector2i, entry: Dictionary = {}) -> bool:
 	var st := b.tiles.standing(h)
 	if float(st.fire) > 0.0 or float(st.drain) > 0.0 or b.tiles.crossing_pct(h) > 0.0:
 		return true
 	if b.tiles.shock.has(h) or str(b.tiles.at(h).get("marker", "")) == "fuse":
 		return true
-	return not (entry.get("slide", {}) as Dictionary).is_empty()
+	return false
 
 
 ## D349: the Lil Fella's turn: it runs from the nearest grunts to the safest

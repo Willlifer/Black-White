@@ -940,7 +940,8 @@ hunt it. There is no exit any more (D349 replaced D331's exit and escape counter
   battle start. Not player-controlled: on its own turn (the squad's median
   speed, move 3) it runs to the safest reachable hex (far from the enemy and
   out of its next reach, close to the squad, off the map's edge), never onto
-  or across fire, a dark 3 drain, a shock field, a fuse or a slide. On the
+  or across fire, a dark 3 drain, a shock field or a fuse (glaze is fine
+  since D397: it no longer slides). On the
   squad's side for damage: **nothing of the squad's** hurts, moves or
   statuses it (blows, areas, ground, blasts, beams, chain arcs). **Enemy**
   blows and ground an enemy laid hurt it; map-seeded ground doesn't (and it
@@ -964,7 +965,7 @@ hunt it. There is no exit any more (D349 replaced D331's exit and escape counter
   r rounds" and "Lil Fella hp / max".
 - Built for the area combos: two **water channels** (row 4 across the field
   with fords at q 4 and 14; row 8 on the flanks, water 3 pools at q 4-5 and
-  13-14, a dry ford in the middle) for electrified pools and rinks; **grass**
+  13-14, a dry ford in the middle) for electrified pools and glaze; **grass**
   on the far bank and the flanks for fire and Overheat; open lanes between
   seven rocks for squalls and Vortex pulls. A low rise behind the line. (Mind
   the little one: your ground can't hurt it, but it won't walk through it.)

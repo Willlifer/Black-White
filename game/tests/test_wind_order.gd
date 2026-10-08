@@ -158,7 +158,6 @@ func test_synthetic(t) -> void:
 		{ "type": "tile", "hex": Vector2i.ZERO },
 		{ "type": "field_fire", "mode": "vortex" },
 		{ "type": "move", "unit": "f", "kind": "pull", "wind": true },
-		{ "type": "move", "unit": "f", "kind": "slide" },
 		{ "type": "slam", "unit": "f" },
 		{ "type": "move", "unit": "g", "kind": "push", "wind": true },
 		{ "type": "move", "unit": "h", "kind": "pull" },          # Hooking: not wind, stays
@@ -166,7 +165,7 @@ func test_synthetic(t) -> void:
 		{ "type": "move", "unit": "x", "kind": "pull", "wind": true },   # outside any blow's tail
 	]
 	var got := BWWindOrder.hoist(evs).map(func(e): return "%s:%s:%s" % [e.type, e.get("unit", ""), e.get("kind", e.get("mode", ""))])
-	t.eq(got, ["turn:a:", "field_fire::vortex", "move:f:pull", "move:f:slide", "slam:f:", "skill:a:", "attack:a:", "tile::",
-		"move:g:push", "move:h:pull", "turn:b:", "move:x:pull"], "pulls (with their slide and slam) go before the blow; pushes stay after")
-	t.eq(evs.size(), 12, "the input is untouched")
+	t.eq(got, ["turn:a:", "field_fire::vortex", "move:f:pull", "slam:f:", "skill:a:", "attack:a:", "tile::",
+		"move:g:push", "move:h:pull", "turn:b:", "move:x:pull"], "pulls (with their slam) go before the blow; pushes stay after")
+	t.eq(evs.size(), 11, "the input is untouched")
 	t.eq(BWWindOrder.hoist([]), [], "empty in, empty out")

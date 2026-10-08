@@ -51,8 +51,8 @@ var eruptions: Array = []
 const STATIC_SCAR_TICKS := 1
 var statics := {}
 var scars := {}
-## D261-D266 the ice/water spine (ELEMENTS-v3 §2, §4; src/core/pools.gd,
-## slides.gd). pillars: hex -> {owner, ticks, born}; steam: hex -> ticks;
+## D262-D266 the ice/water spine (ELEMENTS-v3 §2, §4; src/core/pools.gd;
+## the D261 slides are gone, D397). pillars: hex -> {owner, ticks, born}; steam: hex -> ticks;
 ## fields (electrified): id -> {hexes, ticks, source, ramp {unit id: n}};
 ## shock: hex -> field id. `occupant` (hex -> BWUnit or null) is the battle's
 ## unit_at (unset = nobody). spine_tick: what the last tick thawed/discharged.
@@ -326,7 +326,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 		if p.get("fired", false):
 			out.marker_fired.append(hex)
 	BWPools.finish(self, spine, element, caster, fresh, out, int(opts.get("glaze_plus", 0)))   # D262/D264
-	BWOverfreeze.finish(self, frz, caster, out)   # D312: the burst's rink (radius 1, no pillar), out.overfreeze
+	BWOverfreeze.finish(self, frz, caster, out)   # D312/D398: the burst glazes radius 1 (no pillar), out.overfreeze
 	if opts.has("erupt"):
 		for hex in out.changed:
 			if carries(hex, element) and entries.has(hex) and str(entries[hex].source) == caster:

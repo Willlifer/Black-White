@@ -342,13 +342,11 @@ func _on_hover(h: Vector2i) -> void:
 	if battle.can_move_to(u, h) and h != u.pos:
 		var rr := battle.reachable(u)
 		_show_options(BWBoard.path_to(rr, h))
-		var sl: Dictionary = rr[h].get("slide", {})     # ---- D266: a walk onto ice slides
-		if sl.is_empty():                                # D360: the walk's cost, and a 2-level climb by name
-			ui.hint(BWWeaponMove.walk_hint(battle, u, rr, h))
-		if not sl.is_empty():
-			board_view.highlight([h], "target")
-			ui.hint("%s — slides on the ice to here%s; the walk ends, then 1 more move" % [u.name,
-				(", SLAMS into %s (%d%% to both)" % [str(sl.into), int(BWSlides.SLAM_PCT)]) if bool(sl.slam) else ""])
+		var wh := BWWeaponMove.walk_hint(battle, u, rr, h)   # D360: the walk's cost, and a 2-level climb by name
+		if BWUnsteady.unsteady_at(battle, u, h):           # D397: ending on glaze
+			wh = ("%s  ·  " % wh if wh != "" else "") + "ends on glaze: Unsteady (−%d avoid, −%d glance)" % [
+				int(BWUnsteady.AVOID_PCT), int(BWUnsteady.GLANCE_PCT)]
+		ui.hint(wh)
 	else:
 		_show_options()
 
@@ -687,7 +685,7 @@ func _play(e: Dictionary) -> void:
 						await vfx.dive(_views[e.unit], e.path)
 					else:
 						await _animate_leap(_views[e.unit], e.path)
-				"charge", "shove", "knockback", "pull", "push", "gale", "slide": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind in ["charge", "slide"] else 0.12)
+				"charge", "shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.07 if e.kind == "charge" else 0.12)
 				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
 		"swap":                                             # ---- D181: put away, draw

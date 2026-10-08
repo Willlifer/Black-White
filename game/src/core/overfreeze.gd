@@ -9,16 +9,17 @@ extends RefCounted
 ## (water, glaze > 0, not a pillar, no marker) overfreezes and shatters:
 ##   * damage: PCT (ice class) to every unit on the hex and its six
 ##     neighbours, both teams (the caster too). One burst per unit per action,
-##     however many centres reach it (an area ice cast over a rink must not
-##     stack 7 bursts on one unit). Shattering's potency (whoever glazed the
+##     however many centres reach it (an area ice cast over glazed water must
+##     not stack 7 bursts on one unit). Shattering's potency (whoever glazed the
 ##     centre) scales it, as it scales thunder's shatter.
-##   * the rink: the hex and its ring glaze for GLAZE_CYCLES, as a PROPAGATED
+##   * the glaze: the hex and its ring glaze for GLAZE_CYCLES, as a PROPAGATED
 ##     arrival: charged unglazed hexes glaze, empty ground gets a thin ice
 ##     sheet (water 1, glazed); hexes already glazed, marked hexes, pillars and
-##     walls are left as they are. Slippery (BWSlides), so units entering slide.
+##     walls are left as they are. Glaze is Unsteady ground (D398, BWUnsteady):
+##     whoever stands in the seven hexes is easier to hit and glances less.
 ##   * NO pillar (Claude, D313): the centre just shattered, so even empty
-##     water 3 stays a flat rink (BWPools.finish skips the centres).
-##   * a hex overfreezes once per action; the rink it makes is propagated, so
+##     water 3 stays flat glaze (BWPools.finish skips the centres).
+##   * a hex overfreezes once per action; the glaze it makes is propagated, so
 ##     it never overfreezes anything (no chaining).
 ## Separate from thunder: thunder on glazed water still detonates with the x1.5
 ## shatter (ELEMENTS.md §3.2). Weather Blizzard glazes directly (not an
@@ -53,7 +54,7 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, opts: 
 	return out
 
 
-## After the plans and the pools: each centre's radius-1 rink. Adds
+## After the plans and the pools: each centre's radius-1 glaze. Adds
 ## out.overfreeze = [{hex, ring, glazed, pct, source}] and the glazed hexes
 ## to out.changed.
 static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) -> void:
@@ -75,7 +76,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) 
 					out.changed.append(h)
 		var e := t.at(c)
 		if not e.is_empty():
-			e.glaze = maxi(int(e.glaze), BWTiles.GLAZE_CYCLES)   # the centre is a fresh rink too
+			e.glaze = maxi(int(e.glaze), BWTiles.GLAZE_CYCLES)   # the centre is fresh glaze too
 			e.permanent = false
 			e.erase("seeded")
 		recs.append({ "hex": c, "ring": ring, "glazed": glazed, "source": caster,
@@ -83,7 +84,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) 
 	out["overfreeze"] = recs
 
 
-## One rink hex (a propagated glaze). True when it changed.
+## One glazed hex (a propagated glaze). True when it changed.
 static func _sheet(t: BWTiles, h: Vector2i, caster: String) -> bool:
 	if not t.can_hold(h) or t.is_pillar(h) or t.is_glazed(h):
 		return false
@@ -150,7 +151,7 @@ static func plan_notes(b: BWBattle, _u: BWUnit, p: Dictionary) -> void:
 		ring[h] = 1
 	var n := begin(b.tiles, p.hexes, "ice", true, { "ring": ring }).size()
 	if n > 0:
-		p.notes.append("Overfreeze: %s shatter%s, %d%% to every unit on and around, then a rink (no pillar)" % [
+		p.notes.append("Overfreeze: %s shatter%s, %d%% to every unit on and around, then they glaze: Unsteady ground (no pillar)" % [
 			"1 glazed water hex" if n == 1 else "%d glazed water hexes" % n, "s" if n == 1 else "", int(PCT)])
 
 
@@ -193,5 +194,5 @@ static func ai_skill(b: BWBattle, u: BWUnit, key: String, el: String, h: Vector2
 static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 	var out: Array = []
 	if is_target(b.tiles, h):
-		out.append("Overfreeze: fresh ice here shatters it: %d%% to every unit on it and the six around, then they glaze (a rink, no pillar)" % int(PCT))
+		out.append("Overfreeze: fresh ice here shatters it: %d%% to every unit on it and the six around, then all seven glaze (Unsteady ground, no pillar)" % int(PCT))
 	return out

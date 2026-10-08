@@ -332,7 +332,7 @@ func test_weather_gale_composes(t) -> void:
 	t.eq(f.pos, _nb(h, 2), "at its turn start the field pushes it once")
 
 
-func test_glaze_slide(t) -> void:
+func test_glaze_stops_a_push(t) -> void:
 	var me := _u("st", "staff", "wind")
 	var f := _u("f", "axe", "fire")
 	var b := _duel(me, [f], [Vector2i(2, 6)])
@@ -344,7 +344,8 @@ func test_glaze_slide(t) -> void:
 		b.tiles.entries[h] = b.tiles._entry(-1, 0, "", "", "cast")
 		b.tiles.entries[h].glaze = 2
 	BWWind.push(b, f, 0, 1, "push", me, false, false)
-	t.ok(BWHex.distance(Vector2i(2, 6), f.pos) > 1, "a push onto glaze slides on (Lane A's slide_path): %s" % [f.pos])
+	t.eq(BWHex.distance(Vector2i(2, 6), f.pos), 1, "D397: a push onto glaze stops there (no slide): %s" % [f.pos])
+	t.ok(BWUnsteady.unsteady(b, f), "and it stands Unsteady")
 
 
 # ------------------------------------------------------------------ Wind Wall

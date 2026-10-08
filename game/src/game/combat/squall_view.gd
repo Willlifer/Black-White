@@ -211,7 +211,7 @@ func on_event(e: Dictionary) -> void:
 		"overfreeze":
 			burst(e.hex, e.ring)
 			screen._shake(0.14)
-			screen.ui.feed("[b]Overfreeze![/b] %s's ice shatters the frozen water: %d%% to every unit on and around it, a rink forms" % [
+			screen.ui.feed("[b]Overfreeze![/b] %s's ice shatters the frozen water: %d%% to every unit on and around it, and the ice left behind is Unsteady footing" % [
 				screen._name(str(e.unit)), roundi(float(e.pct))])
 			screen.board_view.refresh_tiles()
 			await get_tree().create_timer(0.35).timeout
