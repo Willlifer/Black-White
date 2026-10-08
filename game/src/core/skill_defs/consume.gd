@@ -58,7 +58,7 @@ func after_paint(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: 
 
 ## D429b: the barrier, in HP: the heal's nominal size.
 func barrier(u: BWUnit, points: int) -> int:
-	return roundi(u.max_hp() * heal_pct(u) * points / 100.0)
+	return roundi(u.pct_base_hp() * heal_pct(u) * points / 100.0)
 
 
 func heal_pct(u: BWUnit) -> int:

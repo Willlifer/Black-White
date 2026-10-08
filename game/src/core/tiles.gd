@@ -233,7 +233,7 @@ static func tile_damage(u: BWUnit, pct: float, element: String, mult: float = 1.
 	if pct <= 0.0:
 		return 0
 	var res := minf(BWFormulas.elemental_resist(u, element), ELEM_RESIST_CAP)
-	return maxi(1, roundi(u.max_hp() * pct / 100.0 * mult * (1.0 - res / 100.0)))
+	return maxi(1, roundi(u.pct_base_hp() * pct / 100.0 * mult * (1.0 - res / 100.0)))
 
 
 # ------------------------------------------------------------------ writing

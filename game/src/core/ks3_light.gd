@@ -59,7 +59,7 @@ static func ai_hex(b: BWBattle, u: BWUnit, h: Vector2i) -> float:
 	var src := b._unit(str(b.tiles.at(h).get("source", "")))
 	if src == null or not ks(src, JUDICATOR):
 		return 0.0
-	var amt := BWTiles.LIGHT_HEAL_PCT * b.tiles.intensity(h, "light") * 2.0 * u.max_hp() / 100.0
+	var amt := BWTiles.LIGHT_HEAL_PCT * b.tiles.intensity(h, "light") * 2.0 * u.pct_base_hp() / 100.0
 	return amt * (0.5 if src.team == u.team else -1.0)
 
 

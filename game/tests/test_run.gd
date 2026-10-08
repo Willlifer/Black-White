@@ -45,7 +45,8 @@ func test_enemies(t) -> void:
 		t.eq(e.equipment.main_hand.tier, "D", "D99: fight 5 enemies carry fight 3's tier, D")
 	t.ok(r.enemies_for(9)[0].level > r.enemies_for(1)[0].level, "enemies grow over the run")
 	var boss: BWUnit = r.enemies_for(11)[0]
-	t.eq(boss.max_hp(), 500, "the boss has 500 HP")
+	t.eq(boss.max_hp(), 5000, "D485: the boss has 5000 HP")
+	t.eq(boss.pct_base_hp(), 500, "D485: its percentages read 500")
 	t.eq(boss.stat("str"), 50, "and 50 in the rest")
 
 

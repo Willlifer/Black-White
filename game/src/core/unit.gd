@@ -76,8 +76,11 @@ var acted := false
 var cooldowns := {}                  # skill id -> turns left
 var battle_mods := {}                # stat -> bonus for this battle (reactive abilities)
 var size := 1                        # hex radius + 1; the boss is 2 (7 hexes)
-## D138: > 0 = max HP is this, not the D137 formula (the Giant's 500).
+## D138: > 0 = max HP is this, not the D137 formula (the Giant's pool, D485).
 var fixed_hp := 0
+## D485: > 0 = the HP a "% of max HP" effect measures on this unit instead of
+## max_hp() (the Giant: 5000 HP, but 500 for percentages). See pct_base_hp().
+var pct_base := 0
 ## D208: a special-encounter unit (BWEncounters): "grunt" (the Horde),
 ## "colossus", "blank" (immune to elements, x2 from melee), "being" (immune
 ## to physical damage); "" = an ordinary unit. Never saved (enemies only).
@@ -167,6 +170,16 @@ func max_hp() -> int:
 	if str(fx.get("lev", "")) == "leviathos":
 		hp_max *= 2                                      # D451 Leviathos: double max HP for the battle
 	return hp_max
+
+
+## D485: the base every "% of max HP" amount uses (tile and reaction damage,
+## slams, Doom, Death Knell, heals, overheal shields, the AI's estimates). It is
+## max_hp() for everyone but the Giant, whose 5000 pool keeps the old 500 as
+## its base: otherwise percentage sources would scale ×10 with him and paint
+## builds would melt him as fast as before while weapon hits barely dented him.
+## HP thresholds ("below 35%") still read max_hp().
+func pct_base_hp() -> int:
+	return pct_base if pct_base > 0 else max_hp()
 
 
 func speed() -> int:

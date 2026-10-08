@@ -34,7 +34,8 @@ up on, or a reason to chain a detonation.
 - **Fights 5–7:** about half of the Hard rooms roll a big map (opt-in).
 - **Fights 8–10:** every room is big, 4v4. The run widens after the boss
   (§3).
-- **The Giant stays 3v1 on the arena** (see Q2).
+- **The Giant stays 3v1 on the arena** (see Q2). *Superseded by D487: the
+  whole squad of six fights the 5000-HP Giant.*
 
 ### Engine
 
@@ -269,7 +270,7 @@ Item 15 closes. Run `campaign_sim` (ENC, SHADOW) after each item.
 1. **Squad 6 with a bench of 2, or grow to 8?** *Recommend keeping 6;*
    recruits stay the growth path.
 2. **The Giant at 3v1 or 4v1?** *Recommend 3v1:* your best three, and the
-   500 HP stays untouched.
+   500 HP stays untouched. (D485 later made it 5000, a punching bag, and D487 brings all six.)
 3. **Is weather its own room or a tag?** *Recommend a tag* on about 25% of
    rooms from fight 5.
 4. **One boss or two?** *Recommend one slot at fight 7 and two bosses

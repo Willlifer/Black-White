@@ -44,7 +44,7 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 	var sl: Dictionary = p.get("slam", {})
 	if not sl.is_empty():
 		var into: BWUnit = sl.get("into", null)
-		p.notes.append("Slam: %s can't be pushed on and takes %d%% HP%s" % [sl.unit.name, slam_pct(u),
+		p.notes.append("Slam: %s can't be pushed on and takes %d%% HP%s%s" % [sl.unit.name, slam_pct(u), BWFormulas.pct_note(sl.unit),
 			(", and so does %s" % into.name) if into != null else ""])
 
 
@@ -132,7 +132,7 @@ func _ai_value(b: BWBattle, u: BWUnit, p: Dictionary) -> float:
 	for h in p.walk:
 		var pct := b.tiles.crossing_pct(h)
 		if pct > 0:
-			score -= u.max_hp() * pct / 100.0
+			score -= u.pct_base_hp() * pct / 100.0
 	return score
 
 

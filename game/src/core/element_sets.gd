@@ -251,7 +251,7 @@ static func roll(b, att, v, fc: Dictionary, res: Dictionary) -> Dictionary:
 	var e := three(v, "dark")
 	if e.is_empty() or _spent(v, "dark") or b.tiles.intensity(v.pos, "dark") <= 0:
 		return res
-	if float(res.get("damage", 0)) * 100.0 < float(e.params.get("min_pct", 25)) * v.max_hp():
+	if float(res.get("damage", 0)) * 100.0 < float(e.params.get("min_pct", 25)) * v.pct_base_hp():
 		return res
 	res["hit"] = false
 	res["damage"] = 0

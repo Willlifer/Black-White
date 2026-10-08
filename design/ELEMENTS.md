@@ -98,7 +98,9 @@ Notes:
   enchantments, keystones, the Twins' own colour) is halved, and from round
   20 heals do nothing; the overheal shields (Ward of Light, Overflow) shrink
   with them. Normal fights end by round 6-9 and never meet it; it ends the
-  heal-tile standoff (LEDGER L-46).
+  heal-tile standoff (LEDGER L-46). **The Giant fight is exempt (D486):** a
+  deliberate long fight (D485), so Fatigue waits until round 45 (halved) and
+  60 (none), a backstop only (`BWFormulas.GIANT_FATIGUE_*`).
 - Crossing damage counts every hex entered along the path, excluding the
   starting hex (V8). Displacement (Charge's shove) is not moving and deals no
   crossing damage.
@@ -782,6 +784,12 @@ board.
   hex**. Otherwise a 7-hex boss would take seven tiles' worth per turn. Whether
   the boss also gets a flat tile-resistance is a Gate 2 tuning call: at 12% of
   500 HP, a burning boss loses 60 per turn.
+- **The Giant's pct base (D485):** the Giant has 5000 HP, but every "% of max
+  HP" amount aimed at it (tiles, reactions, slams, Doom, Death Knell, La Niña,
+  arcs, heals and shields on it) reads **500**, its old pool
+  (`BWUnit.pct_base_hp`). Fire still burns it 60 a turn, not 600. HP thresholds
+  ("under 50%") read the 5000. Breakdowns tag the line "(% of 500, the Giant's
+  pct base)".
 
 ---
 

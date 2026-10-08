@@ -69,7 +69,7 @@ static func note(b: BWBattle, v: BWUnit, dir: int, n: int, slam_pct: int, notes:
 	var moved: int = (sp.path as Array).size() - 1
 	var s := "Shove: %s back %d" % [v.name, moved]
 	if str(sp.slam) != "" and slam_pct > 0:
-		s += ", slams into %s for %d%% HP" % [sp.into.name if sp.into != null else "rock", slam_pct]
+		s += ", slams into %s for %d%% HP%s" % [sp.into.name if sp.into != null else "rock", slam_pct, BWFormulas.pct_note(v)]
 		if sp.into != null:
 			s += " (and so does %s)" % sp.into.name
 	notes.append(s)

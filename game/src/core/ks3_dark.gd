@@ -140,7 +140,7 @@ static func ai_pick(b: BWBattle, u: BWUnit, kind: String) -> Dictionary:
 			sc += d + (1000.0 if d >= f.hp else 0.0)
 		if kind == "solar_flare":
 			for a in near(b, u, h, radius(u, kind), false):
-				sc += minf(a.max_hp() - a.hp, a.max_hp() * BWKeystones.param("sunburst", "heal_pct", 5) / 100.0) * 0.5
+				sc += minf(a.max_hp() - a.hp, a.pct_base_hp() * BWKeystones.param("sunburst", "heal_pct", 5) / 100.0) * 0.5
 		if sc > 0.0 and (best.is_empty() or sc > float(best.score)):
 			best = { "target": h, "element": "", "score": sc }
 	return best
@@ -164,7 +164,7 @@ static func heal_to_harm(b: BWBattle, u: BWUnit, pct: float, cause: String) -> b
 	var hk := hopekiller_on(b, u)
 	if hk == null or u.fx.get("_hopekiller", false):
 		return false
-	var amt := maxi(1, roundi(u.max_hp() * pct / 100.0))
+	var amt := maxi(1, roundi(u.pct_base_hp() * pct / 100.0))   # D485
 	u.fx["_hopekiller"] = true
 	b._emit({ "type": "hopekiller", "unit": u.id, "by": hk.id, "amount": amt, "cause": cause })
 	b._tile_hurt(u, amt, "hopekiller", hk.id)

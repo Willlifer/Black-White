@@ -167,4 +167,4 @@ barrier,Barrier,barriers,status,"Consume's guard: a shield the size of the heal 
 blade_dance,Blade Dance,,progression,A sword passive you pick (in the sword's skill picks; no skill slot): after a sword skill lands you get a free step of up to 2 hexes.,weapon_move
 fissure,Fissure,fissures,rule,"Sunder's split in the earth: a straight 5-hex line from you through the target, painted with your element, every other foe on it hit at 60%. Rock stops it. Bellow doubles it to 10.",push
 lance_line,Set line,lance charge line|charge line,rule,"Lance Charge's telegraph: a straight line up to 10 hexes, drawn on the board. At its holder's next turn start the lance runs it, piercing and painting it, then takes a full turn.",zone
-fatigue,Fatigue,fatigued,rule,"Long fights wear everyone down: from round 15 every heal (and overheal shield) is halved, and from round 20 heals do nothing.",
+fatigue,Fatigue,fatigued,rule,"Long fights wear everyone down: from round 15 every heal (and overheal shield) is halved, and from round 20 heals do nothing. The Giant fight is a long one: there it waits until round 45 and 60.",

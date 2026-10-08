@@ -547,7 +547,7 @@ func _bosses() -> void:
 	v.add_child(_rt(_dim("Counter: light and dark cancel, so paint the opposite colour over their ground; thunder the beam (it breaks for a cycle and jolts both for %d%%); burst both together. Win: every squad unit gets one extra pick (two cards). A loss still levels the squad." % int(BWTwins.FEEDBACK_PCT)), BWStyle.F_SMALL))
 	var g := _card("dark")
 	g.add_child(_rt("[font_size=%d][b]The Giant[/b][/font_size]  %s" % [BWStyle.F_SUB + 3, _dim("the end · the Arena")]))
-	g.add_child(_rt(_dim("500 HP, 50 in every stat, seven hexes. It isn't forced to be unbeatable."), BWStyle.F_SMALL))
+	g.add_child(_rt(_dim("%d HP, 50 in every stat, seven hexes: a punching bag to end the run on, and your whole squad fights it. Percentage effects count from %d (fire burns it 60, not 600). No Fatigue until round %d. It isn't forced to be unbeatable." % [BWRun.GIANT_HP, BWRun.GIANT_PCT_BASE, BWFormulas.GIANT_FATIGUE_HALF]), BWStyle.F_SMALL))   # D485, D486
 
 
 # ---------------------------------------------------------------- glossary (D125)

@@ -97,14 +97,14 @@ func shake_blows(targets: Array, results: Array) -> void:
 		if not bool(res.get("hit", true)):
 			continue
 		var t: Node = targets[k]
-		var mh: int = t.unit.max_hp() if t and t.get("unit") else 100
+		var mh: int = t.unit.pct_base_hp() if t and t.get("unit") else 100
 		s = maxf(s, shake_for(int(res.get("damage", 0)), mh, bool(res.get("crit", false))))
 	shake(s)
 
 
 ## A floating damage number sized by the hit (replaces the fixed-size one).
 func float_number(v: Node3D, text: String, res: Dictionary, hold: float = 0.8) -> void:
-	var mh: int = v.unit.max_hp() if v.get("unit") else 100
+	var mh: int = v.unit.pct_base_hp() if v.get("unit") else 100   # D485: the Giant's hits feel against 500
 	var hit := bool(res.get("hit", true))
 	var crit := bool(res.get("crit", false)) and hit
 	var size := number_size(int(res.get("damage", 0)), mh, crit, hit)
@@ -137,7 +137,7 @@ func impact(a: Node3D, targets: Array, results: Array, flash: String) -> void:
 		if bool(res.get("crit", false)) and flash == "full":
 			crit_full = true                  # D101 already froze this frame
 		var t: Node = targets[k]
-		var mh: int = t.unit.max_hp() if t and t.get("unit") else 100
+		var mh: int = t.unit.pct_base_hp() if t and t.get("unit") else 100
 		stop = maxf(stop, hitstop_for(int(res.get("damage", 0)), mh))
 	if final_blow(results):
 		await final_ko(targets, results)

@@ -271,8 +271,8 @@ static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> vo
 	if pct <= 0.0 or not u.alive():
 		return
 	var room := u.max_hp() - u.hp
-	var fade := BWFormulas.fatigue_heal_mult(b.cycle)   # D474: the overheal shield wanes with the heal
-	var amt := maxi(1, roundi(u.max_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
+	var fade := b.heal_fade()   # D474: the overheal shield wanes with the heal
+	var amt := maxi(1, roundi(u.pct_base_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
 	b._heal(u, pct, "light")
 	var src := b._unit(source)
 	if src == null or src.team != u.team or not ks(src, "overflow"):
@@ -280,7 +280,7 @@ static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> vo
 	var excess := amt - room
 	if excess <= 0 or not u.alive():
 		return
-	var cap := roundi(u.max_hp() * WARD_PCT / 100.0)
+	var cap := roundi(u.pct_base_hp() * WARD_PCT / 100.0)
 	var cur := int((u.fx.get("light_ward", {}) as Dictionary).get("hp", 0))
 	var hp := mini(cap, cur + excess)
 	if hp <= cur or BWKs3Dark.buff_blocked(b, u, "Ward of Light"):
@@ -385,7 +385,7 @@ static func ai_hex(b: BWBattle, u: BWUnit, h: Vector2i) -> float:
 	var score := 0.0
 	for bm in beams(b):
 		if bm.team != u.team and h in bm.hexes and not str(u.id) in bm.ends:
-			score -= float(bm.pct) * u.max_hp() / 100.0
+			score -= float(bm.pct) * u.pct_base_hp() / 100.0
 	var lt := b.tiles.intensity(h, "light")
 	if lt <= 0:
 		return score
@@ -400,7 +400,7 @@ static func ai_hex(b: BWBattle, u: BWUnit, h: Vector2i) -> float:
 		for x in sp:
 			var o := b.unit_at(x)
 			if o != null and o.team != u.team and not BWObelisk.is_objective(o):
-				gain += o.max_hp() * pct / 100.0
+				gain += o.pct_base_hp() * pct / 100.0
 		score += gain
 	return score
 

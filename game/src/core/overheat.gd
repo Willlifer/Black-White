@@ -282,7 +282,7 @@ static func ai_skill(b: BWBattle, u: BWUnit, pv: Dictionary) -> float:
 			var o := b.unit_at(n)
 			if o == null or BWObelisk.is_objective(o):
 				continue
-			var v := o.max_hp() * RING_PCT / 100.0
+			var v := o.pct_base_hp() * RING_PCT / 100.0
 			if o == u and ks(u, "phoenix_heart"):
 				v = 0.0
 			score += v if o.team != u.team else -v

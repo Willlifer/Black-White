@@ -2142,8 +2142,9 @@ func _new_cycle() -> void:
 	queue = BWTurnQueue.build(units)
 	turn_index = 0
 	_emit({ "type": "cycle", "cycle": cycle, "order": queue.map(func(u): return u.id) })
-	if cycle == BWFormulas.FATIGUE_HALF or cycle == BWFormulas.FATIGUE_NONE:   # D474
-		_emit({ "type": "fatigue", "cycle": cycle, "heal_mult": BWFormulas.fatigue_heal_mult(cycle) })
+	var gf := giant_fight()                    # D486: the Giant fight's own, far thresholds
+	if cycle == (BWFormulas.GIANT_FATIGUE_HALF if gf else BWFormulas.FATIGUE_HALF) or cycle == (BWFormulas.GIANT_FATIGUE_NONE if gf else BWFormulas.FATIGUE_NONE):   # D474
+		_emit({ "type": "fatigue", "cycle": cycle, "heal_mult": heal_fade() })
 	BWPhases.new_cycle(self)               # D255: pending phases come due (the rage)
 	_begin_turn()
 
@@ -2279,8 +2280,21 @@ func in_group_turn() -> bool:
 	return u != null and u.group_turn != "" and not group_live.is_empty() and int(group_live.cycle) == cycle 		and turn_index >= int(group_live.from) and turn_index < int(group_live.to)
 
 
+## D486: is this the Giant fight (a unit with its own pct base, D485)?
+func giant_fight() -> bool:
+	for x in units:
+		if x.pct_base > 0:
+			return true
+	return false
+
+
+## D474 Fatigue's heal multiplier now (D486: the Giant fight's far thresholds).
+func heal_fade() -> float:
+	return BWFormulas.fatigue_heal_mult(cycle, giant_fight())
+
+
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
-	pct *= BWFormulas.fatigue_heal_mult(cycle)         # D474 Fatigue: round 15 halves heals, 20 ends them
+	pct *= heal_fade()                                  # D474 Fatigue: round 15 halves heals, 20 ends them (D486: not vs the Giant)
 	if pct <= 0.0:
 		return
 	if BWKs3.heal_hook(self, u, pct, cause):           # D450 Hopekiller: the heal hurts instead
@@ -2292,7 +2306,7 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 	if blocked != "":
 		_emit({ "type": "enchant", "unit": u.id, "name": blocked, "text": "can't be healed" })
 		return
-	var amt := maxi(1, roundi(u.max_hp() * pct / 100.0))
+	var amt := maxi(1, roundi(u.pct_base_hp() * pct / 100.0))   # D485
 	var healed := mini(amt, u.max_hp() - u.hp)
 	u.hp += healed
 	var e := { "type": "heal", "unit": u.id, "amount": healed, "hp": u.hp }
@@ -2564,7 +2578,7 @@ func _arc(by: BWUnit, v: BWUnit, w: BWUnit, raw: float, kind: String = "") -> in
 		raw *= BWUnit.BRACE_TAKEN
 	for e in BWEffects.list(w, "grounded"):
 		raw *= float(BWEffects.p(e, "pct", 50)) / 100.0
-	var dmg := BWTiles.tile_damage(w, 100.0 * raw / maxf(w.max_hp(), 1.0),
+	var dmg := BWTiles.tile_damage(w, 100.0 * raw / maxf(w.pct_base_hp(), 1.0),
 		"thunder", BWEffects.tile_taken(w, "thunder"))
 	if dmg <= 0:
 		return 0
@@ -3760,9 +3774,12 @@ func ground_report(hex: Vector2i) -> Dictionary:
 			for fx in BWEffects.list(s, "sanctuary"):
 				pct = maxf(pct, BWEffects.by_level(fx, tiles.intensity(hex, "light")))
 		if pct > 0.0:
-			var hl := mini(maxi(1, roundi(u.max_hp() * pct / 100.0)), u.max_hp() - maxi(u.hp - int(t.damage), 0))
+			var hl := mini(maxi(1, roundi(u.pct_base_hp() * pct / 100.0)), u.max_hp() - maxi(u.hp - int(t.damage), 0))
 			if hl > 0:
 				t.heal = hl
 				t.lines.append(["Light heals", hl])
+	if u.pct_base > 0:                             # D485: the Giant's percentages read his 500
+		for ln in t.lines:
+			ln[0] = str(ln[0]) + BWFormulas.pct_note(u)
 	return out
 # ---- end D160/D161 ----

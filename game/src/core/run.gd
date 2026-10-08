@@ -248,8 +248,14 @@ var mode_override := {}
 ## 6 on a big map), capped by the squad's size (fewer owned: field them all).
 ## The enemy side fields the map's count (BWRooms draws it, as many as the
 ## roster outside the squad can spare).
+## D487 (author: "Bring the 6 man squad, no other changes"): the Giant fight
+## fields the whole squad (up to GIANT_DEPLOY), on the arena's 3-hex-deep
+## deploy zone (11 hexes; its own spawns are 3, the rest place from the zone).
+const GIANT_DEPLOY := 6
+
+
 func deploy_for(n: int) -> int:
-	var c := deploy_count_of(map_for(n))
+	var c := GIANT_DEPLOY if n >= BOSS_FIGHT and force_map == "" else deploy_count_of(map_for(n))
 	return mini(c, squad.size()) if not squad.is_empty() else c
 
 
@@ -1123,6 +1129,17 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 ## to die here." size 2: it covers its centre and the 6 hexes around it.
 ## BWBattle.setup() places it on an enemy spawn its ring fits, or the nearest
 ## hex that fits; tiles affect it at its centre only (E15).
+## D485 (author: "a big punching bag at the end of my run"): the Giant's pool
+## is 10× the brief's 500 (D138). Set here and not through CON: fixed_hp
+## bypasses the CON formula anyway, CON can't reach it (2 HP a point, STAT_CAP
+## 1000), and percentage effects keep the old 500 (GIANT_PCT_BASE,
+## BWUnit.pct_base_hp) so paint builds don't scale ×10 with him.
+const GIANT_HP := 5000
+const GIANT_PCT_BASE := 500
+## Tuning only (tools/campaign_sim.gd GIANT_PAIR): the pool make_boss gives.
+static var giant_hp := GIANT_HP
+
+
 func make_boss() -> BWUnit:
 	var row := { "id": "boss", "name": "The Giant", "weapon_class": "axe", "weapon_model": "anchor",
 		"element": "dark", "friendliness": "unfriendly" }
@@ -1130,7 +1147,8 @@ func make_boss() -> BWUnit:
 		row[s] = 50
 	var b := BWUnit.from_roster(row)
 	b.size = 2
-	b.fixed_hp = 500         # D138: the brief's 500, exempt from the D137 HP formula
+	b.fixed_hp = giant_hp    # D138, D485: a fixed pool, exempt from the D137 HP formula
+	b.pct_base = GIANT_PCT_BASE   # D485: "% of max HP" effects measure the old 500
 	b.hp = b.max_hp()
 	return b
 

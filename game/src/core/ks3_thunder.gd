@@ -67,14 +67,14 @@ static func overflow(b: BWBattle, u: BWUnit, n: int) -> void:
 		return
 	u.fx["of_used"] = float(u.fx.of_used) + pct
 	var room := u.max_hp() - u.hp
-	var fade := BWFormulas.fatigue_heal_mult(b.cycle)   # D474: the overheal shield wanes with the heal
-	var amt := maxi(1, roundi(u.max_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
+	var fade := b.heal_fade()   # D474: the overheal shield wanes with the heal
+	var amt := maxi(1, roundi(u.pct_base_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
 	b._emit({ "type": "overflow", "unit": u.id, "pct": pct, "n": n })
 	b._heal(u, pct, "overflow")
 	var excess := amt - room
 	if excess <= 0 or not u.alive() or BWKs3Dark.hopekiller_on(b, u) != null:
 		return
-	var shield_cap := roundi(u.max_hp() * BWKeystones.param(OVERFLOW, "shield_pct", 30) / 100.0)
+	var shield_cap := roundi(u.pct_base_hp() * BWKeystones.param(OVERFLOW, "shield_pct", 30) / 100.0)
 	var cur := int((u.fx.get("light_ward", {}) as Dictionary).get("hp", 0))
 	var hp := mini(shield_cap, cur + excess)
 	if hp <= cur:

@@ -55,10 +55,17 @@ const FATIGUE_HALF := 15
 const FATIGUE_NONE := 20
 
 
-static func fatigue_heal_mult(cycle: int) -> float:
-	if cycle >= FATIGUE_NONE:
+## D486: the Giant fight (a deliberate long punching-bag fight, D485) skips
+## Fatigue at 15/20, which would only starve the player's healing; a far
+## backstop at GIANT_FATIGUE_HALF / _NONE still ends a true stall.
+const GIANT_FATIGUE_HALF := 45
+const GIANT_FATIGUE_NONE := 60
+
+
+static func fatigue_heal_mult(cycle: int, giant: bool = false) -> float:
+	if cycle >= (GIANT_FATIGUE_NONE if giant else FATIGUE_NONE):
 		return 0.0
-	return 0.5 if cycle >= FATIGUE_HALF else 1.0
+	return 0.5 if cycle >= (GIANT_FATIGUE_HALF if giant else FATIGUE_HALF) else 1.0
 
 
 ## D424 (author: "Ranged attacks damage reduced by 10% if an enemy is within
@@ -127,13 +134,22 @@ static func _prod(mods: Array, stage: String) -> Array:
 ## Giant, D138) shows that instead.
 static func hp(u: BWUnit) -> Dictionary:
 	if u.fixed_hp > 0:
-		return calc("HP", u.fixed_hp, "fixed (%s)" % ("the Giant" if u.id == "boss" else "its own pool"), "%d" % u.fixed_hp)
+		return calc("HP", u.fixed_hp, "fixed (%s)%s" % ["the Giant" if u.id == "boss" else "its own pool",
+			"; %% effects: %% of %d (the Giant's pct base)" % u.pct_base if u.pct_base > 0 else ""], "%d" % u.fixed_hp)
 	var con := u.stat("con")
 	return calc("HP", hp_value(con, u.level), HP_TEXT,
 		"%d + %d × %d + %d × %d" % [HP_BASE, HP_PER_CON, con, HP_PER_LEVEL, u.level])
 
 
 const HP_TEXT := "100 + 2 × CON + 15 × level"
+
+
+## D485: the breakdown tag on a "% HP" amount aimed at a unit with its own pct
+## base (the Giant): " (% of 500, the Giant's pct base)"; "" for everyone else.
+static func pct_note(u: BWUnit) -> String:
+	if u == null or u.pct_base <= 0:
+		return ""
+	return " (%% of %d, the Giant's pct base)" % u.pct_base
 
 
 static func hp_value(con: int, level: int) -> int:

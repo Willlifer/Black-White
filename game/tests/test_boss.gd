@@ -61,7 +61,8 @@ func _sound(b: BWBattle) -> bool:
 func test_the_giant(t) -> void:
 	var g := _boss()
 	t.eq(g.size, 2, "size 2")
-	t.eq(g.max_hp(), 500, "500 HP")
+	t.eq(g.max_hp(), BWRun.GIANT_HP, "D485: 5000 HP")
+	t.eq(BWRun.GIANT_HP, 5000, "10× the brief's 500")
 	g.pos = B
 	t.eq(g.footprint().size(), 7, "centre + 6 around it")
 	t.ok(B in g.footprint() and BWHex.neighbors(B).all(func(h): return h in g.footprint()), "exactly its ring")
@@ -227,3 +228,61 @@ func test_boss_fight_on_the_arena(t) -> void:
 	t.ok(mine.any(func(e): return e.type == "move"), "the boss moves")
 	t.ok(mine.any(func(e): return e.type == "attack"), "and hits")
 	t.ok(not mine.any(func(e): return e.type == "skill"), "basic AI: no skills")
+
+
+## D485-D486: the 10× Giant. 5000 HP, percentages against 500, no Fatigue.
+func test_giant10_d485(t) -> void:
+	var g := _boss()
+	t.eq(g.hp, 5000, "starts full at 5000")
+	t.eq(g.pct_base_hp(), BWRun.GIANT_PCT_BASE, "the pct base is the old 500")
+	t.eq(g.stat("con"), 50, "CON untouched (fixed_hp bypasses it)")
+	var p := _u("p")
+	t.eq(p.pct_base_hp(), p.max_hp(), "everyone else: the pct base is max HP")
+	# A tile percentage: 12% of 500, not of 5000.
+	var res := minf(BWFormulas.elemental_resist(g, "fire"), BWTiles.ELEM_RESIST_CAP)
+	t.eq(BWTiles.tile_damage(g, 12.0, "fire"), maxi(1, roundi(500 * 0.12 * (1.0 - res / 100.0))), "fire 12% reads 500")
+	t.ok(BWTiles.tile_damage(g, 12.0, "fire") < 100, "a burn is a dent, not 600")
+	t.ok(BWFormulas.hp(g).formula.contains("% of 500 (the Giant's pct base)"), "the HP breakdown says so")
+	t.eq(BWFormulas.pct_note(g), " (% of 500, the Giant's pct base)", "the % HP lines' tag")
+	t.eq(BWFormulas.pct_note(p), "", "no tag on anyone else")
+	# A heal on the Giant: 10% of 500 = 50.
+	var b := _fight([p], [Vector2i(0, 12)])
+	var gb := _boss_of(b)
+	gb.hp = 1000
+	b._heal(gb, 10.0, "test")
+	t.eq(gb.hp, 1050, "a 10% heal on the Giant is 50")
+	# No Fatigue at 15/20 in the Giant fight; the far backstop still holds.
+	t.ok(b.giant_fight(), "the fight knows it is the Giant's")
+	b.cycle = BWFormulas.FATIGUE_NONE + 5
+	t.eq(b.heal_fade(), 1.0, "round 25: heals whole against the Giant")
+	b.cycle = BWFormulas.GIANT_FATIGUE_HALF
+	t.eq(b.heal_fade(), 0.5, "the backstop halves at %d" % BWFormulas.GIANT_FATIGUE_HALF)
+	b.cycle = BWFormulas.GIANT_FATIGUE_NONE
+	t.eq(b.heal_fade(), 0.0, "and stops at %d" % BWFormulas.GIANT_FATIGUE_NONE)
+	var nb := BWBattle.new(_board(), 3)
+	nb.setup([_u("a")], [_u("e")])
+	nb.cycle = BWFormulas.FATIGUE_NONE
+	t.ok(not nb.giant_fight() and nb.heal_fade() == 0.0, "an ordinary fight keeps D474")
+
+
+## D487 (author: "Bring the 6 man squad"): the Giant fight fields the whole squad.
+func test_giant_six_d488(t) -> void:
+	var ids: Array = BWData.table("roster").slice(0, 6).map(func(x): return str(x.id))
+	var r := BWRun.start(ids, 5)
+	t.eq(BWRun.deploy_count_of("arena"), 3, "the arena itself still fields 3 in normal rooms")
+	t.eq(r.deploy_for(BWRun.BOSS_FIGHT), 6, "the Giant: all six")
+	t.eq(r.map_for(BWRun.BOSS_FIGHT), "arena", "on the arena")
+	t.eq(r.enemies_for(BWRun.BOSS_FIGHT).size(), 1, "still one Giant")
+	var small := BWRun.start(ids.slice(0, 4), 5)
+	t.eq(small.deploy_for(BWRun.BOSS_FIGHT), 4, "a squad of 4 brings its 4")
+	var squad: Array = ids.map(func(id): return BWUnit.from_roster(BWData.row("roster", id)))
+	var b := BWBattle.new(BWBoard.load_file("res://maps/arena.json"), 11)
+	b.setup(squad, [_boss()])
+	var g := _boss_of(b)
+	var seen := {}
+	for p in squad:
+		t.ok(p.pos in b.board.deploy.player or p.pos in b.board.spawns.player, "%s starts in the player zone" % p.id)
+		t.ok(not p.pos in g.footprint(), "%s is clear of the Giant's ring" % p.id)
+		seen[p.pos] = true
+	t.eq(seen.size(), 6, "six different hexes")
+	t.ok(_sound(b), "every footprint sound")

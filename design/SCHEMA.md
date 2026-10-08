@@ -8,7 +8,7 @@ first, then fix the data.
 
 | Key | Name | Does |
 |---|---|---|
-| `con` | Constitution | HP = 100 + 2·con + 15·level (D34, D137, D178; the Giant is a fixed 500, D138) |
+| `con` | Constitution | HP = 100 + 2·con + 15·level (D34, D137, D178; the Giant is a fixed 5000, D138, D485: CON is untouched; its % effects read 500) |
 | `str` | Strength | Martial weapon damage, skill damage |
 | `dex` | Dexterity | Dexterous weapon damage, hit, crit, avoid, skill damage |
 | `wil` | Willpower | Spell damage. Replaces wisdom and intelligence. |

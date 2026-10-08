@@ -478,7 +478,7 @@ static func ai_value(b: BWBattle, sim: Dictionary) -> float:
 			if v == null:
 				continue
 			for hz in m.hazard:
-				sc += float(hz[1]) * v.max_hp() / 100.0 * (1.0 if v.team != str(sim.team) else -1.0)
+				sc += float(hz[1]) * v.pct_base_hp() / 100.0 * (1.0 if v.team != str(sim.team) else -1.0)
 		sc += HOLD_AI * (e.becalm as Array).size()
 	return sc
 

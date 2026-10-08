@@ -41,7 +41,7 @@ static func _drawback(u: BWUnit, param: String) -> Dictionary:
 
 
 static func _pct_hp(u: BWUnit, amount: float) -> float:
-	return 100.0 * amount / maxf(1.0, float(u.max_hp()))
+	return 100.0 * amount / maxf(1.0, float(u.pct_base_hp()))   # D485: _heal's base
 
 
 # ================================================================ forecast terms
@@ -274,7 +274,7 @@ static func land(b: BWBattle, att: BWUnit, v: BWUnit, res: Dictionary) -> void:
 		var cp := float(BWEffects.p(e, "cap_pct", 0))
 		if cp <= 0.0:
 			continue
-		var cap := roundi(v.max_hp() * cp / 100.0)
+		var cap := roundi(v.pct_base_hp() * cp / 100.0)
 		if dmg > cap:
 			var now := cap + roundi((dmg - cap) * float(BWEffects.p(e, "excess", 50)) / 100.0)
 			_ev(b, v, e.name, "Bulwark: %d → %d" % [dmg, now])
@@ -493,7 +493,7 @@ static func on_ko(b: BWBattle, victim: BWUnit, by: BWUnit, cause: String) -> voi
 				_ev(b, by, e.name, "Death Knell: %d%% burst around %s" % [int(pct), victim.name], { "hex": victim.pos })
 				for f in b.foes_of(by):
 					if f.alive() and BWHex.distance(f.pos, victim.pos) <= int(BWEffects.p(e, "radius", 1)) and b.can_harm(by, f):
-						b._tile_hurt(f, maxi(1, roundi(f.max_hp() * pct / 100.0)), "knell", by.id)
+						b._tile_hurt(f, maxi(1, roundi(f.pct_base_hp() * pct / 100.0)), "knell", by.id)
 			"paint":
 				var el := str(e.element)
 				if el == "" and str(BWEffects.p(e, "element", "")) == "attuned":
@@ -559,7 +559,7 @@ static func end_action(b: BWBattle, u: BWUnit, attacked: bool) -> void:
 		return
 	var dw := _drawback(u, "hp_cost")
 	if not dw.is_empty() and u.hp > 1:
-		var cost := mini(u.hp - 1, maxi(1, roundi(u.max_hp() * float(BWEffects.p(dw, "hp_cost", 4)) / 100.0)))
+		var cost := mini(u.hp - 1, maxi(1, roundi(u.pct_base_hp() * float(BWEffects.p(dw, "hp_cost", 4)) / 100.0)))
 		u.hp -= cost
 		_ev(b, u, dw.name, "Blood price: -%d" % cost)
 		b._emit({ "type": "tile_damage", "unit": u.id, "amount": cost, "cause": "bloodpact", "hp": u.hp, "source": "" })

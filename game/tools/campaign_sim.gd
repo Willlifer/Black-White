@@ -13,7 +13,9 @@ extends SceneTree
 ## Branch out takes its first card (D176). Found weapons are equipped only in
 ## the unit's own class or one it has expertise in; the best weapon of another
 ## class it has expertise in is carried as the second weapon (D180, D193).
-## Prints win rate and rounds per fight, survivors, and the Giant's HP left.
+## Prints win rate and rounds per fight, survivors, and the Giant's HP left,
+## win rate, mean rounds and player deaths. GIANT_HP=n sets its pool (D485;
+## 500 = before D485: the same seeds give a paired before/after).
 ## D188 room policy, env ROOMS (default standard; "all" runs each in turn):
 ##   standard  always the Standard room
 ##   hard      always the Hard room (when there is a choice)
@@ -123,6 +125,8 @@ func _init() -> void:
 		BWEncounters.BLANK_MULT = float(e[4]); BWEncounters.BEING_MULT = float(e[5])
 		if e.size() >= 8:
 			BWEncounters.BLANK_HP = float(e[6]); BWEncounters.BEING_HP = float(e[7])
+	if OS.get_environment("GIANT_HP") != "":               # D485 tuning: the Giant's pool (500 = before D485)
+		BWRun.giant_hp = int(OS.get_environment("GIANT_HP"))
 	if OS.get_environment("TWINS") != "":                  # D259 tuning: "hp,mult" for the Twins (fight 7)
 		var tw := OS.get_environment("TWINS").split(",")
 		BWTwins.TWINS_HP = float(tw[0])
@@ -161,6 +165,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 		for f in BWRun.BOSS_FIGHT:
 			wins.append(0); rounds.append([]); alive.append(0); played.append({})
 		var boss_left: Array = []
+		var giant := { "fights": 0, "won": 0, "rounds": 0, "deaths": 0, "deployed": 0, "worst": 0 }   # D485
 		var by_room := {}       # D188: "n|kind" -> [wins, played]
 		var ks_fights := {}     # D308: keystone -> [wins, fights a deployed holder fought]
 		led = { "recs": [], "heal": {}, "dmg": { "player": 0, "enemy": 0 }, "kind": {}, "stall": 0, "long": 0 }   # D473
@@ -282,6 +287,12 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				by_room[rk] = [wp[0] + (1 if won else 0), wp[1] + 1]
 				if n == BWRun.BOSS_FIGHT:
 					boss_left.append(enemies[0].hp)
+					giant.fights += 1
+					giant.won += 1 if won else 0
+					giant.rounds += b.cycle
+					giant.worst = maxi(int(giant.worst), b.cycle)
+					giant.deployed += deployed.size()
+					giant.deaths += deployed.filter(func(u): return not u.alive()).size()
 				var defeated := enemies.filter(func(e): return not e.alive())
 				run.after_fight(won, deployed, defeated, enemies, b.history)
 				for u in run.squad:
@@ -351,7 +362,10 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				out.append("  %-9s fights 5-10 %3d%% (%d)  swing %+d%s   %s" % [wk, roundi(wr), tp, roundi(wr - cr),
 					"  <-- FLAG (>15)" if absf(wr - cr) > 15.0 else "", "  ".join(row)])
 		boss_left.sort()
-		out.append("  Giant HP left (of 500): %s" % str(boss_left))
+		out.append("  Giant HP left (of %d): %s" % [BWRun.giant_hp, str(boss_left)])
+		var gf := maxf(float(giant.fights), 1.0)
+		out.append("  Giant (D485, %d HP): win %d%% (%d)  mean rounds %.1f (max %d)  player deaths %.2f of %.1f deployed" % [BWRun.giant_hp,
+			roundi(100.0 * giant.won / gf), giant.fights, giant.rounds / gf, giant.worst, giant.deaths / gf, giant.deployed / gf])
 		var kids: Array = ks_fights.keys()
 		kids.sort_custom(func(a, c): return int(ks_fights[a][1]) > int(ks_fights[c][1]))
 		var krow: PackedStringArray = []

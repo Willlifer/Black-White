@@ -60,7 +60,7 @@ static func ai_skill(b: BWBattle, u: BWUnit, pv: Dictionary) -> float:
 		var o := b.unit_at(h)
 		if o != null and o.team != u.team and b.tiles.intensity(h, "fire") >= 3 \
 				and b.tiles.intensity(h, "fire") < BWTiles.LAVA_MAX:
-			s += o.max_hp() * float(BWTiles.LAVA_STAND_PCT) / 100.0
+			s += o.pct_base_hp() * float(BWTiles.LAVA_STAND_PCT) / 100.0
 	return s
 
 

@@ -235,7 +235,7 @@ static func ai_skill(b: BWBattle, u: BWUnit, key: String, el: String, h: Vector2
 			if d < r0 or d > r0 + TICKS - 1:
 				continue
 			var foe: bool = v.team != u.team
-			var w: float = v.max_hp() * 0.03
+			var w: float = v.pct_base_hp() * 0.03
 			if str(e.element) == "dark":
 				score += w if foe else 0.0
 			else:

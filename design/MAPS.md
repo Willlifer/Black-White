@@ -734,7 +734,7 @@ choice on the room screen (`BWRoomScreen`).
 | 5 | **two Split Fronts**: Split Front (§15) and The Fords (§17), two different dividers (seeded) |
 | 7, 9 | a 3v3 Standard room vs a 6v6 card from the pool |
 | 8, 10 | two 6v6 cards from the pool, two different maps |
-| 11 | the Giant |
+| 11 | the Giant, on the arena: **your whole squad (up to 6) against him** (D487; the arena stays 3 in its normal rooms) |
 
 **The 6v6 pool** (`BWSchedule.SIX_POOL`): Split Front, The Fords, Defend the
 Castle (Keep), Storm the Castle (Stronghold), Stop the Horde (the Horde Road).

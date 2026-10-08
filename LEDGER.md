@@ -61,6 +61,7 @@ Last reviewed: 2026-10-08 (tutorial and glossary refresh).
 
 | ID | Item | Closed | How |
 |---|---|---|---|
+| L-51 | The 10× Giant (D485-D487): at 3 deployed he won 71% by attrition (29% player wins, 38.5 rounds). | 2026-10-08 | The author: "Bring the 6 man squad, no other changes." Six deploy (D487): 92% win, 20.3 mean rounds, 2.5 deaths of 6. |
 | S-1 | The Giant's ground-damage cheese. | 2026-10-05 | The author: "If we win, then we win." No cap. |
 | S-2 | Catacombs' tall pillars. | 2026-10-05 | The author keeps them; the middle became seeded dark (D134–D136). |
 | S-3 | Old saves after the roster rename. | 2026-10-05 | Save v5 shows "from an older version" and starts fresh (D149–D154). |

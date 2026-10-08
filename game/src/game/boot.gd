@@ -157,6 +157,8 @@ func _quick_combat(map_name: String, autoplay: bool, seed_value: int, boss: bool
 	var players: Array = []
 	var enemies: Array = []
 	var count := BWRun.deploy_count_of(map_name)       # D319: the map's deploy count (6 on Commons)
+	if boss and _arg(OS.get_cmdline_user_args(), "--boss", "") != "twins":
+		count = BWRun.GIANT_DEPLOY                     # D487: the whole squad of six against the Giant
 	for i in count:
 		players.append(BWUnit.from_roster(roster[i]))
 		enemies.append(BWUnit.from_roster(roster[(i + 10) % roster.size()]))
