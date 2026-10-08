@@ -231,7 +231,7 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 	c.bar.set_hp(u.hp, u.max_hp())
 	var el := BWLook.element_color(u.element).to_html(false)
 	var lines: PackedStringArray = []
-	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s[/color]" % [BWStyle.F_NAME, u.name,
+	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s[/color]" % [BWStyle.F_NAME, BWKeystones.titled(u),
 		BWStyle.TEXT_DIM.to_html(false), "enemy" if u.team == "enemy" else "Lv %d" % u.level])
 	var model := BWText.model_name(u.weapon_model, u.weapon_class)      # D218: no "Sword · Sword"
 	lines.append("[font_size=%d][color=#%s]%s%s ([hint=%s]%s[/hint])  [/color][color=#%s]■[/color] [color=#%s]%s[/color][/font_size]" % [
@@ -263,6 +263,7 @@ DEF %d   RES %d   SPD %d[/color][/font_size]" % [
 			BWStyle.F_SMALL, GLYPH_MARK + "frost_ward" + GLYPH_MARK + " ", BWGlossary.markup(str(wi[0])), BWStyle.TEXT_DIM.to_html(false), BWGlossary.markup(str(wi[1]))])
 	lines.append_array(BWWindView.card_lines(u, BWStyle.F_SMALL))      # D275: Rot marks
 	lines.append_array(BWElementsView.card_lines(u, BWStyle.F_SMALL))  # D287/D288: Empowered, Ward of Light
+	lines.append_array(BWKit2View.card_lines(u, BWStyle.F_SMALL))     # D436: a held Bellow
 	_set_rich(c.text, "\n".join(lines))          # D153: no personality line          # D102: glyph slots become images
 
 
@@ -475,7 +476,7 @@ func _order_icon(u: BWUnit, current: bool, next_round: bool) -> Control:
 	box.add_child(bar)
 	if current:
 		var n := Label.new()
-		n.text = u.name
+		n.text = BWKeystones.titled(u)   # D445
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		n.add_theme_font_size_override("font_size", 13)
 		box.add_child(n)

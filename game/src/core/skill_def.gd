@@ -240,6 +240,12 @@ func ai_free_wanted(_b: BWBattle, _u: BWUnit) -> bool:
 	return false
 
 
+## D437: a free action the AI opens its turn with (Hook: pull a foe in,
+## then move and act as normal): {target, element} or {} to skip.
+func ai_opener(_b: BWBattle, _u: BWUnit, _row: Dictionary) -> Dictionary:
+	return {}
+
+
 ## D112: a support skill (no damage of its own) the AI may spend its action
 ## on: {target, element, score} or {} to skip. The score is in the attack
 ## scores' units (expected damage); BWAI adds a granted basic follow-up's

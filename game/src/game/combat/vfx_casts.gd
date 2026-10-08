@@ -470,9 +470,10 @@ func on_strike(a: Node3D, targets: Array) -> void:
 			var launch: float = maxf(float(a.call("time_to_marker", "launch")), 0.0)
 			var at: Vector3 = a.global_position
 			var dur := hit + 0.3
-			var r1 := _disc(5, el, at + Vector3(0, 1.0, 0), 1.75, dur)
+			var k := 1.85 if str(ctx.key) == "fan_of_knives" else 1.0   # D430: the fan reaches radius 2
+			var r1 := _disc(5, el, at + Vector3(0, 1.0, 0), 1.75 * k, dur)
 			r1.set_instance_shader_parameter("seed", 0.2)
-			var r2 := _disc(5, el, at + Vector3(0, 0.45, 0), 1.45, dur, 0.05)
+			var r2 := _disc(5, el, at + Vector3(0, 0.45, 0), 1.45 * k, dur, 0.05)
 			r2.set_instance_shader_parameter("seed", 0.2)
 			_trails.append({ "a": a, "el": el, "t": 0.0, "from": maxf(launch - 0.04, 0.0), "to": hit + 0.12, "pts": [], "mi": null })
 
@@ -636,6 +637,8 @@ func impact(a: Node3D, targets: Array, results: Array) -> void:
 			release_at(el, d.global_position, 0.65, 0.0)
 			release_at(el, d.global_position, 1.0, 0.17)
 			_quad(8, el, d.global_position + Vector3(0, 1.1, 0), Vector2(2.2, 2.2), 0.4, 0.17)
+		"en_passant", "en_passant_strike":                 # ---- D426: the passing cut's element release
+			release_at(_el(a), d.global_position, 0.8, 0.0)
 
 
 ## D415 Sunder: Ley Line's racing line, laid by an impact instead of a cast.
@@ -735,9 +738,57 @@ func setup(a: Node3D) -> float:
 		return 0.0
 	match str(ctx.key):
 		"ley_line": return _ley_line(a, w)
-		"war_cry": return _war_cry(a, w)
+		"war_cry", "bellow": return _war_cry(a, w)   # D436: Bellow roars like War Cry did
 		"siphon": return _siphon(a, w)
+		"tapestry": return _tapestry(a, w)          # D439
+		"overload": return _overload(a, w)          # D440
+		"kindle": return _kindle(a, w)              # D441
 	return 0.0
+
+
+## D439 Tapestry: every hex of the element pulses, rippling out from the
+## duelist (the floaters carry the damage and the +1 move).
+func _tapestry(a: Node3D, w: int) -> float:
+	var el := _el(a)
+	var hexes: Array = ctx.e.get("pulse", [])
+	var from: Vector2i = a.unit.pos
+	var step := 0.07 if w == FULL else 0.045
+	var far := 0
+	_disc(1, el, a.global_position + Vector3(0, 0.06, 0), 1.8, 0.5)
+	for h in hexes:
+		var d := BWHex.distance(from, h)
+		far = maxi(far, d)
+		var p := _hex(h)
+		_later(0.1 + d * step, func():
+			_disc(1, el, p + Vector3(0, 0.05, 0), 1.0, 0.55)
+			_quad(8, el, p + Vector3(0, 0.3, 0), Vector2(0.9, 0.9), 0.25))
+	return 0.35 + far * step
+
+
+## D440 Overload: the charge round the dagger is pulled tight, then lets go
+## (the detonate events that follow carry the blasts).
+func _overload(a: Node3D, w: int) -> float:
+	var el := _el(a)
+	var at: Vector3 = a.global_position + Vector3(0, 0.06, 0)
+	_disc(1, el, at, 4.0, 0.45)
+	_disc(1, el, at, 2.4, 0.4, 0.1)
+	_quad(9, el, at + Vector3(0, 1.4 * a.scale.y, 0), Vector2(2.4, 2.4), 0.4)
+	if w == FULL and screen and screen.has_method("_shake"):
+		screen.call("_shake", 0.05)
+	return 0.4
+
+
+## D441 Kindle: a flicked spark from the hand to the foe, then its ring
+## catches (the paint follows).
+func _kindle(a: Node3D, _w: int) -> float:
+	var el := _el(a)
+	var h: Vector2i = ctx.e.get("target", Vector2i(-1, -1))
+	var to := _hex(h) + Vector3(0, 0.6, 0)
+	_tracer(_tip(a), to, el)
+	for n in BWHex.neighbors(h):
+		var p := _hex(n)
+		_later(0.18, func(): _disc(4, el, p + Vector3(0, 0.04, 0), 1.0, 0.6))
+	return 0.4
 
 
 ## Ley Line: the circle flashes, a glowing line races out hex by hex laying

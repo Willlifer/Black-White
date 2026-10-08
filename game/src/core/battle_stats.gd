@@ -22,7 +22,7 @@ extends RefCounted
 ## (D48) takes back the damage its crossing did. Buckets (D119):
 ##   basic  = basic attacks and counters (the weapon's own swing)
 ##   skill  = skills, their extra strikes, ripostes
-##   ground = tiles (fire, dark, steam, erupt, slam), detonations included
+##   ground = tiles (fire, dark, erupt, slam), detonations included
 ##   chain  = arcs on conductive ground
 ## Dealt counts only damage to the other side; friendly fire is still
 ## `taken` by its victim. Highlights and the MVP read the player side.

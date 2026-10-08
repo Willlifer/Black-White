@@ -39,7 +39,7 @@ const STATIC_SORT := 0.45  # over faces (0.30-0.35) and marks (0.40), under high
 ## charge, so the ring goes and never comes back.
 var _seed := {}           # Vector2i -> MeshInstance3D
 var kanji: BWKanjiLayer   # D231
-var icewater: BWIceWaterView   # D266: glaze sheen, pillars, steam, electrified fields
+var icewater: BWIceWaterView   # D266: glaze sheen, pillars, electrified fields
 
 
 func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
@@ -83,7 +83,7 @@ func build(p_board: BWBoard, p_tiles: BWTiles = null) -> void:
 
 
 func top_center(h: Vector2i) -> Vector3:
-	return BWLook.world(h, board.elevation(h)) + Vector3(0, BWLook.TILE_HEIGHT, 0)
+	return BWLook.world(h, board.ground_elevation(h)) + Vector3(0, BWLook.TILE_HEIGHT, 0)   # D459: tiles never lift
 
 
 func hex_node(h: Vector2i) -> Node3D:
@@ -115,6 +115,7 @@ func highlight(hexes: Array, kind: String) -> void:
 		"target": col = Color(0, 0, 0, 0.8)
 		"deploy": col = Color(0.35, 0.35, 0.35, 0.35)
 		"cursor": col = Color(0, 0, 0, 0.25)
+		"blocked": col = Color(0.78, 0.1, 0.08, 0.6)   # D426: a blocked En Passant landing (the one red cue)
 	for h in hexes:
 		if _hi.has(h):
 			var mi: MeshInstance3D = _hi[h]
@@ -176,8 +177,10 @@ func on_tile_event(e: Dictionary) -> void:
 			refresh_tiles()
 			for h in _gale_origins(e, before):
 				burst("gust", h)
+			for h in e.get("doused", []):                 # D421: fire met water: a small hiss puff
+				reaction_burst("hiss", h)
 		"detonate":
-			burst("detonate", e.hex, float(e.get("radius", 1)))
+			burst("detonate", e.hex, float(e.get("radius", 1)), e.get("mix", {}))
 		"tiles_tick":
 			refresh_tiles()
 			for h in e.get("seeded", []):
@@ -276,17 +279,21 @@ func _ribbon(pts: Array, w: float) -> ArrayMesh:
 	return st.commit()
 
 
-## D87: Striketwice's opposite-element reaction one-shots on hex h: steam
-## (a pale gust ring + white flash), eclipse (a dark flash + ring), storm
+## D87: Striketwice's opposite-element reaction one-shots on hex h: douse
+## (D421: a pale gust ring + white flash; "hiss" = the small puff any douse
+## makes), eclipse (a dark flash + ring), storm
 ## (a purple gust ring + flash: the ring is pushed out).
 func reaction_burst(kind: String, h: Vector2i) -> void:
 	if board == null or not board.exists(h):
 		return
 	var top := top_center(h)
 	match kind:
-		"steam":
-			_spawn_burst("burst_steam", top + Vector3(0, 0.05, 0), Vector3.ONE, 0.8)
-			_spawn_burst("flash_steam", top + Vector3(0, 0.7, 0), Vector3.ONE * 1.4, 0.5, true)
+		"douse":
+			_spawn_burst("burst_douse", top + Vector3(0, 0.05, 0), Vector3.ONE, 0.8)
+			_spawn_burst("flash_douse", top + Vector3(0, 0.7, 0), Vector3.ONE * 1.4, 0.5, true)
+		"hiss":
+			_spawn_burst("burst_douse", top + Vector3(0, 0.05, 0), Vector3.ONE * 0.55, 0.5)
+			_spawn_burst("flash_douse", top + Vector3(0, 0.45, 0), Vector3.ONE * 0.7, 0.4, true)
 		"eclipse":
 			_spawn_burst("burst_eclipse", top + Vector3(0, 0.05, 0), Vector3.ONE, 0.8)
 			_spawn_burst("flash_eclipse", top + Vector3(0, 1.0, 0), Vector3.ONE * 1.8, 0.6, true)
@@ -294,19 +301,23 @@ func reaction_burst(kind: String, h: Vector2i) -> void:
 			_spawn_burst("burst_storm", top + Vector3(0, 0.05, 0), Vector3.ONE * 1.2, 0.75)
 			_spawn_burst("flash_detonate", top + Vector3(0, 0.8, 0), Vector3.ONE * 1.2, 0.4, true)
 		"retarget":
-			_spawn_burst("flash_steam", top + Vector3(0, 1.0, 0), Vector3.ONE * 0.9, 0.35, true)
+			_spawn_burst("flash_douse", top + Vector3(0, 1.0, 0), Vector3.ONE * 0.9, 0.35, true)
 
 
 ## Play a one-shot on hex h: "detonate" (radius = splash rings), "gust",
 ## "ignite" or "frost" (frost replays the glaze-forming spread).
-func burst(kind: String, h: Vector2i, radius: float = 1.0) -> void:
+## D423: `mix` ({element: steps}, the event's) colours a detonation's ring and
+## flash by what it consumed (BWTileFX.blast_colors); empty = thunder purple.
+func burst(kind: String, h: Vector2i, radius: float = 1.0, mix: Dictionary = {}) -> void:
 	if board == null or not board.exists(h):
 		return
 	var top := top_center(h)
 	match kind:
 		"detonate":
-			_spawn_burst("burst_detonate", top + Vector3(0, 0.03, 0), Vector3(radius, 1, radius), 0.75)
-			_spawn_burst("flash_detonate", top + Vector3(0, 0.8, 0), Vector3.ONE * 1.5, 0.45, true)
+			var ring := _spawn_burst("burst_detonate", top + Vector3(0, 0.03, 0), Vector3(radius, 1, radius), 0.75)
+			var fl := _spawn_burst("flash_detonate", top + Vector3(0, 0.8, 0), Vector3.ONE * 1.5, 0.45, true)
+			BWTileFX.tint_blast(ring, mix)
+			BWTileFX.tint_blast(fl, mix)
 		"gust":
 			_spawn_burst("burst_gust", top + Vector3(0, 0.03, 0), Vector3.ONE, 0.7)
 		"ignite":
@@ -326,7 +337,7 @@ func burst(kind: String, h: Vector2i, radius: float = 1.0) -> void:
 				_fx_active[h] = true
 
 
-func _spawn_burst(mat: String, at: Vector3, scl: Vector3, dur: float, flash: bool = false) -> void:
+func _spawn_burst(mat: String, at: Vector3, scl: Vector3, dur: float, flash: bool = false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = BWTileFX.quad_mesh() if flash else BWTileFX.disc_mesh()
 	mi.material_override = BWTileFX.material(mat)
@@ -340,6 +351,7 @@ func _spawn_burst(mat: String, at: Vector3, scl: Vector3, dur: float, flash: boo
 		mi.custom_aabb = AABB(Vector3(-1, -1, -1), Vector3(2, 2, 2))
 	add_child(mi)
 	_bursts.append({ "node": mi, "t": 0.0, "dur": dur, "curve": "age" })
+	return mi
 
 
 func _process(delta: float) -> void:

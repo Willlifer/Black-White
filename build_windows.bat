@@ -1,6 +1,6 @@
 @echo off
-rem D395: build the Windows release of Black | White.
-rem   build_windows.bat            -> dist\BlackWhite-<date>\ and dist\BlackWhite-<date>.zip
+rem D395/D466: build the Windows release of Black | White.
+rem   build_windows.bat            -> dist\BlackWhite-<date>.exe  (ONE file: the game data is embedded)
 rem   build_windows.bat tests      -> dist\selftest\ (debug export of "Windows Desktop (tests)": run
 rem                                    dist\selftest\BlackWhite.console.exe -- --self-test)
 rem Needs Godot 4.7 stable export templates in %APPDATA%\Godot\export_templates\4.7.stable\.
@@ -11,31 +11,24 @@ set ROOT=%~dp0
 set ROOT=%ROOT:~0,-1%
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set STAMP=%%d
 
-set MODE=--export-release
+"%GODOT%" --headless --path "%ROOT%\game" --import
+
 if /i "%~1"=="tests" (
-  set PRESET=Windows Desktop ^(tests^)
-  set OUT=%ROOT%\dist\selftest
-  set MODE=--export-debug
-) else (
-  set PRESET=Windows Desktop
-  set OUT=%ROOT%\dist\BlackWhite-%STAMP%
+  if exist "%ROOT%\dist\selftest" rmdir /s /q "%ROOT%\dist\selftest"
+  mkdir "%ROOT%\dist\selftest" || exit /b 1
+  "%GODOT%" --headless --path "%ROOT%\game" --export-debug "Windows Desktop (tests)" "%ROOT%\dist\selftest\BlackWhite.exe"
+  if not exist "%ROOT%\dist\selftest\BlackWhite.pck" (echo Export produced no pck. & exit /b 1)
+  echo Built %ROOT%\dist\selftest
+  exit /b 0
 )
 
-if exist "%OUT%" rmdir /s /q "%OUT%"
-mkdir "%OUT%" || exit /b 1
-
-"%GODOT%" --headless --path "%ROOT%\game" --import
-"%GODOT%" --headless --path "%ROOT%\game" %MODE% "%PRESET%" "%OUT%\BlackWhite.exe"
+set TMP=%ROOT%\dist\.build
+if exist "%TMP%" rmdir /s /q "%TMP%"
+mkdir "%TMP%" || exit /b 1
+"%GODOT%" --headless --path "%ROOT%\game" --export-release "Windows Desktop" "%TMP%\BlackWhite.exe"
 if errorlevel 1 (echo Export failed. & exit /b 1)
-if not exist "%OUT%\BlackWhite.exe" (echo Export produced no exe. & exit /b 1)
-if not exist "%OUT%\BlackWhite.pck" (echo Export produced no pck. & exit /b 1)
-
-if /i "%~1"=="tests" (echo Built %OUT% & exit /b 0)
-
-copy /y "%ROOT%\packaging\README.txt" "%OUT%\README.txt" >nul
-if exist "%ROOT%\dist\BlackWhite-%STAMP%.zip" del "%ROOT%\dist\BlackWhite-%STAMP%.zip"
-powershell -NoProfile -Command "Compress-Archive -Path '%OUT%' -DestinationPath '%ROOT%\dist\BlackWhite-%STAMP%.zip'"
-if errorlevel 1 (echo Zip failed. & exit /b 1)
-echo Built %OUT%
-echo Zipped %ROOT%\dist\BlackWhite-%STAMP%.zip
+if not exist "%TMP%\BlackWhite.exe" (echo Export produced no exe. & exit /b 1)
+move /y "%TMP%\BlackWhite.exe" "%ROOT%\dist\BlackWhite-%STAMP%.exe" >nul
+rmdir /s /q "%TMP%"
+echo Built %ROOT%\dist\BlackWhite-%STAMP%.exe
 exit /b 0

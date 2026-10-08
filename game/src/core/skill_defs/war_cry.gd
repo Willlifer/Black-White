@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D436 Bellow): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Axe (D104). A roar that spends the action: +STR_PCT% STR (battle_mods)
 ## for your next TURNS turns. The expiry listens to the battle's events
 ## (BWBattle.event): it ends when the last of those turns ends.
@@ -14,6 +16,7 @@ func _init() -> void:
 		"desc": "Roar (uses your action): +20% STR for your next 2 turns",
 		"targeting": "self", "needs_element": false, "range": 0, "cd": CD,
 		"power": 0,
+		"retired": true,
 	}, 315)
 
 

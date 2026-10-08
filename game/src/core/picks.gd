@@ -2,13 +2,15 @@ class_name BWPicks
 ## Picks (D90, D91): what a unit chooses as it grows. Pure rules, no nodes.
 ##
 ## Element perks (data/perks.csv, four per element, D281) and keystones
-## (data/keystones.csv, three per element, BWKeystones) climb one ladder per
-## element (D277, ELEMENTS-v3 §9; it replaced "rank 3 grants all"):
-##   rank 1: perk pick · rank 2: perk pick · rank 3: KEYSTONE (1 of 2 drawn
-##   from the element's 3) · rank 4: third perk · rank 5: fourth perk ·
-##   rank 6: second keystone (the 2 left).
-## A unit holds at most BWKeystones.MAX_PER_UNIT (2) keystones across all
-## elements. Units start at rank 1 in their own element; that first perk is
+## (data/keystones.csv, two per element since D443, BWKeystones) climb one
+## ladder per element (D277; D444):
+##   rank 1: perk pick · rank 2: perk pick · rank 3: KEYSTONE (1 of the
+##   element's 2) · rank 4: third perk · rank 5: fourth perk ·
+##   rank 6 (any element): the SECOND keystone, from another element the
+##   unit has learned (a wildcard request, element BWKeystones.ANY).
+## A unit holds at most BWKeystones.MAX_PER_UNIT (2) keystones, one per
+## element. D455: a perk pick may also offer a DUO perk (two elements, the
+## unit holds a perk in both; BWDuo). Units start at rank 1 in their own element; that first perk is
 ## drawn at random (D233, BWRun.auto_first_perk). Perks are one more effect
 ## source in BWEffects.collect, next to equipment and abilities.
 ##
@@ -51,9 +53,9 @@ const OFFER := 2                    # D174: options a pick shows
 
 # ---------------------------------------------------------------- perks
 
-## The element's perks, CSV order.
+## The element's perks, CSV order (D455: duo perks are not in it; BWDuo).
 static func perks_of(element: String) -> Array:
-	return BWData.table(TABLE).filter(func(r): return str(r.element) == element)
+	return BWData.table(TABLE).filter(func(r): return str(r.element) == element and str(r.get("duo", "")) == "")
 
 
 static func perk(id: String) -> Dictionary:
@@ -72,30 +74,46 @@ static func allowance(u: BWUnit, element: String) -> int:
 	return mini(int(PERK_LADDER[r]) + int(u.bonus_perks.get(element, 0)), n)   # D128: + Specialize's free picks
 
 
-# ---------------------------------------------------------------- keystones (D277)
+# ---------------------------------------------------------------- keystones (D277, D444)
 
-## Keystones of `element` the unit holds, in the order taken.
+## Keystones of `element` the unit holds, in the order taken (0 or 1, D444).
 static func keystones_owned(u: BWUnit, element: String) -> Array:
 	return u.keystones.filter(func(id): return BWKeystones.element_of(str(id)) == element)
 
 
-## How many of the element's keystones its rank entitles the unit to (rank 3: 1,
-## rank 6: 2), before the 2-per-unit cap.
+## D444: how many of the element's keystones its rank entitles the unit to:
+## 1 from rank 3 (one per element), before the 2-per-unit cap.
 static func keystone_allowance(u: BWUnit, element: String) -> int:
-	var r := u.affinity_rank(element)
-	var n := 0
-	for k in BWKeystones.RANKS:
-		if r >= int(k):
-			n += 1
-	return mini(n, BWKeystones.of_element(element).size())
+	if BWKeystones.of_element(element).is_empty():
+		return 0
+	return 1 if u.affinity_rank(element) >= int(BWKeystones.RANKS[0]) else 0
 
 
-## Keystone picks owed in `element` right now (rank minus held, within the
-## unit-wide cap of BWKeystones.MAX_PER_UNIT).
+## Keystone picks owed in `element` right now (rank 3 and none held there,
+## within the unit-wide cap of BWKeystones.MAX_PER_UNIT).
 static func keystones_owed(u: BWUnit, element: String) -> int:
 	var owed := keystone_allowance(u, element) - keystones_owned(u, element).size()
 	var room := BWKeystones.cap(u) - u.keystones.size()
 	return maxi(0, mini(owed, room))
+
+
+## D444: rank 6 in any element opens the second slot: a keystone from any
+## OTHER element the unit has learned (rank 1+) and holds none of. The
+## elements it may come from (empty = no wildcard owed).
+static func wild_elements(u: BWUnit) -> Array:
+	if u.keystones.size() >= BWKeystones.cap(u) or u.keystones.size() >= BWKeystones.MAX_PER_UNIT:
+		return []
+	var six := false
+	for el in BWFormulas.ELEMENTS:
+		if u.affinity_rank(el) >= int(BWKeystones.RANKS[1]):
+			six = true
+	if not six:
+		return []
+	var out: Array = []
+	for el in BWFormulas.ELEMENTS:
+		if u.affinity_rank(el) >= 1 and keystones_owned(u, el).is_empty() and not BWKeystones.of_element(el).is_empty():
+			out.append(el)
+	return out
 
 
 # ---------------------------------------------------------------- skills
@@ -139,8 +157,10 @@ static func pending(u: BWUnit) -> Array:
 	for el in BWFormulas.ELEMENTS:
 		for i in maxi(0, allowance(u, el) - owned(u, el).size()):
 			out.append({ "kind": "perk", "element": el })
-		for i in keystones_owed(u, el):               # D277: rank 3 / rank 6
+		for i in keystones_owed(u, el):               # D277 / D444: rank 3, one per element
 			out.append({ "kind": "keystone", "element": el })
+	if not out.any(func(r): return str(r.kind) == "keystone") and not wild_elements(u).is_empty():
+		out.append({ "kind": "keystone", "element": BWKeystones.ANY })   # D444: rank 6, another element
 	for wc in _classes(u):
 		for i in skill_picks_owed(u, wc):
 			out.append({ "kind": "skill", "weapon": wc })
@@ -171,16 +191,27 @@ static func settle(u: BWUnit) -> Array:
 ## same unit, request and pick count give the same cards.
 ## [{ id, name, text, element, owned (false), kind }]
 static func options(u: BWUnit, req: Dictionary) -> Array:
+	if str(req.get("kind", "")) == "leviathan":
+		return BWKs3Water.options(u, req)          # D451: submerge, then the form
 	var free: Array = all_options(u, req).filter(func(o): return not o.owned)
-	if free.size() <= OFFER:
+	var duo := BWDuo.offer(u, req, _offer_salt(u, req))   # D455: a duo perk now and then
+	if not duo.is_empty():
+		var one := _draw(free, _offer_salt(u, req), OFFER - 1)
+		return one + [duo]
+	return _draw(free, _offer_salt(u, req), OFFER)
+
+
+## D174: `n` of `free`, drawn by the salt's hash, shown in data order.
+static func _draw(free: Array, salt: String, n: int) -> Array:
+	if free.size() <= n:
 		return free
 	var draw := RandomNumberGenerator.new()      # a string hash alone mixes too little
-	draw.seed = hash(_offer_salt(u, req))
+	draw.seed = hash(salt)
 	var keyed: Array = []
 	for i in free.size():
 		keyed.append([draw.randi(), i])
 	keyed.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
-	var take: Array = keyed.slice(0, OFFER).map(func(k): return k[1])
+	var take: Array = keyed.slice(0, n).map(func(k): return k[1])
 	take.sort()
 	return take.map(func(i): return free[i])
 
@@ -195,7 +226,7 @@ static func offered(u: BWUnit, req: Dictionary) -> Array:
 static func _offer_salt(u: BWUnit, req: Dictionary) -> String:
 	if str(req.get("kind", "")) == "keystone":
 		var kel := str(req.get("element", ""))
-		return "keystone|%d|%s|%d|%s" % [u.pick_seed, kel, keystones_owned(u, kel).size(), u.id]
+		return "keystone|%d|%s|%d|%d|%s" % [u.pick_seed, kel, keystones_owned(u, kel).size(), u.keystones.size(), u.id]
 	if str(req.get("kind", "")) == "perk":
 		var el := str(req.get("element", ""))
 		return "perk|%d|%s|%d|%s" % [u.pick_seed, el, owned(u, el).size(), u.id]
@@ -214,11 +245,13 @@ static func all_options(u: BWUnit, req: Dictionary) -> Array:
 				"owned": str(r.id) in u.perks, "kind": "perk" })
 	elif req.get("kind", "") == "keystone":
 		var kel := str(req.element)
-		for id in BWKeystones.of_element(kel):
-			var kr := BWKeystones.row(str(id))
-			out.append({ "id": str(id), "name": str(kr.get("name", id)), "text": str(kr.get("text", "")),
-				"element": kel, "owned": str(id) in u.keystones, "kind": "keystone",
-				"action": BWKeystones.is_action(str(id)) })
+		var els: Array = wild_elements(u) if kel == BWKeystones.ANY else [kel]   # D444: the rank-6 wildcard
+		for el in els:
+			for id in BWKeystones.of_element(str(el)):
+				var kr := BWKeystones.row(str(id))
+				out.append({ "id": str(id), "name": str(kr.get("name", id)), "text": str(kr.get("text", "")),
+					"element": str(el), "owned": str(id) in u.keystones, "kind": "keystone",
+					"action": BWKeystones.is_action(str(id)), "title": str(kr.get("title", "")) })
 	elif req.get("kind", "") == "skill":
 		var wc := str(req.weapon)
 		var free := skill_choices(u, wc)
@@ -264,12 +297,17 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 			return _record("perk", el, choice, false)
 		"keystone":
 			var kel := str(req.element)
-			if BWKeystones.element_of(choice) != kel or choice in u.keystones:
+			var cel := BWKeystones.element_of(choice)
+			if choice in u.keystones or cel == "":
 				return {}
-			if keystones_owed(u, kel) <= 0 or not choice in offered(u, req):
+			if kel == BWKeystones.ANY:
+				if not cel in wild_elements(u):
+					return {}                    # D444: the wildcard takes another learned element
+			elif cel != kel or keystones_owed(u, kel) <= 0:
+				return {}
+			if not choice in offered(u, req) or not BWKeystones.grant(u, choice):
 				return {}                        # D277: one of the two offered, within the cap
-			BWKeystones.grant(u, choice)
-			return _record("keystone", kel, choice, false)
+			return _record("keystone", cel, choice, false)
 		"skill":
 			var wc := str(req.weapon)
 			if skill_picks_owed(u, wc) <= 0 or not choice in skill_choices(u, wc):
@@ -295,6 +333,8 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 ## it is deterministic: perks in CSV order, skills passive (D372), then
 ## improve, then learn, so an enemy bow offered HighGrounder takes it.
 static func auto_choice(u: BWUnit, req: Dictionary) -> String:
+	if req.has("ai"):
+		return str(req.ai)                       # D451: the prompt carries the AI's answer
 	for o in options(u, req):
 		if not o.owned:
 			return str(o.id)
@@ -328,7 +368,8 @@ static func _record(kind: String, what: String, id: String, auto: bool) -> Dicti
 static func _classes(u: BWUnit) -> Array:
 	var out: Array = []
 	for wc in BWData.table("weapons").map(func(r): return str(r.id)):
-		if wc == u.weapon_class or int(u.expertise.get(wc, 0)) > 0:
+		# D419: a benched class owes no picks unless it's the one in hand
+		if wc == u.weapon_class or (int(u.expertise.get(wc, 0)) > 0 and not BWRun.is_benched(wc)):
 			out.append(wc)
 	return out
 
@@ -336,7 +377,7 @@ static func _classes(u: BWUnit) -> Array:
 ## One line for a pick record (feeds, results).
 static func describe(u: BWUnit, rec: Dictionary) -> String:
 	if rec.kind == "keystone":
-		return "%s took the keystone %s (%s)" % [u.name, BWKeystones.name_of(str(rec.id)), str(rec.element)]
+		return "%s took the keystone %s (%s): %s" % [u.name, BWKeystones.name_of(str(rec.id)), str(rec.element), BWKeystones.titled(u)]
 	if rec.kind == "perk":
 		return "%s took %s (%s)" % [u.name, str(perk(str(rec.id)).get("name", rec.id)), str(rec.element)]
 	if str(rec.id) == "":

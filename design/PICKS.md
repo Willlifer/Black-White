@@ -10,12 +10,12 @@ Draft for review. Powers stay in the existing bands (skill 8–14, spell 9–13)
 
 | Affinity rank | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|---|---|---|
-| Gives | perk pick | perk pick | **keystone** (1 of 2 drawn from the element's 3) | third perk | fourth perk | **second keystone** (the 2 left) |
+| Gives | perk pick | perk pick | **keystone** (1 of the element's 2) | third perk | fourth perk | **second keystone** (D444: from another element you know) |
 
-- **A unit holds at most 2 keystones** across all elements; a keystone past the cap is never offered.
+- **A unit holds at most 2 keystones, one per element** (D444); a keystone past the cap is never offered. Each gives a **title** (D445). The current list is ELEMENTS.md §20 (Keystones v3); the keystone tables below this section are history.
 - Keystone cards are gold-ruled with "KEYSTONE" over the name; the unit card shows a gold ◈ per keystone after its element and a "Keystones" line; the hall, the codex and the end screen list them (D278).
-- Action keystones (Wind Wall, Flash Freeze, Tidal Release) add their own menu row (`BWKeystones.actions`).
-- Enemies get keystones by stage, not rank: fights 1-3 none, 4-6 one per squad, 7 the Twins (Noon Prism, Dusk Event Horizon), 8-10 every enemy, the Giant one. The enemy card names them (D279).
+- Keystone actions (Pitch Black, Solar Flare, Superconductor's Self-detonate) add their own menu row (`BWKeystones.skills`).
+- Enemies get keystones by stage, not rank: fights 1-3 none, 4-6 one per squad, 7 the Twins (Noon Judicator, Dusk Hopekiller, D454), 8-10 every enemy, the Giant one. The enemy card names them (D279).
 
 **Element perks**
 - **4 perks per element (D281)**: mobility, guard, offence, control. The current 28 are the table at the top of §2 (data/perks.csv wins).
@@ -26,7 +26,7 @@ Draft for review. Powers stay in the existing bands (skill 8–14, spell 9–13)
 **Weapon skills**
 - Each expertise step (E→D, D→C, C→B, B→A) gives 1 pick, so 4 picks per class.
 - A pick either **improves** a skill you know (it gains a "+" rider) or **learns** one of the 5 new skills for that class; 2 of those options are drawn for each pick.
-- A class may also have a **pickable passive** in that pool (D372): the bow's **HighGrounder** (jump 2 → 4 while a bow is drawn). It's drawn like any other option, takes **no skill slot**, and shows on the unit card once owned. AI units and enemies list it first, so they take it whenever their 2 cards offer it.
+- A class may also have a **pickable passive** in that pool (D372): the bow's **HighGrounder** (jump 2 → 4 while a bow is drawn); the sword's **Blade Dance** (D427: after a sword skill lands, a free step of up to 2 hexes, chosen or skipped). Weapon passives live in weapons.csv `passives`, not perks.csv (element perks). It's drawn like any other option, takes **no skill slot**, and shows on the unit card once owned. AI units and enemies list it first, so they take it whenever their 2 cards offer it.
 - You equip up to 3 skills before the fight. An Improve earned mid-fight works at once. A skill learned mid-fight can be equipped from the next fight on.
 
 New status (one): **Pinned**: −2 move, until the end of the holder's next turn.
@@ -35,7 +35,7 @@ New status (one): **Pinned**: −2 move, until the end of the holder's next turn
 
 ## 2. Elements
 
-**Current (D281): the 28 perks and 21 keystones.** The per-element drafts below are history; where they differ, this table and the CSVs win.
+**Current: the 28 perks (D281) and 8 duo perks (D455); the keystones are ELEMENTS.md §20 (D443, 14).** The per-element drafts below are history; where they differ, this table and the CSVs win.
 
 | Element | Perks (ranks 1, 2, 4, 5) | Keystones (ranks 3, 6; 2 per unit) |
 |---|---|---|
@@ -59,9 +59,7 @@ Already chosen; fleshed out here.
 **Current Push** (offence). You hit harder when attacking from a water tile.
 - +5/+10/+15% damage from water 1/2/3. Forecast: "Current (Water 2)".
 
-**Tidal Guard** (defence). While you or an ally stand in water 2+, fire barely touches you. Fire painted on that hex bursts as steam.
-- Fire hits deal 50%, fire tiles deal 0. Fire paint still steps the water down 1, and foes on the ring take 8% (the steam number).
-- ⚠ balance watch: it hard-counters a fire squad. Scope and strength are open question 3.
+**Tidal Guard** (defence). **Current rule (perks.csv `water_guard`):** you and your allies standing in water get +15 glance chance per water level (15/30/45). (Draft, superseded: fire hits 50% / fire tiles 0 on water 2+, and fire painted there burst as steam; steam itself is gone since D421: fire meeting water douses.)
 
 **Undertow** (control). A foe that ends its turn on water 3 is dragged 1 hex toward the deepest neighbouring water.
 - Pull 1. It's displacement, so no crossing damage and no slam. If no neighbour holds water, there's no pull.
@@ -183,38 +181,37 @@ Format: **Name**, then cooldown · shape · power · clip, then what it does.
 ### Sword: the duelist who picks the moment
 Author's five, with numbers refined.
 
-**Heart Seeker**: cd 2 · adjacent · skill 10 · strike
-- +25 crit on this strike.
+**Thread the Needle** (D438, replaced Heart Seeker): cd 2 · adjacent foe on your element · skill 11 · thrust
+- Strike, then dash on through it along the hexes beyond that hold the element, up to 3, to the line's end. No burn on your own line.
 
-**Triumph**: once per battle · adjacent · skill 12 ×1.5 · strike (held windup)
-- If it KOs the foe, you get +25% STR for the rest of the battle.
-- ⚠ balance watch: snowballs late, when STR is high. Consider a flat +4 STR instead.
+**Tapestry** (D439, replaced Triumph): once per battle · self · no blow · brace
+- Every hex holding your element pulses: foes on them take 10% max HP, allies (you too) +1 move next turn.
 
 **Whirlwind Blade**: cd 3 · radius 1 (self) · skill 9 to each foe · 🛠 spin clip
 - Paints 1 step of an element you have affinity in on the ring.
 
 **Lunge**: cd 2 · line 3 · skill 11 · lunge (Vault's leap)
-- Dash straight, stopping at the first unit. A foe takes the hit. An ally just stops you.
+- Dash straight, stopping at the first unit. A foe takes the hit. An ally just stops you. D438: the dash paints its path.
 
-**Elemental Truth**: cd 4 · adjacent · skill 10 ×1.5 · strike
-- Applies the element twice to the target hex:
-  - axis element: +2 steps
-  - thunder: detonate, then re-arm a fuse (the foe stays conductive)
-  - ice: glaze for 4 cycles
-  - wind: gale copies last 2 cycles
-- ⚠ balance watch: thunder's detonate-then-fuse feeds chain arcs every turn after.
+**En Passant** (D426, replaced Elemental Truth, now retired): cd 3 · a foe ≤ 3 in a straight line · skill 11 · thrust
+- Dash through the foe (striking it) and land on the hex beyond; a blocked landing isn't a target (shown red).
+- Every hex travelled takes the element, the target's too. Then the Passing Cut: skill 9 at any adjacent foe, in the dash's element.
+
+**Blade Dance** (D427, passive pick, no slot): after a sword skill lands, a free step of up to 2 hexes (pick it, or Esc).
 
 Improve:
 - **Riposte+**: answers the first two blows, both halved.
 - **Striketwice+**: if both cuts land, a third cut hits any adjacent foe at 50%.
 
-### Axe: slow, heavy, breaks lines
+### Axe: wide directional AoEs and big charges
 
-**Reckless Swing**: cd 1 · adjacent · skill 14 · strike
-- You are Scorched (attacks on you +10%) until your next turn.
+D433: no speed penalty; Cleave widens to all 6 around you when its arc holds your element. D434: Charge's end swing +3% per hex run.
 
-**Hook**: cd 2 · range 2, single · skill 9 · strike
-- Pull the foe 1 to adjacent, onto whatever ground is there.
+**Reckless Arc** (D435, replaced Reckless Swing): cd 2 · the 5 hexes in front · skill 12 each · cut
+- Paints the arc. You are Scorched (attacks on you +10%) until your next turn.
+
+**Hook** (D437: free action): cd 2 · range 3, single · skill 9 · strike
+- Pull the foe in to adjacent, onto whatever ground is there; then move and act as normal.
 
 **Sunder**: cd 3 · adjacent · skill 13 · strike (axe)
 - Ignores 30% of DEF (`def_ignore`), and it can't glance.
@@ -222,18 +219,16 @@ Improve:
 **Earthsplitter**: cd 4 · line 3 · skill 11 to each foe · strike (overhead)
 - Paints 1 step down the line.
 
-**War Cry**: once per battle · radius 2 (self) · no damage · cheer
-- Foes in range are Staggered.
-- ⚠ balance watch: −15 hit on up to 3 foes for a turn can swing a 3v3 outright.
+**Bellow** (D436, replaced War Cry): cd 4 · self, uses the action · no damage · war cry
+- Your next Cleave or Sunder this battle doubles: Cleave 11 hexes (the 6 around you + 5 ahead), Sunder a 10-hex fissure.
 
 Improve:
 - **Cleave+**: +15% per extra foe (base +10%).
 - **Charge+**: reach 4, and the slam is 12%.
 
-### Lance: reach, lines, holding ground
+### Lance: mobile, utility
 
-**Skewer**: cd 2 · line 2 (reach) · skill 12 · strike (spear)
-- The first foe is pushed 1 back. If something stops it, it slams for 8%.
+(Skewer / Guardrush was removed, D442: Sweep covers the shove.)
 
 **Sweep**: cd 3 · the 3 hexes at reach 2 ahead · skill 9 each · strike
 - Paints 1 step on the arc.
@@ -248,14 +243,16 @@ Improve:
 **Dragoon Dive**: once per battle · leap up to 4, radius 1 on landing · skill 13 · leap (Vault)
 - Paints the landing ring 1 step.
 
+**Lance Charge** (D428, a sixth learnable): cd 4 · a hex 2–10 away in a line · skill 10 per foe
+- Set now, shown to both sides; runs at your next turn start before you act: strikes and pierces each foe in the way (one it can't pass slams, 8%), paints the path; then your whole turn.
+
 Improve:
 - **Tridentpierce+**: the pierce carries on to a third foe in line.
 - **Vault+**: leap 3, and the momentum is +35%.
 
-### Bow: distance, height, picking targets
+### Bow: the precise remote trigger
 
-**Aimed Shot**: cd 2 · range 8, single · skill 13 · shot (held draw)
-- +20 hit. +10 crit if you haven't moved.
+(Aimed Shot was removed, D442.)
 
 **Split Arrow**: cd 2 · fan of 3 headings, range 5 · 60% each · shot
 - Uses `multi_hit` with the fan pattern. Each arrow is rolled.
@@ -274,7 +271,7 @@ Improve:
 - **Arcing Shot+**: the wider blast needs only 1 level of height.
 - **Energized Shot+**: the pierce deals 80% and reaches 5.
 
-### Staff: depth, rewriting the ground
+### Staff: the safe painter
 
 **Bolt**: cd 1 · range 4, single · spell 10 · cast
 - +20% if the target's hex carries your element.
@@ -282,12 +279,11 @@ Improve:
 **Transfer**: cd 3 · two hexes within 4 · no damage · channel
 - Lift one hex's whole charge (or marker) and set it down on another, empty hex. Then a follow-up basic.
 
-**Inversion**: cd 3 · one hex within 4 · no damage · channel
-- Flip the axes: fire 3 becomes water 3, dark 2 becomes light 2. Fuse and gale swap places, and stasis stays. Then a follow-up basic.
-- ⚠ balance watch: it turns an enemy's fire-3 trap into your water 3 for one action.
+**Inversion**: cd 4 (+: 3) · every tile within 2 of a hex within 4 flips (D418) · no damage, no follow-up · channel
+- Flip the axes on all 19 tiles: fire 3 becomes water 3, dark 2 becomes light 2. Fuse and gale swap places; stasis and glaze stay. Nothing else (D418: the follow-up basic is gone).
+- ⚠ balance watch: it turns a whole enemy fire field into water in one action; the AI weighs the whole area (allies on harm, foes on help).
 
-**Aegis**: cd 4 · one ally within 4 · no damage · cast
-- The ally takes −20% damage until the end of its next turn (the `guard` key, given to an ally).
+(Aegis was removed, D442.)
 
 **Tempest**: once per battle · radius 2 at range 4 · spell 9 to each foe · cast (long)
 - Paints 1 step on all 19 hexes.
@@ -298,7 +294,7 @@ Improve:
 - **Ley Line+**: length 6.
 - **Siphon+**: heals 6% per step, to you or an ally on the hex.
 
-### Daggers: speed, angles, finishing
+### Daggers: spellblade AoE, a high-risk staff
 
 **Tumble**: cd 1 · self, free · no damage · run
 - After attacking, move 2.
@@ -306,15 +302,17 @@ Improve:
 **Twist the Knife**: cd 2 · adjacent · skill 9 · strike (pair)
 - +10% for each status on the target, and +10% if it stands on any charge. The maximum is +60%.
 
-**Hamstring**: cd 3 · adjacent · skill 8 · strike
-- The target is Pinned.
+**Kindle** (D441, replaced Hamstring): cd 3 · a foe within 3 · no damage · throw
+- Your element takes all six hexes around it.
 
-**Fan of Knives**: cd 3 · radius 1 (self) · skill 8 each · 🛠 spin clip (shared with Whirlwind Blade)
-- Paints the ring 1 step.
+**Fan of Knives** (D430 rework): cd 3 · radius 2 (self) · skill 8 each · spin clip, knives to every hex
+- Paints every hex within 2 (not yours) 1 step; the reactions that paint sets off can't hurt you (allies aren't spared).
 
-**Assassinate**: once per battle · adjacent, from behind only · skill 12 · strike
-- Can't glance, +25 crit, and backstab +50%.
-- ⚠ balance watch: it stacks to ~2.7× on a crit.; watch it vs the boss.
+Also D429: **Daggerleap** then leaps away up to 2 (you pick the hex); **Consume** raises a barrier the size of its heal until your next turn.
+
+**Overload** (D440, replaced Assassinate): cd 4 · self, radius 2 · no blow · brace
+- Every charged hex within 2 (yours too) blows like a fuse detonation +50% and is cleared; you are not spared.
+- ⚠ balance watch: a fully painted radius can take a third of your own HP; the AI only fires it when foes take more.
 
 Improve:
 - **Daggerleap+**: the backstab is +75%.

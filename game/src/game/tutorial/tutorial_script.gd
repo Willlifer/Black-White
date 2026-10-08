@@ -22,6 +22,8 @@ extends RefCounted
 const MAP := "res://maps/tutorial/yard.json"
 const SEED := 3
 const RUN_SEED := 4242
+## D419: the battle rng at the "worn" stage (lesson 10), so the Surge hits all three.
+const WORN_SEED := 1
 
 ## The yard's landmarks (odd-r offset, as the map JSON's q/r).
 const A_START := Vector2i(2, 6)
@@ -113,29 +115,29 @@ static func steps() -> Array:
 		{ "id": "gale", "lesson": 6, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "saturate", "element": "wind", "hex": F_HEX }, "hl": { "hex": F_HEX },
 			"text": "Click the fire and watch it spread, under Burt too." },
 		# ---- 7. skills, cooldowns, the second weapon
-		{ "id": "skill_tip", "lesson": 7, "stage": "front", "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "skill", "key": "heart_seeker" },
+		{ "id": "skill_tip", "lesson": 7, "stage": "thread", "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "skill", "key": "thread_needle" },
 			"text": "Skills are stronger moves than Attack. Hover one to see its range and cooldown." },
-		{ "id": "skill_aim", "lesson": 7, "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "heart_seeker", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
-			"text": "Pick Heart Seeker: +25 crit chance." },
-		{ "id": "skill_use", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "heart_seeker", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
+		{ "id": "skill_aim", "lesson": 7, "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
+			"text": "Pick Thread the Needle: strike a foe standing on your fire (on a longer fire line you'd dash on through it)." },
+		{ "id": "skill_use", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
 			"text": "Click Burt, then press Enter." },
 		{ "id": "cooldown", "lesson": 7, "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "menu" },
-			"text": "Heart Seeker's cooldown is 2, so it's missing from the menu until it's ready again." },
+			"text": "Thread the Needle's cooldown is 2, so it's missing from the menu until it's ready again." },
 		{ "id": "swap", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "swap" }, "hl": { "ui": "swap" },
-			"text": "Della carries a second weapon. Swap weapon is free: draw her pistols." },
+			"text": "Della carries a second weapon. Swap weapon is free: draw her bow." },
 		{ "id": "swapped", "lesson": 7, "actor": "della", "wait": "next", "hl": { "ui": "menu" },
 			"text": "Range, damage and skills follow the weapon in hand. You can swap back any time." },
 		# ---- 8. statuses
-		{ "id": "whip_aim", "lesson": 8, "stage": "pistols", "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "pistol_whip", "element": "", "target": "burt" }, "hl": { "ui": "skill" },
-			"text": "Statuses change what a unit can do. Pick Pistol Whip." },
-		{ "id": "whip", "lesson": 8, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "pistol_whip", "element": "", "target": "burt" }, "hl": { "unit": "burt" },
-			"text": "Click Burt and press Enter. He'll be Staggered: no skills on his next turn." },
+		{ "id": "whip_aim", "lesson": 8, "stage": "bow", "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
+			"text": "Statuses change what a unit can do. Pick Pinning Shot." },
+		{ "id": "whip", "lesson": 8, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
+			"text": "Click Burt and press Enter. He'll be Pinned: 2 less move." },
 		{ "id": "pin_aim", "lesson": 8, "actor": "gail", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "ui": "skill" },
-			"text": "Gail's Pinning Shot leaves its target Pinned: 2 less move. Pick it." },
+			"text": "Gail has one too. Pin Rui: pick Pinning Shot." },
 		{ "id": "pin", "lesson": 8, "actor": "gail", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "unit": "rui" },
 			"text": "Click Rui and press Enter." },
 		{ "id": "blinded", "lesson": 8, "actor": "gail", "wait": "next", "hl": { "unit": "rui" },
-			"text": "The third is Blinded: no crits, and it can only target units within 2 hexes. Hover a status icon over a unit for its rule." },
+			"text": "Also: Staggered (no skills next turn) and Blinded (no crits, targets within 2). Hover a status icon over a unit for its rule." },
 		# ---- 9. facing
 		{ "id": "facing", "lesson": 9, "actor": "della", "fresh": true, "wait": "next", "hl": { "unit": "burt" },
 			"text": "Units face their last foe. A blow from behind gets +15 hit; one from the front may glance." },
@@ -200,9 +202,9 @@ static func make_run() -> BWRun:
 		match u.id:
 			"della":
 				u.perks = ["fire_rush"]     # D284: fixed (the drawn one was Coal Engine, now inside Heat Rush; a 4-perk draw gave Wildfire)
-				u.equipment[BWUnit.SECOND] = run.make_item("m1911", "E", "")
-				_learn(u, "sword", ["heart_seeker", "striketwice"])
-				_learn(u, "pistols", ["pistol_whip", "quick_shot", "reload"])
+				u.equipment[BWUnit.SECOND] = run.make_item("shortbow", "E", "")   # D419: was the m1911 (pistols benched)
+				_learn(u, "sword", ["thread_needle", "striketwice"])   # D438: was Heart Seeker
+				_learn(u, "bow", ["pinning_shot", "arcing_shot"])
 			"jericho":
 				for el in ["fire", "thunder", "ice", "wind"]:
 					u.affinity[el] = BWUnit.POINTS_PER_RANK
@@ -352,7 +354,7 @@ static func give_turn(b: BWBattle, u: BWUnit, fresh: bool, st: Dictionary, settl
 
 ## Staging on the rules (the live tutorial plays the events it emits).
 ## front: Della stands in front of Burt (after a skipped lesson); fire_at_f:
-## the fire tile is back if it decayed; pistols: Della holds her pistols;
+## the fire tile is back if it decayed; bow: Della holds her bow (D419: was pistols);
 ## worn: the enemies are down to a sliver; rear: where "behind Burt" is.
 static func stage_rules(b: BWBattle, stage: String, run: BWRun) -> Dictionary:
 	var della := b._unit("della")
@@ -361,19 +363,30 @@ static func stage_rules(b: BWBattle, stage: String, run: BWRun) -> Dictionary:
 		"front":
 			if della.pos != FRONT and b.unit_at(FRONT) == null:
 				b.place_unit(della, FRONT)
+		"thread":                                   # D438: Thread the Needle wants Burt on fire
+			if della.pos != FRONT and b.unit_at(FRONT) == null:
+				b.place_unit(della, FRONT)
+			var bu := b._unit("burt")
+			if bu != null and bu.alive() and not b.tiles.carries(bu.pos, "fire"):
+				var da := della.attuned
+				b.paint([bu.pos], "fire", della, 1, false)
+				della.attuned = da
 		"fire_at_f":
 			if b.tiles.intensity(F_HEX, "fire") < 1:
 				var j := b._unit("jericho")
 				var att := j.attuned
 				b.paint([F_HEX], "fire", j, 2, false)
 				j.attuned = att
-		"pistols":
-			if della.weapon_class != "pistols" and b.current() == della:
+		"bow":
+			if della.weapon_class != "bow" and b.current() == della:
 				b.swap_weapon(della)
 		"worn":
 			for e in b.side("enemy"):
 				if e.alive():
 					e.hp = mini(e.hp, 4)
+			# D419: the finale's rolls no longer hang on every earlier lesson's
+			# (the bow lesson moved the stream): a fixed stream where the Surge lands
+			b.rng.seed = WORN_SEED
 		"rear":
 			if burt != null and burt.alive():
 				return { "rear": rear_hex(b, della, burt) }

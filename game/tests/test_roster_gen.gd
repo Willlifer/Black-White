@@ -77,11 +77,13 @@ func test_weapons_and_elements_spread(t) -> void:
 			models_seen[str(r.weapon_model)] = true
 			if str(r.id) == "della":
 				el_by_char[str(r.element)] = true
-		t.eq(classes.size(), 7, "seed %d: all 7 classes held" % s)
+		var act := BWRosterGen.active_classes()   # D419: pistols benched
+		t.eq(classes.size(), act.size(), "seed %d: all %d active classes held" % [s, act.size()])
 		t.ok(classes.values().all(func(n): return n >= 2), "seed %d: each class at least twice (%s)" % [s, classes])
 		t.eq(els.size(), 7, "seed %d: all 7 elements" % s)
 		t.ok(not classes.has("fists"), "seed %d: nobody starts with fists (D76)" % s)
-	t.ok(models_seen.size() >= 20, "the models vary across seeds (%d seen)" % models_seen.size())
+		t.ok(classes.keys().all(func(c): return not BWRun.is_benched(str(c))), "seed %d: no benched class rolled (D419)" % s)
+	t.ok(models_seen.size() >= 17, "the models vary across seeds (%d seen; 19 active models, D419)" % models_seen.size())
 	t.ok(el_by_char.size() >= 3, "an unlocked character's element varies (%s)" % [el_by_char.keys()])
 
 

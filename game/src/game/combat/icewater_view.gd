@@ -6,8 +6,7 @@ extends Node3D
 ##     D397) gets glints and ink lines over its frost (shaders/icewater mode 0);
 ##   * PILLAR: an inked ice column, white facets with an ice-cyan band and
 ##     black contours, its ticks left floating over it;
-##   * STEAM: white ink puffs with a grey contour over each steam hex
-##     (billboards, mode 1), drifting;
+##   (D421: the steam puffs are gone with steam; the shader's mode 1 is unused);
 ##   * ELECTRIFIED: each field's outer boundary as a crackling purple ribbon
 ##     (re-rolled ~13x/s like the chain bolts), and its timer as purple pips
 ##     over the field (one per tick left).
@@ -20,7 +19,6 @@ const REROLL := 0.075
 var bv: BWBoardView
 var _sheen := {}          # hex -> MeshInstance3D
 var _pillar := {}         # hex -> [MeshInstance3D, Label3D]
-var _steam := {}          # hex -> [MeshInstance3D x3]
 var _shock_glow: MeshInstance3D
 var _shock_core: MeshInstance3D
 var _pips: Array = []     # MeshInstance3D
@@ -41,10 +39,10 @@ static func material(kind: String) -> Material:
 		return _mats[kind]
 	var m: Material
 	match kind:
-		"sheen", "steam":
+		"sheen":
 			var sm := ShaderMaterial.new()
 			sm.shader = load("res://shaders/icewater.gdshader")
-			sm.set_shader_parameter("mode", 0 if kind == "sheen" else 1)
+			sm.set_shader_parameter("mode", 0)
 			sm.set_shader_parameter("glow", BWLook.element_color("ice"))
 			m = sm
 		"pillar":
@@ -75,7 +73,7 @@ static func material(kind: String) -> Material:
 ## The shaders and meshes BWShaderWarm compiles offscreen at boot (D232).
 static func warm_catalog() -> Array:
 	var out: Array = []
-	for k in ["sheen", "steam", "pillar", "pip", "hull"]:
+	for k in ["sheen", "pillar", "pip", "hull"]:
 		var mi := MeshInstance3D.new()
 		var q := QuadMesh.new()
 		mi.mesh = BWTileFX.hex_mesh() if k == "sheen" else q
@@ -102,7 +100,6 @@ func refresh() -> void:
 	_sync(_pillar, want_p, _make_pillar)
 	for h in _pillar:
 		(_pillar[h][1] as Label3D).text = "∞" if bool(t.pillars[h].get("glacier", false)) else str(int(t.pillars[h].ticks))   # D294 Glacier Wall
-	_sync(_steam, t.steam, _make_steam)
 	_build_edges()
 	_reroll()
 
@@ -129,27 +126,6 @@ func _make_sheen(h: Vector2i) -> MeshInstance3D:
 	mi.set_instance_shader_parameter("seed", BWTileFX.seed_for(h, 31))
 	add_child(mi)
 	return mi
-
-
-func _make_steam(h: Vector2i) -> Array:
-	var out: Array = []
-	var top := bv.top_center(h)
-	for k in 3:
-		var mi := MeshInstance3D.new()
-		var q := QuadMesh.new()
-		var s := 0.95 + 0.35 * BWTileFX.seed_for(h, 40 + k)
-		q.size = Vector2(s, s * 0.8)
-		mi.mesh = q
-		mi.material_override = material("steam")
-		var a := TAU * (k / 3.0 + BWTileFX.seed_for(h, 50))
-		mi.position = top + Vector3(cos(a) * 0.32, 0.45 + 0.38 * k, sin(a) * 0.32)
-		mi.custom_aabb = AABB(Vector3(-1, -1, -1), Vector3(2, 2, 2))
-		mi.sorting_offset = 2.0 + 0.01 * k
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.set_instance_shader_parameter("seed", BWTileFX.seed_for(h, 60 + k))
-		add_child(mi)
-		out.append(mi)
-	return out
 
 
 ## An inked ice column: a hexagonal prism with a faceted crown, white faces

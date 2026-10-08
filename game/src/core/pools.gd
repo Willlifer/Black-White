@@ -10,13 +10,13 @@ extends RefCounted
 ## Only fresh fire, ice and thunder cast on a pool hex react; light, dark,
 ## water and wind never travel through a pool, nor does any propagated arrival.
 ##
-##   fire     STEAM over the whole pool for STEAM_TICKS ticks: blocks line of
-##            sight; a unit in steam can be single-targeted only from within
-##            STEAM_RANGE. The cast hex steps down as ever.
-##   ice      GLAZE within radius 1 of each cast water hex: those pool hexes
+##   fire     nothing pool-wide (D421: steam is gone). The cast hex DOUSES
+##            (fire meeting water clears both, BWTiles._route); fire on an
+##            electrified hex still clears the field there.
+##   ice      GLAZE within radius 1 (2 with the Water set, D422) of each cast water hex: those pool hexes
 ##            glaze (Unsteady ground, BWUnsteady), and every empty water 3 among them
 ##            (and any fresh glaze on empty water 3 anywhere) becomes a PILLAR.
-##   thunder  ELECTRIFIED within radius 1 of each cast water hex (always: no
+##   thunder  ELECTRIFIED within radius 1 (Water set 2) of each cast water hex (always: no
 ##            detonation, even on a 1-hex puddle; glazed water still shatters).
 ##            SHOCK_PCT at an occupant's turn start (both teams, thunder class)
 ##            and Staggered; SHOCK_ENTRY_PCT on entering a field hex, once per
@@ -32,8 +32,6 @@ extends RefCounted
 ## At most PILLAR_MAX per caster: a fifth melts the caster's oldest.
 
 const POOL_MAX := 19
-const STEAM_TICKS := 2
-const STEAM_RANGE := 2
 const ELEC_TICKS := 2
 const SHOCK_PCT := 15.0
 const SHOCK_ENTRY_PCT := 5.0
@@ -93,12 +91,14 @@ static func _live(t: BWTiles, hexes: Array) -> bool:
 ## and plan overrides (thunder on water: no detonation; water on a fuse: no
 ## detonation, it electrifies after).
 static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, steps: int, caster: String, opts: Dictionary) -> Dictionary:
-	var sp := { "plans": {}, "steam": {}, "glaze": {}, "shock": {}, "fuse_water": [], "fire_on": [] }
+	var sp := { "plans": {}, "glaze": {}, "shock": {}, "fuse_water": [], "fire_on": [] }
 	t.pool_cache.clear()
 	t.set_meta("pillar_plus", int(opts.get("pillar_plus", 0)))   # D282: the Ice set (raise_pillar)
+	t.set_meta("pillar_cap", int(opts.get("pillar_cap", PILLAR_MAX)))   # D459 Sculptor: 6
 	if not fresh or not element in REACT:
 		return sp
-	var cap := int(opts.get("pool_max", POOL_MAX))   # D307: the Water set (2) reaches 25
+	var cap := POOL_MAX
+	var reach := int(opts.get("pool_reach", 1))   # D422: the Water set (2) reacts within 2
 	var guard: Array = opts.get("fuse_guard", [])
 	for hex in hexes:
 		if not t.can_hold(hex) or t.fuse_guarded(hex, guard):
@@ -114,11 +114,10 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, steps:
 			"fire":
 				if t.shock.has(hex):
 					sp.fire_on.append(hex)
-				for h in pool(t, hex, true, cap):
-					sp.steam[h] = true
 			"ice":
 				var pl := pool(t, hex, true, cap)
-				for h in t.board.area(hex, 1):
+				var whole := bool(opts.get("flash_flood", false)) and str(t.at(hex).get("source", "")) == caster
+				for h in (pl if whole else t.board.area(hex, reach)):   # D458 Flash Flood: your pool glazes at once
 					if h in pl:
 						sp.glaze[h] = true
 			"thunder":
@@ -134,25 +133,19 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, steps:
 						key = ph
 				if not sp.shock.has(key):
 					sp.shock[key] = {}
-				for h in t.board.area(hex, 1):
+				for h in t.board.area(hex, reach):
 					if h in pl:
 						sp.shock[key][h] = true
 	return sp
 
 
-## After the plans are applied: steam, pool glaze, pillars, fields; a melted
-## or shattered pillar is dropped. Adds out.pools = {steam, glaze, shock,
+## After the plans are applied: pool glaze, pillars, fields; a melted
+## or shattered pillar is dropped. Adds out.pools = {glaze, shock,
 ## pillars, melted} when anything happened.
 static func finish(t: BWTiles, sp: Dictionary, element: String, caster: String, fresh: bool, out: Dictionary, glaze_plus: int = 0) -> void:
-	var rep := { "steam": [], "glaze": [], "shock": [], "pillars": [], "melted": [] }
+	var rep := { "glaze": [], "shock": [], "pillars": [], "melted": [] }
 	for h in sp.fire_on:
 		_unshock(t, h)
-	var steam_keys: Array = sp.steam.keys()
-	steam_keys.sort()
-	for h in steam_keys:
-		t.steam[h] = STEAM_TICKS
-		_unseed(t, h)
-		rep.steam.append(h)
 	var glaze_keys: Array = sp.glaze.keys()
 	glaze_keys.sort()
 	for h in glaze_keys:
@@ -216,7 +209,7 @@ static func raise_pillar(t: BWTiles, h: Vector2i, caster: String, melted: Array 
 	for p in t.pillars:
 		if str(t.pillars[p].owner) == caster:
 			mine.append(p)
-	if mine.size() >= PILLAR_MAX:
+	if mine.size() >= int(t.get_meta("pillar_cap", PILLAR_MAX)):
 		mine.sort_custom(func(a, b): return int(t.pillars[a].born) < int(t.pillars[b].born))
 		melt(t, mine[0])
 		melted.append(mine[0])
@@ -266,18 +259,11 @@ static func _unshock(t: BWTiles, h: Vector2i) -> void:
 
 # ------------------------------------------------------------------ the tick (inside BWTiles.tick)
 
-## Decay step of the tick: steam, fields and pillars count down. A field at 0
+## Decay step of the tick: fields and pillars count down. A field at 0
 ## discharges, a pillar at 0 thaws. t.spine_tick reports what changed.
 static func tick(t: BWTiles) -> void:
 	t.pool_cache.clear()
-	var rep := { "steam_gone": [], "discharged": [], "thawed": [], "melted": [] }
-	var sk: Array = t.steam.keys()
-	sk.sort()
-	for h in sk:
-		t.steam[h] = int(t.steam[h]) - 1
-		if int(t.steam[h]) <= 0:
-			t.steam.erase(h)
-			rep.steam_gone.append(h)
+	var rep := { "discharged": [], "thawed": [], "melted": [] }
 	var ids: Array = t.fields.keys()
 	ids.sort()
 	for id in ids:
@@ -359,12 +345,6 @@ static func hazard_pct(b: BWBattle, u: BWUnit, h: Vector2i, _reach_entry: Dictio
 	return out
 
 
-## D265 steam: may `att` (standing at `at`) single-target `v`? Not when `v`
-## stands in steam more than STEAM_RANGE away.
-static func steam_hides(b: BWBattle, att: BWUnit, at: Vector2i, v: BWUnit) -> bool:
-	return b.tiles.steam.has(v.pos) and b.gap(att, v, at) > STEAM_RANGE
-
-
 ## The electrified field's shock on `u` at its next turn start (ground_report).
 static func shock_next(b: BWBattle, u: BWUnit, hex: Vector2i) -> int:
 	var id := int(b.tiles.shock.get(hex, -1))
@@ -386,9 +366,6 @@ static func report(b: BWBattle, hex: Vector2i) -> Array:
 		out.append(["Pillar", "%d tick%s left. Blocks moves and sight; pushes slam on it. Fire melts it, thunder shatters it (17%% to the ring)." % [pt, "" if pt == 1 else "s"]])
 	elif BWUnsteady.on_glaze(t, hex):
 		out.append(BWUnsteady.card_line(b, hex))       # D397: Unsteady footing
-	if t.steam.has(hex):
-		var st := int(t.steam[hex])
-		out.append(["Steam", "%d tick%s left. Blocks sight; a unit in it can be targeted only from within %d" % [st, "" if st == 1 else "s", STEAM_RANGE]])
 	var id := int(t.shock.get(hex, -1))
 	if id >= 0 and t.fields.has(id):
 		var f: Dictionary = t.fields[id]
@@ -401,5 +378,5 @@ static func report(b: BWBattle, hex: Vector2i) -> Array:
 		out.append(["Electrified", words])
 	var pl := pool(t, hex)
 	if pl.size() > 1:
-		out.append(["Pool", "%d%s connected water hexes: fire steams them all; ice and thunder react within 1" % [pl.size(), "+" if pl.size() >= POOL_MAX else ""]])
+		out.append(["Pool", "%d%s connected water hexes: ice and thunder react within 1 of the cast hex; fire douses the hex it lands on" % [pl.size(), "+" if pl.size() >= POOL_MAX else ""]])
 	return out

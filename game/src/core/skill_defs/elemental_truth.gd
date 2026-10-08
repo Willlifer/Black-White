@@ -4,6 +4,10 @@ extends BWSkillDef
 ## charge to blow) and re-arms a fuse; ice glazes for GLAZE_CYCLES (a charged
 ## hex; bare ground takes a stasis marker); wind's gale copies last
 ## GALE_CYCLES.
+## D426: RETIRED. En Passant took its place in the sword's pool; the def
+## stays so old saves and replays resolve, but it is never offered
+## (`retired`, BWSkillRegistry.pool) and a loaded save maps it to En Passant
+## (BWSkillRegistry.RENAMED).
 
 const POWER := 10
 const MULT := 1.5
@@ -17,7 +21,7 @@ func _init() -> void:
 		"key": "elemental_truth", "name": "Elemental Truth", "weapon": "sword", "clip": "",
 		"desc": "A cut for x1.5 that applies the element twice to the target's hex: fire, water, light or dark +2 steps; thunder detonates then re-arms; ice glazes 4 cycles; wind's gale copies last 2 cycles",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
-		"power": POWER,
+		"power": POWER, "retired": true,
 	}, 305)
 
 

@@ -2,6 +2,8 @@ extends BWSkillDef
 ## Sword (D103). Dash straight up to LEN hexes and strike the first unit in
 ## the way. A foe takes the hit (and its hex the element); an ally, rock or a
 ## climb just stops you. Running, so fire on the way burns (like Charge).
+## D438: the dash paints: every hex you dash over takes the element, and the
+## struck foe's hex too (the sword paints lines and fights on them).
 
 const POWER := 11
 const CD := 2
@@ -11,7 +13,7 @@ const LEN := 3
 func _init() -> void:
 	define({
 		"key": "lunge", "name": "Lunge", "weapon": "sword", "clip": "thrust",
-		"desc": "Dash up to 3 tiles in a straight line and strike the first enemy in the way. An ally or rock just stops you",
+		"desc": "Dash up to 3 tiles in a straight line and strike the first enemy in the way; the tiles you dash over take your element. An ally or rock just stops you",
 		"targeting": "dir", "needs_element": true, "range": LEN, "cd": CD,
 		"power": POWER,
 	}, 304)
@@ -35,7 +37,8 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 		p.walk = []                       # nothing to lunge at: not a legal heading
 		p.dest = u.pos
 	elif not p.walk.is_empty():
-		p.notes.append("Dash %d to strike %s" % [p.walk.size(), p.victims[0].name])
+		p.hexes = (p.walk as Array) + (p.hexes as Array)     # D438: the dash paints its path
+		p.notes.append("Dash %d to strike %s; the path takes the element" % [p.walk.size(), p.victims[0].name])
 
 
 func relocate(b: BWBattle, u: BWUnit, p: Dictionary, target_hex: Vector2i) -> void:

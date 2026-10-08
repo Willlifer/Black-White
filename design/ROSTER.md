@@ -121,7 +121,7 @@ Hair colour is not here: it follows element and affinity rank (D146).
 
 ## Rolled facets (BWRosterGen)
 
-- **Weapon:** a class from a deck (each of the 7 twice, 6 more at random, so every class is
+- **Weapon (D419: pistols are benched; a pistols draw is re-rolled to the active class dealt least so far, on its own seeded stream, so the other seats keep their kits):** a class from a deck (each of the 7 twice, 6 more at random, so every class is
   always held), then a model of that class (a shuffled cycle: a class held three times shows three
   models). Nobody starts with fists (D76).
 - **Element:** the lock (Aureli light, Rem ice), else from a deck (each element twice, 4 more at random).
@@ -143,7 +143,7 @@ con / str / dex / wil / def / res / spd
 | lance | 5/5/3/2/5/3/3 | 26 | CON/STR/DEF |
 | daggers | 3/2/6/2/2/3/6 | 24 | DEX/SPD, fragile |
 | bow | 3/3/6/2/3/3/5 | 25 | DEX/SPD |
-| pistols | 3/4/6/1/3/3/4 | 24 | DEX/STR |
+| pistols | 3/4/6/1/3/3/4 | 24 | DEX/STR · benched (D419), never rolled |
 | staff | 3/1/3/6/2/6/4 | 25 | WIL/RES |
 
 ## Seeds

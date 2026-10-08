@@ -80,11 +80,13 @@ var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate,
 var wind_view: BWWindView       # ---- D269-D276: walls, gravity, Rot marks (D406: no fields)
 var wind_shape: BWWindShapeView # ---- D365-D370: the wind shaping step on a wind skill's confirm
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
+var ks3_view: BWKs3View             # ---- D443-D463: Keystones v3 (lava fizzles, Pitch Black, the rain cloud, Drowned)
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
 var squall_view: BWSquallView       # ---- D309-D313: squall fronts, Overfreeze bursts
 var mode_view: BWModeView           # ---- D327-D333: the 6v6 modes (waves, exits, the divider)
 var castle_view: BWCastleView       # ---- D340: the castle maps' walls, gate, throne
-var mode_opts := {}                 # ---- D328: BWObjectives.configure before setup (tools)
+var kit2_view: BWKit2View           # ---- D425-D432: charge lines, Riposte's release, barriers
+var mode_opts := {}                # ---- D328: BWObjectives.configure before setup (tools)
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -154,6 +156,9 @@ func _ready() -> void:
 	ks_view = BWKeystoneView.new()        # ---- D293-D299: wind, ice, water and dark keystones
 	add_child(ks_view)
 	ks_view.setup(self)
+	ks3_view = BWKs3View.new()           # ---- D443-D463: Keystones v3
+	add_child(ks3_view)
+	ks3_view.setup(self)
 	elements_view = BWElementsView.new()  # ---- D285-D292: fire, light and thunder marks and VFX
 	add_child(elements_view)
 	elements_view.setup(self)
@@ -166,7 +171,10 @@ func _ready() -> void:
 	castle_view = BWCastleView.new()      # ---- D340: castle dressing (inert off a castle map)
 	add_child(castle_view)
 	castle_view.setup(self)
-	name_labels = BWNameLabels.new()      # ---- D344: names only where they fit (focus full size)
+	kit2_view = BWKit2View.new()          # ---- D425-D432: weapon kit pass 2 marks and one-shots
+	add_child(kit2_view)
+	kit2_view.setup(self)
+	name_labels = BWNameLabels.new()     # ---- D344: names only where they fit (focus full size)
 	add_child(name_labels)
 	name_labels.setup(self)
 	ui.wind_changed = _wind_mode_changed  # a shaping change re-opens the confirm
@@ -332,7 +340,10 @@ func _on_hover(h: Vector2i) -> void:
 			var pv := battle.skill_preview(u, _skill.key, _skill.element, h)
 			if not pv.is_empty():
 				# splash: "this will be hit", in the skill's element (V8's amber)
-				_show_options([], pv.hexes + pv.get("ring", []), _skill.element)
+				var splash: Array = pv.hexes + pv.get("ring", [])
+				if _skill.key == "lance_charge":           # ---- D428: the line the charge will run
+					splash = BWSkillRegistry.get_def("lance_charge").call("line_to", battle, u, h, BWHex.distance(u.pos, h))
+				_show_options([], splash, _skill.element)
 				board_view.highlight([h], "target")
 				if not (pv.get("shove", {}) as Dictionary).is_empty():   # ---- D414: where the pushed foe ends
 					board_view.highlight([pv.shove.to], "attack")
@@ -340,6 +351,17 @@ func _on_hover(h: Vector2i) -> void:
 					ui.hint("%s — %s" % [_skill.row.get("name", _skill.key), "  ·  ".join(pv.notes)])
 				return
 		_show_options()
+		if _skill.key == "en_passant":                 # ---- D426: a foe in line whose landing is blocked shows red
+			var bl: Dictionary = BWSkillRegistry.get_def("en_passant").call("blocked", battle, u, h)
+			if not bl.is_empty():
+				board_view.highlight([bl.hex], "blocked")
+				ui.hint("En Passant — can't land beyond %s: the %s is blocked" % [battle.unit_at(h).name,
+					{ "landing": "landing", "edge": "landing (map edge)", "path": "run" }.get(str(bl.why), "landing")])
+		return
+	if BWKit2.dance_pending(battle, u):                # ---- D427: the Blade Dance step's hover
+		_show_options()
+		if h in BWKit2.dance_hexes(battle, u):
+			board_view.highlight([h], "target")
 		return
 	if battle.can_move_to(u, h) and h != u.pos:
 		var rr := battle.reachable(u)
@@ -367,6 +389,13 @@ func _on_click(h: Vector2i) -> void:
 	if not _skill.is_empty():
 		_aim_skill(u, h)
 		return
+	if BWKit2.dance_pending(battle, u):                # ---- D427: Blade Dance: a marked hex steps, anything else skips it
+		if h in BWKit2.dance_hexes(battle, u):
+			board_view.clear_highlights()
+			BWKit2.dance_step(battle, u, h)
+			_after_events()
+			return
+		BWKit2.dance_skip(battle, u)
 	if target and target.team != u.team and (not u.acted or "basic" in u.follow_up) and battle.in_range(u, target):
 		_pending_target = target
 		ui.show_forecast(u, target, battle.forecast_basic(u, target))
@@ -424,6 +453,9 @@ func _on_action(id: String) -> void:
 			elif not _skill.is_empty():
 				_skill = {}
 				_show_options()
+			elif _player_turn() and BWKit2.dance_pending(battle, battle.current()):
+				BWKit2.dance_skip(battle, battle.current())   # ---- D427: Esc skips the Blade Dance step
+				_after_events()
 			elif _player_turn() and battle.can_undo_move(battle.current()):
 				# Esc backs out one step at a time: forecast → aiming → the move itself (D48).
 				battle.undo_move(battle.current())
@@ -439,6 +471,7 @@ func _on_skill_chosen(key: String, element: String) -> void:
 		return
 	var u := battle.current()
 	var row := BWSkills.get_skill(key)
+	BWKit2.dance_skip(battle, u)                     # ---- D427: choosing a skill passes on the Blade Dance step
 	if str(row.get("targeting", "")) == "self":
 		if BWSkills.is_damaging(key):
 			# D110: a self-centred attack shows its forecast and waits for Confirm
@@ -582,6 +615,12 @@ func _show_options(path: Array = [], splash: Array = [], splash_el: String = "")
 			board_view.highlight(foes_in_range, "attack")
 		ui.hint("%s — follow-up: %s, or T to skip" % [u.name, ", ".join(u.follow_up)])
 		return
+	if BWKit2.dance_pending(battle, u):                 # ---- D427: the Blade Dance step, a two-hex mini move
+		var steps := BWKit2.dance_hexes(battle, u)
+		ranges.display(steps + [u.pos], rim)
+		board_view.highlight(steps, "attack")
+		ui.hint("%s — Blade Dance: click a marked tile to step up to 2 (free), Esc to skip" % u.name)
+		return
 	var move: Array = []
 	if battle.can_move(u):
 		var r := battle.reachable(u)
@@ -645,7 +684,8 @@ func _after_events() -> void:
 			BWAI.take_turn(battle)
 			perf_ai_ms.append((Time.get_ticks_usec() - t_ai) / 1000.0)   # ---- D323: the autoplay PERF line
 			continue
-		if u and u.team == "player" and u.acted and u.follow_up.is_empty() and not battle.can_move(u):
+		if u and u.team == "player" and u.acted and u.follow_up.is_empty() and not battle.can_move(u) \
+				and not BWKit2.dance_pending(battle, u):      # ---- D427: a Blade Dance step still owed
 			battle.end_turn()
 			continue
 		break
@@ -736,6 +776,13 @@ func _play(e: Dictionary) -> void:
 			board_view.refresh_tiles()
 		"stat_up":
 			_float_text(_views[e.unit], "%s +%d %s" % [e.name, int(e.amount), "/".join(e.stats).to_upper()], Color.WHITE, 0.9)
+		"bellow":                                     # ---- D436: a held Bellow
+			_float_text(_views[e.unit], "BELLOW: next Cleave / Sunder x2", Color.WHITE, 0.9)
+			ui.feed("%s bellows: the next Cleave or Sunder doubles" % _name(e.unit))
+		"overload":                                   # ---- D440: the spent tiles go
+			board_view.refresh_tiles()
+		"bellow_spent":
+			ui.feed("%s's Bellow doubles the swing" % _name(e.unit))
 		"guard":
 			_float_text(_views[e.unit], "%s" % e.name, Color.WHITE, 0.8)
 			ui.feed("%s raises a guard (%d%%)" % [_name(e.unit), int(e.pct)])
@@ -784,7 +831,7 @@ func _play(e: Dictionary) -> void:
 		"reaction":
 			board_view.reaction_burst(str(e.kind), e.hex)
 			_shake(0.08)
-			var rx := { "steam": "Steam burst", "eclipse": "Eclipse", "storm": "Storm" }
+			var rx := { "douse": "Douse", "eclipse": "Eclipse", "storm": "Storm" }
 			ui.banner(str(rx.get(str(e.kind), e.kind)), 0.8)
 			ui.feed("[b]%s![/b] (%s's second cut)" % [rx.get(str(e.kind), e.kind), _name(e.unit)])
 			await get_tree().create_timer(0.5).timeout
@@ -865,9 +912,15 @@ func _play(e: Dictionary) -> void:
 				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze":   # ---- D285-D292
 			if elements_view:
 				await elements_view.on_event(e)
+		"riposte_release", "lance_charge_set", "lance_charge_run", "blade_dance", "barrier", "barrier_hit", "barrier_end":   # ---- D425-D432
+			if kit2_view:
+				await kit2_view.on_event(e)
 		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "riptide", "event_horizon":   # ---- D293-D299
 			if ks_view:
 				await ks_view.on_event(e)
+		"fizzle", "pitch_black", "solar_flare", "overcharge_end", "hopekiller", "hopekiller_mark", "superconductor", 				"overflow", "la_nina", "la_nina_pull", "shatterer", "blizzard", "rain_cloud", "rain", "leviathan_offer", 				"submerge", "leviathan_form", "drowned_lunge", "drowned_return":   # ---- D443-D463 Keystones v3
+			if ks3_view:
+				await ks3_view.on_event(e)
 		"wave_incoming", "spawn", "wave", "escape", "divider_break", "divider_open", "divider_breach", "divider_gust":   # ---- D327-D333
 			if mode_view:
 				await mode_view.on_event(e)
@@ -2035,6 +2088,8 @@ func _label_height(v: Node3D) -> float:
 
 
 func _unit_pos(h: Vector2i) -> Vector3:
+	if battle != null and BWKs3Ice.sculpted(battle.tiles, h):
+		return board_view.top_center(h) + Vector3(0, BWIceWaterView.PILLAR_H + 0.05, 0)   # D459: atop a Sculptor's pillar
 	return board_view.top_center(h)
 
 

@@ -1,6 +1,6 @@
 extends RefCounted
 ## D262-D266 the ice/water spine (design/ELEMENTS-v3.md §2, §4, rulings of
-## 2026-10-07): pillars, pools, steam, pool glaze and electrified fields
+## 2026-10-07): pillars, pools (D421: fire douses, no steam), pool glaze and electrified fields
 ## (BWPools). D397 removed the D261 slides: glaze is ground (Unsteady footing,
 ## tests/test_unsteady.gd).
 
@@ -200,25 +200,30 @@ func test_pool_bfs_cap(t) -> void:
 	t.eq(moved, 0, "light stays on its own hex")
 
 
-func test_steam_pool(t) -> void:
+## D421: no steam. Fire on a pool douses only the hex it lands on (fire and
+## water both cleared), nothing pool-wide, no sight block; water on fire too.
+func test_fire_on_pool_douses(t) -> void:
 	var bd := _board()
 	var a := _u("a", "bow", "fire")
 	var f := _u("f")
 	var b := _fight(bd, [a], [f], [Vector2i(3, 6)], [Vector2i(6, 6)])
 	var lake: Array = _row(6, 4, 8) + _row(5, 4, 8)
 	_lay(b.tiles, lake, -2, 0)
-	t.ok(b.in_range(a, f), "the bow reaches the foe in the water")
 	var r := b.paint([Vector2i(8, 5)], "fire", a)
-	t.eq((r.pools.steam as Array).size(), lake.size(), "fire on water steams the whole pool")
-	t.eq(int(b.tiles.at(Vector2i(8, 5)).h), -1, "the cast hex still steps down")
-	t.ok(not b.in_range(a, f), "a unit in steam: only from within 2")
-	a.pos = Vector2i(4, 6)
-	t.ok(b.in_range(a, f), "from within 2 it can be shot, through the steam")
-	t.ok(not bd.has_los(Vector2i(3, 6), Vector2i(9, 6)), "steam blocks sight through it")
-	b.tiles.tick()
-	t.ok(b.tiles.steam.has(Vector2i(6, 6)), "1 tick left")
-	b.tiles.tick()
-	t.ok(b.tiles.steam.is_empty(), "gone after 2 ticks")
+	t.ok(b.tiles.at(Vector2i(8, 5)).is_empty(), "the cast hex douses: fire and water both gone")
+	t.eq(r.doused, [Vector2i(8, 5)], "reported as doused")
+	t.ok(not (r.get("pools", {}) as Dictionary).has("steam"), "no steam over the pool")
+	t.eq(int(b.tiles.at(Vector2i(6, 6)).h), -2, "the rest of the pool is untouched")
+	t.ok(b.in_range(a, f), "nothing hides the foe in the water")
+	t.ok(bd.has_los(Vector2i(3, 6), Vector2i(9, 6)), "nothing blocks sight")
+	# water on fire, and a mixed hex keeps its light / dark
+	b.tiles.entries[Vector2i(2, 2)] = b.tiles._entry(3, 2, "", "", "cast")
+	var r2 := b.paint([Vector2i(2, 2)], "water", a)
+	t.eq(r2.doused, [Vector2i(2, 2)], "water on fire douses too")
+	t.eq(int(b.tiles.at(Vector2i(2, 2)).h), 0, "fire 3 + water: no fire, no water")
+	t.eq(int(b.tiles.at(Vector2i(2, 2)).v), 2, "its light stays")
+	var ev: Array = b.history.filter(func(e): return str(e.get("type", "")) == "paint" and e.has("doused"))
+	t.eq(ev.size(), 2, "each paint event names its doused hexes (the hiss)")
 
 
 func test_ice_on_pool_glazes_radius_one(t) -> void:

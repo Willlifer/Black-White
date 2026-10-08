@@ -349,7 +349,7 @@ func test_element_damage_pct(t) -> void:
 	var foe := _u("f", "axe", "water")
 	var me := _ench(_u("me", "staff", "thunder"), "stormcallers")
 	var plain := _u("p", "staff", "thunder")
-	var b := _fight([me, plain], [foe], [C, Vector2i(0, 5)], [_nb(C, 0)])
+	var b := _fight([me, plain], [foe], [C, Vector2i(0, 5)], [C + Vector2i(0, 3)])   # D424: 3 away, not Pressured
 	var fc := b.forecast_basic(me, foe)
 	var base := b.forecast_basic(plain, foe)
 	t.eq(fc.damage.value, maxf(1.0, roundf(base.damage.value * 1.2)), "Stormcaller's: thunder +20%")

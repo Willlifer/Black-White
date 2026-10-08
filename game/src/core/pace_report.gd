@@ -7,13 +7,13 @@ class_name BWPaceReport
 ## is an upper bound on fight length for a player who does.
 
 
-const SUPPORT := ["war_cry", "phalanx", "aegis", "covering_fire", "tumble", "transfer", "inversion"]
+const SUPPORT := ["bellow", "phalanx", "covering_fire", "tumble", "transfer", "inversion", "kindle", "tapestry", "overload"]   # D435-D442
 
 
 ## D112 `--pace --support`: every unit swaps the tail of its starter kit for
 ## its class's support skills, so their share can be read.
-const SUPPORT_KIT := { "axe": ["war_cry"], "lance": ["phalanx"], "pistols": ["covering_fire"],
-	"daggers": ["tumble"], "staff": ["transfer", "inversion", "aegis"] }
+const SUPPORT_KIT := { "axe": ["bellow"], "lance": ["phalanx"], "pistols": ["covering_fire"],
+	"daggers": ["tumble"], "staff": ["transfer", "inversion"] }
 
 
 static func _support_kit(u: BWUnit) -> void:

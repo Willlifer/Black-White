@@ -22,7 +22,7 @@ static func award(u: BWUnit, ko: bool, element: String) -> Array:
 	var events: Array = []
 	if element != "":
 		var before := u.affinity_rank(element)
-		u.affinity[element] = int(u.affinity.get(element, 0)) + g.affinity
+		u.add_affinity(element, int(g.affinity))      # D417: no 4th element
 		if u.affinity_rank(element) > before:
 			events.append({ "type": "affinity_rank", "element": element, "rank": u.affinity_rank(element) })
 	var wc := u.weapon_class

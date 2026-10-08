@@ -2,6 +2,7 @@
 //   1 Smouldering: soot creeping in from the rim, embers pulsing in it
 //   2 Burning: a heat bed licks across the whole face, embers drift
 //   3 Blazing: white-hot core, the bed churns fast
+//   4-5 Lava (D447, a Lava Walker's only): a basalt crust with molten seams
 // The standing flames and smoke live on the flame cards (tile_flame).
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_mix, depth_draw_never, shadows_disabled;
@@ -55,6 +56,27 @@ void fragment() {
 	// Rim glow line along the inner border: the tile reads as "lit" at any size.
 	float rim = smoothstep(0.72, 0.86, d) * (1.0 - smoothstep(0.93, 0.99, d));
 	over(acc, glow.rgb, rim * (0.75 + 0.25 * a2) * (0.7 + 0.3 * sin(t * 3.0 + d * 9.0)) * a1);
+
+	// D447 Lava (a Lava Walker's fire 4 and 5): a black basalt crust plates
+	// over the bed, molten seams glow through it, wider and whiter at 5, with
+	// slow bubbles rising.
+	float a4 = clamp(tier - 3.0, 0.0, 1.0);
+	float a5 = clamp(tier - 4.0, 0.0, 1.0);
+	if (a4 > 0.001) {
+		vec2 cp = lp * 3.0 + seed * 11.0;
+		float plate = fbm(cp + vec2(0.0, t * 0.04));
+		float seam = abs(plate - 0.5);
+		float sw = 0.045 + 0.07 * a5;
+		float molten = 1.0 - smoothstep(sw, sw + 0.05, seam);
+		float inner = 1.0 - smoothstep(0.86, 0.97, d);
+		over(acc, lin(vec3(0.045, 0.03, 0.028)), a4 * 0.9 * (1.0 - molten) * inner);
+		float pulse = 0.7 + 0.3 * sin(t * 2.0 + plate * 14.0);
+		vec3 mcol = mix(glow.rgb, hot, 0.35 + 0.65 * a5);
+		over(acc, mcol, molten * a4 * pulse * inner);
+		float bub = smoothstep(0.8, 0.88, vnoise(lp * 6.0 + vec2(seed * 3.0, -t * 0.5))) * a5 * inner;
+		over(acc, lin(vec3(1.0, 0.93, 0.66)), bub);
+		over(acc, glow.rgb, rim * a4 * 0.9);
+	}
 
 	vec3 col;
 	float alpha;

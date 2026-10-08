@@ -12,7 +12,8 @@ extends RefCounted
 ## clothing_shade (plus the identity columns, unchanged).
 ##
 ##   weapon   a class from a deck (each of the 7 classes twice, 6 more at
-##            random), then a model of that class (the class's models in a
+##            random; D419: a benched class drawn is re-rolled to an active
+##            one, the least-dealt first, on its own seeded stream), then a model of that class (the class's models in a
 ##            shuffled cycle, so a class held 3 times shows 3 models)
 ##   element  the lock if the identity has one (Aureli light, Rem ice);
 ##            the rest from a deck (each element twice, 4 at random)
@@ -28,6 +29,7 @@ extends RefCounted
 ## The seed the self-test, tools and sims roll with (BWData's default roster).
 const DEFAULT_SEED := 1
 ## The 7 classes a roster character can start with (fists never, D76).
+## D419: a benched one (BWRun.is_benched) is dealt, then re-rolled: active_deck.
 const CLASSES := ["sword", "axe", "lance", "daggers", "bow", "pistols", "staff"]
 const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "dark", "light"]
 const STATS := ["con", "str", "dex", "wil", "def", "res", "spd"]
@@ -92,7 +94,7 @@ static func roll(identities: Array, p_seed: int, pool: Array = []) -> Array:
 	rng.seed = hash("bw-roster:%d" % p_seed)
 	var ids: Array = seated(identities, p_seed, pool)
 	var n := ids.size()
-	var classes := _deck(CLASSES, 2, n, rng)
+	var classes := active_deck(_deck(CLASSES, 2, n, rng), hash("bw-unbench:%d" % p_seed))
 	var free := ids.filter(func(r): return str(r.get("element_lock", "")) == "").size()
 	var elements := _deck(ELEMENTS, 2, free, rng)
 	var shades: Array = []
@@ -174,6 +176,9 @@ static func roll_one(identity: Dictionary, stream: int) -> Dictionary:
 	rng.seed = stream
 	var row: Dictionary = identity.duplicate()
 	var wc: String = CLASSES[rng.randi() % CLASSES.size()]
+	if BWRun.is_benched(wc):                     # D419: re-rolled to an active class
+		var act := active_classes()
+		wc = str(act[rng.randi() % act.size()])
 	row["weapon_class"] = wc
 	row["weapon_model"] = _next_model(wc, {}, rng)
 	var lock := str(row.get("element_lock", ""))
@@ -186,6 +191,38 @@ static func roll_one(identity: Dictionary, stream: int) -> Dictionary:
 	row["bottom"] = _weighted(POOLS[g].bottom, rng)
 	row["clothing_shade"] = SHADE_DECK.keys()[rng.randi() % SHADE_DECK.size()]
 	return row
+
+
+## D419: the roster classes still in play (CLASSES minus benched ones).
+static func active_classes() -> Array:
+	return CLASSES.filter(func(c): return not BWRun.is_benched(c))
+
+
+## D419: `deck` with every benched class re-rolled to an active one: the
+## class dealt least so far (ties at random on `stream`), so the deck stays
+## even. Rows that drew an active class keep it (same seed, same kit).
+static func active_deck(deck: Array, stream: int) -> Array:
+	var act := active_classes()
+	var r := RandomNumberGenerator.new()
+	r.seed = stream
+	var count := {}
+	for c in act:
+		count[c] = 0
+	for c in deck:
+		if count.has(c):
+			count[c] += 1
+	var out: Array = deck.duplicate()
+	for i in out.size():
+		if count.has(out[i]):
+			continue
+		var low := 1 << 30
+		for c in act:
+			low = mini(low, int(count[c]))
+		var least: Array = act.filter(func(c): return int(count[c]) == low)
+		var pick: String = least[r.randi() % least.size()]
+		out[i] = pick
+		count[pick] += 1
+	return out
 
 
 ## The class's profile with the seeded variance (see the header).

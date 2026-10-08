@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D440 Overload): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Daggers. Once per battle, from behind only (BWBattle.behind: the back
 ## three of the foe's six sides): a killing stroke that can't glance, with
 ## +CRIT crit and a +BACKSTAB_PCT% backstab.
@@ -15,6 +17,7 @@ func _init() -> void:
 		"desc": "Once per battle, from behind an adjacent enemy only: can't glance, +25 crit, backstab +50%",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": 0, "once_per_battle": true,
 		"power": POWER,
+		"retired": true,
 	}, 355)
 
 

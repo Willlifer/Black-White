@@ -239,7 +239,7 @@ func test_static_and_seeded_interplay(t) -> void:
 	b2.set_weather(BWWeather.RAIN)
 	b2.setup([_u("p")], [_u("e")])
 	b2.tiles.apply([C], "fire", "p")
-	t.eq(_hv(b2.tiles, C), Vector2i(-2, 0), "fire steps the static for the cycle")
+	t.eq(_hv(b2.tiles, C), Vector2i(0, 0), "D421: fire douses the static for the cycle")
 	b2.tiles.tick()
 	BWWeather.tick(b2)
 	t.eq(_hv(b2.tiles, C), Vector2i(-3, 0), "it re-forms at the tick, rain or not")

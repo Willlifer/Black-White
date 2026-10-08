@@ -52,7 +52,7 @@ func show_unit(u: BWUnit) -> void:
 	var faint := BWGearText.hex(BWStyle.FAINT)
 	var el := BWGearText.hex(BWGearText.readable(BWLook.element_color(u.element)))
 	var lines: PackedStringArray = []
-	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s · Lv %d[/color]" % [BWStyle.F_NAME - 4, u.name, dim,
+	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s · Lv %d[/color]" % [BWStyle.F_NAME - 4, BWKeystones.titled(u), dim,
 		"enemy" if enemy else "yours", u.level])
 	var wname := BWText.weapon(u.weapon_class)
 	lines.append("[font_size=%d][color=#%s]%s (%s)   [/color][color=#%s]◆[/color] [color=#%s]%s[/color][/font_size]" % [

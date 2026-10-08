@@ -10,19 +10,6 @@ var K: Object = preload("res://tests/test_weapon_skills_melee.gd").new()
 
 # ------------------------------------------------------------------ bow
 
-func test_aimed_shot(t) -> void:
-	var me: BWUnit = K._equip(K._u("me", "bow", "fire"), ["aimed_shot"])
-	var at: Vector2i = K._line(6)[5]
-	var b: BWBattle = K._fight(me, [K._foe()], [at])
-	var fc: Dictionary = b.skill_preview(me, "aimed_shot", "fire", at).forecasts["f"]
-	t.near(float(K._mod(fc, "Aimed Shot: +20 hit").get("value", 0)), 20.0, 0.01, "+20 hit")
-	t.near(float(K._mod(fc, "Aimed Shot, unmoved").get("value", 0)), 10.0, 0.01, "+10 crit unmoved")
-	b.move(me, Vector2i(4, 5))
-	var fc2: Dictionary = b.skill_preview(me, "aimed_shot", "fire", at).forecasts["f"]
-	t.ok(K._mod(fc2, "Aimed Shot, unmoved").is_empty(), "no crit bonus after moving")
-	K._use(t, b, me, "aimed_shot", "fire", at)
-
-
 func test_split_arrow_fans(t) -> void:
 	var me: BWUnit = K._equip(K._u("me", "bow", "fire"), ["split_arrow"])
 	var nb := BWHex.neighbors(C)
@@ -205,3 +192,6 @@ func test_reload_plus_two_rounds(t) -> void:
 	t.eq(me.loaded, "", "two trailed shots, then empty")
 	var trails: Array = K._events(b, "paint").filter(func(e): return e.unit == "me" and e.element == "fire")
 	t.eq(trails.size(), 2, "both shots laid the trail")
+
+
+## D435-D442: the retired skills' tests moved to test_kit3 (their replacements; the defs stay only for old saves).

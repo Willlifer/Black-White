@@ -400,6 +400,8 @@ static func _step_once(b: BWBattle, v: BWUnit, from: BWUnit, e: Dictionary) -> v
 
 
 static func _empower(b: BWBattle, u: BWUnit, e: Dictionary, by: BWUnit, scale: float = 1.0) -> void:
+	if BWKs3Dark.buff_blocked(b, u, str(e.name)):
+		return                                   # D450 Hopekiller: no buffs on its dark
 	var em := { "name": e.name, "uses": str(BWEffects.p(e, "uses", "next_attack")),
 		"dmg_pct": float(BWEffects.p(e, "dmg_pct", 0)) * scale, "crit": float(BWEffects.p(e, "crit", 0)) * scale,
 		"sure": int(BWEffects.p(e, "sure", 0)) == 1, "source": str(e.source) + ":" + by.id }

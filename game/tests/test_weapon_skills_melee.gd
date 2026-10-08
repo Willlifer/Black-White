@@ -83,12 +83,12 @@ func _use(t, b: BWBattle, u: BWUnit, key: String, el: String, h: Vector2i) -> Di
 
 func test_new_skills_join_their_pools(t) -> void:
 	var want := {
-		"sword": ["heart_seeker", "triumph", "whirlwind_blade", "lunge", "elemental_truth"],
-		"axe": ["reckless_swing", "hook", "sunder", "earthsplitter", "war_cry"],
-		"lance": ["guardrush", "sweep", "set_spear", "phalanx", "dragoon_dive"],
-		"bow": ["aimed_shot", "split_arrow", "retreating_shot", "pinning_shot", "rain_of_arrows"],
-		"staff": ["bolt", "transfer", "inversion", "aegis", "tempest"],
-		"daggers": ["tumble", "manipulate", "hamstring", "fan_of_knives", "assassinate"],
+		"sword": ["thread_needle", "tapestry", "whirlwind_blade", "lunge", "en_passant"],   # D426, D438, D439
+		"axe": ["reckless_arc", "hook", "sunder", "earthsplitter", "bellow"],               # D435-D437
+		"lance": ["sweep", "set_spear", "phalanx", "dragoon_dive", "lance_charge"],   # D428; D442: no Guardrush
+		"bow": ["split_arrow", "retreating_shot", "pinning_shot", "rain_of_arrows"],  # D442: no Aimed Shot
+		"staff": ["bolt", "transfer", "inversion", "tempest"],                         # D442: no Aegis
+		"daggers": ["tumble", "manipulate", "kindle", "fan_of_knives", "overload"],   # D440, D441
 		"pistols": ["point_blank", "pistol_whip", "flash_round", "covering_fire", "empty_the_chamber"],
 		"fists": ["shockwave_palm", "brace", "grapple_throw", "haymaker", "hundred_fists"],
 	}
@@ -99,7 +99,7 @@ func test_new_skills_join_their_pools(t) -> void:
 			var r := BWSkills.get_skill(k)
 			t.ok(str(r.get("desc", "")).length() > 20, "%s has a codex description" % k)
 			t.ok(not k in BWSkillRegistry.starter(wc), "%s is learned, not a starter" % k)
-	for k in ["triumph", "dragoon_dive", "rain_of_arrows", "tempest", "assassinate", "empty_the_chamber", "hundred_fists"]:
+	for k in ["tapestry", "dragoon_dive", "rain_of_arrows", "tempest", "empty_the_chamber", "hundred_fists"]:
 		t.ok(BWSkills.get_skill(k).get("once_per_battle", false), "%s is once per battle" % k)
 	t.eq(BWSkillRegistry.clip("whirlwind_blade"), "spin", "Whirlwind Blade spins")
 	t.eq(BWSkillRegistry.clip("fan_of_knives"), "spin", "Fan of Knives spins")
@@ -107,34 +107,6 @@ func test_new_skills_join_their_pools(t) -> void:
 
 
 # ------------------------------------------------------------------ sword
-
-func test_heart_seeker(t) -> void:
-	var me := _equip(_u("me", "sword", "fire"), ["heart_seeker"])
-	var foe := _foe()
-	var b := _fight(me, [foe], [E])
-	var fc: Dictionary = b.skill_preview(me, "heart_seeker", "fire", E).forecasts["f"]
-	t.near(float(_mod(fc, "Heart Seeker").get("value", 0)), 25.0, 0.01, "+25 crit in the breakdown")
-	_use(t, b, me, "heart_seeker", "fire", E)
-	t.eq(me.cooldowns.get("heart_seeker_fire", 0), 2, "cd 2")
-
-
-func test_triumph_once_and_ko_bonus(t) -> void:
-	var me := _equip(_u("me", "sword", "fire", { "dex": 100, "str": 20 }), ["triumph"])
-	var weak := _u("w", "axe", "water", { "con": 1 })
-	var far := _foe("far")
-	var b := _fight(me, [weak, far], [E, Vector2i(9, 9)])
-	weak.hp = 5
-	var fc: Dictionary = b.skill_preview(me, "triumph", "fire", E).forecasts["w"]
-	t.near(float(_mod(fc, "Triumph").get("value", 0)), 1.5, 0.001, "x1.5 in the breakdown")
-	var str_before := me.stat("str")
-	var ev := _use(t, b, me, "triumph", "fire", E)
-	t.ok(ev.ko, "the weak foe falls")
-	t.eq(me.stat("str"), str_before + roundi(str_before * 0.25), "+25% STR after the KO")
-	t.eq(_events(b, "stat_up").filter(func(e): return e.source == "triumph").size(), 1, "announced")
-	me.affinity["water"] = 10
-	_give_turn(b, me)
-	t.ok(not b.skills_for(me).any(func(s): return s.key == "triumph"), "once per battle: gone in every element")
-
 
 func test_whirlwind_blade_hits_the_ring_not_allies(t) -> void:
 	var me := _equip(_u("me", "sword", "wind"), ["whirlwind_blade"])
@@ -168,36 +140,12 @@ func test_lunge_dashes_to_the_first_foe(t) -> void:
 	t.eq(b2.skill_preview(me2, "lunge", "fire", E), {}, "an ally just stops you: nothing to lunge at")
 
 
-func test_elemental_truth_twice(t) -> void:
-	# axis: +2 steps
-	var me := _equip(_u("me", "sword", "fire"), ["elemental_truth"])
-	var b := _fight(me, [_foe()], [E])
-	var pv := b.skill_preview(me, "elemental_truth", "fire", E)
-	t.near(float(_mod(pv.forecasts["f"], "Elemental Truth").get("value", 0)), 1.5, 0.001, "x1.5")
-	_use(t, b, me, "elemental_truth", "fire", E)
-	t.eq(b.tiles.intensity(E, "fire"), 2, "fire twice: 2 steps")
-	t.eq(me.cooldowns.get("elemental_truth_fire", 0), 4, "cd 4")
-	# thunder on charge: detonate, then a fresh fuse
-	var me2 := _equip(_u("me", "sword", "thunder"), ["elemental_truth"])
-	var b2 := _fight(me2, [_foe()], [E])
-	b2.tiles.apply([E], "fire", "x")
-	_use(t, b2, me2, "elemental_truth", "thunder", E)
-	t.eq(_events(b2, "detonate").size(), 1, "the charge detonates")
-	t.ok(b2.tiles.conductive(E), "and a fuse is armed again")
-	# ice on charge: glazed 4 cycles
-	var me3 := _equip(_u("me", "sword", "ice"), ["elemental_truth"])
-	var b3 := _fight(me3, [_foe()], [E])
-	b3.tiles.apply([E], "water", "x")
-	_use(t, b3, me3, "elemental_truth", "ice", E)
-	t.eq(int(b3.tiles.at(E).glaze), 4, "glazed for 4 cycles")
-	# wind on charge: the gale's copies last 2 cycles
-	var me4 := _equip(_u("me", "sword", "wind"), ["elemental_truth"])
-	var b4 := _fight(me4, [_foe()], [E])
-	b4.tiles.apply([E], "fire", "x")
-	_use(t, b4, me4, "elemental_truth", "wind", E)
-	var copies: Array = b4.tiles.entries.keys().filter(func(h): return h != E and str(b4.tiles.at(h).origin) == "spread")
-	t.ok(not copies.is_empty(), "the gale copied the fire")
-	t.ok(copies.all(func(h): return int(b4.tiles.at(h).timer) >= 2), "copies last 2 cycles")
+## D426: Elemental Truth is retired (never offered; En Passant took its
+## place). Its rules still resolve for an old replay (test_kit2 covers the
+## save migration).
+func test_elemental_truth_retired(t) -> void:
+	t.ok(not "elemental_truth" in BWSkillRegistry.pool("sword"), "never offered")
+	t.ok(BWSkillRegistry.has("elemental_truth"), "the def stays for old saves")
 
 
 func test_riposte_plus_answers_two_blows(t) -> void:
@@ -243,15 +191,6 @@ func test_striketwice_plus_third_cut(t) -> void:
 
 # ------------------------------------------------------------------ axe
 
-func test_reckless_swing_scorches_the_user(t) -> void:
-	var me := _equip(_u("me", "axe", "fire"), ["reckless_swing"])
-	var b := _fight(me, [_foe()], [E])
-	t.ok(b.skill_preview(me, "reckless_swing", "fire", E).notes.any(func(n): return str(n).begins_with("Reckless")), "the cost is in the forecast")
-	_use(t, b, me, "reckless_swing", "fire", E)
-	t.ok(me.statuses.has("scorched"), "the swinger is Scorched")
-	t.eq(me.cooldowns.get("reckless_swing_fire", 0), 1, "cd 1")
-
-
 func test_hook_pulls_adjacent(t) -> void:
 	var pulled := 0
 	for sd in 6:
@@ -293,22 +232,6 @@ func test_earthsplitter_line(t) -> void:
 		var was: Vector2i = line[0] if r.target == "a" else line[2]
 		var back: Vector2i = BWHex.neighbors(was)[0]
 		t.eq(v.pos, back if r.result.secondary else was, "%s heaved 1 back iff the secondary landed" % r.target)
-
-
-func test_war_cry_two_turns(t) -> void:
-	var me := _equip(_u("me", "axe", "fire", { "str": 20 }), ["war_cry"])
-	var b := _fight(me, [_foe()], [Vector2i(9, 9)])
-	_use(t, b, me, "war_cry", "", C)
-	t.ok(me.acted, "it uses the action")
-	t.eq(me.stat("str"), 24, "+20% STR")
-	b.end_turn()
-	_give_turn(b, me)
-	t.eq(me.stat("str"), 24, "still up on the next turn")
-	b.end_turn()
-	_give_turn(b, me)
-	t.eq(me.stat("str"), 24, "and the one after")
-	b.end_turn()
-	t.eq(me.stat("str"), 20, "gone after two of your turns")
 
 
 func test_cleave_plus(t) -> void:
@@ -449,3 +372,6 @@ func test_sunder_fissure(t) -> void:
 	t.eq(pv2.units, ["f"], "the foe past the rock is safe")
 	b2.use_skill(me2, "sunder", "fire", E)
 	t.ok(not b2.tiles.carries(line[4], "fire"), "nothing painted past the rock")
+
+
+## D435-D442: the retired skills' tests moved to test_kit3 (their replacements; the defs stay only for old saves).

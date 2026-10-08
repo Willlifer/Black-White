@@ -336,7 +336,7 @@ func _fill_card(u: BWUnit) -> void:
 	var el := BWLook.element_color(u.element)
 	var wname := BWText.weapon(u.weapon_class)
 	var lines: PackedStringArray = []
-	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]Lv %d[/color]" % [BWStyle.F_NAME - 2, u.name, dim, u.level])
+	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]Lv %d[/color]" % [BWStyle.F_NAME - 2, BWKeystones.titled(u), dim, u.level])
 	lines.append("[font_size=%d][color=#%s]%s (%s)   [/color][color=#%s]◆[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SMALL, lab, wname, u.expertise_letter(u.weapon_class), el.to_html(false),
 		BWGearText.readable(el).to_html(false), u.element.capitalize()])

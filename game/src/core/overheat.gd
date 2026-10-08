@@ -15,22 +15,22 @@ extends RefCounted
 ##     summed per unit over the action's eruptions (one event per unit).
 ##   * centre: vents to fire 2 (VENT_TO), so a second eruption needs a recast.
 ##   * a hex erupts once per action.
-## Keystones (BWKeystones ids):
+## Item enchantments since Keystones v3 (D443; BWKeystones.has still answers
+## the old ids; Trailblazer was REMOVED):
 ##   conflagration  your eruptions chain once: a ring hex your eruption RAISED
 ##                  to fire 3 erupts too, depth DEPTH_MAX at most.
-##   trailblazer    every hex you leave on a walk gets fire 1 (propagated: no
-##                  eruption, no marker fired), TRAIL_MAX per turn; you take no
-##                  crossing burns.
 ##   phoenix_heart  your own fire never hurts you; starting your turn on fire 3
 ##                  heals what it would burn (PHOENIX_HEAL_PCT); once a battle,
 ##                  a KO (blow or ground) while you stand on fire leaves you at
 ##                  1 HP and Overheats your hex.
+## Keystones v3 riders (opts from BWKs3.paint_opts): Lava Walker erupts at its
+## own cap (fire_max 5, not 3) and its ring never cools lava; Island Maker and
+## Superconductor widen the ring (overheat_radius 2).
 
 const RING_STEPS := 2
 const RING_PCT := 6.0
 const VENT_TO := 2
 const DEPTH_MAX := 2
-const TRAIL_MAX := 4
 const PHOENIX_HEAL_PCT := 12.0
 const FIRE_CAUSES := ["fire", "fire_cross", "overheat"]
 
@@ -48,12 +48,13 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, opts: 
 	var out: Array = []
 	if not fresh or element != "fire":
 		return out
+	var cap := int(opts.get("fire_max", BWTiles.AXIS_MAX))   # D447: a Lava Walker erupts at 5
 	var all: Array = hexes.duplicate()
 	all.append_array((opts.get("ring", {}) as Dictionary).keys())
 	for h in all:
 		if h in out or not t.can_hold(h) or t.is_glazed(h) or str(t.at(h).get("marker", "")) != "":
 			continue
-		if t.intensity(h, "fire") >= 3:
+		if t.intensity(h, "fire") >= cap:
 			out.append(h)
 	out.sort()
 	return out
@@ -67,6 +68,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary, 
 	if centres.is_empty():
 		return
 	var conflag := bool(opts.get("conflagration", false))
+	var reach := maxi(1, int(opts.get("overheat_radius", 1)))   # D448 Island Maker / D452 Superconductor: radius 2
 	var erupted := {}
 	var planned := {}
 	for c in centres:
@@ -85,14 +87,14 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary, 
 		erupted[c] = true
 		var ring: Array = []
 		var painted: Array = []
-		for n in t.board.neighbors(c):
-			if not t.board.exists(n):
+		for n in t.board.area(c, reach):
+			if n == c or not t.board.exists(n):
 				continue
 			ring.append(n)
-			if not _paintable(t, n) or erupted.has(n) or planned.has(n):
+			if not _paintable(t, n) or erupted.has(n) or planned.has(n) or not t._lava_ok(n, "fire", caster):
 				continue
 			var before := t.intensity(n, "fire")
-			var p := t._route(t.at(n), "fire", false, RING_STEPS, caster)
+			var p := t._route(t.at(n), "fire", false, RING_STEPS, caster, opts)
 			match str(p.op):
 				"none":
 					continue
@@ -108,7 +110,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary, 
 			painted.append(n)
 			if not n in out.changed:
 				out.changed.append(n)
-			if conflag and depth < DEPTH_MAX and before < 3 and t.intensity(n, "fire") >= 3:
+			if conflag and depth < DEPTH_MAX and before < 3 and t.intensity(n, "fire") >= 3 and int(opts.get("fire_max", 3)) <= 3:
 				planned[n] = true
 				queue.append([n, depth + 1])
 		_vent(t, c, caster)
@@ -146,6 +148,7 @@ static func _vent(t: BWTiles, c: Vector2i, caster: String) -> void:
 static func paint_opts(by: BWUnit, element: String, o: Dictionary) -> void:
 	if element == "fire" and ks(by, "conflagration"):
 		o["conflagration"] = true
+	BWKs3.paint_opts(by, element, o)            # D447-D452: lava, Island Maker / Superconductor radius
 
 
 ## After a paint's detonations: the eruptions' events and ring damage, summed
@@ -177,10 +180,13 @@ static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
 static func plan_notes(b: BWBattle, u: BWUnit, p: Dictionary) -> void:
 	if str(p.get("element", "")) != "fire":
 		return
-	var n := begin(b.tiles, p.hexes, "fire", true, {}).size()
+	var o := {}
+	BWKs3.paint_opts(u, "fire", o)
+	var n := begin(b.tiles, p.hexes, "fire", true, o).size()
 	if n > 0:
-		p.notes.append("Overheat: %s erupt%s, the ring to fire +2, %d%% to every unit on it" % [
-			"1 hex" if n == 1 else "%d hexes" % n, "s" if n == 1 else "", int(RING_PCT)])
+		p.notes.append("Overheat: %s erupt%s, the ring%s to fire +2, %d%% to every unit on it" % [
+			"1 hex" if n == 1 else "%d hexes" % n, "s" if n == 1 else "",
+			" (radius %d)" % int(o.overheat_radius) if int(o.get("overheat_radius", 1)) > 1 else "", int(RING_PCT)])
 		if ks(u, "conflagration"):
 			p.notes.append("Conflagration: a ring hex raised to fire 3 erupts too (once)")
 
@@ -192,41 +198,22 @@ static func basic_mods(b: BWBattle, att: BWUnit, dfn: BWUnit, el: String, basic:
 			"label": "Overheat: the blow's fire erupts here, the ring to fire +2, %d%% to every unit on it" % int(RING_PCT) })
 
 
-## Trailblazer: no crossing burns.
-static func no_cross(u: BWUnit) -> bool:
-	return ks(u, "trailblazer")
-
-
-## Trailblazer: fire 1 on every hex left on a walk (propagated), TRAIL_MAX a turn.
-static func after_walk(b: BWBattle, u: BWUnit, path: Array) -> void:
-	if not ks(u, "trailblazer") or path.size() < 2 or not u.alive() or b.over:
-		return
-	if int(u.fx.get("trail_turn", -1)) != b._turn_serial:
-		u.fx["trail_turn"] = b._turn_serial
-		u.fx["trail_n"] = 0
-	var left := TRAIL_MAX - int(u.fx.get("trail_n", 0))
-	var hexes: Array = []
-	for i in range(0, path.size() - 1):
-		if hexes.size() >= left:
-			break
-		var h: Vector2i = path[i]
-		if b.tiles.can_hold(h) and not h in hexes:
-			hexes.append(h)
-	if hexes.is_empty():
-		return
-	u.fx["trail_n"] = int(u.fx.get("trail_n", 0)) + hexes.size()
-	b._emit({ "type": "trailblaze", "unit": u.id, "hexes": hexes })
-	b.paint(hexes, "fire", u, 1, false, { "propagated": true })
+## D443: Trailblazer is gone; nothing in fire skips the crossing burn here
+## (Lava Walker's aura is BWKs3Fire.fire_immune).
+static func no_cross(_u: BWUnit) -> bool:
+	return false
 
 
 ## Every ground hurt passes here (BWBattle._tile_hurt), before it lands:
-## Ward of Light absorbs, Blast Rider shrugs off its own detonations, Phoenix
-## Heart ignores its own fire, turns a fire 3 turn-start burn into a heal and
-## holds a KO on fire at 1 HP (the eruption follows in after_hurt).
+## the Keystones v3 filters (Lava Walker's aura, Superconductor's own-hex
+## immunity, Island Maker's 75% less), Ward of Light absorbs, Phoenix Heart
+## ignores its own fire, turns a fire 3 turn-start burn into a heal and holds
+## a KO on fire at 1 HP (the eruption follows in after_hurt).
 static func filter_hurt(b: BWBattle, u: BWUnit, amount: int, cause: String, source: String) -> int:
 	if amount <= 0 or u == null:
 		return amount
-	if BWThunderKeys.rider_immune(b, u, cause, source):
+	amount = BWKs3.filter_hurt(b, u, amount, cause, source)
+	if amount <= 0:
 		return 0
 	if ks(u, "phoenix_heart"):
 		if cause == "fire" and b.tiles.intensity(u.pos, "fire") >= 3:
@@ -286,8 +273,12 @@ static func ai_skill(b: BWBattle, u: BWUnit, pv: Dictionary) -> float:
 	if str(pv.get("element", "")) != "fire":
 		return 0.0
 	var score := 0.0
-	for c in begin(b.tiles, pv.hexes, "fire", true, {}):
-		for n in b.board.neighbors(c):
+	var po := {}
+	BWKs3.paint_opts(u, "fire", po)
+	for c in begin(b.tiles, pv.hexes, "fire", true, po):
+		for n in b.board.area(c, maxi(1, int(po.get("overheat_radius", 1)))):
+			if n == c:
+				continue
 			var o := b.unit_at(n)
 			if o == null or BWObelisk.is_objective(o):
 				continue
@@ -310,13 +301,11 @@ static func ai_skill(b: BWBattle, u: BWUnit, pv: Dictionary) -> float:
 ## The tile card's lines for `h`.
 static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 	var out: Array = []
-	if b.tiles.intensity(h, "fire") >= 3 and not b.tiles.is_glazed(h):
+	if b.tiles.intensity(h, "fire") >= 3 and not b.tiles.is_glazed(h) and not b.tiles.is_lava(h):
 		out.append("Overheat: fresh fire here erupts; the ring gets fire +2 and every unit on it takes %d%%; this hex vents to fire 2" % int(RING_PCT))
 	var u := b._centre_at(h)
 	if u != null and u.alive():
 		if ks(u, "phoenix_heart"):
 			out.append("%s (Phoenix Heart): its own fire never burns it; fire 3 heals it %d%%%s" % [u.name, int(PHOENIX_HEAL_PCT),
 				"" if u.fx.has("phoenix_used") else "; a KO on fire leaves it at 1 HP and Overheats the hex (once)"])
-		if ks(u, "trailblazer"):
-			out.append("%s (Trailblazer): leaves fire 1 behind it (%d a turn), no crossing burns" % [u.name, TRAIL_MAX])
 	return out

@@ -472,7 +472,7 @@ func _squad_cell(u: BWUnit) -> Control:
 	hb.add_child(v)
 	var top := HBoxContainer.new()
 	v.add_child(top)
-	var n := _label(u.name, BWStyle.F_SMALL + 1)
+	var n := _label(BWKeystones.titled(u), BWStyle.F_SMALL + 1)
 	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	n.clip_text = true
 	top.add_child(n)

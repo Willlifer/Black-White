@@ -97,7 +97,8 @@ static func build(run: BWRun, n: int, kind: String) -> Array:
 			out.append(c)
 		BLANK:
 			for i in BWRun.DEPLOY:
-				var wc: String = BWRosterGen.CLASSES[erng.randi() % BWRosterGen.CLASSES.size()]
+				var act := BWRosterGen.active_classes()      # D419: no benched class
+				var wc: String = act[erng.randi() % act.size()]
 				var u := _unit(run, n, "blank%d" % (i + 1), "Blank %d" % (i + 1), _model(wc, erng), "", lvl, tier, ranks, b, BLANK_MULT, BLANK_HP, erng)
 				u.encounter = "blank"
 				u.cosmetics = { "hair_style": "none", "top": "tshirt", "bottom": "tight_pants", "clothing_shade": "light", "voice_pitch": 1.0 }
@@ -106,7 +107,8 @@ static func build(run: BWRun, n: int, kind: String) -> Array:
 			var els: Array = BWFormulas.ELEMENTS.duplicate()
 			for i in BWRun.DEPLOY:
 				var el: String = els.pop_at(erng.randi() % els.size())
-				var wc: String = BWRosterGen.CLASSES[erng.randi() % BWRosterGen.CLASSES.size()]
+				var act := BWRosterGen.active_classes()      # D419: no benched class
+				var wc: String = act[erng.randi() % act.size()]
 				var u := _unit(run, n, "being%d" % (i + 1), "%s Being" % el.capitalize(),
 					_model(wc, erng), el, lvl, tier, ranks, b, BEING_MULT, BEING_HP, erng)
 				u.encounter = "being"

@@ -52,18 +52,6 @@ func test_manipulate_counts_statuses_and_charge(t) -> void:
 	K._use(t, b, me, "manipulate", "fire", E)
 
 
-func test_hamstring_pins(t) -> void:
-	var pinned := 0
-	for sd in 6:
-		var me: BWUnit = K._equip(K._u("me", "daggers", "fire"), ["hamstring"])
-		var foe: BWUnit = K._foe()
-		var b: BWBattle = K._fight(me, [foe], [E], 90 + sd)
-		var ev: Dictionary = K._use(t, b, me, "hamstring", "fire", E)
-		t.eq(foe.statuses.has("pinned"), bool(ev.results[0].result.secondary), "Pinned iff not resisted")
-		pinned += 1 if foe.statuses.has("pinned") else 0
-	t.ok(pinned > 0, "pinned at least once")
-
-
 func test_fan_of_knives(t) -> void:
 	var me: BWUnit = K._equip(K._u("me", "daggers", "dark"), ["fan_of_knives"])
 	var nb := BWHex.neighbors(C)
@@ -72,22 +60,6 @@ func test_fan_of_knives(t) -> void:
 	t.eq(pv.units.size(), 2, "the two beside you")
 	K._use(t, b, me, "fan_of_knives", "dark", C)
 	t.ok(Array(BWHex.ring(C, 1)).all(func(h): return b.tiles.carries(h, "dark")), "the ring is painted")
-
-
-func test_assassinate_from_behind_only(t) -> void:
-	var me: BWUnit = K._equip(K._u("me", "daggers", "fire"), ["assassinate"])
-	var foe: BWUnit = K._foe()
-	var b: BWBattle = K._fight(me, [foe], [E])
-	foe.facing = BWHex.direction_index(E, C)             # facing me
-	t.ok(not E in b.skill_targets(me, "assassinate", "fire"), "not from the front")
-	foe.facing = (BWHex.direction_index(E, C) + 3) % 6   # back turned
-	var fc: Dictionary = b.skill_preview(me, "assassinate", "fire", E).forecasts["f"]
-	t.eq(fc.glance.value, 0.0, "can't glance")
-	t.near(float(K._mod(fc, "Assassinate: +25 crit").get("value", 0)), 25.0, 0.01, "+25 crit")
-	t.near(float(K._mod(fc, "Backstab").get("value", 0)), 1.5, 0.001, "backstab +50%")
-	K._use(t, b, me, "assassinate", "fire", E)
-	K._give_turn(b, me)
-	t.ok(not b.skills_for(me).any(func(s): return s.key == "assassinate"), "once per battle")
 
 
 func test_dagger_improves(t) -> void:
@@ -239,9 +211,9 @@ func test_fist_improves(t) -> void:
 ## a script error, and the new skills get used.
 func test_ai_plays_the_new_skills(t) -> void:
 	var kits := {
-		"sword": ["heart_seeker", "whirlwind_blade", "lunge"], "axe": ["reckless_swing", "hook", "sunder"],
-		"lance": ["guardrush", "sweep", "vault"], "bow": ["aimed_shot", "split_arrow", "pinning_shot"],
-		"staff": ["bolt", "tempest", "surge"], "daggers": ["manipulate", "hamstring", "fan_of_knives"],
+		"sword": ["thread_needle", "whirlwind_blade", "lunge"], "axe": ["reckless_arc", "hook", "sunder"],
+		"lance": ["lance_charge", "sweep", "vault"], "bow": ["retreating_shot", "split_arrow", "pinning_shot"],
+		"staff": ["bolt", "tempest", "surge"], "daggers": ["manipulate", "kindle", "fan_of_knives"],
 		"pistols": ["point_blank", "pistol_whip", "empty_the_chamber"], "fists": ["shockwave_palm", "haymaker", "hundred_fists"],
 	}
 	var used := {}
@@ -287,26 +259,18 @@ func test_grapple_second_pick(t) -> void:
 
 ## D112: the support skills' AI conditions.
 func test_ai_support_conditions(t) -> void:
-	# War Cry: nothing in reach now, a foe in reach next turn
-	var ax: BWUnit = K._equip(K._u("me", "axe", "fire"), ["war_cry"])
+	# Bellow (D436, was War Cry): nothing in reach now, a foe in reach next turn, a Cleave to double
+	var ax: BWUnit = K._equip(K._u("me", "axe", "fire"), ["bellow", "cleave"])
 	var b: BWBattle = K._fight(ax, [K._foe()], [Vector2i(4, 8)])
-	t.ok(not BWAI._best_support(b, ax).is_empty() and BWAI._best_support(b, ax).key == "war_cry", "War Cry before closing in")
-	var b2: BWBattle = K._fight(K._equip(K._u("me", "axe", "fire"), ["war_cry"]), [K._foe()], [E])
+	t.ok(not BWAI._best_support(b, ax).is_empty() and BWAI._best_support(b, ax).key == "bellow", "Bellow before closing in")
+	var b2: BWBattle = K._fight(K._equip(K._u("me", "axe", "fire"), ["bellow", "cleave"]), [K._foe()], [E])
 	t.ok(BWAI._best_support(b2, b2.current()).is_empty(), "a foe in reach now: attack instead")
 	# Phalanx: an ally beside you and a foe within 3
 	var ln: BWUnit = K._equip(K._u("me", "lance", "fire"), ["phalanx"])
 	var mate: BWUnit = K._u("m", "axe", "fire")
 	var b3: BWBattle = K._fight(ln, [K._foe()], [Vector2i(4, 7)], 7, [mate], [Vector2i(3, 4)])
 	t.eq(str(BWAI._best_support(b3, ln).get("key", "")), "phalanx", "Phalanx with a mate and a foe near")
-	# Aegis: the hurt, threatened ally
-	var st: BWUnit = K._equip(K._u("me", "staff", "fire"), ["aegis"])
-	var hurt: BWUnit = K._u("m", "axe", "fire")
-	var b4: BWBattle = K._fight(st, [K._foe()], [Vector2i(4, 9)], 7, [hurt], [Vector2i(4, 6)])
-	hurt.hp = int(hurt.max_hp() * 0.4)
-	var a := BWSkillRegistry.get_def("aegis").ai_support(b4, st, {})
-	t.eq(a.get("target", Vector2i(-1, -1)), hurt.pos, "Aegis on the hurt ally")
-	hurt.hp = hurt.max_hp()
-	t.ok(BWSkillRegistry.get_def("aegis").ai_support(b4, st, {}).is_empty(), "not on a healthy one")
+	# (Aegis is retired, D442)
 	# Tumble: after attacking, when a safer hex is near
 	var dg: BWUnit = K._equip(K._u("me", "daggers", "fire"), ["tumble"])
 	var f5: BWUnit = K._foe()
@@ -315,3 +279,6 @@ func test_ai_support_conditions(t) -> void:
 	b5.attack(dg, f5)
 	BWAI._guard_up(b5, dg)
 	t.ok(K._events(b5, "skill").any(func(e): return e.skill == "tumble"), "tumbles after the attack")
+
+
+## D435-D442: the retired skills' tests moved to test_kit3 (their replacements; the defs stay only for old saves).

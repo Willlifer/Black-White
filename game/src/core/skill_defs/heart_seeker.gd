@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D438 Thread the Needle): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Sword (D103). A precise thrust at an adjacent foe: +CRIT crit chance.
 
 const POWER := 10
@@ -12,6 +14,7 @@ func _init() -> void:
 		"desc": "A precise thrust at an adjacent enemy: +25 crit chance",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER,
+		"retired": true,
 	}, 301)
 
 

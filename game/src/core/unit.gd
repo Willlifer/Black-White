@@ -9,6 +9,10 @@ const BASE_MOVE := 4                 # D17; D359: the fallback, a class's own `m
 const EXPERTISE_RANKS := ["E", "D", "C", "B", "A"]
 const POINTS_PER_RANK := 10          # affinity (brief) and expertise (D21)
 const MAX_AFFINITY_RANK := 10
+## D417 (author: "Reduce max elements attuned to 3"): a unit holds affinity
+## (points > 0) in at most this many elements. Gains in a further element are
+## dropped (BWUnit.add_affinity); offers never show a 4th (BWRun).
+const MAX_ELEMENTS := 3
 
 var id := ""
 var name := ""
@@ -159,7 +163,10 @@ func stat(key: String) -> int:
 func max_hp() -> int:
 	if fixed_hp > 0:
 		return fixed_hp
-	return BWFormulas.hp_value(stat("con"), level)    # D137
+	var hp_max := BWFormulas.hp_value(stat("con"), level)    # D137
+	if str(fx.get("lev", "")) == "leviathos":
+		hp_max *= 2                                      # D451 Leviathos: double max HP for the battle
+	return hp_max
 
 
 func speed() -> int:
@@ -217,6 +224,71 @@ func refresh_effects() -> void:
 
 func weapon() -> Dictionary:
 	return BWData.row("weapons", weapon_class)
+
+
+## D417: the elements this unit is attuned to (affinity points > 0), native first.
+func attuned_elements() -> Array:
+	return focus_options()
+
+
+## D417: can `el` gain affinity? Yes if the unit already has it, or has room
+## for another element (MAX_ELEMENTS).
+func can_attune(el: String) -> bool:
+	if el == "":
+		return false
+	return int(affinity.get(el, 0)) > 0 or attuned_elements().size() < MAX_ELEMENTS
+
+
+## D417: the one way affinity grows. False (nothing added) when `el` would be
+## an element past MAX_ELEMENTS.
+func add_affinity(el: String, points: int) -> bool:
+	if points <= 0 or not can_attune(el):
+		return false
+	affinity[el] = int(affinity.get(el, 0)) + points
+	return true
+
+
+## D417 save migration: a unit attuned to more than MAX_ELEMENTS keeps the
+## MAX_ELEMENTS with the most affinity points (ties: native, then the focus,
+## then element order); the native element is always kept (it's the hair), in
+## place of the lowest of the rest. Each dropped element: its points are
+## cleared and HALF of them (rounded down) go to the kept focus element (else
+## native); its perks and keystones are removed, and anything the new ranks
+## owe is asked through the normal pick flow. Returns { dropped: [el],
+## moved: points, to: el } (dropped empty = nothing to do).
+func enforce_element_cap() -> Dictionary:
+	var have: Array = attuned_elements()
+	if have.size() <= MAX_ELEMENTS:
+		return { "dropped": [], "moved": 0, "to": "" }
+	var order := func(a, b2) -> bool:
+		var pa := int(affinity.get(a, 0))
+		var pb := int(affinity.get(b2, 0))
+		if pa != pb:
+			return pa > pb
+		for pref in [element, focus_element]:
+			if a == pref or b2 == pref:
+				return a == pref
+		return BWFormulas.ELEMENTS.find(a) < BWFormulas.ELEMENTS.find(b2)
+	have.sort_custom(order)
+	var keep: Array = have.slice(0, MAX_ELEMENTS)
+	if element != "" and not element in keep:
+		keep[MAX_ELEMENTS - 1] = element
+	var dropped: Array = have.filter(func(e): return not e in keep)
+	var to := focus_element if focus_element in keep else element
+	if to == "":
+		to = str(keep[0])
+	var moved := 0
+	for el in dropped:
+		moved += int(affinity.get(el, 0)) / 2
+		affinity.erase(el)
+		perks = perks.filter(func(id): return str(BWData.row("perks", str(id)).get("element", "")) != el)
+		keystones = keystones.filter(func(id): return str(BWData.row("keystones", str(id)).get("element", "")) != el)
+		bonus_perks.erase(el)
+	if moved > 0:
+		affinity[to] = int(affinity.get(to, 0)) + moved
+	if not focus_element in keep:
+		focus_element = ""
+	return { "dropped": dropped, "moved": moved, "to": to }
 
 
 func affinity_rank(el: String) -> int:

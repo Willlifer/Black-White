@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D435 Reckless Arc): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Axe (D104). A wild, heavy swing at an adjacent foe. It leaves you open:
 ## you are Scorched (attacks on you +10%) through your next turn.
 
@@ -12,6 +14,7 @@ func _init() -> void:
 		"desc": "A wild, heavy swing at an adjacent enemy. It leaves you open: you are Scorched (attacks on you +10%) until your next turn is over",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER,
+		"retired": true,
 	}, 311)
 
 

@@ -34,7 +34,7 @@ var turn_index := -1
 var cycle := 0
 var history: Array = []        # every event, in order
 var _undo := {}                # D48: the last move's snapshot, until the unit commits
-const _COMMITS := ["attack", "skill", "turn_end", "turn", "cycle", "battle_end", "follow_up", "guard"]
+const _COMMITS := ["attack", "skill", "turn_end", "turn", "cycle", "battle_end", "follow_up", "guard", "submerge"]   # D451: submerging commits
 var over := false
 var winner := ""
 var _fx_units: Array = []      # units carrying any effect (fast path for stat hooks)
@@ -87,7 +87,8 @@ func _init(p_board: BWBoard, seed_value: int = 1) -> void:
 	board.extra_cost = tiles.move_penalty
 	tiles.potency = _tile_potency          # FX hook: tile_potency_pct
 	board.blocker = tiles.blocks_move      # D262: ice pillars are impassable
-	board.sight_blocker = tiles.blocks_sight   # D262/D265: pillars and steam block sight
+	board.sight_blocker = tiles.blocks_sight   # D262: pillars block sight (D421: no steam)
+	board.lift = tiles.pillar_lift         # D459 Sculptor: its pillars are high ground
 	tiles.occupant = unit_at               # D262: pillars see the units
 	rng.seed = seed_value
 	BWWind.hook_board(self)                # D273: wind walls join the board's blocker (last: composes)
@@ -235,6 +236,9 @@ func _centre_at(h: Vector2i) -> BWUnit:
 ## Could `u` stand with its centre on `h`? Every footprint hex on the map,
 ## passable, and free of other living units.
 func can_stand(u: BWUnit, h: Vector2i) -> bool:
+	if BWKs3Ice.climbable(self, u, h):          # D459: an ally of a Sculptor stands on its pillar
+		var oc := unit_at(h)
+		return oc == null or oc == u
 	if not board.fits(h, maxi(u.size, 1) - 1):
 		return false
 	for f in u.footprint(h):
@@ -473,7 +477,7 @@ func reachable(u: BWUnit) -> Dictionary:
 		budget = int(u.fx.get("bonus_move", 0))
 		if budget <= 0:
 			return { u.pos: { "cost": 0, "from": u.pos, "stop": true } }
-	if u.statuses.has("becalmed"):            # D270: Becalmed, no move of any kind
+	if u.statuses.has("becalmed") or BWKs3Water.drowned(u):   # D270: Becalmed; D451: Drowned, no move of any kind
 		return { u.pos: { "cost": 0, "from": u.pos, "stop": true } }
 	var blocked := {}
 	var no_stop := {}
@@ -491,6 +495,9 @@ func reachable(u: BWUnit) -> Dictionary:
 		"no_water": _immune(u, "water_wading"),
 		"jump": BWWeaponMove.jump(u),                                     # D360/D371: 2; lance / HighGrounder 4
 	}
+	var climb := BWKs3Ice.climb_hexes(self, u)                            # D459: its side's Sculptor pillars
+	if not climb.is_empty():
+		opts["climb"] = climb
 	# D93/D97: perk movement (Waterwalking, Ice Legs, Heat Rush, Shadowstep) and
 	# enemy zones need the battle's own search; plain units keep the board's.
 	var rules := _move_rules(u)
@@ -535,6 +542,8 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	u.moved = true
 	u.facing = BWHex.direction_index(path[-2], path[-1]) if path.size() > 1 else u.facing   # D87
 	u.fx["moved_hexes"] = int(u.fx.get("moved_hexes", 0)) + path.size() - 1   # Jousting
+	if path.size() > 1 and BWKs3.ks(u, "being_of_rain"):
+		_emit({ "type": "rain_cloud", "unit": u.id, "path": path.duplicate() })   # D451b: the cloud follows the walk
 	var e := { "type": "move", "unit": u.id, "path": path }
 	if flow:
 		u.fx["bonus_move"] = 0
@@ -543,7 +552,7 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	_emit(e)
 	# Fire burns every hex entered along the way, start excluded (ELEMENTS §2.2).
 	# D93 Heat Rush: no crossing damage.
-	var no_cross := BWEffects.has(u, "heat_rush") or BWOverheat.no_cross(u)   # D286: Trailblazer too
+	var no_cross := BWEffects.has(u, "heat_rush")   # D443: Trailblazer is gone (Lava Walker's aura is BWKs3.filter_hurt)
 	for i in range(1, path.size()):
 		if tiles.intensity(path[i], "water") > 0:          # v2 hook: Tidewalker counts water entered
 			u.fx["on_hexes:water"] = int(u.fx.get("on_hexes:water", 0)) + 1
@@ -551,7 +560,6 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 		if pct > 0 and u.alive() and not no_cross:
 			_tile_hurt(u, _tile_dmg(u, pct, "fire"), "fire_cross", str(tiles.at(path[i]).get("source", "")))
 	_lay_on_move(u, path)
-	BWOverheat.after_walk(self, u, path)      # D286: Trailblazer's fire 1 behind it
 	BWPools.on_walk(self, u, path)            # D264: an electrified pool's entry shock
 	BWUnsteady.after_walk(self, u, path)      # D399 Sure-Footed: a foe walking off its glaze stays Unsteady
 	BWPhases.after_move(self, u, path)        # D256: the Twins' beam (crossing it)
@@ -559,6 +567,8 @@ func move(u: BWUnit, h: Vector2i) -> bool:
 	if u.alive() and not over:
 		_static_field_check(u)                # D93 Static Field: ending a move on its fuse
 		_zone_check(u)                        # D97: ending a move inside an enemy zone
+	if u.alive() and not over:
+		BWKs3.after_walk(self, u, path)       # D451b Being of Rain's rain, D451 the Leviathan's offer
 	return true
 
 
@@ -588,16 +598,21 @@ func undo_move(u: BWUnit) -> bool:
 
 ## FX hook: range_mod (Piercing, Longshot, Throwing, Ammo Belt).
 func weapon_range(u: BWUnit) -> int:
+	if BWKs3Water.drowned(u):
+		return DROWNED_RANGE                    # D451: Drowned reaches the whole board
 	return BWEffects.basic_range(u)
+
+
+const DROWNED_RANGE := 99
 
 
 ## Range and sight between the nearest pair of footprint hexes that works.
 func in_range(u: BWUnit, target: BWUnit, from: Vector2i = NOWHERE) -> bool:
 	var at := u.pos if from == NOWHERE else from
+	if BWKs3Water.drowned(u):
+		return target.alive() and target.team != u.team   # D451: Drowned: any foe on the board, no sight needed
 	if u.statuses.has("blinded") and gap(u, target, at) > BWSkills.BLIND_RANGE:
 		return false                          # D94: Blinded targets within 2 only
-	if BWPools.steam_hides(self, u, at, target):
-		return false                          # D265: a unit in steam, only from within 2
 	return _reaches_unit(u, at, target, weapon_range(u))
 
 
@@ -666,6 +681,8 @@ func forecast_basic(u: BWUnit, target: BWUnit, share: float = 1.0, share_label: 
 			"label": "Own round (%s): +%d%%" % [rnd, BWSkills.OWN_ROUND_PCT], "tag": "Own round" })
 	if share != 1.0:
 		mods.append({ "stage": "dmg", "label": share_label, "value": share })
+	if BWFormulas.is_ranged(int(w.get("range", 1)), true) and pressured(u, from):   # D424
+		mods.append(BWFormulas.pressure_mod())
 	var fcb := _annotate(_guarded(BWFormulas.forecast(u, target, kind, power, el, 0.0, 0.0, 1.0, mods), target), target, u)
 	if el == "wind":                           # D407: what a wind basic does, in words
 		fcb["notes"] = (fcb.get("notes", []) as Array) + ["Gust: a landed hit pushes it 1 away"]
@@ -721,6 +738,10 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	if att.fx.get("momentum", false):
 		mods.append({ "stage": "dmg", "value": 1.0 + BWSkills.VAULT_MOMENTUM_PCT / 100.0,
 			"label": "Momentum (Vault): +%d%%" % BWSkills.VAULT_MOMENTUM_PCT, "tag": "Momentum" })
+	if basic and int(att.fx.get("charge_momentum", 0)) > 0:   # D434: Charge's run rides into the swing
+		var cm_n := int(att.fx.charge_momentum)
+		mods.append({ "stage": "dmg", "value": 1.0 + 0.03 * cm_n,
+			"label": "Momentum (Charge, %d hexes): +%d%%" % [cm_n, 3 * cm_n], "tag": "Momentum" })
 	# D209: special encounters (Blank, Elemental Being) by the blow's damage class
 	if dfn.encounter != "":
 		var em := BWFormulas.encounter_mod(dfn, BWFormulas.damage_class({ "source": "basic" if basic else "skill", "kind": kind, "element": el }),
@@ -732,6 +753,7 @@ func _mods(att: BWUnit, dfn: BWUnit, kind: String, el: String, basic: bool, roun
 	BWOverheat.basic_mods(self, att, dfn, el, basic, mods)   # D285: an Overheat note
 	BWOverfreeze.basic_mods(self, dfn, el, basic, mods)      # D312: an Overfreeze note
 	BWKeystoneFx.blow_mods(self, att, dfn, mods)   # D294: Frozen (x2, counts as glazed)
+	BWKs3.blow_mods(self, att, dfn, mods)          # D458b Shatterer, D462 Permafrost
 	BWCastle.mods(self, att, dfn, ap, el, mods)    # D336/D337: castle high ground, a wood / glazed gate
 	if _fx_units.is_empty():
 		return mods
@@ -821,6 +843,7 @@ func basic_strikes(u: BWUnit, target: BWUnit) -> Array:
 				continue
 			out.append({ "unit": o, "share": share, "label": "%s (outer ring)" % e.name if share != 1.0 else "", "pattern": "cleave" })
 		break
+	BWKs3Water.splash_strikes(self, u, target, out)            # D451b Leviathos: a radius-1 splash
 	return out.filter(func(s): return can_harm(u, s.unit))     # D140: side lines and rings pass over an obelisk
 
 
@@ -884,6 +907,9 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 	var strikes := basic_strikes(u, target)
 	u.acted = true
 	_face(u, target_hex)
+	var lunge := BWKs3Water.drowned(u) and BWKs3Water.melee(u) and gap(u, target) > 1
+	if lunge:                                  # D451: a Drowned melee blow lunges there (the view) and back
+		_emit({ "type": "drowned_lunge", "unit": u.id, "from": u.pos, "to": BWKs3Water.lunge_hex(self, u, target), "target": target.id })
 	var first := {}
 	var ko_any := false
 	var counters: Array = []
@@ -917,6 +943,7 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 		counters.append_array(_riposte_check(v, res))
 		_note_struck(struck, v, res)
 	u.fx.erase("momentum")          # D87: Vault's momentum is spent on the follow-up
+	u.fx.erase("charge_momentum")   # D434: and Charge's
 	# FX hook: knockback on=hit (Impact pushes, Hooking pulls) — a secondary
 	# effect, so it lands on an avoid too and is stopped only by a resist.
 	if target.alive() and not first.is_empty() and first.secondary:
@@ -943,7 +970,8 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 	elif spell and u.attuned != "":
 		paint([target_hex], u.attuned, u)
 	_fire_pistol(u, target_hex)
-	BWThunderKeys.after_basic(self, u, target, first, target_hex)   # D290: Static Blades (burst, else arm)
+	if lunge:
+		_emit({ "type": "drowned_return", "unit": u.id, "to": u.pos })
 	BWWind.after_basic(self, u, target, first)  # D407: a wind basic pushes its target 1 away
 	BWObjectives.after_basic(self, u, target, first)   # D327: a Gust on a wind divider
 	_after_action(u, u.attuned if spell else "", true)
@@ -1094,13 +1122,6 @@ func skill_targets(u: BWUnit, key: String, element: String = "") -> Array[Vector
 			if BWHex.distance(u.pos, h) <= BWSkills.BLIND_RANGE:
 				near.append(h)
 		out = near
-	if str(s.get("targeting", "")) in ["unit", "adjacent_unit"]:
-		var seen: Array[Vector2i] = []        # D265: a unit in steam, only from within 2
-		for h in out:
-			var o := unit_at(h)
-			if o == null or not BWPools.steam_hides(self, u, u.pos, o):
-				seen.append(h)
-		out = seen
 	out = BWWind.filter_targets(self, u, out, s)   # D273: a Wind Wall blocks skills both ways
 	return out
 
@@ -1293,6 +1314,7 @@ func use_skill(u: BWUnit, key: String, element: String, target_hex: Vector2i, ch
 	_overwatch_check(u, struck)               # D97: Covering Fire
 	if not u.alive():
 		u.follow_up = []
+	BWKit2.after_skill(self, u, s, results)   # D427: Blade Dance's free step
 	BWEnchant.end_action(self, u, BWSkills.is_damaging(key))   # v2 hook
 	_check_end()
 	return e
@@ -1310,6 +1332,7 @@ func _plan(u: BWUnit, s: Dictionary, element: String, target: Vector2i, choice: 
 	d.plan(self, u, element, target, p)
 	_widen(u, d, p)
 	BWBeams.magnify(self, u, d, p)            # D289: an ally on a Magnify holder's light casts magnified
+	BWKs3.plan(self, u, d, p)                 # D454 El Niño: a wind area +1 ring
 	BWOverheat.plan_notes(self, u, p)         # D285: the forecast names an Overheat
 	BWOverfreeze.plan_notes(self, u, p)       # D312: ... an Overfreeze
 	BWSquall.plan_notes(self, u, p)           # D309: ... a Squall
@@ -1447,6 +1470,30 @@ func _rush(u: BWUnit, toward: Vector2i, p: Dictionary, shove: bool) -> void:
 	p.dest = walk[-1] if not walk.is_empty() else u.pos
 
 
+## D424: is any foe within BWFormulas.PRESSURE_RADIUS of `u` (standing at
+## `at`, default where it is)? Big bodies count by their nearest hex.
+func pressured(u: BWUnit, at: Vector2i = NOWHERE) -> bool:
+	var me: Array = u.footprint(u.pos if at == NOWHERE else at)
+	for f in foes_of(u):
+		if not f.alive():
+			continue
+		for fh in f.footprint():
+			for mh in me:
+				if BWHex.distance(mh, fh) <= BWFormulas.PRESSURE_RADIUS:
+					return true
+	return false
+
+
+## D424: a ranged single-target skill: one unit or one hex, no area, reach
+## 3+ (bow and staff shots, Bolt, Saturate, a thrown pair, Hook). Areas
+## (radius / aoe), lines, leaps and self shapes are exempt; a skill that
+## uses the basic attack (Quick Shot) goes through forecast_basic instead.
+static func ranged_skill(s: Dictionary) -> bool:
+	if s.get("aoe", false) or int(s.get("radius", 0)) > 0 or s.get("basic", false):
+		return false
+	return BWFormulas.is_ranged(int(s.get("range", 0)), str(s.get("targeting", "")) in ["unit", "hex"])
+
+
 ## `strike`: which strike of a multi-strike skill (Flurry) this forecast is.
 func _skill_forecast(u: BWUnit, s: Dictionary, el: String, v: BWUnit, p: Dictionary = {}, strike: int = 0) -> Dictionary:
 	if s.get("basic", false):
@@ -1469,6 +1516,8 @@ func _skill_forecast(u: BWUnit, s: Dictionary, el: String, v: BWUnit, p: Diction
 		var pct := float(s.get("hit_pct", 100))
 		mods.append({ "stage": "dmg", "value": pct / 100.0,
 			"label": "%s: strike %d of %d at %d%%" % [s.name, strike + 1, hits, int(pct)] })
+	if ranged_skill(s) and pressured(u):            # D424: a foe within 2 of a ranged single-target skill
+		mods.append(BWFormulas.pressure_mod())
 	# The skill's own riders (D87), labelled for the breakdown.
 	var notes: Array = []
 	d.forecast_mods(self, u, el, v, p, strike, mods, notes)
@@ -1539,6 +1588,7 @@ func _riposte_check(v: BWUnit, res: Dictionary) -> Array:
 func _answer(counters: Array) -> void:
 	for c in counters:
 		var d: BWUnit = c.unit
+		d.fx["riposte_answered"] = true              # D425: an answered guard never releases
 		if not d.alive() or over:
 			continue
 		var el: String = c.element
@@ -1582,6 +1632,7 @@ func _after_blow(att: BWUnit, v: BWUnit, res: Dictionary, before: int, cause: St
 	_fault_lines(att, v, res)              # D93: a Shatter hit breaks the glaze
 	BWOverheat.after_hurt(self, v)         # D286: Phoenix Heart's held KO Overheats the hex
 	BWKeystoneFx.after_blow(self, att, v, res)   # D294: a landed hit thaws Frozen
+	BWKs3.after_blow(self, att, v, res)          # D458b Shatterer: the glaze around shatters
 	if not v.alive():
 		if before > 0:
 			_ko(v, att, cause)
@@ -1634,6 +1685,7 @@ func _ko(victim: BWUnit, by: BWUnit, cause: String = "") -> void:
 	BWEnchant.on_ko(self, victim, by, cause)   # v2 hook: on-kill, ally_kill, ally_ko
 	BWPhases.on_ko(self, victim)               # D255: a boss unit fell (the rage clock)
 	BWCurse.on_ko(self, victim, by)            # D275: Lane C's Contagion hooks here
+	BWKs3.on_ko(self, victim)                  # D450 Hopekiller: dark 3 where its foe fell
 	BWObjectives.on_ko(self, victim, by)       # D327: an objective object broke
 
 
@@ -1696,9 +1748,8 @@ func _award(u: BWUnit, ko: bool, el: String) -> Array:
 	for e in BWEffects.list(u, "affinity_gain_plus"):
 		if e.element == "" or e.element == el:
 			extra += int(BWEffects.p(e, "amount", 0))
-	if extra > 0:
-		var before := u.affinity_rank(el)
-		u.affinity[el] = int(u.affinity.get(el, 0)) + extra
+	var before := u.affinity_rank(el)
+	if extra > 0 and u.add_affinity(el, extra):   # D417: no 4th element
 		events.append({ "type": "affinity_bonus", "element": el, "amount": extra })
 		if u.affinity_rank(el) > before:
 			events.append({ "type": "affinity_rank", "element": el, "rank": u.affinity_rank(el) })
@@ -1816,6 +1867,8 @@ func _immune(u: BWUnit, what: String) -> bool:
 		return true                            # D93 Eye of the Storm
 	if what == "displace" and BWKeystoneFx.holds(u):
 		return true                            # D294: Frozen can't be displaced
+	if what == "displace" and BWKs3Water.drowned(u):
+		return true                            # D451: Drowned can't be moved
 	if what == "displace" and BWEnchant.planted(self, u):
 		return true                            # v2: Planted
 	for e in BWEffects.list(u, "immune"):
@@ -1874,7 +1927,7 @@ func _lay_on(u: BWUnit, trigger: String, ctx: Dictionary) -> void:
 
 
 func _lay_on_move(u: BWUnit, path: Array) -> void:
-	if path.size() > 1:
+	if path.size() > 1 and BWKs3.paints_walking(u):   # D451b: Being of Rain never paints as it walks
 		_lay_on(u, "move", { "path": path.slice(0, path.size() - 1) })
 
 
@@ -1991,7 +2044,7 @@ func _tile_potency(source: String, element: String) -> float:
 
 ## Tile damage to `u` with its damage_taken_mod tile_pct (Fireproof, Grounded).
 ## D130: a quarter from an element the unit is braced against (standing,
-## crossing, eruptions, steam, detonations: every ground source comes here).
+## crossing, eruptions, detonations: every ground source comes here).
 func _tile_dmg(u: BWUnit, pct: float, element: String, mult: float = 1.0) -> int:
 	if u.braced_against(element):
 		mult *= BWUnit.BRACE_TAKEN
@@ -2019,6 +2072,7 @@ func end_turn() -> void:
 			return
 		u.follow_up = []           # waiting declines a follow-up
 		u.fx.erase("momentum")
+		u.fx.erase("charge_momentum")
 		var st_steady: Dictionary = u.statuses.get("steadied", {})
 		if not st_steady.is_empty() and st_steady.armed:   # D94: Steadied counts its holder's turns
 			st_steady.turns = int(st_steady.turns) - 1
@@ -2028,6 +2082,7 @@ func end_turn() -> void:
 		BWWind.turn_end(self, u)                   # D270: Becalmed ends into Restless (2 turns)
 		BWCurse.turn_end(self, u)                  # D275: ending on a foe's dark: +1 Rot
 		BWBeams.turn_end(self, u)                  # D287: Empowered lasts until the end of this turn
+		BWKs3.turn_end(self, u)                    # D449/D451: the overcharge reverts; a Leviathan offer lapses
 		for k in u.statuses.keys():                # D87: armed statuses end with this turn
 			if u.statuses[k].armed and not u.statuses[k].get("keep", false):
 				u.statuses.erase(k)
@@ -2105,9 +2160,13 @@ func _begin_turn() -> void:
 	if u.fx.has("guard"):          # FX hook: guard lasts until your next turn
 		u.fx.erase("guard")
 		_emit({ "type": "guard_end", "unit": u.id })
+	var released := {}                                 # D425: an unanswered guard releases (BWKit2)
 	if not u.riposte.is_empty():
+		if not u.fx.get("riposte_answered", false):
+			released = u.riposte.duplicate()
 		u.riposte = {}             # an unspent guard drops at your next turn (V8)
 		_emit({ "type": "riposte_end", "unit": u.id })
+	u.fx.erase("riposte_answered")
 	for k in u.cooldowns.keys():
 		u.cooldowns[k] = maxi(0, u.cooldowns[k] - 1)
 	u.fx.erase("momentum")
@@ -2117,6 +2176,9 @@ func _begin_turn() -> void:
 	_arced.clear()
 	_expire_holds(u)                               # D97: zone / overwatch end at the holder's turn
 	_emit({ "type": "turn", "unit": u.id, "team": u.team })
+	BWKit2.turn_start(self, u, released)           # D425-D432: Riposte's release, Lance Charge's run, barrier/dance end
+	if over:
+		return
 	if BWObelisk.is_objective(u):
 		if u is BWLilFella:
 			_fella_turn_start(u)                   # D348: the enemy's ground under it bites
@@ -2128,12 +2190,15 @@ func _begin_turn() -> void:
 		_tile_hurt(u, _tile_dmg(u, BWSkills.SHROUD_DRAIN_PCT, "dark"), "shrouded", str(u.statuses.shrouded.source))
 	# Standing on the ground: damage first, then healing (ELEMENTS §2.2).
 	var st := tiles.standing(u.pos)
+	BWKs3.standing(self, u, st)                    # D450b Judicator, D460 Solar Wind
 	var own := BWPhases.turn_start(self, u)        # D256: a Twin heals on its own colour instead
 	if st.fire > 0 and u.alive():
 		var half := 1.0
 		for e in BWEffects.list(u, "ember_skin"):  # D93 Ember Skin: your standing fire halved
 			half = float(BWEffects.p(e, "stand_pct", 50)) / 100.0
 		_tile_hurt(u, _tile_dmg(u, st.fire, "fire", half), "fire", st.source)
+	if float(st.get("judged", 0.0)) > 0.0 and u.alive() and not own:   # D450b Judicator: its light burns its foes
+		_tile_hurt(u, _tile_dmg(u, float(st.judged), "light"), "judicator", str(st.source))
 	BWPools.turn_shock(self, u)                    # D264: an electrified pool shocks (after fire, before the drain)
 	if st.drain > 0 and u.alive() and not night and not own:
 		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", st.source)
@@ -2141,7 +2206,9 @@ func _begin_turn() -> void:
 	if heal > 0 and u.alive():
 		BWBeams.light_heal(self, u, heal, str(st.source))   # D288: Overflow turns the excess into a Ward of Light
 	BWBeams.turn_start(self, u)                    # D287: Dawn, -1 on the longest cooldown on light 2+
-	BWThunderKeys.turn_start(self, u)              # D291: Blast Rider's launch lock lifts
+	if over:
+		return
+	BWKs3.turn_start(self, u)                      # D455 La Niña, D451 the Leviathan's form
 	if over:
 		return
 	if u.alive() and BWKeystoneFx.turn_start(self, u):   # D295 Riptide; D294 Frozen skips the turn
@@ -2207,6 +2274,8 @@ func in_group_turn() -> bool:
 
 
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
+	if BWKs3.heal_hook(self, u, pct, cause):           # D450 Hopekiller: the heal hurts instead
+		return
 	if BWKeystoneFx.heal_blocked(self, u):              # D296 Event Horizon: no heals on its dark 3
 		_emit({ "type": "enchant", "unit": u.id, "name": "Event Horizon", "text": "can't be healed" })
 		return
@@ -2246,11 +2315,12 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	BWKeystoneFx.paint_opts(by, o)             # D293 Jetstream: gale 3, copies last 2
 	BWOverheat.paint_opts(by, element, o)      # D285: Conflagration
 	BWOverfreeze.paint_opts(self, o)           # D343: a hex / unit overfreezes once per action
-	hexes = BWThunderKeys.filter_rearm(self, by, element, hexes)   # D291: Blast Rider's locked hex
 	var wsnap := BWWind.before_paint(self, hexes)   # the gales about to fire (their owner; D406: no modes)
+	var ks3pre := BWKs3.before_paint(self)        # D459: the pillars before (a Sculptor's shatters x2)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
+	BWKs3.after_apply(self, by, element, r)       # D447 fizzles; D452 Superconductor's own-hex immunity
 	BWThunderKeys.inject_self_det(self, by, o, r)    # D306: Self-detonate on the holder's own empty fuse
-	BWThunderKeys.after_apply(self, by, element, r)   # D291: Daisy Chain, Blast Rider's self-detonation
+	BWThunderKeys.after_apply(self, by, element, r)   # D291: Daisy Chain
 	if cast:
 		by.attuned = element
 	var pe := { "type": "paint", "unit": by.id, "element": element, "hexes": r.changed }
@@ -2262,7 +2332,9 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	if not r.gales.is_empty():                 # D160: which hexes each gale copied onto (preview, recap)
 		pe["gales"] = r.gales.map(func(g): return { "origin": g.origin, "copies": (g.copies as Array).duplicate() })
 	if r.has("pools"):
-		pe["pools"] = r.pools                  # D262-D265: steam / glaze / shock / pillars / melted
+		pe["pools"] = r.pools                  # D262-D265: glaze / shock / pillars / melted
+	if not (r.get("doused", []) as Array).is_empty():
+		pe["doused"] = (r.doused as Array).duplicate()   # D421: fire met water: the hiss
 	_emit(pe)
 	if not r.detonations.is_empty():
 		by.fx["detonated"] = true              # D93 Bolt Step reads it after the action
@@ -2282,10 +2354,13 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 			for e in BWEffects.list(src, "effect_repeat", "thunder"):
 				for k in int(BWEffects.p(e, "extra", 0)):
 					echoes.append(float(BWEffects.p(e, "scale_pct", 100)) / 100.0)
-		_emit({ "type": "detonate", "hex": d.hex, "pct": d.pct, "radius": radius })
+		var dmix: Dictionary = d.get("mix", {})    # D423: the ring's colour (BWTiles.blast_mix)
+		radius = BWKs3.det_radius(self, by, d, radius)   # D452 Superconductor 2, D457b Powder Keg +1
+		d.pct = float(d.pct) * BWKs3.det_mult(ks3pre, d)   # D459: a Sculptor's pillar shatters for double
+		_emit({ "type": "detonate", "hex": d.hex, "pct": d.pct, "radius": radius, "mix": dmix })
 		var factor := 1.0
 		for sc in echoes:
-			_emit({ "type": "detonate", "hex": d.hex, "pct": d.pct * sc, "radius": radius, "echo": true })
+			_emit({ "type": "detonate", "hex": d.hex, "pct": d.pct * sc, "radius": radius, "echo": true, "mix": dmix })
 			factor += sc
 		for u in units:
 			if not u.alive():
@@ -2320,11 +2395,12 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(g.origin, h), int(BWEffects.p(e, "hexes", 1))])
 	for pu in pushes:
 		_displace(pu[0], pu[1], pu[2], "push", true)
-	BWWind.after_paint(self, by, element, r, wsnap)   # D406: fired gales' copies carry steam / shock / glaze
+	BWWind.after_paint(self, by, element, r, wsnap)   # D406: fired gales' copies carry shock / glaze (D421: no steam)
 	BWSquall.after_paint(self, by, r, wsnap)       # D309: a fresh gale on light/dark 2+ starts a squall
 	BWKeystoneFx.after_paint(self, by, r)          # D294 Glacier Wall: its pillars last all battle
 	BWEnchant.after_paint(self, by, element, r)   # v2 hook: Cold Snap, Windrider
 	BWPhases.after_paint(self, hexes, element, by)   # D256: thunder breaks the Twins' beam
+	BWKs3.after_paint(self, by, element, r)        # D453 Overflow: the reactions heal its painter
 	return r
 
 
@@ -2340,6 +2416,7 @@ func _erupt(er: Dictionary) -> void:
 	var owner := _unit(str(er.owner))
 	var hex: Vector2i = er.hex
 	var pts := int(er.points)
+	er.radius = BWKs3Fire.erupt_radius(owner, str(er.element), int(er.radius))   # D448 Island Maker: +1
 	_emit({ "type": "erupt", "hex": hex, "element": er.element, "points": pts, "owner": er.owner,
 		"radius": er.radius, "push": er.push, "consume": er.consume, "name": er.get("name", "") })
 	var near: Array = []
@@ -2386,6 +2463,8 @@ func _tile_hurt(u: BWUnit, amount: int, cause: String, source: String) -> void:
 		return                                 # D141: ground, blasts and slams never hurt an obelisk; D348: the Lil Fella only the enemy's
 	if _class_immune(u, BWFormulas.damage_class({ "source": "tile" if cause in ELEMENTAL_CAUSES else cause })):
 		return                                 # D209: a Blank shrugs off the ground, a Being a slam
+	if BWKit2.shielded(self, u):
+		return                                 # D430: Fan of Knives' user is immune to the reactions it sets off
 	amount = BWOverheat.filter_hurt(self, u, amount, cause, source)   # D285-D291: Phoenix, Blast Rider, Ward of Light
 	if amount <= 0 or not u.alive():
 		return
@@ -2464,6 +2543,8 @@ func _arc(by: BWUnit, v: BWUnit, w: BWUnit, raw: float, kind: String = "") -> in
 		raw *= float(BWEffects.p(BWEffects.list(rod, "lightning_rod")[0], "pct", 50)) / 100.0
 		w = rod
 	_arced[w] = true
+	if BWKit2.shielded(self, w):
+		return 0                               # D430: Fan of Knives' user
 	if _class_immune(w, BWFormulas.damage_class({ "source": "chain" })):
 		return 0                               # D209: a Blank is never shocked
 	if _negate(w, "chain"):
@@ -2619,6 +2700,10 @@ func pending_picks(team: String = "player") -> Array:
 			continue
 		for rec in BWPicks.settle(u):      # rank-3 grants first, announced
 			_picked(u, rec)
+		var lev := BWKs3Water.request(self, u)   # D451: the Leviathan's prompts come first
+		if not lev.is_empty():
+			out.append([u, lev])
+			continue
 		var req := BWPicks.next_request(u)
 		if not req.is_empty():
 			out.append([u, req])
@@ -2627,6 +2712,8 @@ func pending_picks(team: String = "player") -> Array:
 
 ## The player's choice for an owed pick (BWPicks.apply). Emits "pick".
 func apply_pick(u: BWUnit, req: Dictionary, choice: String) -> bool:
+	if str(req.get("kind", "")) == "leviathan":
+		return BWKs3Water.answer(self, u, choice)   # D451: submerge / the form
 	var rec := BWPicks.apply(u, req, choice)
 	if rec.is_empty():
 		return false
@@ -2658,7 +2745,7 @@ func _picked(u: BWUnit, rec: Dictionary) -> void:
 
 ## Tile damage causes that count as an elemental effect (D93: a Frost Ward or
 ## Nightborn negates one). Slams and plain blows don't.
-const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "steam", "ember_skin", "shock", "overheat", "light_beam", "overfreeze"]   # D285/D287/D312
+const ELEMENTAL_CAUSES := ["fire", "fire_cross", "dark", "detonation", "erupt", "shrouded", "ember_skin", "shock", "overheat", "light_beam", "overfreeze", "tapestry"]   # D285/D287/D312   # D439 Tapestry
 
 
 ## D93: negate one elemental effect landing on `u`, if it holds a negation.
@@ -2858,7 +2945,6 @@ func _after_action_move(u: BWUnit, el: String) -> void:
 		for e in BWEffects.list(u, "tailwind"):
 			more += int(BWEffects.p(e, "after", 1))
 			names.append(e.name)
-	more = BWThunderKeys.launch_move(u, more, names)   # D291: Blast Rider's launch replaces Bolt Step's +2
 	if more <= 0:
 		return
 	if u.moved:
@@ -3049,6 +3135,7 @@ func _move_rules(u: BWUnit) -> Dictionary:
 	if not z.is_empty():
 		r["zone"] = z
 	BWCurse.move_rules(self, u, r)            # D276: a foe's dark 3 is heavy to climb out of
+	BWKs3.move_rules(self, u, r)              # D451b Being of Rain: water costs no move
 	return r
 
 
@@ -3516,9 +3603,16 @@ func _digest(actor: BWUnit, before: Dictionary, hp0: Dictionary) -> Dictionary:
 						copies[h] = true
 						_hex_kind(hx, before, h, "spread")
 				var pools: Dictionary = e.get("pools", {})      # D266: the pool that reacts, pillars
-				for pk in ["steam", "glaze", "shock", "pillars", "melted"]:
+				for pk in ["glaze", "shock", "pillars", "melted"]:
 					for h in pools.get(pk, []):
 						_hex_kind(hx, before, h, "pillar" if pk == "pillars" else pk)
+				for h in e.get("doused", []):                    # D421: fire meets water, both cleared
+					_hex_kind(hx, before, h, "douse")
+				if str(e.get("kind", "")) == "inversion":     # D418: the area and each tile's swap
+					out["inversion"] = { "area": e.get("area", []), "swaps": e.get("swaps", []) }
+					for h in e.get("hexes", []):
+						_hex_kind(hx, before, h, "invert")
+					continue
 				for h in e.get("hexes", []):
 					if copies.has(h):
 						continue
@@ -3599,7 +3693,7 @@ func ground_report(hex: Vector2i) -> Dictionary:
 		"scarred": tiles.is_scarred(hex), "seeded": tiles.is_seeded(hex),
 		"move_extra": tiles.move_penalty(hex), "hit_mod": tiles.hit_mod(hex),
 		"conductive": tiles.conductive(hex), "unit": "", "turn": { "damage": 0, "heal": 0, "lines": [] },
-		"spine": BWPools.report(self, hex) }        # D266/D397: unsteady glaze, pillar, steam, electrified, pool
+		"spine": BWPools.report(self, hex) }        # D266/D397: unsteady glaze, pillar, electrified, pool
 	var u := _centre_at(hex)
 	if u == null or not u.alive() or BWObelisk.is_objective(u):
 		return out

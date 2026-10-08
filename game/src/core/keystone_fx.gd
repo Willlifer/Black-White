@@ -1,23 +1,24 @@
 class_name BWKeystoneFx
 extends RefCounted
 ## D293-D297 the battle's hooks for the wind, ice, water and dark keystones
-## (Lane C3; the rules live in ks_wind.gd, ks_ice.gd, ks_water.gd and
-## ks_dark.gd, who holds what in BWKeystones). BWBattle calls these at the
-## lines marked "D293"-"D297"; each is a no-op when nobody holds the
-## keystone, so a battle without keystones plays exactly as before.
+## of C3 (rules in ks_wind.gd, ks_ice.gd, ks_water.gd and ks_dark.gd). Since
+## Keystones v3 (D443) these serve the ones that became item enchantments
+## (Wellspring, Event Horizon, Doom, Contagion, Eye of the Vortex,
+## Sure-Footed) and the dormant Frozen status; Riptide, Jetstream, Flash
+## Freeze, Glacier Wall, Tidal Release and Wind Wall were removed. The v3
+## keystones' hooks are BWKs3. Each is a no-op when nobody holds the
+## keystone, so a battle without them plays exactly as before.
 
 
-## BWBattle._begin_turn, after the ground: Riptide (the holder's own turn
-## start), then Frozen. True = the turn is skipped (Frozen).
+## BWBattle._begin_turn, after the ground: Frozen. True = the turn is skipped.
 static func turn_start(b: BWBattle, u: BWUnit) -> bool:
-	BWKsWater.riptide(b, u)
 	if b.over or not u.alive():
 		return false
 	return BWKsIce.turn_start(b, u)
 
 
-## The tick (BWWind.tick, after the vortex fields and Event Horizon):
-## Wellspring heals, then served Frozen units thaw.
+## The tick (BWWind.tick, after Event Horizon): Wellspring heals, then served
+## Frozen units thaw.
 static func tick(b: BWBattle) -> void:
 	BWKsWater.tick(b)
 	if not b.over:
@@ -44,27 +45,26 @@ static func heal_blocked(b: BWBattle, u: BWUnit) -> bool:
 	return BWKsDark.heal_blocked(b, u)
 
 
-## BWBattle.paint, before BWTiles.apply: Jetstream's opts.
-static func paint_opts(by: BWUnit, o: Dictionary) -> void:
-	BWKsWind.paint_opts(by, o)
+## BWBattle.paint, before BWTiles.apply (D443: Jetstream's options are gone).
+static func paint_opts(_by: BWUnit, _o: Dictionary) -> void:
+	pass
 
 
-## BWBattle.paint, after the tiles changed: Glacier pillars.
-static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
-	BWKsIce.after_paint(b, by, r)
+## BWBattle.paint, after the tiles changed (D443: Glacier Wall is gone).
+static func after_paint(_b: BWBattle, _by: BWUnit, _r: Dictionary) -> void:
+	pass
 
 
-## BWBattle.use_skill, after the ground: a Glacier holder's shape shatters
-## its own pillars.
-static func after_skill(b: BWBattle, u: BWUnit, p: Dictionary) -> void:
-	BWKsIce.after_skill(b, u, p)
+## BWBattle.use_skill, after the ground (D443: Glacier Wall is gone).
+static func after_skill(_b: BWBattle, _u: BWUnit, _p: Dictionary) -> void:
+	pass
 
 
-## BWAI._best_hex: cheap positioning for Riptide and Event Horizon.
+## BWAI._best_hex: Event Horizon wariness, plus the v3 keystones' (BWKs3).
 static func ai_hex(b: BWBattle, u: BWUnit, h: Vector2i) -> float:
-	return BWKsWater.ai_hex(b, u, h) + BWKsDark.ai_hex(b, u, h)
+	return BWKsDark.ai_hex(b, u, h) + BWKs3.ai_hex(b, u, h)
 
 
 ## The tile card's keystone lines (BWBattle.ground_report "keystones").
 static func card_lines(b: BWBattle, h: Vector2i) -> Array:
-	return BWKsIce.card_lines(b, h) + BWKsWater.card_lines(b, h) + BWKsDark.card_lines(b, h)
+	return BWKsIce.card_lines(b, h) + BWKsWater.card_lines(b, h) + BWKsDark.card_lines(b, h) + BWKs3.card_lines(b, h)

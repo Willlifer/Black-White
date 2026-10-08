@@ -85,7 +85,7 @@ func _build() -> void:
 	kicker.add_theme_color_override("font_color", Color(accent, 0.95) if accent != Color.WHITE else Color(1, 1, 1, 0.6))
 	hv.add_child(kicker)
 	var title := Label.new()
-	title.text = "%s — choose one" % unit.name
+	title.text = "%s — choose one" % BWKeystones.titled(unit)   # D445: the title shows
 	title.add_theme_font_size_override("font_size", BWStyle.F_NAME)
 	hv.add_child(title)
 	var sub := Label.new()
@@ -134,8 +134,13 @@ func _build() -> void:
 
 
 func _kicker() -> String:
+	if request.get("kind", "") == "leviathan":         # D451: the Leviathan's prompts
+		return "LEVIATHAN  ·  %s%s" % ["submerge?" if str(request.get("step", "")) == "submerge" else "choose your form",
+			("  ·  " + context) if context != "" else ""]
 	if request.get("kind", "") == "keystone":
 		var kel := str(request.element)
+		if kel == BWKeystones.ANY:                     # D444: the rank-6 wildcard
+			return "KEYSTONE  ·  second slot  ·  rank 6%s" % [("  ·  " + context) if context != "" else ""]
 		return "KEYSTONE  ·  %s  ·  rank %d%s" % [kel.capitalize(), unit.affinity_rank(kel),
 			("  ·  " + context) if context != "" else ""]
 	if request.get("kind", "") == "perk":
@@ -151,12 +156,17 @@ func _subtitle() -> String:
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		var n := BWPicks.perks_of(el).size()
-		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Ranks 3 and 6 bring keystones." % [
+		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank 3 brings a keystone, rank 6 a second." % [
 			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n]
+	if request.get("kind", "") == "leviathan":
+		if str(request.get("step", "")) == "submerge":
+			return "%s ended its walk on water 3. Once a battle it may sink: its turn ends now." % unit.name
+		return "%s rises from the water. The form it takes holds for the rest of the battle." % unit.name
 	if request.get("kind", "") == "keystone":
 		var kel := str(request.element)
-		return ("A keystone breaks one of %s's rules. %s A unit holds at most %d." % [kel,
-			"Your first: one of two drawn from three." if BWPicks.keystones_owned(unit, kel).is_empty() else "Your second: the two left.",
+		if kel == BWKeystones.ANY:
+			return "Rank 6: a second keystone, from another element you know (one per element, %d at most). It names you anew." % BWKeystones.MAX_PER_UNIT
+		return ("A keystone breaks one of %s's rules and gives a title. One per element, %d at most; rank 6 opens the second." % [kel,
 			BWKeystones.MAX_PER_UNIT])
 	var tail := " A passive takes no slot." if not BWWeaponMove.passives_of(str(request.get("weapon", ""))).is_empty() else ""   # D372
 	return "A new expertise letter: two ways to grow, drawn for you. You equip up to %d.%s" % [BWUnit.loadout_cap(str(request.get("weapon", ""))), tail]
@@ -236,7 +246,7 @@ class Card:
 		index = i
 		picker = p
 		custom_minimum_size = BWPicker.CARD
-		if str(o.get("kind", "")) == "keystone":
+		if str(o.get("kind", "")) in ["keystone", "leviathan"]:
 			custom_minimum_size = BWPicker.CARD + Vector2(36, 84)   # D278: a keystone's rule is longer
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_ARROW if o.owned else Control.CURSOR_POINTING_HAND
@@ -261,7 +271,8 @@ class Card:
 		var sel := picker._sel == index
 		var acc: Color = picker.accent
 		var el := str(opt.get("element", ""))
-		var ks := str(opt.get("kind", "")) == "keystone"
+		var ks := str(opt.get("kind", "")) in ["keystone", "leviathan"]
+		var duo := str(opt.get("duo", ""))             # D455: a duo perk's second element
 		var glyph_col := BWLook.element_color(el) if el != "" else acc
 		var fade := 0.32 if owned else 1.0
 		# plate
@@ -288,9 +299,15 @@ class Card:
 		draw_arc(c, 46, 0, TAU, 64, Color(glyph_col, 0.85 * fade), 2.5, true)
 		var g := Rect2(c - Vector2(28, 28), Vector2(56, 56))
 		var kind := str(opt.get("kind", "perk"))
-		if kind == "keystone":
+		if kind in ["keystone", "leviathan"]:
 			BWPicker.draw_keystone_sigil(self, c, 40.0, Color(BWPicker.GOLD, fade))
 			BWPicker.draw_element_glyph(self, el, Rect2(c - Vector2(20, 20), Vector2(40, 40)), Color(glyph_col, fade))
+		elif kind == "perk" and duo != "":           # D455: two glyphs, side by side, the two colours
+			var c2 := BWLook.element_color(duo)
+			draw_arc(c, 46, PI * 0.5, PI * 1.5, 32, Color(glyph_col, 0.95 * fade), 3.0, true)
+			draw_arc(c, 46, -PI * 0.5, PI * 0.5, 32, Color(c2, 0.95 * fade), 3.0, true)
+			BWPicker.draw_element_glyph(self, el, Rect2(c + Vector2(-38, -17), Vector2(34, 34)), Color(glyph_col, fade))
+			BWPicker.draw_element_glyph(self, duo, Rect2(c + Vector2(4, -17), Vector2(34, 34)), Color(c2, fade))
 		elif kind == "perk":
 			BWPicker.draw_element_glyph(self, el, g, Color(glyph_col, fade))
 		else:
@@ -300,12 +317,22 @@ class Card:
 		while nfs > BWStyle.F_SMALL - 2 and font.get_string_size(str(opt.name), HORIZONTAL_ALIGNMENT_LEFT, -1, nfs).x > s.x - 24:
 			nfs -= 1
 		if ks:                                     # D278: "KEYSTONE" over the name
-			draw_string(font, Vector2(12, 146), "KEYSTONE" + ("  ·  ACTION" if opt.get("action", false) else ""),
-				HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, BWStyle.F_SMALL - 2, Color(BWPicker.GOLD, fade))
-		draw_string(font, Vector2(12, 168 if ks else 160), str(opt.name), HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, nfs,
+			var kick := "KEYSTONE" + ("  ·  ACTION" if opt.get("action", false) else "")
+			if kind == "leviathan":
+				kick = "LEVIATHAN"
+			draw_string(font, Vector2(12, 146), kick, HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, BWStyle.F_SMALL - 2, Color(BWPicker.GOLD, fade))
+		elif duo != "":                            # D455: "DUO · Fire + Wind" over the name
+			draw_string(font, Vector2(12, 148), "DUO  ·  %s + %s" % [el.capitalize(), duo.capitalize()],
+				HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, BWStyle.F_SMALL - 2, Color(BWLook.element_color(duo).lightened(0.2), fade))
+		draw_string(font, Vector2(12, 168 if ks or duo != "" else 160), str(opt.name), HORIZONTAL_ALIGNMENT_CENTER, s.x - 24, nfs,
 			Color(BWStyle.TEXT, fade))
+		var y := 196.0 if ks or duo != "" else 192.0
+		var ttl := str(opt.get("title", ""))
+		if ttl != "" and picker.unit != null:      # D445: the title it gives ("Will, the Lava Walker")
+			draw_string(font, Vector2(12, 190), "%s, %s" % [picker.unit.name, ttl], HORIZONTAL_ALIGNMENT_CENTER, s.x - 24,
+				BWStyle.F_SMALL - 1, Color(BWPicker.GOLD.lightened(0.15), 0.95 * fade))
+			y = 216.0
 		# effect text, wrapped; the last line that fits ends in an ellipsis (the tooltip has it all)
-		var y := 196.0 if ks else 192.0
 		var fs := BWStyle.F_SMALL - 1
 		var lines := _wrap(font, str(opt.text), s.x - 28, fs)
 		var room := int((s.y - 44.0 - y) / (BWStyle.F_SMALL + 3)) + 1
@@ -318,6 +345,8 @@ class Card:
 			y += BWStyle.F_SMALL + 3
 		if owned:
 			var tag := "OWNED" if kind in ["perk", "keystone", "passive"] else "IMPROVED"
+			if opt.get("locked", false):
+				tag = "NOT YET"                    # D451: Leviathos isn't built
 			draw_string(font, Vector2(14, s.y - 14), tag, HORIZONTAL_ALIGNMENT_CENTER, s.x - 28, BWStyle.F_MENU_TITLE,
 				Color(1, 1, 1, 0.55))
 		elif sel:
@@ -357,7 +386,7 @@ static func keystone_bb(u: BWUnit, fs: int) -> String:
 	var names: PackedStringArray = []
 	for id in u.keystones:
 		var r := BWKeystones.row(str(id))
-		names.append("[hint=%s][color=#%s]%s[/color][/hint]" % [BWPicker.hint_safe("%s: %s" % [str(r.get("name", id)), str(r.get("text", ""))]),
+		names.append("[hint=%s][color=#%s]%s[/color][/hint]" % [BWPicker.hint_safe("%s (%s): %s" % [str(r.get("name", id)), str(r.get("title", "")), str(r.get("text", ""))]),
 			BWGearText.hex(BWGearText.readable(BWLook.element_color(str(r.get("element", ""))))), str(r.get("name", id))])
 	return "[font_size=%d][color=#%s]◈ %s[/color]  %s[/font_size]" % [fs, GOLD.to_html(false),
 		"Keystones" if u.keystones.size() > 1 else "Keystone", " · ".join(names)]

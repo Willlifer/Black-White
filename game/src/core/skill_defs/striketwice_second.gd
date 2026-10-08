@@ -2,7 +2,7 @@ extends BWSkillDef
 ## Sword, follow-up only (Striketwice's follow-through), at any adjacent foe.
 ## Same element as the first cut: the ring floods. D87: the same foe twice
 ## can't glance and is Staggered; opposite elements react on the hex
-## (BWSkills.REACTIONS: steam, eclipse, storm). Striketwice+ (D103): if
+## (BWSkills.REACTIONS: douse, eclipse, storm; D422: douse was steam). Striketwice+ (D103): if
 ## both cuts land, a third cut hits an adjacent foe (the lowest HP) at
 ## THIRD_PCT%.
 
@@ -12,7 +12,7 @@ const THIRD_PCT := 50
 func _init() -> void:
 	define({
 		"key": "striketwice_second", "name": "Second Cut", "weapon": "sword", "clip": "",
-		"desc": "The follow-through, at any adjacent foe. Same foe: can't glance, staggers (no skills next turn). Same element: flood. Opposite: fire+water steam (8% to the ring), light+dark eclipse (blinds), thunder+wind storm (pushes the ring 1)",
+		"desc": "The follow-through, at any adjacent foe. Same foe: can't glance, staggers (no skills next turn). Same element: flood. Opposite: fire+water douse (Drenches foes on the ring), light+dark eclipse (blinds), thunder+wind storm (pushes the ring 1)",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": 0,
 		"power": BWSkills.STRIKE_DMG, "follow_up_only": true,
 	}, 120)
@@ -32,7 +32,7 @@ func plan(b: BWBattle, u: BWUnit, element: String, target: Vector2i, p: Dictiona
 	if rx != "":
 		p["reaction"] = rx
 		p.notes.append({
-			"steam": "Fire meets water: steam bursts on the ring (%d%% HP)" % BWSkills.STEAM_PCT,
+			"douse": "Fire meets water: the hex douses and the foes on the ring are Drenched",
 			"eclipse": "Light meets dark: an eclipse Blinds the foes there (no crits; targets within 2)",
 			"storm": "Thunder meets wind: a storm pushes the ring back 1",
 		}[rx])
@@ -91,8 +91,9 @@ func third_cut(b: BWBattle, u: BWUnit, el: String) -> void:
 	b._check_end()
 
 
-## D87: the opposite-element reaction on the second cut's hex. steam
-## (fire+water): STEAM_PCT% max HP fire damage to every unit on the ring;
+## D87: the opposite-element reaction on the second cut's hex. douse
+## (fire+water, D422: was steam's 8% to the ring): the cutter's foes on the
+## ring are Drenched (-1 move, thunder hits +20%);
 ## eclipse (light+dark): the foe on the hex and the cutter's foes on the ring
 ## are Blinded; storm (thunder+wind): every unit on the ring is pushed 1
 ## straight out. The cutter is never caught in its own reaction; the ground
@@ -106,10 +107,10 @@ static func reaction(b: BWBattle, u: BWUnit, kind: String, hex: Vector2i) -> voi
 	b._emit({ "type": "reaction", "unit": u.id, "kind": kind, "hex": hex,
 		"units": ring.map(func(o): return o.id) })
 	match kind:
-		"steam":
+		"douse":
 			for o in ring:
-				if o.alive():
-					b._tile_hurt(o, b._tile_dmg(o, BWSkills.STEAM_PCT, "fire"), "steam", u.id)
+				if o.team != u.team and o.alive():
+					b._add_status(o, "drenched", u)
 		"eclipse":
 			var c := b._centre_at(hex)
 			if c != null and c.team != u.team:

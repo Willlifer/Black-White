@@ -14,9 +14,13 @@ extends Node3D
 ##   spread     sparse wind hatch (a gale copy)
 ##   arm        the operator's colour, sparse (a marker laid)
 ##   paint      the element's colour, sparse; erase: grey, sparse
+##   invert     D418 Inversion: the flipped tile in its NEW element's colour
+##              (mid hatch), a tag "FIRE 3 → WATER 3"; the rest of the radius-2
+##              area gets a dashed grey rim
 ##   ignite     a dashed fire rim (fire 2+ on grass catches at cycle end)
-##   D266 pools  the pool that reacts: steam (grey hatch, dashed rim, "STEAM"),
-##              electrified (thunder hatch, dashed rim, "ELECTRIFIED"), pool
+##   douse      D421: fire met water, both cleared: grey hatch, dashed rim,
+##              tag "DOUSE" on each hex (no steam since D421)
+##   D266 pools  the pool that reacts: electrified (thunder hatch, dashed rim, "ELECTRIFIED"), pool
 ##              glaze; a pillar that rises: ice hatch, heavy ink rim, "PILLAR"
 ##              (D397: the slide ghosts and "SLIDE" / "SLAM" tags are gone)
 ##   arcs       a purple dashed arch from the conductive unit to the one
@@ -94,14 +98,18 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 			if h != d.hex and board_view.board.exists(h) and not sim.hexes.has(h):
 				_hatch(st, h, BWLook.glow_color("thunder"), "sparse", 0.55)
 				_rim(st, h, Color(BWLook.glow_color("thunder"), 0.55), RIM_W * 0.6)
+	var inv: Dictionary = sim.get("inversion", {})  # D418: Inversion's whole radius-2 area, rimmed
+	for h in inv.get("area", []):
+		if board_view.board.exists(h) and not sim.hexes.has(h):
+			_rim(st, h, Color(0.18, 0.18, 0.22, 0.85), RIM_W * 0.9, true)
 	for h in sim.hexes:
 		var rec: Dictionary = sim.hexes[h]
 		var kinds: Array = rec.kinds
 		var k := _main_kind(kinds)
 		var col := _kind_color(k, rec, element)
-		_hatch(st, h, col, "dense" if k in ["detonate", "pillar"] else ("mid" if k in ["glaze", "gale", "shock"] else "sparse"), 0.95)
+		_hatch(st, h, col, "dense" if k in ["detonate", "pillar"] else ("mid" if k in ["glaze", "gale", "shock", "invert"] else "sparse"), 0.95)
 		_rim(st, h, INK if k in ["detonate", "pillar"] else Color(col, 0.95), RIM_W * (1.6 if k in ["detonate", "pillar"] else 1.0),
-			k in ["steam", "shock"])                   # D266: a reacting pool's outline is dashed
+			k in ["douse", "shock"])                   # D266: a reacting pool's outline is dashed; D421 a douse
 		if "ignite" in kinds:
 			_rim(st, h, BWLook.glow_color("fire"), RIM_W * 0.8, true)
 		drawn[h] = true
@@ -117,6 +125,10 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 				if d.hex == h:
 					pct = float(d.pct)
 			_hex_tag(h, ("IGNITES FUSE %d%%" if "fuse" in kinds else "BLAST %d%%") % roundi(pct), BWLook.glow_color("thunder"), 0.3)   # D405
+		elif k == "invert":                            # D418: what each tile becomes
+			for sw in inv.get("swaps", []):
+				if sw.hex == h:
+					_hex_tag(h, str(sw.text).to_upper(), col, 0.3)
 		elif k == "gale":
 			_hex_tag(h, "GALE", BWLook.glow_color("wind"), 0.3)        # D406: one gale, no modes
 		elif k == "glaze":
@@ -126,9 +138,11 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 		elif k == "shock" and "fuse" in kinds:
 			drawn[k] = true                            # D405: water on a fuse electrifies it
 			_hex_tag(h, "IGNITES FUSE: ELECTRIFIED", BWLook.glow_color("thunder"), 0.3)
-		elif k in ["steam", "shock"] and not drawn.has(k):
+		elif k == "douse":
+			_hex_tag(h, "DOUSE", Color(0.5, 0.52, 0.56), 0.3)   # D421: fire meets water, both cleared
+		elif k == "shock" and not drawn.has(k):
 			drawn[k] = true                            # D266: one tag per reacting pool
-			_hex_tag(h, "STEAM" if k == "steam" else "ELECTRIFIED", Color(0.5, 0.52, 0.56) if k == "steam" else BWLook.glow_color("thunder"), 0.3)
+			_hex_tag(h, "ELECTRIFIED", BWLook.glow_color("thunder"), 0.3)
 	for c in sim.chains:
 		_arc(st, c.hex, c.to_hex)
 	for mv in sim.get("moves", []):
@@ -150,7 +164,7 @@ func show_sim(sim: Dictionary, element: String = "") -> void:
 
 ## Which kind a hex reads as when it has several (the strongest consequence).
 static func _main_kind(kinds: Array) -> String:
-	for k in ["detonate", "pillar", "shock", "glaze", "steam", "gale", "spread", "arm", "paint", "erase"]:
+	for k in ["detonate", "pillar", "shock", "glaze", "douse", "invert", "gale", "spread", "arm", "paint", "erase"]:
 		if k in kinds:
 			return k
 	return "paint"
@@ -161,7 +175,7 @@ static func _kind_color(k: String, rec: Dictionary, element: String) -> Color:
 		"detonate", "shock": return BWLook.glow_color("thunder")
 		"glaze": return BWLook.glow_color("ice")
 		"pillar": return BWLook.element_color("ice")
-		"steam": return Color(0.55, 0.58, 0.62)
+		"douse": return Color(0.55, 0.58, 0.62)
 		"gale", "spread": return BWLook.glow_color("wind")
 		"arm":
 			var mk := str((rec.after as Dictionary).get("marker", ""))

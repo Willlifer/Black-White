@@ -53,46 +53,57 @@ func test_transfer_plus_spreads(t) -> void:
 		"Transfer+: the destination and its ring")
 
 
+## D418: Inversion flips every tile within 2 of the aimed hex and does
+## nothing else (no damage, no status, no follow-up), cd 4.
 func test_inversion(t) -> void:
 	var me: BWUnit = K._equip(K._u("me", "staff", "fire"), ["inversion"])
-	var b: BWBattle = K._fight(me, [K._foe()], [Vector2i(9, 9)])
+	var foe_at := Vector2i(5, 2)                        # inside X's radius
+	var b: BWBattle = K._fight(me, [K._foe()], [foe_at])
+	var far := Vector2i(4, 8)                           # 6 from X: outside
+	var ring2: Array = Array(BWHex.ring(X, 2))
 	b.tiles.apply([X], "fire", "x", 3)
-	b.tiles.apply([E], "thunder", "x")
-	t.ok(not Vector2i(4, 6) in b.skill_targets(me, "inversion", ""), "nothing to flip: not a target")
+	b.tiles.apply([foe_at], "dark", "x", 2)
+	b.tiles.apply([ring2[0]], "thunder", "x")          # a fuse 2 away
+	b.tiles.apply([far], "fire", "x", 2)
+	t.ok(not Vector2i(4, 9) in b.skill_targets(me, "inversion", ""), "nothing to flip in the area: not a target")
+	t.ok(Vector2i(4, 0) in b.skill_targets(me, "inversion", ""), "a bare hex with charged tiles within 2 is a target")
+	var sim := b.simulate(me, { "kind": "skill", "key": "inversion", "element": "", "hex": X })
+	t.eq((sim.inversion.area as Array).size(), BWHex.area(X, 2).filter(func(h): return b.board.exists(h)).size(), "the preview carries the whole area")
+	t.eq((sim.inversion.swaps as Array).size(), 3, "and one swap per charged tile")
+	t.ok(sim.hexes.has(X) and "invert" in sim.hexes[X].kinds, "the preview marks the flipped tile")
+	t.ok(sim.units.is_empty(), "nobody's HP changes")
+	var hp0: int = b.units[1].hp
 	K._use(t, b, me, "inversion", "", X)
 	t.eq(b.tiles.intensity(X, "water"), 3, "fire 3 becomes water 3")
-	t.eq(me.follow_up, ["basic"], "then a basic")
-	var me2: BWUnit = K._equip(K._u("me", "staff", "fire"), ["inversion"])
-	var b2: BWBattle = K._fight(me2, [K._foe()], [Vector2i(9, 9)])
-	b2.tiles.apply([E], "thunder", "x")
-	b2.use_skill(me2, "inversion", "", E)
-	t.eq(str(b2.tiles.at(E).marker), "gale", "a fuse becomes a gale")
+	t.eq(b.tiles.intensity(foe_at, "light"), 2, "dark 2 under the foe becomes light 2")
+	t.eq(str(b.tiles.at(ring2[0]).marker), "gale", "a fuse 2 away becomes a gale")
+	t.eq(b.tiles.intensity(far, "fire"), 2, "outside the radius: untouched")
+	t.eq(me.follow_up, [], "no follow-up any more")
+	t.eq(b.units[1].hp, hp0, "no damage")
+	t.ok(b.units[1].statuses.is_empty(), "no status")
+	t.eq(me.cooldowns.get("inversion", 0), 4, "cd 4")
 
 
 func test_inversion_plus_ring(t) -> void:
 	var me: BWUnit = K._equip(K._u("me", "staff", "fire"), ["inversion"])
 	me.skill_ranks["inversion"] = 2
 	var b: BWBattle = K._fight(me, [K._foe()], [Vector2i(9, 9)])
-	var ring: Array = Array(BWHex.area(X, 1))
-	b.tiles.apply(ring, "light", "x", 2)
+	var area: Array = Array(BWHex.area(X, 2)).filter(func(h): return b.board.exists(h))
+	b.tiles.apply(area, "light", "x", 2)
 	b.use_skill(me, "inversion", "", X)
-	t.ok(ring.all(func(h): return b.tiles.intensity(h, "dark") == 2), "Inversion+: the hex and its ring flip")
+	t.ok(area.all(func(h): return b.tiles.intensity(h, "dark") == 2), "all 19 flip")
+	t.eq(me.cooldowns.get("inversion", 0), 3, "Inversion+: cd 3")
 
 
-func test_aegis_through_the_allys_turn(t) -> void:
-	var me: BWUnit = K._equip(K._u("me", "staff", "fire"), ["aegis"])
+## D418: the AI flips a field of enemy fire from under its allies.
+func test_inversion_ai(t) -> void:
+	var me: BWUnit = K._equip(K._u("me", "staff", "fire"), ["inversion"])
 	var mate: BWUnit = K._u("m", "sword", "fire")
-	var foe: BWUnit = K._foe()
-	var mate_at: Vector2i = K._line(2)[1]
-	var b: BWBattle = K._fight(me, [foe], [Vector2i(9, 9)], 7, [mate], [mate_at])
-	t.ok(not C in b.skill_targets(me, "aegis", ""), "not yourself")
-	K._use(t, b, me, "aegis", "", mate_at)
-	t.near(float(K._mod(b.forecast_basic(foe, mate), "Aegis").get("value", 0)), 0.8, 0.001, "-20% damage taken")
-	K._give_turn(b, mate)
-	t.ok(not K._mod(b.forecast_basic(foe, mate), "Aegis").is_empty(), "still warded during its next turn")
-	b.end_turn()
-	t.ok(K._mod(b.forecast_basic(foe, mate), "Aegis").is_empty(), "gone when that turn ends")
-	t.eq(me.cooldowns.get("aegis", 0), 4, "cd 4")
+	var b: BWBattle = K._fight(me, [K._foe()], [Vector2i(9, 9)], 7, [mate], [X])
+	var area: Array = Array(BWHex.area(X, 1)).filter(func(h): return b.board.exists(h))
+	b.tiles.apply(area, "fire", "f", 3)
+	var pick: Dictionary = BWSkillRegistry.get_def("inversion").ai_support(b, me, {})
+	t.ok(not pick.is_empty() and BWHex.distance(pick.target, X) <= 2, "the AI aims Inversion over its ally on fire: %s" % pick)
 
 
 func test_tempest(t) -> void:
@@ -187,3 +198,6 @@ func test_ai_transfers_then_strikes(t) -> void:
 	# D285: the staff's fire basic then lands on that fire 3: it Overheats and vents to 2
 	t.ok(b.history.any(func(e): return e.type == "overheat" and e.hex == E), "and the fire blow on it Overheats")
 	t.eq(b.tiles.intensity(E, "fire"), 2, "venting to fire 2")
+
+
+## D435-D442: the retired skills' tests moved to test_kit3 (their replacements; the defs stay only for old saves).

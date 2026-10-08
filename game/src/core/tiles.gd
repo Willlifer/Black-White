@@ -10,6 +10,12 @@ extends RefCounted
 ## ("" = authored). Section numbers below refer to ELEMENTS.md.
 
 const AXIS_MAX := 3
+## D447 Lava Walker: its fire climbs to LAVA_MAX; an entry it laid carries
+## `lava` (nothing else reacts with it: every other arrival fizzles) and burns
+## LAVA_STAND_PCT / LAVA_CROSS_PCT a step (not 4% / 2%).
+const LAVA_MAX := 5
+const LAVA_STAND_PCT := 5
+const LAVA_CROSS_PCT := 3
 const STEP_CYCLES := 2
 const MARK_CYCLES := 3
 const GLAZE_CYCLES := 2
@@ -52,12 +58,11 @@ const STATIC_SCAR_TICKS := 1
 var statics := {}
 var scars := {}
 ## D262-D266 the ice/water spine (ELEMENTS-v3 §2, §4; src/core/pools.gd;
-## the D261 slides are gone, D397). pillars: hex -> {owner, ticks, born}; steam: hex -> ticks;
+## the D261 slides are gone, D397; D421: no steam). pillars: hex -> {owner, ticks, born};
 ## fields (electrified): id -> {hexes, ticks, source, ramp {unit id: n}};
 ## shock: hex -> field id. `occupant` (hex -> BWUnit or null) is the battle's
 ## unit_at (unset = nobody). spine_tick: what the last tick thawed/discharged.
 var pillars := {}
-var steam := {}
 var fields := {}
 var shock := {}
 var spine_serial := 0
@@ -86,12 +91,19 @@ func intensity(hex: Vector2i, element: String) -> int:
 	var e := at(hex)
 	if e.is_empty():
 		return 0
+	var ecl := int(e.get("ecl", 0))           # D461 Eclipse: the opposite of v, held beside it
 	match element:
 		"fire": return maxi(e.h, 0)
 		"water": return maxi(-e.h, 0)
-		"light": return maxi(e.v, 0)
-		"dark": return maxi(-e.v, 0)
+		"light": return maxi(e.v, 0) if int(e.v) >= 0 or ecl <= 0 else ecl
+		"dark": return maxi(-e.v, 0) if int(e.v) <= 0 or ecl <= 0 else ecl
 	return 0
+
+
+## D447: is this hex a Lava Walker's fire (nothing reacts with it)?
+func is_lava(hex: Vector2i) -> bool:
+	var e := at(hex)
+	return bool(e.get("lava", false)) and int(e.get("h", 0)) > 0
 
 
 func is_glazed(hex: Vector2i) -> bool:
@@ -106,8 +118,8 @@ func carries(hex: Vector2i, element: String) -> bool:
 	match element:
 		"fire": return e.h > 0
 		"water": return e.h < 0
-		"light": return e.v > 0
-		"dark": return e.v < 0
+		"light": return e.v > 0 or (e.v < 0 and int(e.get("ecl", 0)) > 0)
+		"dark": return e.v < 0 or (e.v > 0 and int(e.get("ecl", 0)) > 0)
 		"thunder": return e.marker == "fuse"
 		"wind": return e.marker == "gale"
 		"ice": return e.marker == "stasis" or e.glaze > 0
@@ -162,8 +174,9 @@ func hit_mod(hex: Vector2i) -> float:
 func standing(hex: Vector2i) -> Dictionary:
 	var fire := intensity(hex, "fire")
 	var light := intensity(hex, "light")
+	var per := LAVA_STAND_PCT if is_lava(hex) else FIRE_STAND_PCT      # D447 Lava Walker
 	return {
-		"fire": FIRE_STAND_PCT * fire * (pot(hex, "fire") if fire > 0 else 1.0),
+		"fire": per * fire * (pot(hex, "fire") if fire > 0 else 1.0),
 		"drain": DARK3_DRAIN_PCT if intensity(hex, "dark") >= 3 else 0,
 		"heal": LIGHT_HEAL_PCT * light * (pot(hex, "light") if light > 0 else 1.0),
 		"source": str(at(hex).get("source", "")),
@@ -172,7 +185,8 @@ func standing(hex: Vector2i) -> Dictionary:
 
 func crossing_pct(hex: Vector2i) -> float:
 	var fire := intensity(hex, "fire")
-	return FIRE_CROSS_PCT * fire * (pot(hex, "fire") if fire > 0 else 1.0)
+	var per := LAVA_CROSS_PCT if is_lava(hex) else FIRE_CROSS_PCT      # D447 Lava Walker
+	return per * fire * (pot(hex, "fire") if fire > 0 else 1.0)
 
 
 ## D86: a unit standing on a fuse is conductive (§8.5). D264: so is one in an
@@ -186,15 +200,19 @@ func is_pillar(hex: Vector2i) -> bool:
 	return pillars.has(hex) and is_glazed(hex)
 
 
+## D459: the levels a Sculptor's pillar lifts whoever stands on it (BWBoard.lift).
+func pillar_lift(hex: Vector2i) -> int:
+	return BWKs3Ice.lift(self, hex)
+
+
 ## D262/D264: the board's dynamic blockers (BWBoard.blocker / sight_blocker).
 func blocks_move(hex: Vector2i) -> bool:
 	return is_pillar(hex)
 
 
-## Steam blocks a line through it, except between hexes within
-## BWPools.STEAM_RANGE (a unit in steam can be targeted from that close).
+## A pillar blocks a line through it (D421: steam is gone).
 func blocks_sight(hex: Vector2i, from: Vector2i = hex, to: Vector2i = hex) -> bool:
-	return is_pillar(hex) or (steam.has(hex) and BWHex.distance(from, to) > BWPools.STEAM_RANGE)
+	return is_pillar(hex)
 
 
 ## D86: does the hex hold axis charge (Spark needs it not to)?
@@ -278,17 +296,33 @@ func author(hex: Vector2i, h: int, v: int, marker: String = "") -> void:
 
 ## Apply one action's element to a shape, simultaneously (§3.5).
 ## Returns { detonations: [{hex, pct, source}], changed: [hex], marker_fired: [hex],
-##           gales: [{origin, copies}] }.
+##           gales: [{origin, copies}], doused: [hex] (D421) }.
 ## FX hook `opts` (BWEffects.paint_opts): timer_plus / glaze_plus /
 ## gale_timer_plus (tile_duration_plus), ring {hex: steps} (element_area_plus,
 ## resolved in the same simultaneous pass), gale_radius (Gusting), erupt (a
 ## tile_erupt countdown stamped on every hex this cast leaves carrying it).
 func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: Dictionary = {}) -> Dictionary:
-	var out := { "detonations": [], "changed": [], "marker_fired": [], "gales": [] }
+	var out := { "detonations": [], "changed": [], "marker_fired": [], "gales": [], "doused": [], "fizzled": [] }
 	var plans := {}
 	# D199: `propagated` = the charge arrives as spread (on-kill paint, ENCHANTMENTS
 	# §5.3): it never fires a marker and skips glazed hexes.
 	var fresh: bool = not opts.get("propagated", false)
+	# D447 Lava Walker: nothing reacts with lava. Every arrival on a lava hex
+	# fizzles there (out.fizzled), unless it is its own walker's fire.
+	hexes = _lava_filter(hexes, element, caster, out.fizzled)
+	if opts.has("ring"):
+		var kept := {}
+		for h in opts.ring:
+			if _lava_ok(h, element, caster):
+				kept[h] = opts.ring[h]
+			elif not h in out.fizzled:
+				out.fizzled.append(h)
+		opts["ring"] = kept
+	var pre_ice := {}                         # D459 Sculptor: ice or glaze before this paint
+	if element == "ice" and fresh and opts.get("sculpt", false):
+		for h in hexes:
+			if is_glazed(h) or str(at(h).get("marker", "")) == "stasis":
+				pre_ice[h] = true
 	var spine := BWPools.begin(self, hexes, element, fresh, steps, caster, opts)   # D264: pool reactions, pre-action
 	var hot := BWOverheat.begin(self, hexes, element, fresh, opts)   # D285: fresh fire on fire 3 erupts
 	var frz := BWOverfreeze.begin(self, hexes, element, fresh, opts)   # D312: fresh ice on glazed water shatters
@@ -320,13 +354,17 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 			if statics.has(hex):
 				scars[hex] = STATIC_SCAR_TICKS          # D115: a blown static stays spent a cycle
 			out.detonations.append({ "hex": hex, "pct": p.detonate, "source": p.get("det_source", caster),
-				"points": int(p.get("det_points", 0)) })   # v2 Overload reads the points blown
+				"points": int(p.get("det_points", 0)), "mix": p.get("det_mix", {}) })   # v2 Overload reads the points blown; D423 mix
 		if p.has("gale"):
 			gales.append([hex, p.gale, int(p.get("gale_level", 1))])
 		if p.get("fired", false):
 			out.marker_fired.append(hex)
+		if p.get("doused", false):
+			out.doused.append(hex)                  # D421: fire met water here
 	BWPools.finish(self, spine, element, caster, fresh, out, int(opts.get("glaze_plus", 0)))   # D262/D264
-	BWOverfreeze.finish(self, frz, caster, out)   # D312/D398: the burst glazes radius 1 (no pillar), out.overfreeze
+	if not pre_ice.is_empty():
+		BWKs3Ice.sculpt(self, pre_ice.keys(), caster, out, opts)   # D459 Sculptor: ice on ice raises a pillar
+	BWOverfreeze.finish(self, frz, caster, out, int(opts.get("overfreeze_radius", 1)))   # D312/D398: the burst glazes radius 1 (no pillar), out.overfreeze
 	if opts.has("erupt"):
 		for hex in out.changed:
 			if carries(hex, element) and entries.has(hex) and str(entries[hex].source) == caster:
@@ -340,9 +378,29 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	BWOverheat.finish(self, hot, caster, out, opts)   # D285: the eruptions (ring +2, vent to 2), out.overheat
 	for g in gales:
 		# D95: a gale 2 copies one ring further (rings 1 and 2, same skip rules)
-		var copies := _gale_copy(g[0], g[1], caster, out.changed,
-			int(opts.get("gale_radius", 1)) + int(g[2]) - 1, int(opts.get("gale_timer_plus", 0)))
+		var gr := int(opts.get("gale_radius", 1)) + int(g[2]) - 1
+		if int(g[1][0]) > 0:
+			gr += int(opts.get("fire_gale_plus", 0))      # D456 Wildfire Gale: fire it carries goes 1 ring further
+		var copies := _gale_copy(g[0], g[1], caster, out.changed, gr, int(opts.get("gale_timer_plus", 0)))
 		out.gales.append({ "origin": g[0], "copies": copies, "level": int(g[2]), "hv": g[1], "fresh": fresh })   # D309: the squall reads hv
+	return out
+
+
+## D447 Lava Walker: may `element` from `caster` land on `h`? Only its own
+## walker's fire lands on lava; everything else fizzles there.
+func _lava_ok(h: Vector2i, element: String, caster: String) -> bool:
+	if not is_lava(h):
+		return true
+	return element == "fire" and str(at(h).get("source", "")) == caster
+
+
+func _lava_filter(hexes: Array, element: String, caster: String, fizzled: Array) -> Array:
+	var out: Array = []
+	for h in hexes:
+		if _lava_ok(h, element, caster):
+			out.append(h)
+		elif not h in fizzled:
+			fizzled.append(h)
 	return out
 
 
@@ -367,6 +425,23 @@ func break_glaze(hex: Vector2i) -> bool:
 
 ## Consume (§7.2): the hex is eaten back to bare ground. A static hex is
 ## spent like a detonated one (D115).
+## D423: the non-thunder elements a detonation consumes, by steps: the axis
+## charges (fire / water, light / dark: their intensity) and a glaze (ice, 1).
+## { element: steps }; empty = a pure fuse pop (thunder only). The view
+## colours the blast ring from it (BWTileFX.blast_colors).
+static func blast_mix(e: Dictionary) -> Dictionary:
+	var out := {}
+	var h := int(e.get("h", 0))
+	var v := int(e.get("v", 0))
+	if h != 0:
+		out["fire" if h > 0 else "water"] = absi(h)
+	if v != 0:
+		out["light" if v > 0 else "dark"] = absi(v)
+	if int(e.get("glaze", 0)) > 0:
+		out["ice"] = 1
+	return out
+
+
 func clear(hex: Vector2i) -> void:
 	entries.erase(hex)
 	if statics.has(hex):
@@ -408,15 +483,23 @@ func tick() -> Array:
 			continue
 		var ah := absi(e.h)
 		var av := absi(e.v)
+		var v_sign := signi(int(e.v))
 		if ah >= av:
 			e.h -= signi(e.h)
 		if av >= ah:
 			e.v -= signi(e.v)
+		if int(e.get("ecl", 0)) > 0:                # D461: an eclipse's other half fades with it
+			e.ecl = int(e.ecl) - 1
+			if e.v == 0 and int(e.ecl) > 0:
+				e.v = -v_sign * int(e.ecl)          # the dominant half is gone: the other one stands alone
+				e.ecl = 0
+			if int(e.ecl) <= 0:
+				e.erase("ecl")
 		if e.h == 0 and e.v == 0:
 			entries.erase(hex)
 		else:
 			e.timer = STEP_CYCLES
-	BWPools.tick(self)                         # D262/D264: pillars, steam and fields count down
+	BWPools.tick(self)                         # D262/D264: pillars and fields count down
 	var seeded := _grass_spread()
 	_static_phase()
 	return seeded
@@ -538,13 +621,32 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 			return { "op": "none" }          # everything else washes off
 		var nh := h
 		var nv := v
+		# D461 Eclipse: your light on your dark (or dark on light) is held beside it
+		if element in ["light", "dark"] and opts.get("eclipse", false) and marker == "" and v != 0 \
+				and str(e.get("source", "")) == caster and (v > 0) != (element == "light"):
+			var ecl_e := e.duplicate()
+			ecl_e["ecl"] = mini(AXIS_MAX, int(e.get("ecl", 0)) + steps)
+			ecl_e.permanent = false
+			ecl_e.timer = STEP_CYCLES
+			ecl_e.erase("seeded")
+			return { "op": "set", "entry": ecl_e }
 		match element:
 			"fire": nh += steps
 			"water": nh -= steps
 			"light": nv += steps
 			"dark": nv -= steps
-		nh = clampi(nh, -AXIS_MAX, AXIS_MAX)
+		# D447: a Lava Walker's fire climbs to fire_max (5); anything else keeps
+		# a hotter hex where it is (never cools it to 3)
+		nh = clampi(nh, -AXIS_MAX, int(opts.get("fire_max", AXIS_MAX)) if element == "fire" else maxi(AXIS_MAX, h))
 		nv = clampi(nv, -AXIS_MAX, AXIS_MAX)
+		# D421 douse: fire meeting water (either order) clears both from the
+		# hex (its light/dark stays); no steam, nothing lingers.
+		var douse := marker == "" and ((element == "fire" and h < 0) or (element == "water" and h > 0))
+		if douse:
+			nh = 0
+			if nv == 0:
+				return { "op": "erase", "doused": true }
+			return { "op": "set", "doused": true, "entry": _entry(0, nv, "", str(e.get("source", caster)), str(e.get("origin", "cast"))) }
 		if marker != "":
 			if not fresh:
 				return { "op": "none" }      # containment rule 1
@@ -556,8 +658,12 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 			return p
 		if nh == 0 and nv == 0:
 			return { "op": "erase" }
-		return { "op": "set", "entry": _entry(nh, nv, "", caster, "cast" if fresh else "spread",
-			int(opts.get("timer_plus", 0)) if fresh else 0) }
+		var ne := _entry(nh, nv, "", caster, "cast" if fresh else "spread", int(opts.get("timer_plus", 0)) if fresh else 0)
+		if element == "fire" and nh > 0 and opts.get("lava", false):
+			ne["lava"] = true                       # D447: a Lava Walker's fire
+		if int(e.get("ecl", 0)) > 0 and nv != 0 and signi(nv) == signi(v):
+			ne["ecl"] = int(e.ecl)                  # D461: an eclipsed hex keeps its other half
+		return { "op": "set", "entry": ne }
 
 	# operator element
 	var mk: String = OPERATORS.get(element, "")
@@ -593,10 +699,12 @@ func _operate(e: Dictionary, mk: String, src: String, glaze_plus: int = 0) -> Di
 		"fuse":
 			var water := maxi(-int(e.h), 0)
 			var wet := CONDUCT_DET_PCT * water * (pot(Vector2i.ZERO, "water", str(e.get("source", ""))) if water > 0 else 1.0)
-			var pct := float(DETONATE_BASE_PCT + DETONATE_PER_POINT_PCT * (absi(e.h) + absi(e.v))) + wet
+			var pts := absi(e.h) + absi(e.v) + int(e.get("ecl", 0))      # D461: an eclipsed hex blows both halves
+			var pct := float(DETONATE_BASE_PCT + DETONATE_PER_POINT_PCT * pts) + wet
 			if int(e.get("glaze", 0)) > 0:
 				pct *= SHATTER_MULT * pot(Vector2i.ZERO, "ice", str(e.get("glaze_source", "")))
-			return { "op": "erase", "detonate": pct, "det_source": src, "det_points": absi(e.h) + absi(e.v) }
+			return { "op": "erase", "detonate": pct, "det_source": src, "det_points": pts,
+				"det_mix": blast_mix(e) }   # D423: what the blast consumed (its ring's colour)
 		"stasis":
 			e.glaze = GLAZE_CYCLES + glaze_plus
 			e["glaze_source"] = src
@@ -617,8 +725,8 @@ func _gale_copy(origin: Vector2i, hv: Array, caster: String, changed: Array, rad
 		if n == origin or not can_hold(n) or n in changed:
 			continue
 		var cur := at(n)
-		if not cur.is_empty() and (cur.marker != "" or cur.glaze > 0):
-			continue
+		if not cur.is_empty() and (cur.marker != "" or cur.glaze > 0 or bool(cur.get("lava", false))):
+			continue                                   # D447: lava never takes a gale copy
 		var copy := _entry(hv[0], hv[1], "", caster, "spread")
 		copy.timer = 1 + timer_plus
 		entries[n] = copy

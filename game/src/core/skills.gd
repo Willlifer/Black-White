@@ -79,7 +79,6 @@ const SURGE_CENTRE_PCT := 30
 const LEY_SWIFT := 1               # move for allies on the line, next turn
 const SIPHON_HEAL_PCT := 4         # per step stripped
 const FLURRY_FINISH_CRIT := 15     # crit points on the last strike
-const STEAM_PCT := 8               # fire + water: % max HP to the ring
 const BLIND_RANGE := 2             # D94: Blinded can only target units within 2 hexes
 const PINNED_MOVE := 2             # D94: Pinned, -2 move
 const STEADIED_TURNS := 2          # D94: after Staggered ends, immune to it for 2 turns
@@ -92,7 +91,7 @@ const SATURATE_STATUS := { "fire": "scorched", "water": "drenched", "light": "bl
 ## Striketwice's second cut in the opposite element (D87), keyed by the pair
 ## in either order.
 const REACTIONS := {
-	"fire|water": "steam", "water|fire": "steam",
+	"fire|water": "douse", "water|fire": "douse",   # D421/D422: was steam (8% to the ring)
 	"light|dark": "eclipse", "dark|light": "eclipse",
 	"thunder|wind": "storm", "wind|thunder": "storm",
 }

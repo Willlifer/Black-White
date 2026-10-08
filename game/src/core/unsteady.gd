@@ -64,7 +64,7 @@ static func unsteady(b: BWBattle, u: BWUnit) -> bool:
 
 ## Would `u` be Unsteady standing on `h` (the AI's hex scoring)?
 static func unsteady_at(b: BWBattle, u: BWUnit, h: Vector2i) -> bool:
-	if u == null or BWObelisk.is_objective(u) or not on_glaze(b.tiles, h):
+	if u == null or BWObelisk.is_objective(u) or not (on_glaze(b.tiles, h) or BWDuo.permafrost(b, u, h)):   # D462 Permafrost
 		return false
 	return not immune(b, u, h)
 
@@ -74,7 +74,7 @@ static func unsteady_at(b: BWBattle, u: BWUnit, h: Vector2i) -> bool:
 static func mods(b: BWBattle, dfn: BWUnit, out: Array) -> void:
 	if dfn == null or BWObelisk.is_objective(dfn):
 		return
-	var glazed := on_glaze(b.tiles, dfn.pos)
+	var glazed := on_glaze(b.tiles, dfn.pos) or BWDuo.permafrost(b, dfn, dfn.pos)   # D462 Permafrost
 	if not glazed and not dfn.statuses.has(STATUS):
 		return
 	if immune(b, dfn):

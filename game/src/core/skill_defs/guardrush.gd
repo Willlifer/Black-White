@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D442: Sweep covers the shove): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Lance (D105; drafted as Skewer). Drive the spear into a foe within reach
 ## (2) and shove it back PUSH hex, straight away from you. If rock or a unit
 ## stops it, it slams: SLAM_PCT% max HP to it, and to a unit it hits (the
@@ -19,6 +21,7 @@ func _init() -> void:
 		"desc": "Drive the spear into an enemy within reach and shove it back 1. If rock or a unit stops it, it slams for 8% HP (and so does what it hits)",
 		"targeting": "unit", "needs_element": true, "range": REACH, "cd": CD,
 		"power": POWER,
+		"retired": true,
 	}, 321)
 
 

@@ -1,8 +1,9 @@
 extends RefCounted
-## D293-D298 the wind, ice, water and dark keystones (design/ELEMENTS-v3.md,
-## the author's rulings of 2026-10-07; ELEMENTS.md §16.1-§16.4): each
-## keystone, its caps and its once-per-battle rules, the AI's use of the
-## action keystones, determinism.
+## D293-D298 the wind, ice, water and dark keystones of C3 that live on as
+## item enchantments since Keystones v3 (D443): Eye of the Vortex, the glaze
+## carry, Sure-Footed, Wellspring, Contagion, Doom, Event Horizon; the cap
+## (now D444's), determinism. Wind Wall, Jetstream, Flash Freeze, Glacier
+## Wall, Tidal Release and Riptide were removed with their tests.
 
 const C := Vector2i(4, 4)
 
@@ -18,11 +19,14 @@ func _board(n: int = 9, cells: Dictionary = {}) -> BWBoard:
 		"spawns": { "player": [[0, 0], [0, 1], [0, 2]], "enemy": [[8, 0], [8, 1], [8, 2]] } })
 
 
+## D443: these keystones are item enchantments now; the tests append the old
+## ids to the unit's list (BWKeystones.has reads it), and test_keystones_v3
+## checks the enchantment route itself.
 func _u(id: String, wc: String, el: String, ks: Array = []) -> BWUnit:
 	var u := BWUnit.from_roster({ "id": id, "name": id, "weapon_class": wc, "element": el,
 		"con": 6, "str": 4, "dex": 4, "wil": 4, "def": 4, "res": 4, "spd": 4 })
 	for k in ks:
-		u.keystones.append(k)
+		u.keystones.append(k)                     # has() reads the list: an old id still answers (tests only)
 	return u
 
 
@@ -106,44 +110,8 @@ func test_eye_respects_the_cap(t) -> void:
 	t.eq(BWHex.distance(f.pos, x), 2, "only 1 left of the 2-hex cycle budget")
 
 
-func test_wind_wall_is_the_keystone(t) -> void:
-	var me := _u("w", "staff", "wind")
-	var b := _duel(me, [_u("f", "bow", "fire")], [Vector2i(4, 0)])
-	t.ok(not b.skills_for(me).any(func(r): return r.key == "wind_wall"), "no keystone, no wall (the flag is gone)")
-	me.fx["ks:wind_wall"] = true
-	t.ok(not b.skills_for(me).any(func(r): return r.key == "wind_wall"), "the old fx flag no longer grants it")
-	me.keystones.append("wind_wall")
-	t.ok(b.skills_for(me).any(func(r): return r.key == "wind_wall"), "the keystone grants it")
 
 
-func test_jetstream_gale_three(t) -> void:
-	var me := _u("w", "staff", "wind", ["jetstream"])
-	var b := _duel(me, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
-	var x := Vector2i(4, 2)
-	var e := b.tiles._entry(0, 0, "gale", me.id, "cast")
-	e["gale_level"] = 2
-	b.tiles.entries[x] = e
-	b.paint([x], "wind", me)
-	t.eq(int(b.tiles.at(x).get("gale_level", 1)), 3, "wind on a gale 2 makes a gale 3")
-	var r := b.paint([x], "fire", me)
-	var far := false
-	var timers := true
-	for g in r.gales:
-		for c in g.copies:
-			if BWHex.distance(x, c) == 3:
-				far = true
-			if int(b.tiles.at(c).get("timer", 0)) < 2:
-				timers = false
-	t.ok(far, "a gale 3 copies to radius 3")
-	t.ok(timers, "Jetstream copies last 2 cycles")
-	# without the keystone, wind on a gale 2 stays a gale 2
-	var p := _u("p", "staff", "wind")
-	var b2 := _duel(p, [_u("f2", "axe", "fire")], [Vector2i(8, 8)])
-	var e2 := b2.tiles._entry(0, 0, "gale", p.id, "cast")
-	e2["gale_level"] = 2
-	b2.tiles.entries[x] = e2
-	b2.paint([x], "wind", p)
-	t.eq(int(b2.tiles.at(x).get("gale_level", 1)), 2, "no keystone: a gale 2 refreshes")
 
 
 func test_glaze_carry(t) -> void:
@@ -203,144 +171,16 @@ func test_sure_footed(t) -> void:
 	t.eq(me.pos, on, "pushed onto ice, it stops on it")
 
 
-func test_flash_freeze(t) -> void:
-	var me := _u("i", "staff", "ice", ["flash_freeze"])
-	var f := _u("f", "axe", "fire")
-	var g := _u("g", "axe", "fire")
-	var b := _duel(me, [f, g], [_nb(C, 0, 2), Vector2i(8, 8)])
-	t.ok(b.skills_for(me).any(func(r): return r.key == "flash_freeze"), "the holder has the action")
-	t.ok(not f.pos in [] and f.pos in b.skill_targets(me, "flash_freeze", ""), "a foe within 3")
-	t.ok(not g.pos in b.skill_targets(me, "flash_freeze", ""), "not one beyond 3")
-	var plain := float(b.forecast_basic(me, f).damage.value)
-	b.use_skill(me, "flash_freeze", "", f.pos)
-	t.ok(BWKsIce.frozen(f), "Frozen")
-	t.ok(not "flash_freeze" in BWWind.keystone_actions(me), "once a battle: gone after use")
-	var fc := b.forecast_basic(me, f)
-	t.ok(float(fc.damage.value) >= 2.0 * float(plain) - 1.0, "its next hit is x2 (%s vs %s)" % [fc.damage.value, plain])
-	t.ok(BWBattle._tags(fc).has("Shatter"), "it counts as glazed for Shatter")
-	t.ok(not b._displace(f, 0, 1, "push"), "it can't be displaced")
-	BWKsIce.after_blow(b, f, { "hit": true, "damage": 5 })
-	t.ok(not BWKsIce.frozen(f), "a landed hit thaws it")
-	# the skip
-	BWKsIce.freeze(b, f, me)
-	_give_turn(b, f)
-	t.ok(not _ev(b, "frozen_skip").is_empty(), "a Frozen foe skips its turn")
-	t.ok(_ev(b, "turn_end").any(func(e): return e.unit == "f"), "its turn ended at once")
-	# a boss doesn't skip
-	var boss := _u("bz", "axe", "fire")
-	var b3 := _duel(_u("i2", "staff", "ice"), [boss], [Vector2i(6, 4)])
-	boss.encounter = "twin"
-	BWKsIce.freeze(b3, boss, null)
-	t.ok(not BWKsIce.turn_start(b3, boss), "a boss doesn't skip")
-	t.ok(BWKsIce.frozen(boss), "but stays encased for the x2")
 
 
-func test_glacier_wall(t) -> void:
-	var me := _u("i", "staff", "ice", ["glacier_wall"])
-	var f := _u("f", "axe", "fire")
-	var a := _u("a", "axe", "fire")
-	var x := Vector2i(4, 2)
-	var b := _duel(me, [f], [_nb(x, 0)], [a], [_nb(x, 3)])
-	_water(b, x, 3)
-	b.paint([x], "ice", me)
-	t.ok(b.tiles.is_pillar(x), "a pillar rose")
-	t.eq(int(b.tiles.pillars[x].ticks), BWKsIce.GLACIER_TICKS, "it lasts all battle")
-	for i in 5:
-		b.tiles.tick()
-	t.ok(b.tiles.is_pillar(x), "still standing after 5 ticks")
-	t.ok(b.skills_for(me).any(func(r): return r.key == "glacier_shatter"), "the Break Pillar row")
-	var f0 := f.hp
-	var a0 := a.hp
-	for k in 3:                                    # D400: glaze behind the foe: the push stops on it, no slide
-		var g := _nb(_nb(x, 0), 0, k + 1)
-		_water(b, g, 1)
-		b.tiles.entries[g].glaze = 2
-	BWKsIce.shatter(b, me, x)
-	t.ok(not b.tiles.is_pillar(x), "shattered")
-	t.ok(f.hp < f0 and a.hp < a0, "12% to the neighbours, both teams")
-	t.eq(f0 - f.hp, b._tile_dmg(f, BWKsIce.SHATTER_PCT, "ice"), "12% (ice)")
-	t.eq(BWHex.distance(f.pos, x), 2, "and pushed 1 away, onto the glaze, where it stops (no slide)")
-	t.ok(_ev(b, "slam").is_empty(), "no slam")
-	# still capped at 4
-	var hs: Array = [Vector2i(0, 6), Vector2i(2, 6), Vector2i(4, 6), Vector2i(6, 6), Vector2i(8, 6)]
-	for h in hs:
-		_water(b, h, 3)
-		b.paint([h], "ice", me)
-	t.eq(BWKsIce.own_pillars(b, me).size(), 4, "still 4 at most")
-	# a skill shape on an older pillar shatters it; one raised in the same action doesn't
-	var p0: Vector2i = BWKsIce.own_pillars(b, me)[0]
-	b._action_serial += 1
-	BWKsIce.after_skill(b, me, { "hexes": [p0] })
-	t.ok(not b.tiles.is_pillar(p0), "your skill on your pillar shatters it")
-	var p1: Vector2i = BWKsIce.own_pillars(b, me)[0]
-	b.tiles.pillars[p1]["act"] = b._action_serial
-	BWKsIce.after_skill(b, me, { "hexes": [p1] })
-	t.ok(b.tiles.is_pillar(p1), "not one raised by that same action")
-	# a plain pillar thaws as ever
-	var q := _u("q", "staff", "ice")
-	var b2 := _duel(q, [_u("f2", "axe", "fire")], [Vector2i(8, 8)])
-	_water(b2, x, 3)
-	b2.paint([x], "ice", q)
-	for i in BWPools.PILLAR_TICKS:
-		b2.tiles.tick()
-	t.ok(not b2.tiles.is_pillar(x), "no keystone: it thaws after 3 ticks")
 
 
 # ------------------------------------------------------------------ water
 
-func test_tidal_release(t) -> void:
-	var me := _u("wa", "staff", "water", ["tidal_release"])
-	var f1 := _u("f1", "axe", "fire")
-	var f2 := _u("f2", "axe", "fire")
-	var s := Vector2i(1, 6)
-	var line: Array = []
-	for i in 5:
-		line.append(_nb(s, 0, i))
-	var b := _duel(me, [f1, f2], [line[1], line[3]])
-	me.pos = Vector2i(1, 4)
-	for h in line:
-		_water(b, h, 3)
-	var extra := _nb(line[2], 5)
-	_water(b, extra, 1)
-	t.ok(s in b.skill_targets(me, "tidal_release", ""), "a pool hex within 3")
-	var seconds := BWSkillRegistry.get_def("tidal_release").second_targets(b, me, "", s)
-	t.eq(seconds.size(), 6, "six headings")
-	var d1 := f1.pos
-	var d2 := f2.pos
-	var pv := b.skill_preview(me, "tidal_release", "", s, _nb(s, 0))
-	t.eq((pv.hexes as Array).size(), 6, "the wave's length is the pool's size (6 hexes)")
-	b.use_skill(me, "tidal_release", "", s, _nb(s, 0))
-	t.eq(BWHex.distance(d2, f2.pos), 3, "the front unit is pushed 3 along the line")
-	t.ok(BWHex.distance(d1, f1.pos) >= 1, "the one behind it too (then it may slam)")
-	t.eq(b.tiles.intensity(extra, "water"), 0, "the pool drained (off the line too)")
-	t.eq(b.tiles.intensity(s, "water"), 2, "the line gets water 2")
-	t.eq(int(me.cooldowns.get("tidal_release", 0)), 4, "cooldown 4")
-	t.ok(not _ev(b, "tidal").is_empty(), "the tidal event for the view")
 
 
-func test_tidal_wave_length_cap(t) -> void:
-	var me := _u("wa", "staff", "water", ["tidal_release"])
-	var b := _duel(me, [_u("f", "axe", "fire")], [Vector2i(8, 8)])
-	for c in 9:
-		_water(b, Vector2i(c, 6), 2)
-		_water(b, Vector2i(c, 7), 2)
-	var line := BWKsWater.wave_line(b, Vector2i(1, 6), 0)
-	t.eq(line.size(), BWKsWater.WAVE_MAX, "max 6 hexes")
 
 
-func test_riptide(t) -> void:
-	var me := _u("wa", "staff", "water", ["riptide"])
-	var f := _u("f", "axe", "fire")
-	var g := _u("g", "axe", "fire")
-	var b := _duel(me, [f, g], [_nb(C, 0, 3), _nb(C, 3, 3)])
-	_water(b, f.pos, 1)
-	var f0 := BWHex.distance(C, f.pos)
-	_give_turn(b, me)
-	t.eq(BWHex.distance(C, f.pos), f0 - 1, "a foe in water within 4 is pulled 1")
-	t.eq(BWHex.distance(C, g.pos), 3, "a foe on dry ground isn't")
-	t.ok(not _ev(b, "riptide").is_empty(), "the riptide event")
-	var mv := _ev(b, "move").filter(func(e): return e.unit == "f")
-	t.ok(not mv.is_empty() and bool(mv[-1].get("wind", false)), "a field move (it spends the wind budget)")
 
 
 func test_wellspring(t) -> void:
@@ -458,82 +298,32 @@ func test_event_horizon(t) -> void:
 
 # ------------------------------------------------------------------ AI
 
-func test_ai_flash_freeze_targets_the_hitter(t) -> void:
-	var me := _u("i", "staff", "ice", ["flash_freeze"])
-	var weak := _u("w", "staff", "fire")
-	var big := BWUnit.from_roster({ "id": "big", "name": "big", "weapon_class": "axe", "element": "fire",
-		"con": 6, "str": 14, "dex": 4, "wil": 4, "def": 4, "res": 4, "spd": 4 })
-	var b := _duel(me, [weak, big], [_nb(C, 0, 2), _nb(C, 3, 2)])
-	var s := BWKsIce.ai_freeze(b, me, { "key": "flash_freeze" })
-	t.eq(s.get("target", Vector2i(-1, -1)), big.pos, "it freezes the foe that hits hardest")
 
 
-func test_ai_tidal_needs_two(t) -> void:
-	var me := _u("wa", "staff", "water", ["tidal_release"])
-	var f1 := _u("f1", "axe", "fire")
-	var f2 := _u("f2", "axe", "fire")
-	var s := Vector2i(1, 6)
-	var b := _duel(me, [f1, f2], [_nb(s, 0, 1), _nb(s, 0, 2)])
-	me.pos = Vector2i(1, 4)
-	for i in 4:
-		_water(b, _nb(s, 0, i), 2)
-	var a := BWKsWater.ai_tidal(b, me, { "key": "tidal_release" })
-	t.ok(not a.is_empty(), "two foes on a line: it releases")
-	f2.pos = Vector2i(8, 0)
-	var a2 := BWKsWater.ai_tidal(b, me, { "key": "tidal_release" })
-	t.ok(a2.is_empty(), "one: it doesn't")
 
 
-## D304: the AI's Wind Wall: a ranged foe threatening 2+ of us along lines a
-## wall cuts, or a melee foe closing on a hurt ally; never one screened unit.
-func test_ai_wind_wall(t) -> void:
-	var me := _u("w", "staff", "wind", ["wind_wall"])
-	var al := _u("a", "axe", "fire")
-	var bow := _u("b", "bow", "fire")
-	var b := _duel(me, [bow], [Vector2i(8, 4)], [al], [Vector2i(4, 5)])
-	var s := BWKsWind.ai_wall(b, me, { "key": "wind_wall" })
-	t.ok(not s.is_empty(), "a bow threatening two of us: raise a wall")
-	if not s.is_empty():
-		var wall := BWWind.wall_line(b, s.target, BWHex.direction_index(s.target, s.choice))
-		var cut := 0
-		for x in [me, al]:
-			if BWHex.line(bow.pos, x.pos).slice(1, -1).any(func(h): return h in wall):
-				cut += 1
-		t.eq(cut, 2, "the wall cuts both lines")
-		t.ok(not b.use_skill(me, "wind_wall", "", s.target, s.choice).is_empty(), "and it is a legal cast")
-	al.pos = Vector2i(0, 8)
-	t.ok(BWKsWind.ai_wall(b, me, { "key": "wind_wall" }).is_empty(), "one unit in its reach: no wall")
-	# melee: an axe closing on a hurt ally
-	var me2 := _u("w2", "staff", "wind", ["wind_wall"])
-	var al2 := _u("a2", "staff", "fire")
-	var axe := _u("x", "axe", "fire")
-	var b2 := _duel(me2, [axe], [Vector2i(7, 2)], [al2], [Vector2i(5, 2)])
-	me2.pos = Vector2i(3, 4)
-	al2.pos = Vector2i(4, 2)
-	t.ok(BWKsWind.ai_wall(b2, me2, { "key": "wind_wall" }).is_empty(), "a healthy ally: no wall")
-	al2.hp = int(al2.max_hp() * 0.3)
-	var s2 := BWKsWind.ai_wall(b2, me2, { "key": "wind_wall" })
-	t.ok(not s2.is_empty(), "a hurt ally in an axe's reach: wall the approach")
 
 
-## D302: the cap of 2 binds every grant (the C3 render's three came from a
-## review tool appending past it); a save trimmed on load.
+## D302 / D444: the cap of 2 binds every grant, one per element; a save
+## trimmed on load; the old ids are no keystones any more.
 func test_keystone_cap(t) -> void:
 	var u := _u("k", "staff", "ice")
-	t.ok(BWKeystones.grant(u, "flash_freeze"), "first")
-	t.ok(BWKeystones.grant(u, "glacier_wall"), "second")
-	t.ok(not BWKeystones.grant(u, "tidal_release"), "a third is refused")
+	t.ok(BWKeystones.grant(u, "sculptor"), "first")
+	t.ok(not BWKeystones.grant(u, "shatterer"), "one per element: a second ice one is refused")
+	t.ok(BWKeystones.grant(u, "lava_walker"), "second (another element)")
+	t.ok(not BWKeystones.grant(u, "abyssal"), "a third is refused")
+	t.ok(not BWKeystones.grant(u, "doom"), "an old (converted) id is no keystone")
 	t.eq(u.keystones.size(), 2, "two held")
-	u.keystones.append("doom")
+	u.keystones.append("hopekiller")
 	t.eq(BWKeystones.enforce_cap(u), 1, "enforce_cap trims the extra")
-	t.eq(u.keystones, ["flash_freeze", "glacier_wall"], "keeping the first taken")
+	t.eq(u.keystones, ["sculptor", "lava_walker"], "keeping the first taken")
 
 
 func _play(seed_value: int) -> String:
-	var players: Array = [_u("p1", "staff", "ice", ["flash_freeze", "glacier_wall"]), _u("p2", "axe", "water", ["riptide", "tidal_release"]),
-		_u("p3", "staff", "dark", ["doom", "event_horizon"])]
-	var enemies: Array = [_u("e1", "axe", "wind", ["eye_of_vortex", "wind_wall"]), _u("e2", "staff", "water", ["wellspring", "tidal_release"]),
-		_u("e3", "staff", "dark", ["contagion", "skater"])]
+	var players: Array = [_u("p1", "staff", "ice", ["sculptor", "skater"]), _u("p2", "axe", "water", ["being_of_rain", "wellspring"]),
+		_u("p3", "staff", "dark", ["doom", "event_horizon", "abyssal"])]
+	var enemies: Array = [_u("e1", "axe", "wind", ["eye_of_vortex", "la_nina"]), _u("e2", "staff", "water", ["wellspring", "leviathan"]),
+		_u("e3", "staff", "dark", ["contagion", "hopekiller"])]
 	var b := BWBattle.new(_board(), seed_value)
 	b.setup(players, enemies)
 	var n := 0

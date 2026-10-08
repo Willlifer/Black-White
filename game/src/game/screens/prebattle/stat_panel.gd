@@ -46,7 +46,7 @@ func refresh() -> void:
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hv)
 	var nm := Label.new()
-	nm.text = u.name
+	nm.text = BWKeystones.titled(u)   # D445: the keystone title
 	nm.add_theme_font_size_override("font_size", BWStyle.F_NAME)
 	hv.add_child(nm)
 	var sub := HBoxContainer.new()

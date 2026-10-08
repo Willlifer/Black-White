@@ -20,7 +20,7 @@ extends Node
 ##   anything that changes HP or KOs      BWMusic.set_intensity (0..2)
 ##   move without an animator             a step per hex (the primitive stand-ins)
 ##   chain (D86)                          a zap at the chained unit (elem_thunder, pitched up)
-##   reaction (D87)                       steam hiss / eclipse / storm at the hex
+##   reaction (D87)                       douse hiss / eclipse / storm at the hex; a paint's doused hexes hiss (D421)
 ##   rider_shown (D86/D87, screen signal) Spark crackle (bolt_fizz), Shatter glass
 ##                                        (tile_glaze, pitched up), at the blow's impact
 ##   skill_called (D100, screen signal)   a quick whoosh (cast_whoom pitched up) as the
@@ -131,6 +131,8 @@ func _replayed(e: Dictionary) -> void:
 		"paint":
 			var kind := str(e.get("kind", ""))
 			var hexes: Array = e.get("hexes", [])
+			if not (e.get("doused", []) as Array).is_empty():   # D421: fire met water, a short hiss
+				BWSfx.play("elem_water", _centroid(e.doused), { "pitch": 1.6, "gain_db": -6.0, "tag": "hiss" })
 			if kind in ["consume", "siphon"] or hexes.is_empty():
 				return
 			var el := str(e.get("element", ""))
@@ -170,7 +172,7 @@ func _replayed(e: Dictionary) -> void:
 		"reaction":
 			var at := _hex_pos(e.get("hex"))
 			match str(e.get("kind", "")):
-				"steam": BWSfx.play("elem_water", at, { "pitch": 1.4, "tag": "steam" })
+				"douse": BWSfx.play("elem_water", at, { "pitch": 1.4, "tag": "douse" })
 				"eclipse": BWSfx.play("elem_dark", at, { "pitch": 0.8, "tag": "eclipse" })
 				"storm":
 					BWSfx.play("elem_wind", at, { "tag": "storm" })
@@ -224,7 +226,7 @@ static func proc_kind(text: String) -> String:
 
 
 ## Keystone casts with no element of their own.
-const KEYSTONE_EL := { "flash_freeze": "ice", "tidal_release": "water", "glacier_shatter": "ice", "wind_wall": "wind" }
+const KEYSTONE_EL := { "pitch_black": "dark", "solar_flare": "light", "self_detonate": "thunder" }   # D449-D452 (Keystones v3)
 const ELEMENTS := ["fire", "water", "ice", "thunder", "wind", "light", "dark"]
 
 

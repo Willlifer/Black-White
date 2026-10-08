@@ -12,6 +12,18 @@ class_name BWSkillRegistry
 ##                      it holds (BWUnit.skill_loadout), else the starter kit
 
 const DIR := "res://src/core/skill_defs/"
+## D426: retired keys and the skill that took their place. A retired def
+## (row `retired`) stays loadable but leaves the learnable pool; a loaded
+## save's known skills, ranks and loadouts are mapped (migrate_unit).
+## D435-D442 (weapon kit pass 3): renames map to their replacement; the
+## pure removals (Guardrush, Aegis, Aimed Shot) to the nearest skill left.
+const RENAMED := {
+	"elemental_truth": "en_passant",
+	"reckless_swing": "reckless_arc", "war_cry": "bellow",
+	"heart_seeker": "thread_needle", "triumph": "tapestry",
+	"assassinate": "overload", "hamstring": "kindle",
+	"guardrush": "sweep", "aegis": "transfer", "aimed_shot": "pinning_shot",
+}
 
 static var _defs := {}          # key -> BWSkillDef
 static var _keys: Array = []    # every key, class then order
@@ -97,9 +109,41 @@ static func for_class(weapon_class: String) -> Array:
 	return out
 
 
-## Learnable keys of a class (follow-up halves ride along with their skill).
+## Learnable keys of a class (follow-up halves ride along with their skill;
+## retired skills, D426, are never offered).
 static func pool(weapon_class: String) -> Array:
-	return for_class(weapon_class).filter(func(d): return not d.data.get("follow_up_only", false)).map(func(d): return d.id)
+	return for_class(weapon_class).filter(func(d): return not d.data.get("follow_up_only", false) \
+		and not d.data.get("retired", false)).map(func(d): return d.id)
+
+
+## D426: map a unit's retired skill keys (RENAMED) in known_skills,
+## skill_ranks and skill_loadout. Returns whether
+## anything changed.
+static func migrate_unit(u: BWUnit) -> bool:
+	var changed := false
+	for old in RENAMED:
+		var nu: String = RENAMED[old]
+		var had := nu in u.known_skills         # D442: a removal mapped onto a skill already known gives no free Improve
+		if old in u.known_skills:
+			u.known_skills.erase(old)
+			if not nu in u.known_skills:
+				u.known_skills.append(nu)
+			changed = true
+		if u.skill_ranks.has(old):
+			if not had:
+				u.skill_ranks[nu] = maxi(int(u.skill_ranks.get(nu, 1)), int(u.skill_ranks[old]))
+			u.skill_ranks.erase(old)
+			changed = true
+		for wc in u.skill_loadout:
+			var lo: Array = u.skill_loadout[wc]
+			var i := lo.find(old)
+			if i >= 0:
+				if nu in lo:
+					lo.remove_at(i)
+				else:
+					lo[i] = nu
+				changed = true
+	return changed
 
 
 ## The class's starting skills. weapons.csv `skills` is the contract when

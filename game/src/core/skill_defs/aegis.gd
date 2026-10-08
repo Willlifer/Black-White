@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D442: removed): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Staff spell (D107). Ward one ally within RANGE (not yourself): it takes
 ## GUARD_PCT% less damage until the end of its next turn. The ward is the FX
 ## `guard` (Phalanx.guard); the battle drops guards when the holder's turn
@@ -18,6 +20,7 @@ func _init() -> void:
 		"desc": "Ward an ally up to 4 tiles away: it takes 20% less damage until the end of its next turn",
 		"targeting": "hex", "needs_element": false, "range": RANGE, "cd": CD,
 		"power": 0, "min_range": 1, "los": true, "spell": true,
+		"retired": true,
 	}, 344)
 
 

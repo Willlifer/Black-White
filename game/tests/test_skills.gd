@@ -102,8 +102,8 @@ func test_shapes_flat(t) -> void:
 	var arc: Array = s.pv.hexes
 	s.b.tiles.apply([arc[0]], "fire", "x")
 	var pv2: Dictionary = s.b.skill_preview(s.me, "cleave", "fire", E)
-	var ext := Array(BWHex.fringe(arc, 1)).filter(func(h): return h != C)
-	t.ok(_same(pv2.hexes, ext), "cleave extends when an arc hex carries the element")
+	var ext := Array(BWHex.neighbors(C))
+	t.ok(_same(pv2.hexes, ext), "D433: cleave widens to all 6 around you when an arc hex carries the element")
 	var pv3: Dictionary = s.b.skill_preview(s.me, "cleave", "water", E)
 	t.eq(pv3, {}, "cleave in an unlearned element is not a legal click")
 
@@ -252,7 +252,7 @@ func test_daggerleap_far(t) -> void:
 	t.ok(not far in b.skill_targets(me, "daggerleap", "fire"), "bare far hex is out of reach")
 	b.tiles.apply([far], "fire", "x")
 	t.ok(far in b.skill_targets(me, "daggerleap", "fire"), "far hex carrying fire is in reach")
-	b.use_skill(me, "daggerleap", "fire", far)
+	b.use_skill(me, "daggerleap", "fire", far, far)   # D429a: stay where it lands
 	t.eq(me.pos, far, "leapt")
 	t.eq(_events(b, "move")[-1].kind, "leap", "leap move event")
 	for h in b.board.neighbors(far):
@@ -382,7 +382,7 @@ func test_staff_skills(t) -> void:
 	var W := Vector2i(3, 6)
 	b.tiles.apply([W], "water", "x")
 	b.use_skill(me, "saturate", "fire", W)
-	t.eq(b.tiles.intensity(W, "fire"), 1, "saturate flips water 1 to fire 1")
+	t.eq(b.tiles.intensity(W, "fire") + b.tiles.intensity(W, "water"), 0, "D421: saturate's fire on water 1 douses both")
 
 	_give_turn(b, me)
 	b.board.set_cell(Vector2i(7, 4), "jagged")
@@ -552,12 +552,12 @@ func test_palm_burst_pours_two(t) -> void:
 	# combo bait: thunder on the charged hex detonates it
 	var r := b.tiles.apply([E], "thunder", "x")
 	t.ok(not r.detonations.is_empty(), "thunder detonates the poured charge")
-	# water 1 under it: 2 steps flip it to fire 1, like Saturate
+	# water 1 under it: D421, the fire douses it (both cleared), like Saturate
 	var me2 := _u("me", "fists", "fire", { "dex": 100 })
 	var b2 := _duel(me2, [_foe("f", { "con": 300 })], [E])
 	b2.tiles.apply([E], "water", "x")
 	b2.use_skill(me2, "palm_burst", "fire", E)
-	t.eq(b2.tiles.intensity(E, "fire"), 1, "water 1 flips to fire 1")
+	t.eq(b2.tiles.intensity(E, "fire") + b2.tiles.intensity(E, "water"), 0, "D421: fire on water 1 douses both")
 	# Welling: 3 steps
 	var me3 := _fists(_u("me", "fists", "fire", { "dex": 100 }), "gauntlets", "welling")
 	var b3 := _duel(me3, [_foe("f", { "con": 300 })], [E])

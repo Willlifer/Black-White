@@ -344,7 +344,7 @@ func test_placeholders(c) -> void:
 	c.eq(BWCombatAudio.proc_kind("Bulwark: 9 → 6"), "", "other enchant text -> no proc sound")
 	var caster := BWUnit.new()
 	caster.element = "fire"
-	c.eq(BWCombatAudio.big_cast_element({ "skill": "flash_freeze", "element": "", "hexes": [] }, caster), "ice", "Flash Freeze: a big ice cast")
+	c.eq(BWCombatAudio.big_cast_element({ "skill": "pitch_black", "element": "", "hexes": [] }, caster), "dark", "Pitch Black: a big dark cast (D449)")
 	c.eq(BWCombatAudio.big_cast_element({ "skill": "lunge", "element": "fire", "hexes": [Vector2i(0, 0)] }, caster), "", "a sword lunge is no cast")
 	for e in BWCombatAudio.ELEMENTS:
 		c.ok(manifest.has("ph_cast_" + e), "a big-cast release for %s" % e)

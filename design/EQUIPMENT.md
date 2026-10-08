@@ -30,7 +30,7 @@ learned. Data: `game/data/sets.csv`; code: `BWSets` (`src/core/element_sets.gd`)
 | Set | 2 pieces | 3 pieces |
 |---|---|---|
 | Fire | On fire: +10% STR per level. Free fire crossing. | **Flashpoint**: once a battle, dropping under 50%, your hex and ring go to fire 3 and you heal 20%. |
-| Water | On water: +10% DEX per level. Your pools reach 25 (D307). | **Breakwater**: once a battle, a foe that hits you is swept 2 away and Drenched. |
+| Water | On water: +10% DEX per level. Your ice and thunder on a pool react within 2 of the cast hex (D422; was pools reaching 25, D307, which only steam used). | **Breakwater**: once a battle, a foe that hits you is swept 2 away and Drenched. |
 | Ice | On glaze: +20% DEF. Your pillars last 1 tick longer. | **Frost Ward**: each turn the nearest unwarded ally within 2 (else you) gets a ward that negates its next elemental effect. |
 | Thunder | Your detonations +10%. Electrified water shocks you for half. | **Stormfront**: your first detonation each turn also arcs 10% to every conductive foe it missed. |
 | Wind | +1 move. Your wind fields skip your allies. | **Slipstream**: after moving 4+ hexes, your attacks can't be avoided. |
@@ -227,7 +227,16 @@ the brim (Feathered Cap, Baseball Cap, Tilted Beret, Wizard Hat), `none` shows i
   staff's Channel; skills are unchanged and the attunement doesn't move.
   Name: "Fire Flamberge of Cleaving", "Keen Ice Dagger".
 
-### Fists (D76)
+### Fists (D76) — benched (D419)
+
+> **Benched (D419, 2026-10-08, the author: "Bench fists." / "Bench pistol.").** Fists and pistols
+> keep their rows, items, skills and rules but never appear in play: no drops, shop stock, finds,
+> roster or enemy rolls, Branch out cards or tutorial use, and the fists-only enchantments
+> (Pummeling, Rebound, Welling) are never rolled. A recruit's spare weapon is now tier-E **daggers**.
+> A save holding either converts on load (D420): pistols → bow, fists → daggers, the same item
+> (uid, tier, stat values, imbue) on a stand-in model, its enchantment kept where it applies to the
+> new model, else re-rolled for it. Clear the `benched` cell in `weapons.csv` to bring a class back
+> (SCHEMA.md "Benched classes").
 
 A new weapon class, the daggers' counterpart: blunt and elemental, fast and
 up close. Class row: martial (STR), Jab 8, range 1, speed +2, move +1,

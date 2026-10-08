@@ -57,7 +57,7 @@ static func begin(t: BWTiles, hexes: Array, element: String, fresh: bool, opts: 
 ## After the plans and the pools: each centre's radius-1 glaze. Adds
 ## out.overfreeze = [{hex, ring, glazed, pct, source}] and the glazed hexes
 ## to out.changed.
-static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) -> void:
+static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary, radius: int = 1) -> void:
 	if centres.is_empty():
 		return
 	var recs: Array = []
@@ -65,7 +65,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) 
 		var gsrc := str(t.at(c).get("glaze_source", caster))
 		var glazed: Array = []
 		var ring: Array = []
-		for h in t.board.area(c, 1):
+		for h in t.board.area(c, maxi(1, radius)):   # D452 Superconductor: radius 2
 			if not t.board.exists(h):
 				continue
 			if h != c:
@@ -79,7 +79,7 @@ static func finish(t: BWTiles, centres: Array, caster: String, out: Dictionary) 
 			e.glaze = maxi(int(e.glaze), BWTiles.GLAZE_CYCLES)   # the centre is fresh glaze too
 			e.permanent = false
 			e.erase("seeded")
-		recs.append({ "hex": c, "ring": ring, "glazed": glazed, "source": caster,
+		recs.append({ "hex": c, "ring": ring, "glazed": glazed, "source": caster, "radius": maxi(1, radius),
 			"pct": PCT * t.pot(Vector2i.ZERO, "ice", gsrc) })
 	out["overfreeze"] = recs
 
@@ -128,7 +128,7 @@ static func after_paint(b: BWBattle, by: BWUnit, r: Dictionary) -> void:
 			if not u.alive() or BWObelisk.is_objective(u):
 				continue
 			for f in u.footprint():
-				if BWHex.distance(f, rec.hex) <= 1:
+				if BWHex.distance(f, rec.hex) <= int(rec.get("radius", 1)):
 					hit.append(u.id)
 					if not hurt.has(u) and int(u.fx.get("ofz_act", -1)) != b._action_serial:
 						hurt[u] = float(rec.pct)

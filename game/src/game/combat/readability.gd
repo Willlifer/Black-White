@@ -349,9 +349,9 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 		lines.append("Static (%s): returns every cycle%s" % [_hv_words(sv.x, sv.y), "; spent, back after the next tick" if r.scarred else ""])
 	if r.seeded:
 		lines.append("Seeded: holds until play changes it")
-	for sl in r.get("spine", []):                  # D266/D397: unsteady glaze, pillar, steam, electrified, pool
+	for sl in r.get("spine", []):                  # D266/D397: unsteady glaze, pillar, electrified, pool
 		var scol := { "Pillar": BWLook.element_color("ice"), "Unsteady": BWLook.element_color("ice"),
-			"Electrified": BWLook.element_color("thunder"), "Steam": Color(0.75, 0.77, 0.8), "Pool": BWLook.element_color("water") }
+			"Electrified": BWLook.element_color("thunder"), "Pool": BWLook.element_color("water") }
 		lines.append("[color=#%s][b]%s[/b][/color]: %s" % [_hx(scol.get(str(sl[0]), Color.WHITE)), str(sl[0]), str(sl[1])])
 	# what it does
 	var does: PackedStringArray = []
@@ -372,6 +372,8 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	if BWPools.is_water(b.tiles, h):                 # D264: thunder on water electrifies, never blasts
 		lines.append("[color=#%s]Thunder here: electrifies the water within 1 (%d%% + Staggered at turn start)%s[/color]" % [
 			_hx(BWLook.element_color("thunder")), int(BWPools.SHOCK_PCT), "; already live, nothing" if b.tiles.shock.has(h) else ""])
+	elif b.tiles.is_lava(h):                         # D447: nothing reacts with lava
+		lines.append("[color=#%s]Thunder here: fizzles on the lava (no blast)[/color]" % _hx(BWLook.element_color("thunder")))
 	elif hv != 0 or vv != 0:
 		var plan: Dictionary = b.tiles._route(e, "thunder", true, 1, "")
 		if plan.has("detonate"):

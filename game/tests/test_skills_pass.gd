@@ -124,7 +124,7 @@ func test_striketwice_retarget(t) -> void:
 
 
 func test_striketwice_reactions(t) -> void:
-	# steam: fire then water on the same hex; a foe beside it takes 8%, the cutter never
+	# douse (D422, was steam): fire then water on the same hex; a foe beside it is Drenched, the cutter never
 	var me := _u("me", "sword", "fire", { "dex": 100 })
 	me.affinity["water"] = 10
 	var foe := _foe("f")
@@ -134,13 +134,14 @@ func test_striketwice_reactions(t) -> void:
 	var b := _fight(me, [foe, nb], [E, side_hex])
 	b.use_skill(me, "striketwice", "fire", E)
 	var pv := b.skill_preview(me, "striketwice_second", "water", E)
-	t.eq(pv.reaction, "steam", "fire + water = steam")
+	t.eq(pv.reaction, "douse", "fire + water = douse")
 	t.ok(pv.notes.any(func(n): return str(n).begins_with("Fire meets water")), "named in the preview")
 	b.use_skill(me, "striketwice_second", "water", E)
-	t.eq(_events(b, "reaction").map(func(e): return e.kind), ["steam"], "a reaction event")
-	var steam := _events(b, "tile_damage").filter(func(e): return e.cause == "steam")
-	t.eq(steam.map(func(e): return e.unit), ["nb"], "steam scalds the ring, not the cutter")
-	t.eq(int(steam[0].amount), BWTiles.tile_damage(nb, BWSkills.STEAM_PCT, "fire"), "8% HP, fire resistance applies")
+	t.eq(_events(b, "reaction").map(func(e): return e.kind), ["douse"], "a reaction event")
+	t.ok(nb.statuses.has("drenched"), "the foe on the ring is Drenched")
+	t.ok(not me.statuses.has("drenched"), "the cutter never")
+	t.ok(_events(b, "tile_damage").filter(func(e): return e.cause == "steam").is_empty(), "no steam damage any more")
+	t.eq(b.tiles.intensity(E, "fire") + b.tiles.intensity(E, "water"), 0, "the hex douses: no fire or water left")
 	# eclipse: light then dark blinds the foe and its neighbours
 	var me2 := _u("me", "sword", "light", { "dex": 100 })
 	me2.affinity["dark"] = 10

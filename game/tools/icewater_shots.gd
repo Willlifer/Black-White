@@ -1,7 +1,7 @@
 extends SceneTree
 ## D266 review renders of the ice/water spine on the real combat screen (needs
 ## a window); D397-D401 replaced the slide scenes with Unsteady footing:
-##   RES=1920x1080 [SHOTS=<dir>] [ONLY=unsteady,overfreeze,pillar,steam,shock,pool] godot --path . --script res://tools/icewater_shots.gd
+##   RES=1920x1080 [SHOTS=<dir>] [ONLY=unsteady,overfreeze,pillar,douse,shock,pool] godot --path . --script res://tools/icewater_shots.gd
 ## ice2_unsteady_hover.png  Wilona hovers Gail standing on glaze: the crack
 ##                         ring under Gail, the damage sticker
 ## ice2_unsteady_forecast.png  the confirm box: "Unsteady footing -10 avoid /
@@ -12,8 +12,8 @@ extends SceneTree
 ##                         units on them Unsteady (crack rings), the tile card
 ## v3_icewater_pillar.png  an ice pillar between Wilona's bow and a foe: no
 ##                         shot (no pulse on the foe), the pillar's tile card
-## v3_icewater_steam.png   fire on a lake: steam over the whole pool, a unit in
-##                         it, its tile card
+## sys5_douse_hiss|after.png  D421: fire on two lake hexes douses them (the
+##                         hiss puff, then the cleared hexes; no steam)
 ## v3_icewater_shock_preview.png  a thunder Saturate aimed at the lake: the
 ##                         radius-1 field outlined, "ELECTRIFIED"
 ## v3_icewater_shock.png   the field live after two of the foe's turn starts:
@@ -94,7 +94,7 @@ func _go() -> void:
 		C = _centre()
 	print("centre ", C)
 	var only := OS.get_environment("ONLY").split(",", false)
-	for k in ["unsteady", "overfreeze", "pillar", "steam", "shock", "pool"]:
+	for k in ["unsteady", "overfreeze", "pillar", "douse", "shock", "pool"]:
 		if only.is_empty() or k in only:
 			await call("_" + k)
 	quit()
@@ -139,7 +139,7 @@ func _west(h: Vector2i, n: int) -> Vector2i:
 func _reset(placed: Dictionary) -> void:
 	var b := s.battle
 	b.tiles.entries.clear()
-	for d in [b.tiles.pillars, b.tiles.steam, b.tiles.fields, b.tiles.shock]:
+	for d in [b.tiles.pillars, b.tiles.fields, b.tiles.shock]:
 		d.clear()
 	var far: Array = []
 	var keys := b.board.cells()
@@ -303,20 +303,27 @@ func _lake() -> Array:
 	return out
 
 
-## Fire on the lake: steam over it all.
-func _steam() -> void:
+## D421: fire on the lake douses the hex it lands on (no steam): the small
+## hiss puff mid-play, the cleared hex in the lake.
+func _douse() -> void:
 	var lake := _lake()
 	var k0 := _west(C, 3)
 	_reset({ kira: k0, bob: BWHex.neighbors(C)[0], gail: BWHex.neighbors(C)[4] })
 	_lay(lake, -2)
-	s.battle.paint([_east(C, 2)], "fire", kira)
-	s.board_view.refresh_tiles()
+	s.board_view.refresh_tiles(true)
 	await _turn(kira)
 	await _cam(C, -20.0, 15.0, 50.0)
-	await _move_mouse(bob.pos)
+	s.battle.paint([_east(C, 2), C], "fire", kira)
+	var pe: Dictionary = {}
+	for e in s.battle.history:
+		if str(e.get("type", "")) == "paint":
+			pe = e
+	s.board_view.on_tile_event(pe)
+	await _wait(0.12)
+	print("douse: ", pe.get("doused", []), "; kira reaches bob ", s.battle.in_range(kira, bob))
+	await _shot("sys5_douse_hiss")
 	await _wait(1.0)
-	print("steam: ", s.battle.tiles.steam.size(), " hexes; kira reaches bob ", s.battle.in_range(kira, bob), "; card ", s.readability.card_text())
-	await _shot("v3_icewater_steam")
+	await _shot("sys5_douse_after")
 
 
 ## Thunder on the lake: the preview, then the live field after two turn starts.

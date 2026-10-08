@@ -22,7 +22,8 @@ func _board(n: int = 13, terrain: Dictionary = {}) -> BWBoard:
 func _u(id: String, wc: String = "sword", el: String = "wind", ks: Array = []) -> BWUnit:
 	var u := BWUnit.from_roster({ "id": id, "name": id, "weapon_class": wc, "element": el,
 		"con": 6, "str": 4, "dex": 4, "wil": 4, "def": 4, "res": 4, "spd": 4 })
-	u.keystones = ks.duplicate()
+	for k in ks:                       # D443: old ids are enchantments now; has() reads the list (tests only)
+		u.keystones.append(str(k))
 	return u
 
 
@@ -89,7 +90,7 @@ func test_overheat_erupts(t) -> void:
 	var far := _u("fx")
 	var b := _fight([me, ally], [foe, far], [Vector2i(0, 12), _nb(C, 1)], [_nb(C, 0), Vector2i(12, 12)])
 	_lay(b, C, 3)
-	_lay(b, _nb(C, 2), -3)                       # water 3 -> water 1
+	_lay(b, _nb(C, 2), -3)                       # water 3 -> doused (D421)
 	_lay(b, _nb(C, 3), 1)                        # fire 1 -> fire 3
 	b.tiles.entries[_nb(C, 4)] = b.tiles._entry(1, 0, "", "", "cast")
 	b.tiles.entries[_nb(C, 4)].glaze = 2         # glazed: skipped
@@ -99,7 +100,7 @@ func test_overheat_erupts(t) -> void:
 	t.eq(b.tiles.intensity(C, "fire"), 2, "the centre vents to fire 2")
 	t.eq(b.tiles.intensity(_nb(C, 0), "fire"), 2, "an empty ring hex gets fire 2")
 	t.eq(str(b.tiles.at(_nb(C, 0)).origin), "spread", "ring fire is propagated (no grass ignition)")
-	t.eq(b.tiles.intensity(_nb(C, 2), "water"), 1, "water 3 on the ring becomes water 1")
+	t.ok(b.tiles.at(_nb(C, 2)).is_empty(), "D421: the ring's fire douses water 3 (both cleared)")
 	t.eq(b.tiles.intensity(_nb(C, 3), "fire"), 3, "fire 1 on the ring becomes fire 3")
 	t.eq(b.tiles.intensity(_nb(C, 4), "fire"), 1, "a glazed ring hex is skipped")
 	t.eq(str(b.tiles.at(_nb(C, 5)).marker), "fuse", "a marked ring hex is skipped, its fuse unfired")
@@ -160,23 +161,6 @@ func test_conflagration_depth(t) -> void:
 	t.eq((r.overheat as Array).size(), 1, "without Conflagration nothing chains")
 
 
-func test_trailblazer(t) -> void:
-	var me := _u("me", "sword", "fire", ["trailblazer"])
-	var foe := _u("fo")
-	var b := _fight([me], [foe], [C], [Vector2i(12, 12)])
-	_lay(b, _far(C, E, 2), 2, 0, "fo")
-	_turn(b, me)
-	b.history.clear()
-	var dest := _far(C, E, 3)
-	var hp := me.hp
-	t.ok(b.move(me, dest), "it walks 3 east")
-	t.eq(b.tiles.intensity(C, "fire"), 1, "fire 1 on the start hex it left")
-	t.eq(b.tiles.intensity(_nb(C, E), "fire"), 1, "and on the next")
-	t.eq(b.tiles.intensity(_far(C, E, 2), "fire"), 3, "a fire 2 it crossed gets +1 (propagated: no eruption)")
-	t.eq(b.tiles.intensity(dest, "fire"), 0, "not on the hex it stands on")
-	t.eq(me.hp, hp, "no crossing burns")
-	t.eq(int(me.fx.trail_n), 3, "3 of 4 used")
-	t.eq(_ev(b, "overheat").size(), 0, "the trail never erupts")
 
 
 func test_phoenix_heart(t) -> void:
@@ -303,26 +287,25 @@ func test_dawn(t) -> void:
 	t.eq(_ev(b, "dawn").size(), 1, "a dawn event")
 
 
-func test_prism_and_overflow(t) -> void:
-	var a := _u("a", "sword", "light", ["prism", "overflow"])
-	var m := _u("m")
+## D443: the light Overflow is the Ward of Light enchantment now (Prism, and
+## its bent beams, are gone): a beam it is part of Empowers +25%, and light it
+## lays heals past max into a ward.
+func test_ward_of_light(t) -> void:
+	var a := _u("a", "sword", "light", ["overflow"])
 	var c := _u("c")
+	var m := _u("m")
 	var foe := _u("fo")
-	# a -> m east (2), m -> c north-east-ish: a and c not on one line
-	var mp := _far(C, E, 2)
-	var cp := _far(mp, 5, 2)
-	var b := _fight([a, m, c], [foe], [C, mp, cp], [Vector2i(12, 12)])
-	for p in [C, mp, cp]:
+	var cp := _far(C, E, 2)
+	var b := _fight([a, c, m], [foe], [C, cp, _far(C, 3, 3)], [Vector2i(12, 12)])
+	for p in [C, cp]:
 		_lay(b, p, 0, 1, "a")
-	t.ok(BWBeams.span(b, C, cp) == null, "a and c are not in line")
-	var bent: Array = BWBeams.beams(b).filter(func(x): return str(x.bend) == "m")
-	t.eq(bent.size(), 1, "Prism bends a beam through m")
-	t.eq(int(bent[0].empower), 25, "Overflow: the beam Empowers +25%")
+	var bm: Array = BWBeams.beams(b)
+	t.eq(bm.size(), 1, "one straight beam (no bends without Prism)")
+	t.eq(int(bm[0].empower), 25, "Ward of Light: the beam Empowers +25%")
+	t.ok(BWBeams.beams(b).all(func(x): return str(x.bend) == ""), "beams never bend")
 	m.hp = m.max_hp() - 2
-	b.history.clear()
-	BWBeams.tick(b)
-	t.ok(_ev(b, "heal").any(func(e): return str(e.unit) == "m"), "Prism: allies on the beam heal at the tick")
-	t.ok(not (m.fx.get("light_ward", {}) as Dictionary).is_empty(), "Overflow: the excess becomes a Ward of Light")
+	BWBeams.light_heal(b, m, 9.0, "a")
+	t.ok(not (m.fx.get("light_ward", {}) as Dictionary).is_empty(), "the excess becomes a Ward of Light")
 	var w := int(m.fx.light_ward.hp)
 	t.ok(w > 0 and w <= roundi(m.max_hp() * 0.15), "capped at 15% max HP")
 	var hp := m.hp
@@ -380,91 +363,25 @@ func test_magnify(t) -> void:
 
 # ------------------------------------------------------------------ thunder
 
-func test_static_blades(t) -> void:
-	var me := _u("me", "daggers", "thunder", ["static_blades"])
-	me.affinity["thunder"] = 10
-	var foe := _u("fo")
-	var b := _fight([me], [foe], [_nb(C, 3)], [C])
-	foe.facing = E                               # facing east, away from me (west)
-	_turn(b, me)
-	b.expected_rolls = true                      # every blow lands
-	b.attack(me, foe)
-	t.eq(str(b.tiles.at(C).get("marker", "")), "fuse", "a basic hit arms my fuse on the foe's hex")
-	t.eq(str(b.tiles.at(C).source), "me", "my fuse")
-	t.eq(_ev(b, "static_arm").size(), 1, "a static_arm event")
-	t.eq(_ev(b, "blade_burst").size(), 0, "no burst yet (the hex held no fuse when struck)")
-	# next turn, from behind: the burst
-	_turn(b, me)
-	b.history.clear()
-	var hp := foe.hp
-	b.attack(me, foe)
-	t.eq(_ev(b, "blade_burst").size(), 1, "a backstab on a foe on my fuse bursts")
-	t.ok(b.tiles.at(C).is_empty() or str(b.tiles.at(C).get("marker", "")) != "fuse" or _ev(b, "static_arm").size() == 0, "the fuse is spent")
-	var want := b._tile_dmg(foe, BWThunderKeys.BLADE_PCT, "thunder", BWThunderKeys.det_mult(me))
-	t.eq(_hurt(b, foe, "detonation"), want, "12% x the thunder bonus to the occupant")
-	t.ok(foe.hp < hp, "it hurt")
-	# once per turn
-	_fuse(b, C, "me")
-	me.acted = false
-	b.history.clear()
-	b.attack(me, foe)
-	t.eq(_ev(b, "blade_burst").size(), 0, "one burst per turn")
-	# from the front: no burst
-	var b2 := _fight([me], [foe], [_nb(C, 0)], [C])
-	foe.facing = E
-	_fuse(b2, C, "me")
-	_turn(b2, me)
-	b2.expected_rolls = true
-	b2.attack(me, foe)
-	t.eq(_ev(b2, "blade_burst").size(), 0, "not a backstab: no burst")
 
 
-func test_blast_rider(t) -> void:
-	var me := _u("me", "daggers", "thunder", ["blast_rider"])
-	var foe := _u("fo")
-	var b := _fight([me], [foe], [C], [_nb(C, 0)])
-	_lay(b, C, 1, 0, "me")
-	_turn(b, me)
-	var hp := me.hp
-	b.history.clear()
-	var r := b.paint([C], "thunder", me)
-	t.eq(r.detonations.size(), 1, "thunder on my own charged hex detonates")
-	t.eq(me.hp, hp, "immune to my own blast")
-	t.eq(_ev(b, "launch").size(), 1, "launched")
-	var splash := _hurt(b, foe, "detonation")
-	var full := b._tile_dmg(foe, float(r.detonations[0].pct), "thunder", BWThunderKeys.det_mult(me))
-	t.eq(splash, maxi(1, int(full / 2.0)), "the ring takes the normal half (no full ring)")
-	b._after_action(me, "thunder", true)
-	t.eq(int(me.fx.get("extra_move", 0)), BWThunderKeys.LAUNCH, "move 2 after the action")
-	# once per turn, and the hex can't be re-armed by me until my next turn
-	_lay(b, C, 1, 0, "me")
-	b.history.clear()
-	b.paint([C], "thunder", me)
-	t.eq(_ev(b, "launch").size(), 0, "one launch per turn")
-	t.ok(b.tiles.at(C).is_empty(), "the charge is spent")
-	b.paint([C], "thunder", me)
-	t.ok(b.tiles.at(C).is_empty(), "my locked hex can't be re-armed by me")
-	_turn(b, me)
-	b.paint([C], "thunder", me)
-	t.eq(str(b.tiles.at(C).get("marker", "")), "fuse", "next turn it can")
-	# Bolt Step doesn't stack: the launch replaces its +2
-	var names: Array = []
-	me.fx["launch"] = true
-	t.eq(BWThunderKeys.launch_move(me, 0, names), 2, "launch = 2")
 
 
 ## D306 Self-detonate: Blast Rider's free action on a charge or the holder's
 ## own fuse: immunity, the half ring, the launch, once per turn, the lock;
 ## never on unglazed water; the dagger dive (leap in, blow, launch out); the AI.
+## D452: Self-detonate is Superconductor's now (kept provisionally): free,
+## once per turn, on a charge or your own fuse; Superconductor's own-hex rule
+## makes you immune, and the blast reaches 2 rings. No launch.
 func test_self_detonate(t) -> void:
 	var plain := _u("pl", "daggers", "thunder")
-	var me := _u("me", "daggers", "thunder", ["blast_rider"])
+	var me := _u("me", "daggers", "thunder", ["superconductor"])
 	var f1 := _u("f1")
 	var f2 := _u("f2")
-	var b := _fight([me, plain], [f1, f2], [C, _far(C, 3, 4)], [_nb(C, 0), _nb(C, 1)])
+	var b := _fight([me, plain], [f1, f2], [C, _far(C, 3, 4)], [_nb(C, 0), _far(C, 1, 2)])
 	_turn(b, me)
 	t.ok(b.skills_for(plain).all(func(r): return r.key != "self_detonate"), "no keystone, no Self-detonate")
-	t.ok(b.skills_for(me).any(func(r): return r.key == "self_detonate"), "a Blast Rider holder has it")
+	t.ok(b.skills_for(me).any(func(r): return r.key == "self_detonate"), "a Superconductor holder has it")
 	t.ok(b.skill_targets(me, "self_detonate", "").is_empty(), "bare ground: nothing to blow")
 	_lay(b, C, 1, 0, "f1")                        # fire 1, anyone's
 	t.eq(b.skill_targets(me, "self_detonate", ""), [C] as Array[Vector2i], "on a charge: its own hex")
@@ -473,11 +390,12 @@ func test_self_detonate(t) -> void:
 	var e := b.use_skill(me, "self_detonate", "", C)
 	t.ok(not e.is_empty(), "it plays")
 	t.eq(_ev(b, "detonate").size(), 1, "the hex blows")
-	t.eq(me.hp, hp, "immune to its own blast")
+	t.eq(int(_ev(b, "detonate")[0].radius), 2, "Superconductor: radius 2")
+	t.eq(me.hp, hp, "its own hex: immune to the whole action's reactions")
 	var full := b._tile_dmg(f1, float(BWTiles.DETONATE_BASE_PCT + BWTiles.DETONATE_PER_POINT_PCT), "thunder", BWThunderKeys.det_mult(me))
 	t.eq(_hurt(b, f1, "detonation"), maxi(1, int(full / 2.0)), "the ring takes the normal half")
-	t.eq(_ev(b, "launch").size(), 1, "launched")
-	t.eq(int(me.fx.get("extra_move", 0)) + int(me.fx.get("bonus_move", 0)), BWThunderKeys.LAUNCH, "move 2 after it")
+	t.ok(_hurt(b, f2, "detonation") > 0, "the second ring too")
+	t.ok(_ev(b, "launch").is_empty(), "no launch (that was Blast Rider)")
 	t.ok(not me.acted, "free: the action is still there")
 	t.ok(b.tiles.at(C).is_empty(), "the charge is spent")
 	_lay(b, C, 2, 0, "f1")
@@ -506,28 +424,9 @@ func test_self_detonate(t) -> void:
 	t.ok(not BWThunderKeys.ai_self_det(b, me), "AI: only an ally in the ring, hold it")
 
 
-## D306: the dagger bomber dive: Daggerleap into the pack onto a fire hex,
-## self-detonate, launch out.
-func test_dagger_dive(t) -> void:
-	var me := _u("me", "daggers", "thunder", ["blast_rider"])
-	var f1 := _u("f1")
-	var f2 := _u("f2")
-	var land := _far(C, E, 3)
-	var b := _fight([me], [f1, f2], [C], [_nb(land, 0), _nb(land, 1)])
-	_lay(b, land, 2, 0, "f1")
-	_turn(b, me)
-	t.ok(land in b.skill_targets(me, "daggerleap", "thunder"), "the fire hex is a leap target")
-	b.use_skill(me, "daggerleap", "thunder", land)
-	t.eq(me.pos, land, "landed in the pack on the fire")
-	b.history.clear()
-	t.ok(not b.use_skill(me, "self_detonate", "", land).is_empty(), "blows its hex")
-	t.ok(_hurt(b, f1, "detonation") > 0 and _hurt(b, f2, "detonation") > 0, "the pack takes the ring")
-	t.ok(b.can_move(me), "and launches out (move 2)")
-
-
 ## D307 the L-30 riders: Sunpath's beam move, Static Field's ally-paint
 ## guard, Gale Force applying the mode, Wildfire's wild eruption ring, and the
-## Water set's pools reaching 25.
+## Water set's pool reach (D422: was pools reaching 25, which only steam used).
 func test_l30_riders(t) -> void:
 	# Sunpath: an ally on the holder's beam starts its turn with +1 move
 	var a := _u("a", "staff", "light")
@@ -596,27 +495,28 @@ func test_l30_riders(t) -> void:
 		if BWHex.distance(n, C) == 2 and b4.tiles.intensity(n, "fire") > 0:
 			seeded += 1
 	t.ok(seeded > 0, "and seeds the next ring at the tick")
-	# Water set (2): pools reach 25
+	# Water set (2, D422): ice / thunder on a pool react within 2 (base 1)
 	var ws := _u("ws", "staff", "water")          # a set sleeps until its element is learned
 	ws.equipment["head"] = { "uid": "ws_h", "base": "", "slot": "head", "tier": "E", "stats": {}, "enchant": "brimming", "worn": {} }
 	ws.equipment["chest"] = { "uid": "ws_c", "base": "", "slot": "chest", "tier": "E", "stats": {}, "enchant": "soaking", "worn": {} }
 	ws.refresh_effects()
-	t.eq(BWSets.pool_max(ws), 25, "Water set (2): pools reach 25")
+	t.eq(BWSets.pool_reach(ws), 2, "Water set (2): pools react within 2")
 	var plain := _u("pl", "staff", "fire")
 	var b5 := _fight([ws, plain], [_u("f5")], [Vector2i(0, 12), Vector2i(1, 12)], [Vector2i(12, 12)])
 	for rr in 6:
 		for cc in 6:
 			_lay(b5, Vector2i(cc, rr), -1)
 	_turn(b5, ws)
-	b5.paint([Vector2i(0, 0)], "fire", ws)
-	t.eq(b5.tiles.steam.size(), 25, "its fire steams 25 hexes of a 36-hex pool")
-	b5.tiles.steam.clear()
+	b5.paint([Vector2i(2, 2)], "thunder", ws)
+	t.eq(b5.tiles.shock.size(), 19, "its thunder electrifies radius 2 of the pool (19 hexes)")
+	b5.tiles.shock.clear()
+	b5.tiles.fields.clear()
 	for rr in 6:
 		for cc in 6:
 			_lay(b5, Vector2i(cc, rr), -1)
 	_turn(b5, plain)
-	b5.paint([Vector2i(0, 0)], "fire", plain)
-	t.eq(b5.tiles.steam.size(), BWPools.POOL_MAX, "without the set: 19")
+	b5.paint([Vector2i(2, 2)], "thunder", plain)
+	t.eq(b5.tiles.shock.size(), 7, "without the set: radius 1 (7)")
 
 
 func test_daisy_chain(t) -> void:
@@ -675,8 +575,8 @@ func test_ai_and_preview(t) -> void:
 
 
 func _replay() -> String:
-	var a := _u("a", "sword", "light", ["prism"])
-	var c := _u("c", "daggers", "thunder", ["static_blades", "blast_rider"])
+	var a := _u("a", "sword", "light", ["judicator"])
+	var c := _u("c", "daggers", "thunder", ["superconductor", "daisy_chain"])
 	var f := _u("f", "staff", "fire", ["conflagration"])
 	var g := _u("g", "axe", "fire", ["phoenix_heart"])
 	var b := BWBattle.new(_board(), 3)

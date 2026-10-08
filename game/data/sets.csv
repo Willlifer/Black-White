@@ -1,6 +1,6 @@
 id,element,two_text,two,three,three_text,three_params
 fire,fire,"On fire: +10% STR per fire level. Free fire crossing.",stand_on_bonus(stat=str;per_point=1;pct_per_point=10) | heat_rush(move=0),Flashpoint,"Once a battle, when you drop under 50% HP, your hex and its ring go to fire 3 and you heal 20%.",threshold=50;heal_pct=20;level=3
-water,water,"On water: +10% DEX per water level. Your pools reach 25 hexes (base 19).",stand_on_bonus(stat=dex;per_point=1;pct_per_point=10),Breakwater,"Once a battle, a foe that hits you is swept 2 away and Drenched.",push=2;status=drenched
+water,water,"On water: +10% DEX per water level. Your ice and thunder on a pool react within 2 of the cast hex (base 1).",stand_on_bonus(stat=dex;per_point=1;pct_per_point=10),Breakwater,"Once a battle, a foe that hits you is swept 2 away and Drenched.",push=2;status=drenched
 ice,ice,"On glaze: +20% DEF. Your pillars last 1 tick longer.",stand_on_bonus(stat=def;flat=2;pct=20),Frost Ward,"At the start of your turn the nearest unwarded ally within 2 (else you) gains a Frost Ward: it negates the next elemental effect on it, then breaks.",radius=2
 thunder,thunder,"Your detonations +10%. Electrified water shocks you for half.",element_damage_pct(pct=10;blast_only=1),Stormfront,"Your first detonation each turn also arcs to every conductive foe it missed: 10% each.",arc_pct=10
 wind,wind,"+1 move. Your squalls skip your allies.",aura_mod(radius=0;move=1),Slipstream,"After moving 4+ hexes this turn, your attacks can't be avoided.",moved=4

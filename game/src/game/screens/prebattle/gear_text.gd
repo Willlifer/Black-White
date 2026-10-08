@@ -106,9 +106,9 @@ static func equip_check(run: BWRun, u: BWUnit, item: Dictionary) -> Array:
 	return [run.can_equip(u, item), "Anyone can wield it · %s's %s expertise %s" % [u.name, wname, u.expertise_letter(wc)]]
 
 
-## Weapon classes in data order.
+## Weapon classes in data order (D419: the active ones).
 static func weapon_classes() -> Array:
-	return BWData.table("weapons").map(func(r): return str(r.id))
+	return BWRun.weapon_classes()
 
 
 # ------------------------------------------------------------------ glyphs

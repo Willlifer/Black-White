@@ -278,58 +278,15 @@ func test_glaze_stops_a_push(t) -> void:
 
 # ------------------------------------------------------------------ Wind Wall
 
-func test_wind_wall(t) -> void:
+## D443: Wind Wall left with its keystone (the wall rules in BWWind stay,
+## unused): nobody gets the action any more.
+func test_wind_wall_removed(t) -> void:
 	var me := _u("st", "staff", "wind")
-	var f := _u("f", "bow", "fire")
-	var b := _duel(me, [f], [Vector2i(4, 1)])
-	t.ok(not b.skills_for(me).any(func(r): return r.key == "wind_wall"), "without the keystone: no Wind Wall")
-	me.keystones.append("wind_wall")              # D293: the keystone
-	t.ok(b.skills_for(me).any(func(r): return r.key == "wind_wall"), "a holder gets the action")
-	var start := Vector2i(3, 2)
-	var seconds := BWSkillRegistry.get_def("wind_wall").second_targets(b, me, "", start)
-	t.ok(not seconds.is_empty(), "the second pick lists headings")
-	var choice := _nb(start, 0)
-	t.ok(choice in seconds, "east is one")
-	b.use_skill(me, "wind_wall", "", start, choice)
-	var wall := BWWind.wall_hexes(b)
-	t.eq(wall.size(), 3, "a line of 3")
-	t.eq(int(me.cooldowns.get(BWSkills.cd_key("wind_wall", ""), 0)), 3, "cooldown 3")
-	t.ok(b.board.blocked(wall[1]), "the wall blocks movement (the board's blocker)")
-	# skills can't cross it, basic attacks pierce it
-	var past := Vector2i(4, 1)
-	t.ok(BWHex.line(C, past).any(func(h): return h in wall) or true, "geometry")
-	var crossing := false
-	for h in BWHex.line(C, past).slice(1, -1):
-		if h in wall:
-			crossing = true
-	if crossing:
-		t.ok(not past in b.skill_targets(me, "surge", "wind"), "a skill can't be aimed past the wall")
-	_give_turn(b, f)
-	t.ok(b.in_range(f, me) == b._reaches_unit(f, f.pos, me, b.weapon_range(f)), "basic attacks ignore the wall (sight is untouched)")
-	var r := b.reachable(f)
-	for h in wall:
-		t.ok(not r.has(h), "nobody walks onto the wall")
-	# a push into the wall slams
-	var g := _u("g", "axe", "fire")
-	b.units.append(g)
-	g.team = "enemy"
-	g.begin_battle()
-	g.pos = _nb(wall[1], 4)
-	var hp := g.hp
-	b._action_serial += 1
-	BWWind.push(b, g, 1, 1, "push", me, false, true)
-	if _nb(g.pos, 1) in wall:
-		t.ok(g.hp < hp, "a push into the wall slams")
-	# one wall per unit; 2 ticks
-	_give_turn(b, me)
-	me.cooldowns.clear()
-	me.acted = false
-	b.use_skill(me, "wind_wall", "", Vector2i(6, 6))
-	t.eq(BWWind.wall_hexes(b).size(), 3, "one wall at a time: the old one came down")
-	BWWind.tick(b)
-	t.eq(BWWind.wall_hexes(b).size(), 3, "after 1 tick it stands")
-	BWWind.tick(b)
-	t.eq(BWWind.wall_hexes(b).size(), 0, "after 2 ticks it's gone")
+	var b := _duel(me, [_u("f", "bow", "fire")], [Vector2i(4, 1)])
+	t.ok(not BWKeystones.grant(me, "wind_wall"), "no such keystone")
+	me.fx["ks:wind_wall"] = true
+	t.ok(not b.skills_for(me).any(func(r): return r.key == "wind_wall"), "no Wind Wall action, whatever the flags")
+	t.ok(not BWSkillRegistry.has("wind_wall"), "its def is gone")
 
 
 # ------------------------------------------------------------------ Rot
@@ -425,7 +382,7 @@ func _play(seed_value: int) -> String:
 	var b := BWBattle.new(_board(), seed_value)
 	b.setup(players, enemies)
 	for u in b.units:
-		u.keystones.append("wind_wall")         # D293
+		u.keystones.append("el_nino" if u.team == "player" else "la_nina")   # D454/D455 (Wind Wall is gone)
 	var n := 0
 	while not b.over and n < 60:
 		BWAI.take_turn(b)

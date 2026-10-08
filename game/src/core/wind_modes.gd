@@ -9,7 +9,7 @@ extends RefCounted
 ##
 ## There is ONE wind tile: the gale marker (BWTiles). It only spreads: when a
 ## charge lands on it, the charge is copied to its neighbours (gale 2: radius
-## 2, Jetstream's gale 3: radius 3), carrying steam / electrified / glaze
+## 2, Jetstream's gale 3: radius 3), carrying electrified / glaze (D421: no steam)
 ## (carry). No stored mode, no heading, no field effects (D406).
 ##
 ## Wind MOVES units only from actions:
@@ -146,9 +146,30 @@ static func push(b: BWBattle, v: BWUnit, dir: int, n: int, kind: String, by: BWU
 	if out.gravity != 0:
 		e["gravity"] = out.gravity
 	b._emit(e)
+	if kind == "push" and not field and by != null and by.team != v.team and BWDuo.has(by, "blizzard"):
+		blizzard(b, by, v.pos)                     # D463 Blizzard: the landing hex glazes
 	if slam and stop in ["rock", "unit"] and v.alive() and not b.over:
 		_slam(b, v, dir, by)
 	return out
+
+
+## D463 Blizzard (wind + ice duo): glaze the hex a pushed foe landed on (an
+## empty hex gets a thin glazed sheet of water 1, like Overfreeze's).
+static func blizzard(b: BWBattle, by: BWUnit, h: Vector2i) -> void:
+	if not b.tiles.can_hold(h) or b.tiles.is_pillar(h) or b.tiles.is_lava(h):
+		return
+	var e := b.tiles.at(h)
+	if not e.is_empty() and str(e.get("marker", "")) != "":
+		return
+	if e.is_empty():
+		e = b.tiles._entry(-1, 0, "", by.id, "spread")
+		b.tiles.entries[h] = e
+	e.glaze = maxi(int(e.glaze), BWTiles.GLAZE_CYCLES)
+	e["glaze_source"] = by.id
+	e.permanent = false
+	e.erase("seeded")
+	b._emit({ "type": "blizzard", "unit": by.id, "hex": h })
+	b._emit({ "type": "paint", "unit": by.id, "element": "ice", "hexes": [h], "kind": "lay_on" })
 
 
 ## A wind push stopped short: SLAM_PCT to it and to the unit it hit.
@@ -341,27 +362,21 @@ static func before_paint(b: BWBattle, hexes: Array) -> Dictionary:
 
 
 ## After a paint: the copies of every gale that fired carry the origin's
-## reaction states (steam, electrified, glaze); Jetstream's copies last 2.
+## reaction states (electrified, glaze; D421: no steam); Jetstream's copies last 2.
 static func after_paint(b: BWBattle, _by: BWUnit, _element: String, r: Dictionary, snap: Dictionary) -> void:
 	for g in r.get("gales", []):
 		carry(b, g.origin, g.copies)
-		BWKsWind.after_gale(b, g, snap)                # D293 Jetstream: your gales' copies last 2
 
 
 ## Gale copies carry the origin's reaction state (v3 §1 "Spreading,
-## extended"): steam (1 tick) and electrified (joins the origin's field) from
-## Lane A's BWTiles.steam / shock / fields when they exist; glaze is a
+## extended"): electrified (joins the origin's field) from BWTiles.shock /
+## fields when they exist (D421: steam is gone); glaze is a
 ## D293/D398 glaze carry (a gale beside glaze, BWKsWind.carry_glaze). Plus any
 ## `carry_hooks` Lane A registers.
 static func carry(b: BWBattle, origin: Vector2i, copies: Array) -> void:
 	if copies.is_empty():
 		return
 	var t := b.tiles
-	var steam = t.get("steam")
-	if steam is Dictionary and (steam as Dictionary).has(origin):
-		for c in copies:
-			if not steam.has(c):
-				steam[c] = 1
 	var shock = t.get("shock")
 	var fields = t.get("fields")
 	if shock is Dictionary and fields is Dictionary and (shock as Dictionary).has(origin):
@@ -421,25 +436,17 @@ static func turn_end(b: BWBattle, u: BWUnit) -> void:
 
 # ---------------------------------------------------------------- D273 Wind Wall
 
-static func has_wind_wall(u: BWUnit) -> bool:
-	return u != null and BWKeystones.has(u, WALL_KEY)            # D293: the keystone, not a flag
+static func has_wind_wall(_u: BWUnit) -> bool:
+	return false                                   # D443: Wind Wall was removed with its keystone (the wall rules stay, unused)
 
 
-## Keystone actions `u` fights with (BWBattle.skills_for adds them): every
-## action keystone it holds that has a skill def (D293: Wind Wall, Flash
-## Freeze, Tidal Release), plus Glacier Wall's Shatter while it has a pillar.
+## Keystone actions `u` fights with (BWBattle.skills_for adds them). D443:
+## the v3 keystones' menu rows (BWKeystones.skills: Pitch Black, Solar Flare,
+## Superconductor's Self-detonate).
 static func keystone_actions(u: BWUnit) -> Array:
-	var out: Array = []
 	if u == null:
-		return out
-	for id in BWKeystones.actions(u):
-		if BWSkillRegistry.has(str(id)) and not str(id) in out and BWKsIce.action_open(u, str(id)):
-			out.append(str(id))
-	if BWKeystones.has(u, BWKsIce.GLACIER) and BWSkillRegistry.has(BWKsIce.SHATTER_KEY):
-		out.append(BWKsIce.SHATTER_KEY)
-	if BWKeystones.has(u, "blast_rider") and BWSkillRegistry.has(BWThunderKeys.SELF_DET):
-		out.append(BWThunderKeys.SELF_DET)        # D306: listed for every holder; open only on a charge or its fuse
-	return out
+		return []
+	return BWKeystones.skills(u)
 
 
 static func walls(b: BWBattle) -> Dictionary:

@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D442: removed): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Bow (D106). A long, drawn shot at a foe within RANGE: +HIT hit, and +CRIT
 ## crit if you haven't moved this turn. The arrow lays the element on the
 ## target's hex.
@@ -16,6 +18,7 @@ func _init() -> void:
 		"desc": "A long, drawn shot at an enemy up to 8 tiles away: +20 hit, and +10 crit if you haven't moved",
 		"targeting": "unit", "needs_element": true, "range": RANGE, "cd": CD,
 		"power": POWER,
+		"retired": true,
 	}, 331)
 
 

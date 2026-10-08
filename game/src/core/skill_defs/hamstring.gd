@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D441 Kindle): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Daggers. Cut the tendon of an adjacent foe: it is Pinned (-2 move until
 ## the end of its next turn; a secondary effect, so a resist stops it).
 
@@ -12,6 +14,7 @@ func _init() -> void:
 		"desc": "Cut the tendon of an adjacent enemy: it is Pinned (-2 move)",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": CD,
 		"power": POWER,
+		"retired": true,
 	}, 353)
 
 

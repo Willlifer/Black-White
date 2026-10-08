@@ -225,7 +225,7 @@ static func soldiers(run: BWRun, n: int, key: String, label: String, count: int,
 	var out: Array = []
 	for i in count:
 		var pool: Array = classes if not classes.is_empty() else BWRosterGen.CLASSES
-		var wc: String = pool[erng.randi() % pool.size()]
+		var wc: String = BWRun.active_class(str(pool[erng.randi() % pool.size()]))   # D419: benched -> its stand-in
 		var el: String = BWFormulas.ELEMENTS[erng.randi() % BWFormulas.ELEMENTS.size()]
 		var u := BWEncounters._unit(run, n, "%s%d" % [key, i + 1], "%s %d" % [label, i + 1], BWEncounters._model(wc, erng), el,
 			lvl, tier, ranks, bld, mult * ENEMY_MULT * fight_mult(mode, n), hp_share * ENEMY_HP * fight_mult(mode, n), erng)

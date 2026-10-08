@@ -1,52 +1,97 @@
 class_name BWKeystones
-## Element Overhaul keystones (design/ELEMENTS-v3.md §9, D277-D284).
+## Keystones v3 (D443-D465, design/ELEMENTS.md "Keystones v3"; the C1 ladder
+## D277-D284 it replaced is history).
 ##
-## A keystone is a rule-breaker earned at affinity rank 3 (pick 1 of 2 from
-## the element's 3) and rank 6 (the second, from the 2 left). A unit holds at
-## most MAX_PER_UNIT across all elements. Rows live in data/keystones.csv:
-## id, element, name, text, kind (passive | action), params (k=v;k=v).
+## FOURTEEN keystones, TWO per element (data/keystones.csv: id, element, name,
+## title, text, kind (passive | action), params). A unit holds at most
+## MAX_PER_UNIT (2), at most ONE per element (any 2 of its <= 3 elements).
+## The ladder (D444): affinity rank 3 in an element owes that element's
+## keystone (1 of its 2); rank 6 in any element opens the second slot, taken
+## from another element the unit has learned (2 cards drawn from those).
+## Taking one gives the unit a TITLE ("Will, the Lava Walker", D445).
+##
+## The 21 keystones of C1-C3 left the pool (D443): eleven became item
+## enchantments (LEGACY: enchantments.csv rows with effect_key "keystone",
+## params id=<old id>, so their effect code still asks has(u, "<old id>")),
+## ten were removed (REMOVED). Saves migrate (migrate(): D446).
 ##
 ## The shared contract: effect code anywhere asks `BWKeystones.has(u, id)`.
-## This file owns only the bookkeeping (who holds what, the offers, the
-## menu hook for action keystones); the effects live with their element.
+## It is true for a held keystone, a worn enchantment granting the old one
+## (awake: its element learned), or the dev / review flag fx["ks:<id>"].
 
 const TABLE := "keystones"
 const MAX_PER_UNIT := 2
-## Affinity ranks that grant a keystone pick (D277).
+## Affinity ranks that open keystone picks (D277, re-read by D444): rank 3
+## owes the element's own keystone, rank 6 the second slot (another element).
 const RANKS := [3, 6]
+const ANY := "*"                  # D444: the rank-6 request's element: any other learned element
 
 const ELEMENT_IDS := {
-	"wind": ["eye_of_vortex", "wind_wall", "jetstream"],
-	"ice": ["skater", "flash_freeze", "glacier_wall"],
-	"light": ["prism", "overflow", "magnify"],
-	"water": ["tidal_release", "riptide", "wellspring"],
-	"fire": ["conflagration", "trailblazer", "phoenix_heart"],
-	"dark": ["contagion", "doom", "event_horizon"],
-	"thunder": ["static_blades", "blast_rider", "daisy_chain"],
+	"fire": ["lava_walker", "island_maker"],
+	"dark": ["abyssal", "hopekiller"],
+	"light": ["judicator", "sunburst"],
+	"water": ["leviathan", "being_of_rain"],
+	"thunder": ["superconductor", "thunder_overflow"],
+	"wind": ["el_nino", "la_nina"],
+	"ice": ["shatterer", "sculptor"],
 }
 
+## D443: the C1-C3 keystones that became item enchantments: old id -> the
+## enchantments.csv row granting it (and the name its effect code shows).
+const LEGACY := {
+	"conflagration": { "name": "Conflagration", "enchant": "conflagration", "element": "fire" },
+	"phoenix_heart": { "name": "Phoenix Heart", "enchant": "phoenix_heart", "element": "fire" },
+	"doom": { "name": "Doom", "enchant": "doom", "element": "dark" },
+	"contagion": { "name": "Contagion", "enchant": "contagion", "element": "dark" },
+	"event_horizon": { "name": "Event Horizon", "enchant": "event_horizon", "element": "dark" },
+	"daisy_chain": { "name": "Daisy Chain", "enchant": "daisy_chain", "element": "thunder" },
+	"eye_of_vortex": { "name": "Eye of the Vortex", "enchant": "eye_of_vortex", "element": "wind" },
+	"skater": { "name": "Sure-Footed", "enchant": "sure_footed", "element": "ice" },
+	"overflow": { "name": "Ward of Light", "enchant": "ward_of_light", "element": "light" },
+	"wellspring": { "name": "Wellspring", "enchant": "wellspring", "element": "water" },
+	"magnify": { "name": "Magnify", "enchant": "magnify", "element": "light" },
+}
+## D443: removed outright (a save's slot is refunded).
+const REMOVED := ["trailblazer", "prism", "tidal_release", "riptide", "blast_rider", "static_blades",
+	"wind_wall", "jetstream", "flash_freeze", "glacier_wall"]
+## Keystone -> the skill def its menu row is (D447-D449: the free actions).
+const SKILLS := { "abyssal": "pitch_black", "sunburst": "solar_flare", "superconductor": "self_detonate" }
 
-## Does unit `u` hold keystone `id`? Null-safe (false for a null unit).
+
+## Does unit `u` hold keystone `id` (or wear an enchantment granting the old
+## one, or carry the dev flag)? Null-safe.
 static func has(u, id: String) -> bool:
 	if u == null:
 		return false
-	return id in of(u)
+	if id in of(u):
+		return true
+	if "fx" in u and bool(u.fx.get("ks:" + id, false)):
+		return true
+	if "effects" in u:
+		for e in u.effects:
+			if str(e.key) == "keystone" and str(e.params.get("id", "")) == id and BWEffects.awake(u, e):
+				return true
+	return false
 
 
-## The keystone ids `u` holds, in the order taken.
+## The keystone ids `u` holds, in the order taken (enchantments not included).
 static func of(u) -> Array:
 	if u == null or not ("keystones" in u):
 		return []
 	return u.keystones
 
 
-## Give `u` keystone `id` (no-op when held, unknown, or the unit is at the cap).
+## Give `u` keystone `id`: no-op when held, unknown (or a legacy / removed id),
+## at the cap, or when `u` already holds one of that element (D444).
 ## Returns true when it was added.
 static func grant(u, id: String) -> bool:
-	if u == null or row(id).is_empty() or has(u, id):
+	if u == null or row(id).is_empty() or id in of(u):
 		return false
 	if u.keystones.size() >= cap(u):
 		return false                          # D302: the cap (2, or an enemy's stage cap) binds every grant
+	var el := element_of(id)
+	if u.keystones.any(func(k): return element_of(str(k)) == el):
+		return false                          # D444: one per element
 	u.keystones.append(id)
 	return true
 
@@ -57,10 +102,14 @@ static func row(id: String) -> Dictionary:
 
 
 static func name_of(id: String) -> String:
+	if LEGACY.has(id):
+		return str(LEGACY[id].name)
 	return str(row(id).get("name", id))
 
 
 static func element_of(id: String) -> String:
+	if LEGACY.has(id):
+		return str(LEGACY[id].element)
 	return str(row(id).get("element", ""))
 
 
@@ -83,10 +132,20 @@ static func is_action(id: String) -> bool:
 	return str(row(id).get("kind", "")) == "action"
 
 
-## The action keystones `u` holds (each gets its own menu row). The battle
-## UI lists these; the effect lanes resolve them.
+## The action keystones `u` holds.
 static func actions(u) -> Array:
 	return of(u).filter(func(id): return is_action(str(id)))
+
+
+## The skill defs `u`'s keystones put on its menu (D447-D449: Pitch Black,
+## Solar Flare, Self-detonate), registered ones only.
+static func skills(u) -> Array:
+	var out: Array = []
+	for id in of(u):
+		var k := str(SKILLS.get(str(id), ""))
+		if k != "" and BWSkillRegistry.has(k) and not k in out:
+			out.append(k)
+	return out
 
 
 ## All keystone ids of an element, in csv order.
@@ -107,13 +166,47 @@ static func cap(u) -> int:
 	return MAX_PER_UNIT if c < 0 else mini(c, MAX_PER_UNIT)
 
 
+# ---------------------------------------------------------------- titles (D445)
+
+## The title a keystone gives ("the Lava Walker", "El Niño").
+static func title_of(id: String) -> String:
+	return str(row(id).get("title", ""))
+
+
+## `u`'s title: its most recent keystone's (D445: the newest names you), or "".
+static func title(u) -> String:
+	var ids := of(u)
+	for i in range(ids.size() - 1, -1, -1):
+		var t := title_of(str(ids[i]))
+		if t != "":
+			return t
+	return ""
+
+
+## "Will, the Lava Walker" (or just "Will" with no keystone).
+static func titled(u) -> String:
+	if u == null:
+		return ""
+	var t := title(u)
+	return str(u.name) if t == "" else "%s, %s" % [u.name, t]
+
+
+## Every title `u` holds, oldest first ("the Lava Walker · La Niña"), for hovers.
+static func titles_line(u) -> String:
+	var out: Array = []
+	for id in of(u):
+		var t := title_of(str(id))
+		if t != "":
+			out.append(t)
+	return " · ".join(out)
+
+
 # ---------------------------------------------------------------- enemies (D279)
 
-## The Twins' keystones by role (D279): Noon carries Prism (its beam bends at
-## a third light-standing unit, and heals the twins on it); Dusk carries Event
-## Horizon (its dark 3 pulls you in and can't be healed on): Shadow Clone, the
-## draft's second, was removed with dark's stealth (author, 2026-10-07).
-const TWINS := { "noon": "prism", "dusk": "event_horizon" }
+## The Twins' keystones by role (D279; D454 re-cut for v3): Noon carries
+## Judicator (its light heals the twins double and burns you), Dusk carries
+## Hopekiller (on its dark you can't be healed or buffed).
+const TWINS := { "noon": "judicator", "dusk": "hopekiller" }
 
 
 ## How many of fight n's enemies carry a keystone (ELEMENTS-v3 §9):
@@ -155,7 +248,7 @@ static func arm_enemies(units: Array, n: int, room: Dictionary = {}) -> Array:
 	return made
 
 
-## One line naming a unit's keystones ("Keystone: Prism"), "" when none.
+## One line naming a unit's keystones ("Keystone: Lava Walker"), "" when none.
 static func line(u) -> String:
 	var ids := of(u)
 	if ids.is_empty():
@@ -163,13 +256,50 @@ static func line(u) -> String:
 	return ("Keystones: " if ids.size() > 1 else "Keystone: ") + ", ".join(ids.map(func(id): return name_of(str(id))))
 
 
-## D302: trim a unit to the cap (a save or a tool that appended past it):
-## keeps the first ones taken. Returns how many were dropped.
+## D302 / D444: trim a unit to the rules (a save or a tool that appended past
+## them): unknown ids out, one per element, at most MAX_PER_UNIT, keeping the
+## first ones taken. Returns how many were dropped.
 static func enforce_cap(u) -> int:
 	if u == null or not ("keystones" in u):
 		return 0
-	var n := 0
-	while u.keystones.size() > MAX_PER_UNIT:
-		u.keystones.pop_back()
-		n += 1
+	var keep: Array = []
+	var els := {}
+	for id in u.keystones:
+		var el := element_of(str(id))
+		if row(str(id)).is_empty() or els.has(el) or keep.size() >= MAX_PER_UNIT:
+			continue
+		els[el] = true
+		keep.append(str(id))
+	var n: int = u.keystones.size() - keep.size()
+	u.keystones = keep
 	return n
+
+
+# ---------------------------------------------------------------- saves (D446)
+
+## D446: take the C1-C3 keystones off a unit. Removed ones are refunded (the
+## slot reopens: the pick flow asks again). Converted ones are refunded the
+## same way AND come back as an item (the caller, BWRun, makes it: a matching
+## enchanted piece in the inventory). Returns { converted: [old ids],
+## refunded: [old ids] } (converted ones are in both).
+static func migrate(u) -> Dictionary:
+	var out := { "converted": [], "refunded": [] }
+	if u == null or not ("keystones" in u):
+		return out
+	var keep: Array = []
+	for id in u.keystones:
+		var k := str(id)
+		if not row(k).is_empty():
+			keep.append(k)
+			continue
+		out.refunded.append(k)
+		if LEGACY.has(k):
+			out.converted.append(k)
+	u.keystones = keep
+	enforce_cap(u)
+	return out
+
+
+## The enchantment id that carries a converted keystone now ("" for none).
+static func enchant_of(old_id: String) -> String:
+	return str(LEGACY.get(old_id, {}).get("enchant", ""))

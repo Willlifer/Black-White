@@ -1,29 +1,37 @@
-id,element,name,effect_text,effect_key,params,also
-water_walk,water,Waterwalking,"Water never slows you, and the first water hex you cross each turn costs no move.",move_cost,on=water;cost=0;once=1,immune(what=water_wading;radius=0)
-water_guard,water,Tidal Guard,You and your allies standing in water get +15 glance chance per water level (15/30/45).,stand_on_mod,on=water;side=def;stage=glance;per_point=15;team=1,
-water_push,water,Current Push,"Attacking from water: +8/+16/+24% damage (water 1/2/3), and +5% per water hex you entered this turn (up to +20%). Your hit on a foe standing in water pushes it 1 along the water.",stand_on_mod,on=water;side=att;stage=dmg;per_point=8,attack_mod(per_hex_on=water;per_hex_on_pct=5;on_max=20) | pool_push(push=1)
-water_undertow,water,Undertow,"While you live and any water 3 is on the board, foes get +1 move toward the nearest water 3, normal move level with it and -1 move away from it.",undertow,move=1;level=3,
-fire_rush,fire,Heat Rush,"No fire crossing damage, and the first fire hex you enter each turn gives +1 move. You and allies starting a turn on fire get +1 move per fire level.",heat_rush,move=1,start_move(on=fire;per_point=1;team=1)
-fire_skin,fire,Ember Skin,"An adjacent foe that hits you while you stand on fire takes 2/4/6% (your fire 1/2/3). Your fire standing damage is halved.",ember_skin,per_point=2;stand_pct=50,
-fire_kindling,fire,Kindling,"+6/+12/+18% damage when you or the target stands on fire (the higher level counts). Standing on fire, your attacks ignore 5% of the target's DEF per fire level.",stand_on_mod,on=fire;side=either;stage=dmg;per_point=6,stand_on_mod(on=fire;side=att;stage=def_ignore;per_point=5)
-fire_wild,fire,Wildfire,"Your fresh fire at 2+ seeds fire 1 onto neutral neighbours on the next tick, once per cast; your eruption rings do too. Grass containment still applies.",wildfire,min=2,
-ice_skate,ice,Ice Legs,"You're never Unsteady on glaze, and glaze costs you 1 move (even glazed mud). +1 move when you start your turn on ice.",skate,cost=1;move=1,
-ice_rime,ice,Rime Armour,"You and your allies standing on your glaze take 5% less damage per glaze level. Shatter doesn't apply to you.",rime_armour,pct=0,stand_on_mod(on=ice;side=def;stage=dmg;per_point=-5;team=1;own=1)
-ice_fault,ice,Fault Lines,"Your Shatter is doubled: hits on glaze +30% (base +15%), and thunder shattering your glaze x2 (base x1.5). Your Shatter also lands on foes standing on a stasis marker.",fault_lines,pct=30;nobreak=1,tile_potency_pct(pct=33)
-ice_frostbite,ice,Frostbite,"Your glaze Pins foes: glazing a foe's hex Pins it, and a foe starting its turn on your glaze is Pinned again (-2 move).",frostbite,status=pinned,on_event(on=glaze;do=status;status=pinned)
-thunder_step,thunder,Bolt Step,After any action that detonates a tile: move 2 more.,bolt_step,hexes=2,
-thunder_rod,thunder,Lightning Rod,"An arc that would hit an ally within 3 of you hits you instead. Chain arcs and detonation splash on you deal half.",lightning_rod,radius=3;pct=100,grounded(pct=50)
-thunder_overcharge,thunder,Overcharge,"An arc from a target you hit jumps again: a second arc at 50% of the first, to the next-nearest of that team. Your detonations deal +5% per charge point they blow.",overcharge,pct=50,element_damage_pct(per_level=5)
-thunder_static,thunder,Static Field,Your fuses last 5 cycles (base 3) and your allies' paint can't set them off. A foe ending its move on one is Staggered.,static_field,cycles=2;status=staggered,
-wind_tail,wind,Tailwind,"+2 move when you start on a gale marker, and 1 more after any wind action. Allies starting their turn within 2 of you get +1 move. Updraft: +1 jump, and allies starting their turn on your gale markers get +1 jump.",tailwind,start=2;after=1,slipstream(radius=2;move=1)
-wind_eye,wind,Eye of the Storm,"Immune to displacement. Bow, pistol and thrown attacks on you can't crit.",eye_of_storm,hit=0;nocrit=1,
-wind_force,wind,Gale Force,"+5% damage per hex you moved this turn (up to +20%). After moving 4+, your first hit that turn pushes its target 1 away. A foe your wind skill hits is pushed 1; if something stops it, it slams.",attack_mod,dmg_per_hex_moved_pct=5;max_pct=20,gust(push=1;slam_pct=8)
-wind_cross,wind,Crosswind,"Your wind slams deal 12% (base 8%), and a foe you slam with wind is Becalmed.",crosswind,slam_pct=12;status=becalmed,
-dark_step,dark,Shadowstep,"Once per turn, from a dark hex, step to another dark hex within 3 that you can see, for 1 move.",shadowstep,range=3;cost=1;los=1,
-dark_night,dark,Nightborn,"No dark drain on you. While you stand on dark, the first elemental effect each turn that would land on you is negated; so is an adjacent ally's on dark.",nightborn,once=1;allies=1,
-dark_ambush,dark,Ambush,"Attacking from dark 1/2/3: +6/+12/+18 crit, and +0.1 crit multiplier per dark level.",stand_on_mod,on=dark;side=att;stage=crit;per_point=6,stand_on_mod(on=dark;side=att;stage=crit_mult;per_point=0.1)
-dark_pall,dark,Pall,A foe you hit while it stands on dark 2+ is Blinded (it can't crit).,hit_status,on=dark;min=2;status=blinded,
-light_sun,light,Sunpath,+1 move when you start on light; +2 on light 3. Allies on your beam start their turn with +1 move.,start_move,on=light;l1=1;l2=1;l3=2,
-light_judge,light,Judgement,"Your attacks on a foe standing on light can't glance. Allies (you too) starting their turn on your light get +5 crit per light level that turn.",judgement,on=light,on_event(on=ally_turn_start;do=empower;on_tile=light;own=1;crit=5;per_level=1;uses=turn)
-light_glare,light,Glare,A foe starting its turn on light you laid isn't healed; on light 2+ it's also Blinded.,glare,min=2;status=blinded,
-light_sanct,light,Sanctuary,"Your light heals allies 5/9/14% (base 3/6/9), and light's hit bonus spares you and allies on it. Once per battle, when an ally within 3 drops under 35% HP, its hex gains light 2.",sanctuary,l1=5;l2=9;l3=14;radius=3;threshold=35;steps=2,radiant_guard(allies=1)
+id,element,name,effect_text,effect_key,params,also,duo
+water_walk,water,Waterwalking,"Water never slows you, and the first water hex you cross each turn costs no move.",move_cost,on=water;cost=0;once=1,immune(what=water_wading;radius=0),
+water_guard,water,Tidal Guard,You and your allies standing in water get +15 glance chance per water level (15/30/45).,stand_on_mod,on=water;side=def;stage=glance;per_point=15;team=1,,
+water_push,water,Current Push,"Attacking from water: +8/+16/+24% damage (water 1/2/3), and +5% per water hex you entered this turn (up to +20%). Your hit on a foe standing in water pushes it 1 along the water.",stand_on_mod,on=water;side=att;stage=dmg;per_point=8,attack_mod(per_hex_on=water;per_hex_on_pct=5;on_max=20) | pool_push(push=1),
+water_undertow,water,Undertow,"While you live and any water 3 is on the board, foes get +1 move toward the nearest water 3, normal move level with it and -1 move away from it.",undertow,move=1;level=3,,
+fire_rush,fire,Heat Rush,"No fire crossing damage, and the first fire hex you enter each turn gives +1 move. You and allies starting a turn on fire get +1 move per fire level.",heat_rush,move=1,start_move(on=fire;per_point=1;team=1),
+fire_skin,fire,Ember Skin,An adjacent foe that hits you while you stand on fire takes 2/4/6% (your fire 1/2/3). Your fire standing damage is halved.,ember_skin,per_point=2;stand_pct=50,,
+fire_kindling,fire,Kindling,"+6/+12/+18% damage when you or the target stands on fire (the higher level counts). Standing on fire, your attacks ignore 5% of the target's DEF per fire level.",stand_on_mod,on=fire;side=either;stage=dmg;per_point=6,stand_on_mod(on=fire;side=att;stage=def_ignore;per_point=5),
+fire_wild,fire,Wildfire,"Your fresh fire at 2+ seeds fire 1 onto neutral neighbours on the next tick, once per cast; your eruption rings do too. Grass containment still applies.",wildfire,min=2,,
+ice_skate,ice,Ice Legs,"You're never Unsteady on glaze, and glaze costs you 1 move (even glazed mud). +1 move when you start your turn on ice.",skate,cost=1;move=1,,
+ice_rime,ice,Rime Armour,You and your allies standing on your glaze take 5% less damage per glaze level. Shatter doesn't apply to you.,rime_armour,pct=0,stand_on_mod(on=ice;side=def;stage=dmg;per_point=-5;team=1;own=1),
+ice_fault,ice,Fault Lines,"Your Shatter is doubled: hits on glaze +30% (base +15%), and thunder shattering your glaze x2 (base x1.5). Your Shatter also lands on foes standing on a stasis marker.",fault_lines,pct=30;nobreak=1,tile_potency_pct(pct=33),
+ice_frostbite,ice,Frostbite,"Your glaze Pins foes: glazing a foe's hex Pins it, and a foe starting its turn on your glaze is Pinned again (-2 move).",frostbite,status=pinned,on_event(on=glaze;do=status;status=pinned),
+thunder_step,thunder,Bolt Step,After any action that detonates a tile: move 2 more.,bolt_step,hexes=2,,
+thunder_rod,thunder,Lightning Rod,An arc that would hit an ally within 3 of you hits you instead. Chain arcs and detonation splash on you deal half.,lightning_rod,radius=3;pct=100,grounded(pct=50),
+thunder_overcharge,thunder,Overcharge,"An arc from a target you hit jumps again: a second arc at 50% of the first, to the next-nearest of that team. Your detonations deal +5% per charge point they blow.",overcharge,pct=50,element_damage_pct(per_level=5),
+thunder_static,thunder,Static Field,Your fuses last 5 cycles (base 3) and your allies' paint can't set them off. A foe ending its move on one is Staggered.,static_field,cycles=2;status=staggered,,
+wind_tail,wind,Tailwind,"+2 move when you start on a gale marker, and 1 more after any wind action. Allies starting their turn within 2 of you get +1 move. Updraft: +1 jump, and allies starting their turn on your gale markers get +1 jump.",tailwind,start=2;after=1,slipstream(radius=2;move=1),
+wind_eye,wind,Eye of the Storm,"Immune to displacement. Bow, pistol and thrown attacks on you can't crit.",eye_of_storm,hit=0;nocrit=1,,
+wind_force,wind,Gale Force,"+5% damage per hex you moved this turn (up to +20%). After moving 4+, your first hit that turn pushes its target 1 away. A foe your wind skill hits is pushed 1; if something stops it, it slams.",attack_mod,dmg_per_hex_moved_pct=5;max_pct=20,gust(push=1;slam_pct=8),
+wind_cross,wind,Crosswind,"Your wind slams deal 12% (base 8%), and a foe you slam with wind is Becalmed.",crosswind,slam_pct=12;status=becalmed,,
+dark_step,dark,Shadowstep,"Once per turn, from a dark hex, step to another dark hex within 3 that you can see, for 1 move.",shadowstep,range=3;cost=1;los=1,,
+dark_night,dark,Nightborn,"No dark drain on you. While you stand on dark, the first elemental effect each turn that would land on you is negated; so is an adjacent ally's on dark.",nightborn,once=1;allies=1,,
+dark_ambush,dark,Ambush,"Attacking from dark 1/2/3: +6/+12/+18 crit, and +0.1 crit multiplier per dark level.",stand_on_mod,on=dark;side=att;stage=crit;per_point=6,stand_on_mod(on=dark;side=att;stage=crit_mult;per_point=0.1),
+dark_pall,dark,Pall,A foe you hit while it stands on dark 2+ is Blinded (it can't crit).,hit_status,on=dark;min=2;status=blinded,,
+light_sun,light,Sunpath,+1 move when you start on light; +2 on light 3. Allies on your beam start their turn with +1 move.,start_move,on=light;l1=1;l2=1;l3=2,,
+light_judge,light,Judgement,Your attacks on a foe standing on light can't glance. Allies (you too) starting their turn on your light get +5 crit per light level that turn.,judgement,on=light,on_event(on=ally_turn_start;do=empower;on_tile=light;own=1;crit=5;per_level=1;uses=turn),
+light_glare,light,Glare,A foe starting its turn on light you laid isn't healed; on light 2+ it's also Blinded.,glare,min=2;status=blinded,,
+light_sanct,light,Sanctuary,"Your light heals allies 5/9/14% (base 3/6/9), and light's hit bonus spares you and allies on it. Once per battle, when an ally within 3 drops under 35% HP, its hex gains light 2.",sanctuary,l1=5;l2=9;l3=14;radius=3;threshold=35;steps=2,radiant_guard(allies=1),
+duo_wildfire,fire,Wildfire Gale,"Fire your gales carry spreads one ring further, at full steps.",duo,id=wildfire_gale;radius=1,,wind
+duo_powder_keg,fire,Powder Keg,A fuse set off on your fire blows 1 ring wider. (A Lava Walker's fire still fizzles a fuse: lava wins.),duo,id=powder_keg;radius=1,,thunder
+duo_storm_drain,water,Storm Drain,"Water you electrify is electrified across its whole connected pool, not just within 1.",duo,id=storm_drain,,thunder
+duo_flash_flood,water,Flash Flood,Your ice on your water glazes the whole pool at once; every foe on it is Unsteady.,duo,id=flash_flood,,ice
+duo_permafrost,ice,Permafrost,Your dark 3 counts as glazed: foes on it are Unsteady and take Shatter (+15%).,duo,id=permafrost,,dark
+duo_solar_wind,light,Solar Wind,"On your light, allies heal for the hex's fire steps too (and don't burn), and foes burn for its light steps too (and don't heal).",duo,id=solar_wind,,fire
+duo_eclipse,light,Eclipse,"Your light and your dark on the same hex both stay instead of cancelling: the hex holds both, at their own steps.",duo,id=eclipse,,dark
+duo_blizzard,wind,Blizzard,Your wind pushes leave glaze on the hex where each pushed foe lands.,duo,id=blizzard,,ice

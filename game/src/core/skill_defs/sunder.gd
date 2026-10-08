@@ -15,6 +15,8 @@ const CD := 3
 const DEF_IGNORE := 30
 const LINE_PCT := 60
 const LEN := BWSkills.LEY_LEN + 1        # 5: the target's hex + 4 beyond
+const BELLOW_LEN := 10                   # D436: a Bellow doubles the fissure
+const Bellow := preload("res://src/core/skill_defs/bellow.gd")
 
 
 func _init() -> void:
@@ -30,7 +32,9 @@ func plan(b: BWBattle, u: BWUnit, element: String, target: Vector2i, p: Dictiona
 	p.victims = b._foes_on(u, [target])
 	if not p.victims.is_empty():
 		p["sunder_main"] = (p.victims[0] as BWUnit).id
-	p.hexes = fissure(b, u, target)
+	p.hexes = fissure(b, u, target, BELLOW_LEN if Bellow.held(u) else LEN)
+	if Bellow.held(u):
+		p.notes.append("Bellow: the fissure doubles, up to %d tiles" % BELLOW_LEN)
 	var hit: Array = []
 	for o in b._foes_on(u, p.hexes):
 		if not o in p.victims:
@@ -45,9 +49,9 @@ func plan(b: BWBattle, u: BWUnit, element: String, target: Vector2i, p: Dictiona
 
 ## The fissure: from `u` through `target` (adjacent), LEN hexes, the target's
 ## hex first. Stops before jagged rock, an ice pillar or the map's edge.
-static func fissure(b: BWBattle, u: BWUnit, target: Vector2i) -> Array:
+static func fissure(b: BWBattle, u: BWUnit, target: Vector2i, length: int = LEN) -> Array:
 	var out: Array = []
-	for h in b.board.ray(u.pos, target, LEN):
+	for h in b.board.ray(u.pos, target, length):
 		if out.is_empty() and h != target:
 			break                               # a multi-hex foe off the heading: the target's hex only
 		if not b.board.is_passable(h) or b.board.blocked(h):
@@ -56,6 +60,11 @@ static func fissure(b: BWBattle, u: BWUnit, target: Vector2i) -> Array:
 	if out.is_empty():
 		out = [target]
 	return out
+
+
+## D436: a Bellow is spent by the blow.
+func after_hits(b: BWBattle, u: BWUnit, _p: Dictionary, _results: Array) -> void:
+	Bellow.spend(b, u, id)
 
 
 func forecast_mods(_b: BWBattle, _u: BWUnit, _el: String, v: BWUnit, p: Dictionary, _strike: int,

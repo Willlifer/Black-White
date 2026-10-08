@@ -241,5 +241,5 @@ func test_save_migration(t) -> void:
 	var back := BWRun.from_dict(JSON.parse_string(JSON.stringify(r4.to_dict())))
 	t.eq(BWRooms.offer(back), o4, "a boss offer survives a save")
 	t.ok(back.is_twins(), "and the Twins choice")
-	t.eq(int(r4.to_dict().version), 12, "saves are v12")
+	t.eq(int(r4.to_dict().version), 13, "saves are v13 (D446: Keystones v3)")
 	_restore()

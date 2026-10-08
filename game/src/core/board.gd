@@ -73,10 +73,12 @@ var objective := {}
 var extra_cost: Callable
 ## D263 dynamic blockers (the battle plugs in BWTiles): `blocker` (hex -> bool)
 ## makes a hex impassable for now (an ice pillar), `sight_blocker`
-## (hex, from, to) -> bool blocks line of sight through it (a pillar, steam).
+## (hex, from, to) -> bool blocks line of sight through it (a pillar).
 ## Unset = none.
 var blocker: Callable
 var sight_blocker: Callable
+## D459: extra levels on a hex right now (a Sculptor's pillar, BWTiles.pillar_lift).
+var lift: Callable
 
 
 static func from_dict(d: Dictionary) -> BWBoard:
@@ -207,7 +209,14 @@ func terrain(h: Vector2i) -> String:
 	return _terrain.get(h, JAGGED)
 
 
+## D459: the authored ground level, without a pillar's lift (the tile meshes).
+func ground_elevation(h: Vector2i) -> int:
+	return _elev.get(h, 0)
+
+
 func elevation(h: Vector2i) -> int:
+	if lift.is_valid():
+		return _elev.get(h, 0) + int(lift.call(h))   # D459: standing on a Sculptor's pillar
 	return _elev.get(h, 0)
 
 
@@ -230,7 +239,7 @@ func cells() -> Array:
 ## D360: opts.jump caps the rise (a walk); without it, MAX_CLIMB (forced moves).
 ## D375: a rise within the cap costs no extra move.
 func step_cost(a: Vector2i, b: Vector2i, opts: Dictionary = {}) -> int:
-	if not is_passable(b) or blocked(b):
+	if not is_passable(b) or (blocked(b) and not (opts.get("climb", {}) as Dictionary).has(b)):   # D459: a climbable pillar
 		return -1
 	var rise := elevation(b) - elevation(a)
 	if rise > int(opts.get("jump", MAX_CLIMB)):
@@ -347,7 +356,7 @@ static func path_to(reach: Dictionary, goal: Vector2i) -> Array[Vector2i]:
 
 ## Line of sight (D20): blocked by jagged hexes and by any hex between that
 ## stands 2+ levels above both ends. Units never block sight. D263: nor can it
-## pass a dynamic sight blocker between (an ice pillar, steam).
+## pass a dynamic sight blocker between (an ice pillar).
 func has_los(a: Vector2i, b: Vector2i) -> bool:
 	var line := BWHex.line(a, b)
 	var top := maxi(elevation(a), elevation(b))

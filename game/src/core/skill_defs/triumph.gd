@@ -1,4 +1,6 @@
 extends BWSkillDef
+## RETIRED (D439 Tapestry): never offered; the def stays for old saves, which map it
+## (BWSkillRegistry.RENAMED, migrate_unit). Its helpers may still be shared.
 ## Sword (D103). Once per battle: a held, heavy cut at an adjacent foe for
 ## POWER x MULT. A KO with it is a triumph: +STR_PCT% STR (battle_mods) for
 ## the rest of the battle. "Once" = every element's cooldown set to ONCE_CD.
@@ -15,6 +17,7 @@ func _init() -> void:
 		"desc": "Once per battle: a held, heavy cut at an adjacent enemy for x1.5. If it knocks the foe out, +25% STR for the rest of the battle",
 		"targeting": "adjacent_unit", "needs_element": true, "range": 1, "cd": 0, "once_per_battle": true,
 		"power": POWER,
+		"retired": true,
 	}, 302)
 
 

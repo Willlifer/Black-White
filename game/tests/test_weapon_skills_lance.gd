@@ -8,41 +8,6 @@ const E := Vector2i(5, 4)
 var K: Object = preload("res://tests/test_weapon_skills_melee.gd").new()
 
 
-func test_guardrush_shoves_and_slams(t) -> void:
-	var line: Array = K._line(3)
-	var shoved := 0
-	for sd in 6:
-		var me: BWUnit = K._equip(K._u("me", "lance", "fire"), ["guardrush"])
-		var foe: BWUnit = K._foe("f", { "res": 0 })
-		var b: BWBattle = K._fight(me, [foe], [line[1]], 40 + sd)
-		var pv := b.skill_preview(me, "guardrush", "fire", line[1])
-		t.ok(pv.notes.any(func(n): return str(n).begins_with("Shove")), "the shove is in the forecast")
-		var ev: Dictionary = K._use(t, b, me, "guardrush", "fire", line[1])
-		var sec: bool = ev.results[0].result.secondary
-		t.eq(foe.pos == line[2], sec, "shoved back 1 iff the secondary landed (seed %d)" % sd)
-		shoved += 1 if sec else 0
-	t.ok(shoved > 0, "shoved at least once")
-	# blocked by a unit: both slam for 8% (when the secondary lands)
-	var slammed := false
-	for sd in 10:
-		var me2: BWUnit = K._equip(K._u("me", "lance", "fire"), ["guardrush"])
-		var x: BWUnit = K._foe("x")
-		var y: BWUnit = K._foe("y")
-		var b2: BWBattle = K._fight(me2, [x, y], [line[1], line[2]], 60 + sd)
-		t.ok(b2.skill_preview(me2, "guardrush", "fire", line[1]).notes.any(func(n): return str(n).contains("slams into y")), "slam named")
-		var ev2 := b2.use_skill(me2, "guardrush", "fire", line[1])
-		var slams: Array = K._events(b2, "tile_damage").filter(func(e): return e.cause == "slam")
-		if not ev2.results[0].result.secondary:
-			t.ok(slams.is_empty(), "resisted: no slam")
-			continue
-		t.eq(slams.map(func(e): return e.unit), ["x", "y"], "the foe and what it hits")
-		t.eq(int(slams[0].amount), BWTiles.tile_damage(x, 8, ""), "8% max HP")
-		t.eq(x.pos, line[1], "it didn't move")
-		slammed = true
-		break
-	t.ok(slammed, "a slam within 10 seeds")
-
-
 func test_sweep_clears_the_front(t) -> void:
 	var nb := BWHex.neighbors(C)
 	var me: BWUnit = K._equip(K._u("me", "lance", "fire"), ["sweep"])
@@ -185,3 +150,6 @@ func test_tridentpierce_plus(t) -> void:
 	var me2: BWUnit = K._u("me", "lance", "fire")
 	var b2: BWBattle = K._fight(me2, [K._foe("a"), K._foe("b"), K._foe("d")], line)
 	t.ok(K._mod(b2.skill_preview(me2, "tridentpierce", "fire", E).forecasts["d"], "Pierce").is_empty(), "not without the Improve")
+
+
+## D435-D442: the retired skills' tests moved to test_kit3 (their replacements; the defs stay only for old saves).

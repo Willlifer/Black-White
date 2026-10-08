@@ -6,9 +6,14 @@ extends BWSkillDef
 ## reach PLUS_LEN and the slam is PLUS_SLAM_PCT%. Downhill (D362): reach +1
 ## and the shove carries one hex further. The AI charges through
 ## ai_support (D414): the follow-up from where the run ends, plus the slam.
+## D434 Momentum: every hex the run travels adds MOMENTUM_PCT% to the end
+## swing (the basic follow-up), a named forecast line (7 hexes: +21%); the
+## unit's fx `charge_momentum` holds the hexes until that swing or the turn's end.
 
 const PLUS_LEN := 8
 const PLUS_SLAM_PCT := 12
+const MOMENTUM_PCT := 3
+const FX := "charge_momentum"
 
 
 func _init() -> void:
@@ -34,11 +39,27 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 	if not sh.is_empty():
 		p.notes.append("Shove: %s pushed %d hex%s" % [sh.unit.name, BWHex.distance(sh.from, sh.to),
 			"" if BWHex.distance(sh.from, sh.to) == 1 else "es"])
+	if not (p.walk as Array).is_empty():
+		p.notes.append("Momentum: %d hexes run, the swing after +%d%%" % [(p.walk as Array).size(), momentum_pct((p.walk as Array).size())])
 	var sl: Dictionary = p.get("slam", {})
 	if not sl.is_empty():
 		var into: BWUnit = sl.get("into", null)
 		p.notes.append("Slam: %s can't be pushed on and takes %d%% HP%s" % [sl.unit.name, slam_pct(u),
 			(", and so does %s" % into.name) if into != null else ""])
+
+
+static func momentum_pct(hexes: int) -> int:
+	return MOMENTUM_PCT * maxi(hexes, 0)
+
+
+## D434: the run's hexes ride into the follow-up swing (BWBattle's forecast
+## reads fx `charge_momentum`; the swing, or the turn's end, spends it).
+func on_follow_up(_b: BWBattle, u: BWUnit, p: Dictionary) -> void:
+	var n := (p.walk as Array).size()
+	if n > 0:
+		u.fx[FX] = n
+	else:
+		u.fx.erase(FX)
 
 
 func slam_pct(u: BWUnit) -> int:
@@ -91,7 +112,13 @@ func _ai_value(b: BWBattle, u: BWUnit, p: Dictionary) -> float:
 	u.pos = p.dest
 	if moved != null:
 		moved.pos = sh.to
+	var had: Variant = u.fx.get(FX, null)
+	u.fx[FX] = (p.walk as Array).size()          # D434: the swing carries the run
 	var t := BWAI._best_target(b, u, u.pos)
+	if had == null:
+		u.fx.erase(FX)
+	else:
+		u.fx[FX] = had
 	u.pos = start
 	if moved != null:
 		moved.pos = was

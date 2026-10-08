@@ -83,7 +83,7 @@ func test_turn_order(t) -> void:
 	var units := [
 		mk.call("a", "enemy", 4, "sword"),     # 4 + 1 = 5
 		mk.call("b", "player", 2, "daggers"),  # 2 + 3 = 5
-		mk.call("c", "player", 6, "axe"),      # 6 − 1 = 5
+		mk.call("c", "player", 5, "axe"),      # 5 + 0 = 5 (D433: the axe lost its −1)
 		mk.call("d", "enemy", 6, "sword"),     # 7
 	]
 	var q := BWTurnQueue.build(units)

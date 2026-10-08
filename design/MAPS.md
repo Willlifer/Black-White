@@ -593,7 +593,7 @@ stats from the class profiles × the fight's curve multiplier (held to
 
 **Damage classes** (author's ruling, `BWFormulas.damage_class`, the one place):
 - **Physical**: weapon basic attacks, even with an imbued weapon; weapon skills cast without an element; slams.
-- **Elemental**: any skill cast with an element; staff spells (the staff's basic too); tile damage (fire, dark, shroud, steam, eruptions); detonations; chain arcs.
+- **Elemental**: any skill cast with an element; staff spells (the staff's basic too); tile damage (fire, dark, shroud, eruptions); detonations; chain arcs.
 - Neither: obelisk pulses, thorns, Death Knell, Covering shares.
 
 An immune blow deals 0 and carries nothing (no status, no knockback); the

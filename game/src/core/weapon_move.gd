@@ -43,6 +43,9 @@ const TRAITS := {
 const PASSIVES := {
 	HIGH_GROUNDER: ["HighGrounder", "jump 4 with a bow drawn",
 		"Passive: takes no skill slot. With a bow drawn your jump doubles to 4, so one step may climb 4 levels."],
+	# D427: the sword's (BWKit2: the step's rules, its prompt in the combat screen)
+	"blade_dance": ["Blade Dance", "a free step after a sword skill lands",
+		"Passive: takes no skill slot. With a sword drawn, after one of your sword skills lands you may take a free step of up to 2 tiles (pick the tile, or skip)."],
 }
 
 

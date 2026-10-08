@@ -75,7 +75,12 @@ const PERK_KEYS := ["move_cost", "stand_on_mod", "start_move", "undertow", "heat
 ##   drawback  the cost half of a cursed row (hp_cost, status, no_heal, ...)
 ##   swap      trade places with an ally (Bodyguard: mode=move; Lifeline: on=ally_low)
 const V2_KEYS := ["on_event", "pity", "drawback", "swap"]
-const KEYS := GEAR_KEYS + PERK_KEYS + V2_KEYS
+## D443/D455 (Keystones v3):
+##   keystone  id    an item enchantment granting a C1-C3 keystone (BWKeystones.LEGACY);
+##                   BWKeystones.has(u, id) reads it (awake: its element learned)
+##   duo       id    a duo perk (perks.csv `duo` column; BWDuo.has)
+const V3_KEYS := ["keystone", "duo"]
+const KEYS := GEAR_KEYS + PERK_KEYS + V2_KEYS + V3_KEYS
 
 ## "AoE skills" for aoe_radius_plus (Cleaving, Channelling) are the skill
 ## defs with `aoe: true` in their row (D89): arcing_shot, surge,
@@ -329,8 +334,8 @@ static func paint_opts(u: BWUnit, element: String, hexes: Array, board: BWBoard,
 	var o := { "steps_plus": 0 }
 	if u == null:
 		return o
-	if element in BWPools.REACT and BWSets.pool_max(u) > BWPools.POOL_MAX:
-		o["pool_max"] = BWSets.pool_max(u)              # D307: the Water set's pools reach 25
+	if element in ["ice", "thunder"] and BWSets.pool_reach(u) > 1:
+		o["pool_reach"] = BWSets.pool_reach(u)          # D422: the Water set's pools react within 2
 	if element == "ice" and BWSets.pillar_plus(u) > 0:
 		o["pillar_plus"] = BWSets.pillar_plus(u)        # D282: the Ice set's +1 pillar tick
 	var turns := int(total(u, "tile_duration_plus", "turns", element))

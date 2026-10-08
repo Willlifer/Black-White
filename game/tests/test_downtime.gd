@@ -215,17 +215,18 @@ func test_branch_out(t) -> void:
 	var rep2 := r2.downtime(u2, "branch_out")
 	t.ok(not rep2.pending and int(rep2.picked) == 0, "auto takes the first option")
 	t.eq(u2.affinity_rank(str(rep2.options[0].element)), 1, "and applies it")
-	# one valid option: one card
+	# one valid option: one card. D417: a unit holding 3 elements is offered no
+	# new element, so with one class left it is one class-only card.
 	var r3 := _run(9)
 	var u3: BWUnit = r3.squad[0]
 	var left: Array = BWFormulas.ELEMENTS.filter(func(e): return u3.affinity_rank(e) == 0)
-	for e in left.slice(1):
+	for e in left.slice(0, BWUnit.MAX_ELEMENTS - u3.attuned_elements().size()):
 		u3.affinity[e] = 10
 	var cls: Array = BWRun.weapon_classes().filter(func(c): return c != u3.weapon_class and u3.expertise_rank(c) == 0)
 	for c in cls.slice(1):
 		u3.expertise[c] = 10
 	var rep3 := r3.downtime(u3, "branch_out", false)
-	t.eq(rep3.options, [{ "element": left[0], "weapon": cls[0] }], "only one valid pairing: one card")
+	t.eq(rep3.options, [{ "element": "", "weapon": cls[0] }], "at 3 elements, one class left: one class-only card")
 	# nothing left: every element ranked, every class at D
 	for e in BWFormulas.ELEMENTS:
 		u3.affinity[e] = maxi(int(u3.affinity.get(e, 0)), 10)
@@ -617,3 +618,56 @@ func test_focus_element(t) -> void:
 		t.ok(a.all(func(it): return BWRun.item_element(it) == other), "seed %d: armour attuned to the focus" % s)
 		BWPicks.auto_resolve(u)
 	t.eq(int(u.affinity[u.element]), native, "the native element untouched")
+
+
+## D417 (author: "Reduce max elements attuned to 3"): no 4th element from any
+## source: battle awards, Branch out's cards, Wander's element; a save holding
+## more keeps the top 3 and moves half of the rest's points to the focus.
+func test_element_cap(t) -> void:
+	t.eq(BWUnit.MAX_ELEMENTS, 3, "the cap is 3")
+	var r := _run(77)
+	var u: BWUnit = r.squad[0]
+	var others: Array = BWFormulas.ELEMENTS.filter(func(e): return e != u.element)
+	u.affinity[others[0]] = 10
+	u.affinity[others[1]] = 4                      # rank 0, but attuned: it counts
+	t.eq(u.attuned_elements().size(), 3, "native + two others = 3")
+	t.ok(not u.can_attune(others[2]) and u.can_attune(others[1]), "a 4th can't attune; an owned one can")
+	BWProgression.award(u, true, str(others[2]))
+	t.eq(int(u.affinity.get(others[2], 0)), 0, "a knockout with a 4th element grows nothing in it")
+	BWProgression.award(u, true, str(others[1]))
+	t.eq(int(u.affinity[others[1]]), 7, "an owned element still grows")
+	# Branch out: class-only cards at the cap
+	r.day = 3
+	for o in r.branch_options(u):
+		t.ok(str(o.element) == "" or str(o.element) in u.attuned_elements(), "no 4th element on a Branch out card: %s" % o)
+	# Wander's element: owned elements only
+	for s in 30:
+		var r2 := _run(900 + s)
+		var w: BWUnit = r2.squad[1]
+		var oth: Array = BWFormulas.ELEMENTS.filter(func(e): return e != w.element)
+		w.affinity[oth[0]] = 10
+		w.affinity[oth[1]] = 10
+		var rep := { "lines": [], "items": [], "successes": [] }
+		if r2._wander_effect(w, "element", rep):
+			t.ok(w.attuned_elements().size() == 3, "seed %d: Wander teaches an owned element (%s)" % [s, w.affinity])
+	# save migration: 5 elements -> the top 3, half the rest to the focus
+	var m := _run(5)
+	var v: BWUnit = m.squad[0]
+	var oo: Array = BWFormulas.ELEMENTS.filter(func(e): return e != v.element)
+	v.affinity = { v.element: 12, oo[0]: 40, oo[1]: 25, oo[2]: 9, oo[3]: 6 }
+	v.focus_element = str(oo[0])
+	var d: Dictionary = JSON.parse_string(JSON.stringify(m.to_dict()))
+	var back: BWUnit = BWRun.from_dict(d).squad[0]
+	t.eq(back.attuned_elements().size(), 3, "a loaded save holds 3 elements: %s" % back.affinity)
+	t.ok(back.affinity.has(back.element) and back.affinity.has(oo[0]) and back.affinity.has(oo[1]), "native and the two highest kept")
+	t.eq(int(back.affinity[oo[0]]), 40 + 4 + 3, "half of the dropped 9 and 6 (4 + 3) went to the focus")
+	t.ok(not back.affinity.has(oo[2]) and not back.affinity.has(oo[3]), "the rest dropped")
+	# the native element is kept even when it's 4th by points
+	var n := BWUnit.from_roster({ "id": "x", "element": "fire", "weapon_class": "sword" })
+	n.affinity = { "fire": 5, "ice": 30, "dark": 20, "light": 10 }
+	var res := n.enforce_element_cap()
+	t.eq(res.dropped, ["light"], "the native stays, the lowest other drops")
+	t.eq(int(n.affinity.fire), 10, "and half of light's 10 goes to the native (no focus)")
+	# enemies and the roster roll hold one element
+	for e in r.enemies_for(3):
+		t.ok(e.attuned_elements().size() <= 3, "enemy within the cap")

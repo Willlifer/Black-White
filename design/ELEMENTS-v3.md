@@ -1,5 +1,7 @@
 # Elements v3: every element is a build
 
+> **Keystones v3 (2026-10-08, D443-D465) replaced this draft's keystones:** the current fourteen, the duo perks and the fate of the 21 below are ELEMENTS.md §20.
+
 ## Author rulings (2026-10-07): these OVERRIDE the draft below
 
 **Wind**
@@ -19,7 +21,7 @@
 - Lean light toward buffing teammates.
 
 **Water**
-- **Pools:** fire → steam over the whole connected pool (up to 19). **Ice and thunder react only within radius 1 of the cast hex** (7 hexes), not the whole pool.
+- **Pools:** fire → steam over the whole connected pool (up to 19). **SUPERSEDED (2026-10-08, D421-D422):** steam is removed; fire meeting water douses (both cleared from the hex), and every steam mention below is historical. **Ice and thunder react only within radius 1 of the cast hex** (7 hexes), not the whole pool.
 - Light and dark never travel through pools.
 - **Electrified:** it can't be refreshed. Fire on a hex clears it, which is fine.
 - **Lockdown fix:** each unit builds resistance the longer it stays in an electrified field. Full damage on the first turn-start, 25% on the next, then immune for the rest of that field.

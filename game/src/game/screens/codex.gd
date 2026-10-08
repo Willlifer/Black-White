@@ -253,7 +253,7 @@ func _el(e: String, t: String = "") -> String:
 
 func _elements() -> void:
 	_intro("Every unit carries an element (its hair colour) and paints the ground with it through skills. "
-		+ "Four are [b]axes[/b] that build up on a tile to intensity %d: %s ↔ %s and %s ↔ %s, so an opposite steps a tile back. "
+		+ "Four are [b]axes[/b] that build up on a tile to intensity %d: %s ↔ %s and %s ↔ %s: dark steps light back (and the reverse), and fire meeting water [b]douses[/b], clearing both. "
 		% [BWTiles.AXIS_MAX, _el("fire"), _el("water"), _el("light"), _el("dark")]
 		+ "Three are [b]operators[/b] that act on whatever charge a tile already holds: %s detonates, %s locks, %s spreads."
 		% [_el("thunder"), _el("ice"), _el("wind")])
@@ -359,7 +359,7 @@ func _rules_card() -> void:
 	var per := BWUnit.POINTS_PER_RANK
 	v.add_child(_rt("[font_size=%d][b]Affinity and the ground[/b][/font_size]" % (BWStyle.F_SUB + 3)))
 	v.add_child(_rt(
-		"[b]Affinity[/b] ranks 0–%d, %d points each. Everyone starts at rank 1 in their own element; any element at rank 1+ can be used in skills. " % [BWUnit.MAX_AFFINITY_RANK, per]
+		"[b]Affinity[/b] ranks 0–%d, %d points each. Everyone starts at rank 1 in their own element; any element at rank 1+ can be used in skills. A unit holds at most [b]%d elements[/b]; a 4th never grows. " % [BWUnit.MAX_AFFINITY_RANK, per, BWUnit.MAX_ELEMENTS]
 		+ "An attack with an element earns %d point, a knockout %d.\n" % [BWProgression.ATTACK.affinity, BWProgression.KNOCKOUT.affinity]
 		+ "Each rank: [b]+%d%%[/b] damage with it, [b]+%d[/b] resist against it, [b]+%.1f[/b] resist against its opposite. Ice ranks give +%.1f against every other element.\n"
 		% [roundi(BWFormulas.AFFINITY_DMG_PER_RANK * 100), roundi(BWFormulas.AFFINITY_RES_PER_RANK), BWFormulas.OPPOSITE_RES_PER_RANK, BWFormulas.OPPOSITE_RES_PER_RANK]
@@ -387,7 +387,7 @@ func _weapons() -> void:
 		+ "and each version has its own cooldown. Skill damage: [b]power + ½ STR + ½ DEX[/b]; staff spells: [b]power + WIL[/b].")
 	var tbl := "[table=6][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell]" % [
 		_faint("CLASS"), _faint("DAMAGE"), _faint("BASE"), _faint("RANGE"), _faint("SPEED"), _faint("MOVE")]
-	var rows: Array = BWData.table("weapons")
+	var rows: Array = BWData.table("weapons").filter(func(r): return not BWRun.is_benched(str(r.id)))   # D419
 	for w in rows:
 		tbl += "[cell][b]%s[/b][/cell][cell]%s[/cell][cell]%d[/cell][cell]%s[/cell][cell]%s[/cell][cell]%s[/cell]" % [
 			str(w.get("name", w.id)), _dmg_type(w), int(w.get("base_dmg", 0)), _range(int(w.get("range", 1))),

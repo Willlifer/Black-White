@@ -179,11 +179,12 @@ static func pillar_plus(u) -> int:
 	return 1 if tier(u, "ice") >= 2 else 0
 
 
-## Water 2: pools your casts reach run this far (BWPools.pool, D307).
-const WATER_POOL_MAX := 25
+## Water 2 (D422, was D307's 25-hex pools, which only steam used): your ice
+## and thunder on a pool react within this radius of the cast hex (base 1).
+const WATER_POOL_REACH := 2
 
-static func pool_max(u) -> int:
-	return WATER_POOL_MAX if tier(u, "water") >= 2 else BWPools.POOL_MAX
+static func pool_reach(u) -> int:
+	return WATER_POOL_REACH if tier(u, "water") >= 2 else 1
 
 
 ## Thunder 2: electrified water shocks you at this factor (BWPools shock).

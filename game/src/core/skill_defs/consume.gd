@@ -3,6 +3,9 @@ extends BWSkillDef
 ## learned): it takes CONSUME_DMG + CONSUME_PER_POINT per point eaten, the
 ## ring around you takes that element, and D87: you heal CONSUME_HEAL_PCT%
 ## max HP per point; Consume+ PLUS_HEAL_PCT%.
+## D429b (the author): it also raises a barrier equal to the heal (the
+## nominal heal, so it counts at full HP too) that soaks damage of any kind
+## until your next turn (BWKit2.barrier_absorb).
 
 const PLUS_HEAL_PCT := 7
 
@@ -10,7 +13,7 @@ const PLUS_HEAL_PCT := 7
 func _init() -> void:
 	define({
 		"key": "consume", "name": "Consume", "weapon": "daggers", "clip": "",
-		"desc": "Devour the element under an adjacent enemy; it takes the damage, you heal 5% HP per point eaten, and you flourish",
+		"desc": "Devour the element under an adjacent enemy; it takes the damage, you heal 5% HP per point eaten and raise a barrier of the same size until your next turn, and you flourish",
 		"plus": "Consume+: heals 7% per point",
 		"targeting": "adjacent_unit", "needs_element": false, "range": 1, "cd": BWSkills.DEFAULT_CD,
 		"power": BWSkills.CONSUME_DMG,
@@ -30,7 +33,8 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 	p.hexes = b._without(b._without(b._on_board(b.board.area(u.pos, 1)), u.pos), target)
 	p.victims = b._foes_on(u, [target])
 	if int(p.points) > 0:               # D87
-		p.notes.append("Consume heals you %d%% HP (%d points eaten)" % [heal_pct(u) * int(p.points), int(p.points)])
+		p.notes.append("Consume heals you %d%% HP (%d points eaten), and a barrier of %d until your next turn" % [
+			heal_pct(u) * int(p.points), int(p.points), barrier(u, int(p.points))])
 
 
 func power_formula(b: BWBattle, _u: BWUnit, el: String, v: BWUnit, p: Dictionary) -> Dictionary:
@@ -49,6 +53,12 @@ func after_paint(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: 
 		_results: Array, _stripped: int) -> void:
 	if int(p.get("points", 0)) > 0:
 		b._heal(u, heal_pct(u) * int(p.points), "consume")
+		BWKit2.set_barrier(b, u, barrier(u, int(p.points)), "consume")   # D429b
+
+
+## D429b: the barrier, in HP: the heal's nominal size.
+func barrier(u: BWUnit, points: int) -> int:
+	return roundi(u.max_hp() * heal_pct(u) * points / 100.0)
 
 
 func heal_pct(u: BWUnit) -> int:

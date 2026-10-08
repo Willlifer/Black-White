@@ -120,6 +120,49 @@ static func seed_for(h: Vector2i, salt: int = 0) -> float:
 	return float(absi(hash(Vector3i(h.x, h.y, salt))) % 997) / 997.0
 
 
+# ------------------------------------------- D423 detonation ring colours
+
+## The ring's colours from a detonation's mix ({element: steps}, BWTiles.blast_mix;
+## thunder never counts): [[element, weight]] heaviest first, weights summing
+## to 1 (ties: BWFormulas.ELEMENTS order), at most 3 (one per axis + ice).
+## Empty / nothing but thunder = [["thunder", 1.0]], the pure fuse pop.
+static func blast_colors(mix: Dictionary) -> Array:
+	var out: Array = []
+	var total := 0.0
+	for el in BWFormulas.ELEMENTS:
+		var n := float(mix.get(el, 0))
+		if el == "thunder" or n <= 0.0:
+			continue
+		out.append([el, n])
+		total += n
+	if out.is_empty():
+		return [["thunder", 1.0]]
+	out.sort_custom(func(a, b): return a[1] > b[1])
+	for pair in out:
+		pair[1] = pair[1] / total
+	return out.slice(0, 3)
+
+
+## A ring colour per element. The tile glow, except dark: its near-black glow
+## reads as a hole; the hair violet keeps it dark but visible on white.
+static func blast_color(el: String) -> Color:
+	return BWLook.element_color(el) if el in ["dark", "ice"] else BWLook.glow_color(el)
+
+
+## Set a detonation burst's swirl colours (tile_burst.gdshader blast_a..c,
+## weight in alpha). An empty mix leaves the material's thunder purple.
+static func tint_blast(mi: GeometryInstance3D, mix: Dictionary) -> void:
+	if mi == null:
+		return
+	var cols := blast_colors(mix)
+	for i in 3:
+		var c := Color(0, 0, 0, 0)
+		if i < cols.size() and str(cols[0][0]) != "thunder":
+			c = blast_color(str(cols[i][0]))
+			c.a = float(cols[i][1])
+		mi.set_instance_shader_parameter("blast_" + ["a", "b", "c"][i], c)
+
+
 # ------------------------------------------------------------------ materials
 
 static func material(kind: String) -> ShaderMaterial:
@@ -167,12 +210,12 @@ static func material(kind: String) -> ShaderMaterial:
 			var el := "thunder" if kind.ends_with("detonate") else ("wind" if kind == "burst_gust" else "fire")
 			m.set_shader_parameter("glow", BWLook.glow_color(el))
 		# D87 Striketwice reactions, the same burst shader re-tinted
-		"burst_steam", "flash_steam", "burst_eclipse", "flash_eclipse", "burst_storm":
+		"burst_douse", "flash_douse", "burst_eclipse", "flash_eclipse", "burst_storm":   # D421: douse = the hiss puff
 			m.shader = load("res://shaders/tile_burst.gdshader")
-			var mode: int = { "burst_steam": 1, "flash_steam": 2, "burst_eclipse": 3, "flash_eclipse": 2, "burst_storm": 1 }[kind]
+			var mode: int = { "burst_douse": 1, "flash_douse": 2, "burst_eclipse": 3, "flash_eclipse": 2, "burst_storm": 1 }[kind]
 			m.set_shader_parameter("mode", mode)
 			var col: Color = {
-				"burst_steam": Color(0.78, 0.86, 0.92), "flash_steam": Color(0.9, 0.95, 1.0),
+				"burst_douse": Color(0.78, 0.86, 0.92), "flash_douse": Color(0.9, 0.95, 1.0),
 				"burst_eclipse": BWLook.glow_color("dark"), "flash_eclipse": BWLook.glow_color("dark"),
 				"burst_storm": BWLook.glow_color("thunder"),
 			}[kind]

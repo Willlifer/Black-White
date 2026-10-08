@@ -167,8 +167,13 @@ unit action and false for gale copies and grass seeds.
    `timer = STEP_CYCLES`, `source = caster`, `origin = "cast"` (fresh) or
    `"spread"` (propagated).
 
-Because opposites share an axis, *fire on water steps it back toward neutral*.
-Water 3 hit by one fire becomes water 2, not "steam". There are no compounds.
+**Douse (D421).** Fire meeting water (either order: fire arriving on a
+water hex, or water on a fire hex, any amount) **clears both**: the hex's
+fire/water axis goes to 0, its light/dark stays, and nothing lingers (no
+steam; D421 removed it). The board plays a small hiss puff and sound; the
+blast preview tags the hex "DOUSE". A marker hex is not doused (the
+marker's own rules run). Light and dark still step each other back toward
+neutral. There are no compounds.
 
 ### 3.2 Operator element on a charged tile
 
@@ -284,7 +289,7 @@ Operators:
 
 | Element | Marker (empty ground) | Event |
 |---|---|---|
-| **Thunder** (crackling purple) | *Fuse*: purple arcs crackling along the hex edges | Detonation: purple-white flash, ring burst onto the neighbours |
+| **Thunder** (crackling purple) | *Fuse*: purple arcs crackling along the hex edges | Detonation: white flash, ring burst onto the neighbours. **D423:** the ring and flash take the colours of the non-thunder elements the blast consumed, by steps (fire / water, light / dark intensity; a glaze = 1 ice): the heaviest is the base, the others swirl through it in spiral arms by share (2 fire + 3 dark = dark, 40% red swirls). Purple only for a pure fuse pop (nothing else consumed; Static Blades / Daisy Chain / Self-detonate pops too). `BWTiles.blast_mix` → the event's `mix` → `BWTileFX.blast_colors` / `tint_blast` |
 | **Wind** (swirling green) | *Gale*: green eddies swirling over the face | Gale fires: green gust ring blowing outward to the six neighbours |
 | **Ice** (pale cyan frost, proposed) | *Stasis*: pale cyan rime pattern on the face | Glaze: frost sheet over the existing glow layers, which dim to ~60%; cracks appear in the glaze's last cycle |
 
@@ -616,6 +621,7 @@ carries 2 hexes. See SKILLS.md.
 ### 7.1 The element an action carries
 
 - **Learned elements:** any element in which the unit has affinity rank ≥ 1.
+  A unit is attuned to at most **3 elements** (any affinity points; D417, SCHEMA.md "Progression").
   Every unit starts at rank 1 in its own (hair) element (D22 in code).
 - **Skills** with `needs_element` show one menu row per learned element (V8's
   submenu), and lay the chosen one.
@@ -744,6 +750,15 @@ tile_damage = max_hp × pct × (1 + 0.05 × detonator_thunder_rank)   # detonati
 | Damage | thunder vs target on water: × (1 + 0.10 × water intensity), after mitigation | "Conducted through Water 3: ×1.3" |
 | Resist chance | none (tiles never roll) | — |
 | Avoid / glance | none; painting happens anyway | — |
+| Damage (D424, not a tile term) | a **ranged** blow while any foe stands within 2 of the attacker: ×0.9 after mitigation | "Pressured (enemy within 2) −10%" |
+
+**Pressured (D424).** Ranged = a basic of a class with reach 3+ (bow, pistols,
+staff; the lance's reach 2 is melee) or a skill aimed at one unit or one hex
+with range 3+ and no area (Aimed Shot, Bolt, Saturate, Pinning / Retreating /
+Split / Energized Shot, Flash Round, a dagger's thrown pair, Hook). Exempt:
+areas (radius / `aoe`: Surge, Tempest, Rain of Arrows, Arcing Shot), lines,
+leaps and self shapes. Any living foe within 2 hexes counts, the target too;
+allies don't. `BWFormulas.PRESSURE_*`, `BWBattle.pressured` / `ranged_skill`.
 
 The forecast also lists what the action will do to the ground ("Detonates
 Fire 3 / Dark 1: 21% to occupant, 10% splash"), using §8.2 with the current
@@ -769,7 +784,7 @@ board.
 
 **Conductive.** A unit whose centre hex holds a **fuse** is conductive. Any
 damage it takes (a hit, a skill, a riposte answer, a counter, or tile
-damage such as detonation splash, steam or a slam) also arcs
+damage such as detonation splash or a slam) also arcs
 `CHAIN_FRACTION = 0.5` of that damage to the **nearest other living unit of
 its own team**, measured by hex distance (footprint gap), with no range
 limit. Ties go to the earlier unit in setup order. The arc:
@@ -1053,7 +1068,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 
 **Negation (D93).** "Elemental effect" = tile damage from an element (fire
 standing or crossing, dark drain, Shrouded, a detonation blast or splash, an
-eruption, steam, Ember Skin), a chain arc, an elemental status (Scorched,
+eruption, Ember Skin), a chain arc, an elemental status (Scorched,
 Drenched, Shrouded, Blinded; Staggered when Static Field lays it), or
 displacement by an element (gale, blast and eruption pushes, Gust). Nightborn
 is checked first so a Frost Ward is kept when it can be.
@@ -1141,11 +1156,12 @@ crack ring in `BWKeystoneView`. Tests: `tests/test_icewater.gd`,
 ### 14.3 Pools (D264, D265)
 
 - A **pool**: connected unglazed water, BFS from the cast hex, nearest first,
-  capped at 19 (`POOL_MAX`; 25 for a caster wearing the Water set (2), D307). Only fresh fire, ice and thunder react; light,
-  dark, water and wind never travel through a pool.
-- **Fire: steam** over the whole pool for 2 ticks. It blocks sight through
-  it (not between hexes within 2), and a unit in steam can be single-targeted
-  only from within 2.
+  capped at 19 (`POOL_MAX`). Only fresh ice and thunder react pool-wide;
+  light, dark, water and wind never travel through a pool.
+- **Fire** has no pool reaction (D421: steam is gone): it douses the hex it
+  lands on (§3.1) and clears an electrified field there.
+- The Water set (2) (D422, was D307's 25-hex pools): its holder's ice and
+  thunder react within **2** of the cast hex, not 1.
 - **Ice: glaze** within radius 1 of the cast hex: those pool hexes glaze
   (Unsteady ground, §14.1; the "rink" name is gone, D398); empty water 3
   among them become pillars.
@@ -1162,14 +1178,14 @@ crack ring in `BWKeystoneView`. Tests: `tests/test_icewater.gd`,
 
 ### 14.4 Readability (D266)
 
-Blast preview: the reacting pool hatched with a dashed outline and a
-"STEAM" / "ELECTRIFIED" tag, a rising "PILLAR" (the D266 slide ghosts went
+Blast preview: the reacting pool hatched with a dashed outline and an
+"ELECTRIFIED" tag, a doused hex grey-hatched "DOUSE" (D421), a rising "PILLAR" (the D266 slide ghosts went
 with the slides, D397). Move hover: "ends on glaze: Unsteady". Tile card:
-Unsteady, Pillar, Steam, Electrified (with the occupant's next shock), Pool.
+Unsteady, Pillar, Electrified (with the occupant's next shock), Pool.
 Board: the glaze sheen, the Unsteady crack ring under a unit, the inked ice
-pillar with its ticks, steam puffs, the electrified outline with timer pips.
+pillar with its ticks, the electrified outline with timer pips.
 
-## 15. Fire, light and thunder (D285-D292, Element Overhaul)
+## 15. Fire, light and thunder (D285-D292, Element Overhaul; keystones: see §20)
 
 Built from `ELEMENTS-v3.md` §3, §5 and §7 with the author's rulings of
 2026-10-07 (fire as drafted; light without Dawn Relay, plus Magnify; Blast
@@ -1307,7 +1323,7 @@ beside a foe) and, for a Blast Rider holder, a `simulate` of a thunder skill
 covering its own charged hex (ground damage on foes minus allies, +3 for
 the launch).
 
-## 16. Wind, ice, water and dark keystones (D293-D300, Element Overhaul)
+## 16. Wind, ice, water and dark keystones (D293-D300; superseded by §20, Keystones v3)
 
 Built from `ELEMENTS-v3.md` §1, §2, §4 and §6 with the author's rulings of
 2026-10-07 (C3; numbered §14.5-§14.9 until D305 moved them here, after
@@ -1565,7 +1581,7 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 - **The gale is the only wind tile (D406).** Wind on empty ground arms a
   gale; when a charge lands on it, the charge is copied to its neighbours
   (§3.4: radius 1; a gale 2, wind on wind, radius 2; Jetstream's gale 3,
-  radius 3), carrying steam, electrified water and glaze as built (§16.1).
+  radius 3), carrying electrified water and glaze as built (§16.1; D421: no steam).
   That is all it does. It stores no mode and no heading, and it never moves
   anyone: **no** entering pushes, **no** turn-start pushes, **no** tick
   pulls, **no** Becalm stops. Tile card: "Gale mark: spreads whatever lands
@@ -1593,3 +1609,50 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 - **Saves (D409):** nothing to migrate. A run save never held a wind mode
   (`wind_mode` was never in `BWUnit.to_dict`) or battle tiles; the dropped
   unit field is simply not read.
+
+## 20. Keystones v3 (D443-D465, the author's overhaul of 2026-10-08)
+
+**Current.** This replaces the keystone parts of §15 and §16 (and ELEMENTS-v3 §9's ladder). Data: `game/data/keystones.csv` (id, element, name, **title**, text, kind, params); rules `src/core/ks3*.gd` (`BWKs3` dispatches; one file per element), duo perks `src/core/duo.gd` (`BWDuo`); view `src/game/combat/ks3_view.gd`; tests `tests/test_keystones_v3.gd`; renders `design/art/ks3_*.png` (`tools/ks3_shots.gd`).
+
+### 20.1 The ladder and titles (D444, D445)
+- **Fourteen keystones, two per element.** A unit holds at most **2, one per element** (any 2 of its ≤3 elements).
+- **Rank 3** in an element owes that element's keystone (1 of its 2). **Rank 6** in any element opens the second slot: 2 cards drawn from the keystones of the *other* elements the unit has learned (rank 1+). Enemies are dealt keystones by stage as before.
+- **A keystone names you:** "Will, the Lava Walker". With two, the most recent names you; the hover lists both. The pick card shows the title it gives.
+
+### 20.2 The fourteen
+
+| Element | Keystone (title) | Rule |
+|---|---|---|
+| Fire | **Lava Walker** (the Lava Walker) | Your fire climbs to 4 and 5. **Nothing reacts with your fire**: any other element, anyone else's fire and fuses **fizzle** on it ("lava 5 reigns supreme"); fresh fire erupts only at 5. It burns 5%/step standing, 3%/step crossing (fire 5: 25%). You and allies within 1 take no fire walking/standing damage. |
+| Fire | **Island Maker** | Your Overheats and fire eruptions reach 1 ring further (radius 2). You take 75% less from the reactions you set off, your own fire included. |
+| Dark | **Abyssal** | Free, once a turn, range 3: overcharge a dark 3 hex. **Pitch Black**: 15% and +1 Rot to every foe within 1. The hex stays, dark 4 until your turn ends. |
+| Dark | **Hopekiller** | Foes on your dark can't be healed or buffed; a heal hurts them for the same amount. A foe KO'd on your dark leaves dark 3. |
+| Light | **Judicator** | Your light heals your side ×2; a foe starting its turn on it burns for that amount. |
+| Light | **Sunburst** | Abyssal's twin on light 3: a **Solar Flare**, 15% to foes within 1, allies within 1 heal 5%; light 4 for your turn. |
+| Water | **Leviathan** | Once a battle, your own walk ending on water 3 may **submerge** you (a prompt; pushes never), ending your turn. Next turn choose: **Leviathos** (one hex, double max and current HP, a bigger model, basic blows splash foes next to the target at 50%; the true 7-hex body is a TODO, D451b) or **Drowned** (rooted, unmovable, basic attacks reach any foe on the board; a melee blow lunges there and back). |
+| Water | **Being of Rain** | Water costs no move. You never paint as you walk. A walk's hexes and their neighbours gain water 1 at its end; a rain cloud follows you. |
+| Thunder | **Superconductor** | Your explosions and reactions reach radius 2. A reaction your action sets off on your own hex can't hurt you from that action. Grants **Self-detonate** (kept provisionally: free, once a turn). |
+| Thunder | **Overflow** (the Overflowing) | Every explosion or reaction you set off heals you 5% (20% an action); overheal becomes a shield up to 30%, until hit. |
+| Wind | **El Niño** | Your wind areas grow a ring (radius 1-3 → +1); your gales spread 1 further. |
+| Wind | **La Niña** | At your turn start every foe takes 2.5% and is pulled 1 toward you. |
+| Ice | **Shatterer** | Your Shatter breaks the glaze around the target too: 8% to anyone on it, +15% to your blow per hex. |
+| Ice | **Sculptor** | Your ice on ice or glaze raises a pillar (6 at most). Your side climbs your pillars as high ground (2 levels). They shatter for double. |
+
+### 20.3 The old keystones (D443, D446)
+- **Item enchantments now** (tier ≥ B unless noted): Conflagration, Phoenix Heart, Doom, Contagion, Daisy Chain, Eye of the Vortex, Sure-Footed, Wellspring (provisional), Magnify (provisional); **≥ C**: Event Horizon, **Ward of Light** (was the light Overflow). Their rules (§15, §16) are unchanged; a worn one works while its element is learned. ENCHANTMENTS-v2 family `keystone`.
+- **Removed:** Trailblazer, Prism, Tidal Release, Riptide, Blast Rider, Static Blades, Wind Wall, Jetstream, Flash Freeze, Glacier Wall (and their actions). Self-detonate moved to Superconductor.
+- **Saves (v13):** a removed keystone is refunded (the slot reopens); a converted one is refunded and comes back as the matching enchanted item in the inventory.
+
+### 20.4 Duo perks (D455-D458)
+Offered on a perk pick of the first element, only to a unit holding an ordinary perk in **both** elements, as the second card on about a third of such picks; it fills that perk slot.
+
+| Duo | Elements | Rule |
+|---|---|---|
+| **Wildfire Gale** (renamed: "Wildfire" is a fire perk) | fire + wind | Fire your gales carry spreads one ring further, at full steps. |
+| **Powder Keg** | fire + thunder | A fuse set off on your fire blows 1 ring wider. Lava Walker wins: lava fizzles the fuse. |
+| **Storm Drain** | water + thunder | Water you electrify is electrified across its whole connected pool. |
+| **Flash Flood** | water + ice | Your ice on your water glazes the whole pool at once (every foe on it Unsteady). |
+| **Permafrost** | ice + dark | Your dark 3 counts as glazed for your foes (Unsteady, Shatter). |
+| **Solar Wind** | light + fire | On your light: allies also heal for its fire steps (no burn), foes also burn for its light steps (no heal). |
+| **Eclipse** | light + dark | Your light and dark on one hex both stay instead of cancelling. |
+| **Blizzard** | wind + ice | Your wind pushes glaze the hex the foe lands on. |

@@ -130,7 +130,13 @@ var _branch_day := -1
 ## 12 (D358): the D353 schedule. Cards carry `boss` / `mode` / `divider`; a
 ## stored offer that doesn't fit its fight's new slots is dropped and re-rolled
 ## (BWRooms.load_state); the room log and the queue carry over.
-const SAVE_VERSION := 12
+## 13 (D446): Keystones v3. Units' C1-C3 keystones leave on load (any
+## version; migrate_keystones): a removed one is refunded (the slot reopens,
+## the pick flow asks again), a converted one is refunded too AND comes back
+## as an item: the matching enchantment on a piece in the inventory, at the
+## enchantment's own tier (keystone_items). `keystone_notes` names them for
+## the screens (not saved).
+const SAVE_VERSION := 13
 const OLDEST_LOADABLE := 5
 
 var rng := RandomNumberGenerator.new()
@@ -155,6 +161,8 @@ var equipped_ability := {}        # unit id -> { type: ability id }
 ## kos, damage, taken, mvp } }, best: { text, score, fight } }.
 var stats := new_stats()
 var _uid := 0
+## D446: what the last load did to the squad's old keystones (lines for a screen).
+var keystone_notes: Array = []
 ## D150: this run's roster roll (BWRosterGen.roll): the seed (never shown)
 ## and the 20 rows the squad, the enemies (enemies_for) and recruits come from.
 var roster_seed := -1
@@ -572,7 +580,7 @@ static func roll_imbue(p_seed: int, uid: String) -> String:
 
 
 func random_item(tier: String) -> Dictionary:
-	var all := BWData.table("equipment")
+	var all := gear_rows()
 	return make_item(str(all[rng.randi() % all.size()].id), tier)
 
 
@@ -606,7 +614,7 @@ func _roll_enchant(base_id: String, tier: String = "E") -> String:
 	var pool: Array = []
 	for e in BWData.table("enchantments"):
 		var w := ench_weight(e, tier)
-		if w > 0 and base_id in BWData.list(e.applies_to):
+		if w > 0 and base_id in BWData.list(e.applies_to) and enchant_active(e):   # D419
 			pool.append([str(e.id), w])
 	return _weighted(pool, rng)
 
@@ -690,7 +698,7 @@ func restock_shop() -> void:
 	shop.clear()
 	var tier := tier_for(fight)
 	for slot in SHOP_SLOTS:
-		var bases: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == slot)
+		var bases: Array = gear_rows().filter(func(r): return str(r.slot) == slot)
 		shop.append(make_item(str(bases[rng.randi() % bases.size()].id), tier))
 	roll_scrolls()
 
@@ -705,7 +713,7 @@ func roll_scrolls() -> void:
 		var pool: Array = []
 		for e in BWData.table("enchantments"):
 			var w := ench_weight(e, tier)
-			if w > 0 and of_element(e, el):
+			if w > 0 and of_element(e, el) and enchant_active(e):   # D419
 				pool.append([str(e.id), w])
 		var r := RandomNumberGenerator.new()
 		r.seed = hash("scroll|%d|%d|%s" % [seed_value, fight, el])
@@ -1092,7 +1100,7 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 		if n >= ENEMY_SECOND_FROM:
 			var others: Array = weapon_classes().filter(func(c): return c != u.weapon_class)
 			wc2 = str(others[erng.randi() % others.size()])
-			var models: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc2)
+			var models: Array = gear_rows().filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc2)
 			if not models.is_empty():
 				u.equipment[BWUnit.SECOND] = make_item(str(models[erng.randi() % models.size()].id), tier)
 			else:
@@ -1341,7 +1349,7 @@ func _specialize(u: BWUnit, rep: Dictionary) -> void:
 	var gained: Array = []
 	if el != "":
 		var before := u.affinity_rank(el)
-		u.affinity[el] = int(u.affinity.get(el, 0)) + SPECIALIZE_POINTS
+		u.add_affinity(el, SPECIALIZE_POINTS)        # the focus is always attuned (D417)
 		gained.append("%s affinity" % el)
 		_line(rep, "+half a level in %s affinity%s" % [el,
 			"  (now rank %d)" % u.affinity_rank(el) if u.affinity_rank(el) > before else ""], el)
@@ -1387,7 +1395,8 @@ func _branch_out(u: BWUnit, rep: Dictionary) -> void:
 ## pairings where the unit has room for two, else one ("" = that half has
 ## nothing left). Rolled on `roll` (branch_preview's day rng), else the run's.
 func branch_options(u: BWUnit, roll: RandomNumberGenerator = null) -> Array:
-	var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) == 0)
+	# D417: a new element only while the unit has room for one (MAX_ELEMENTS)
+	var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) == 0 and u.can_attune(e))
 	var wcs: Array = weapon_classes().filter(func(c): return c != u.weapon_class and u.expertise_rank(c) == 0)
 	_shuffle(els, roll)
 	_shuffle(wcs, roll)
@@ -1411,8 +1420,9 @@ func branch_pick(u: BWUnit, rep: Dictionary, i: int) -> bool:
 	var new_wc := str(opt.weapon)
 	rep.pending = false
 	rep["picked"] = i
+	if new_el != "" and not u.add_affinity(new_el, BRANCH_POINTS):   # D417: full since the offer
+		new_el = ""
 	if new_el != "":
-		u.affinity[new_el] = int(u.affinity.get(new_el, 0)) + BRANCH_POINTS
 		_line(rep, "A full level in %s affinity  (rank %d)" % [new_el, u.affinity_rank(new_el)], new_el)
 	if new_wc != "":
 		u.expertise[new_wc] = int(u.expertise.get(new_wc, 0)) + BRANCH_POINTS
@@ -1496,11 +1506,12 @@ func _wander_effect(u: BWUnit, eff: String, rep: Dictionary) -> bool:
 			var s := _stat_point(u)
 			_line(rep, "The road toughened me up.  (+%d %s, for good)" % [WANDER_STAT_POINT, s.to_upper()])
 		"element":
-			var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) < BWUnit.MAX_AFFINITY_RANK)
+			# D417: owned elements only once the unit holds MAX_ELEMENTS
+			var els: Array = BWFormulas.ELEMENTS.filter(func(e): return u.affinity_rank(e) < BWUnit.MAX_AFFINITY_RANK and u.can_attune(e))
 			if els.is_empty():
 				return false
 			var el: String = els[rng.randi() % els.size()]
-			u.affinity[el] = int(u.affinity.get(el, 0)) + BRANCH_POINTS
+			u.add_affinity(el, BRANCH_POINTS)
 			_line(rep, "Something out there taught me %s.  (a full level: rank %d)" % [el, u.affinity_rank(el)], el)
 		"weapon":
 			var wcs: Array = weapon_classes().filter(func(c): return u.expertise_rank(c) < BWUnit.EXPERTISE_RANKS.size() - 1)
@@ -1514,7 +1525,7 @@ func _wander_effect(u: BWUnit, eff: String, rep: Dictionary) -> bool:
 			var up := rng.randf() < 0.5 and t < TIERS.size() - 1
 			var tier: String = TIERS[t + 1 if up else t]
 			var weapon := eff == "find_weapon"
-			var pool: Array = BWData.table("equipment").filter(func(r): return (str(r.slot) == "main_hand") == weapon)
+			var pool: Array = gear_rows().filter(func(r): return (str(r.slot) == "main_hand") == weapon)
 			var it := make_item(str(pool[rng.randi() % pool.size()].id), tier)
 			inventory.append(it)
 			rep.items.append(it)
@@ -1586,7 +1597,9 @@ func recruit(id: String = "") -> BWUnit:
 	# D179: joins at the squad's level (the highest in it), grown from its
 	# roster stats the way a squad unit grows (not the enemy's scaled sheet).
 	BWProgression.level_up(nu, squad_level() - nu.level)
-	var fists: Array = BWData.table("equipment").filter(func(row): return str(row.weight) == "fists")
+	# D76 gift; D419: fists are benched, so the gift is their active stand-in (daggers)
+	var gift_wc := active_class("fists")
+	var fists: Array = gear_rows().filter(func(row): return str(row.slot) == "main_hand" and str(row.weight) == gift_wc)
 	if not fists.is_empty():
 		inventory.append(make_item(str(fists[rng.randi() % fists.size()].id), "E"))
 	seed_unit(nu)                        # D174
@@ -1621,7 +1634,7 @@ func enemy_ids() -> Array:
 
 ## A weapon of class `wc` (a random model of it, random enchantment), into the inventory.
 func _find_weapon(rep: Dictionary, wc: String, tier: String) -> Dictionary:
-	var models: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc)
+	var models: Array = gear_rows().filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == wc)
 	if models.is_empty():
 		return {}
 	var w := make_item(str(models[rng.randi() % models.size()].id), tier)
@@ -1676,8 +1689,58 @@ static func _and(parts: Array) -> String:
 	return ", ".join(parts.slice(0, parts.size() - 1)) + ", and " + str(parts.back())
 
 
+## D419: the ACTIVE weapon classes (weapons.csv rows without `benched`).
+## Every roll, offer, drop, shop and sim reads this; a benched class keeps its
+## data and rules so it can come back (clear its `benched` cell).
 static func weapon_classes() -> Array:
+	return all_weapon_classes().filter(func(c): return not is_benched(c))
+
+
+## D419: every weapons.csv class, benched or not (codex, data checks).
+static func all_weapon_classes() -> Array:
 	return BWData.table("weapons").map(func(r): return str(r.id))
+
+
+## D419: is weapon class `wc` benched (weapons.csv `benched` = 1)?
+static func is_benched(wc: String) -> bool:
+	var v := str(BWData.row("weapons", wc).get("benched", "")).strip_edges().to_lower()
+	return v in ["1", "true", "yes"]
+
+
+## D419: is this equipment row / item a benched class's weapon?
+static func benched_item(row: Dictionary) -> bool:
+	return str(row.get("slot", "")) in ["main_hand", BWUnit.SECOND] and is_benched(str(row.get("weight", "")))
+
+
+## D419: equipment.csv without the benched classes' weapons: what drops,
+## the shop, finds, starting gear and enemy gear draw from.
+static func gear_rows() -> Array:
+	return BWData.table("equipment").filter(func(r): return not benched_item(r))
+
+
+## D419: the active class a benched one is swapped to (save conversion D420,
+## recruit gifts): pistols -> bow, fists -> daggers; else the first active.
+const BENCH_SWAP := { "pistols": "bow", "fists": "daggers" }
+static func active_class(wc: String) -> String:
+	if not is_benched(wc):
+		return wc
+	var to := str(BENCH_SWAP.get(wc, ""))
+	if to != "" and not is_benched(to):
+		return to
+	return str(weapon_classes()[0])
+
+
+## D419: may an enchantment row be offered? Not when every item it applies
+## to is a benched weapon (the fists-only pummeling / rebound / welling).
+static func enchant_active(row: Dictionary) -> bool:
+	var items := BWData.list(row.get("applies_to", ""))
+	if items.is_empty():
+		return true
+	for id in items:
+		var base := BWData.row("equipment", str(id))
+		if base.is_empty() or not benched_item(base):
+			return true
+	return false
 
 
 ## A weapon class's display name, lower case ("sword", "daggers").
@@ -1756,6 +1819,7 @@ func roster_row(id: String) -> Dictionary:
 static func from_dict(d: Dictionary) -> BWRun:
 	var r := BWRun.new()
 	var version := int(d.get("version", 1))
+	var old_keystones: Array = []                # D446: [unit, {converted, refunded}]
 	r.seed_value = str(d.seed).to_int()
 	# D150: the rolled rows come back as they were (JSON floats -> ints for the stats)
 	r.roster_seed = str(d.get("roster_seed", "-1")).to_int()
@@ -1801,13 +1865,17 @@ static func from_dict(d: Dictionary) -> BWRun:
 		# D90/D91 picks (save version 2)
 		u.perks = Array(ud.get("perks", [])).duplicate()
 		u.keystones = Array(ud.get("keystones", [])).map(func(x): return str(x))   # D277 (v11)
-		BWKeystones.enforce_cap(u)                    # D302: never more than 2
+		var kmig := BWKeystones.migrate(u)            # D446: the C1-C3 keystones leave (refunded / converted)
+		if not (kmig.refunded as Array).is_empty():
+			old_keystones.append([u, kmig])
+		BWKeystones.enforce_cap(u)                    # D302: never more than 2 (D444: one per element)
 		if version < 11:
 			u.perks = migrate_perks_v11(u.perks)          # D283: the 4-per-element re-cut
 		u.known_skills = Array(ud.get("known_skills", [])).duplicate()
 		u.skill_ranks = _ints(ud.get("skill_ranks", {}))
 		u.skill_picks = _ints(ud.get("skill_picks", {}))
 		u.skill_loadout = Dictionary(ud.get("skill_loadout", {})).duplicate(true)
+		BWSkillRegistry.migrate_unit(u)                # D426: Elemental Truth → En Passant
 		# D132 save v4: the downtime outcomes that last (defaults when older)
 		u.bonus_perks = _ints(ud.get("bonus_perks", {}))
 		u.bonus_skills = _ints(ud.get("bonus_skills", {}))
@@ -1817,6 +1885,7 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.next_brace = Array(ud.get("next_brace", [])).map(func(x): return str(x))
 		u.fight_buff = _ints(ud.get("fight_buff", {}))
 		u.focus_element = str(ud.get("focus_element", ""))
+		u.enforce_element_cap()          # D417: at most 3 elements (top 3 kept, half the rest moved)
 		u.sync_weapon()                  # D131: the class follows the main hand
 		if version < 2:
 			# Migration 1 → 2: the save predates picks. Whatever the ranks
@@ -1861,8 +1930,153 @@ static func from_dict(d: Dictionary) -> BWRun:
 	if version < 10:
 		r.migrate_abilities_v10()                          # D247
 	r._uid = int(d.uid)
+	r.unbench_all()                                    # D420: benched classes (D419) converted, any version
 	r.stats = _load_stats(d.get("stats", {}), version, r.fight)
+	r.keystone_items(old_keystones)                # D446: converted keystones come back as items
 	return r
+
+
+## D446: for each converted keystone a unit lost on load, a matching item in
+## the inventory (the enchantment's first base that isn't benched, at the
+## enchantment's tier); every refunded one is noted. Deterministic: the run's
+## own item rolls (make_item) after everything else loaded.
+func keystone_items(old: Array) -> void:
+	keystone_notes = []
+	for pair in old:
+		var u: BWUnit = pair[0]
+		var mig: Dictionary = pair[1]
+		for id in mig.refunded:
+			var k := str(id)
+			if not k in mig.converted:
+				keystone_notes.append("%s: %s was removed; the keystone slot is open again" % [u.name, BWKeystones.name_of(k)])
+				continue
+			var ench := BWKeystones.enchant_of(k)
+			var row := BWData.row("enchantments", ench)
+			var base := ""
+			for b in BWData.list(row.get("applies_to", "")):
+				if not benched_item(BWData.row("equipment", str(b))):
+					base = str(b)
+					break
+			if row.is_empty() or base == "":
+				keystone_notes.append("%s: %s was refunded (the slot is open)" % [u.name, BWKeystones.name_of(k)])
+				continue
+			var it := make_item(base, str(row.get("tier", "B")), ench)
+			if it.is_empty():
+				continue
+			inventory.append(it)
+			keystone_notes.append("%s: %s is an item now (%s, in the inventory); the keystone slot is open again" % [
+				u.name, BWKeystones.name_of(k), item_name(it)])
+
+
+# ---------------------------------------------------------------- D420: unbench a save
+
+## D420: convert everything a save holds of a benched class (D419) to its
+## stand-in (BENCH_SWAP: pistols -> bow, fists -> daggers). Runs on every load
+## (a class benched later converts too); a no-op when nothing is benched.
+##   items (worn, carried, inventory, trash, shop): the same uid, tier, stat
+##     values (in stat-line order), imbue and its enchantment; the base becomes
+##     a model of the stand-in, the first (models' CSV order, starting at the
+##     old model's index) its enchantment applies to, so it's kept when valid;
+##     otherwise the enchantment is re-rolled for the new base at the item's
+##     tier on its own rng (run seed + uid; the run's stream is unmoved)
+##   units: class and model follow the main hand (else the stand-in, its
+##     first model); expertise in the benched class merges into the stand-in
+##     (the higher points kept); its skills, ranks, loadout, picks and bonus
+##     picks are dropped, so picks the merged letter owes are asked for anew
+##   roster / reserve rows (recruits, enemies): class and model swapped
+func unbench_all() -> void:
+	if all_weapon_classes().all(func(c): return not is_benched(c)):
+		return
+	for list in [inventory, trash, shop]:
+		for it in list:
+			unbench_item(it, seed_value)
+	for u in squad:
+		_unbench_unit(u)
+	for rows in [roster_rows, reserve_rows]:
+		for row in rows:
+			var wc := str(row.get("weapon_class", ""))
+			if is_benched(wc):
+				row["weapon_class"] = active_class(wc)
+				row["weapon_model"] = _stand_in_model(str(row.get("weapon_model", "")), active_class(wc), "")
+	for e in last_enemies:
+		if e is Dictionary and is_benched(str(e.get("weapon_class", ""))):
+			e["weapon_class"] = active_class(str(e.weapon_class))
+
+
+func _unbench_unit(u: BWUnit) -> void:
+	for slot in ["main_hand", BWUnit.SECOND]:
+		var it: Dictionary = u.equipment.get(slot, {})
+		if not it.is_empty():
+			unbench_item(it, seed_value)
+	for wc in all_weapon_classes():
+		if not is_benched(wc):
+			continue
+		var to := active_class(wc)
+		if u.expertise.has(wc):
+			u.expertise[to] = maxi(int(u.expertise.get(to, 0)), int(u.expertise[wc]))
+			u.expertise.erase(wc)
+		u.known_skills = u.known_skills.filter(func(k): return not (BWSkills.has_skill(str(k)) and str(BWSkills.get_skill(str(k)).get("weapon", "")) == wc))
+		for k in u.skill_ranks.keys():
+			if BWSkills.has_skill(str(k)) and str(BWSkills.get_skill(str(k)).get("weapon", "")) == wc:
+				u.skill_ranks.erase(k)
+		u.skill_loadout.erase(wc)
+		u.skill_picks.erase(wc)
+		u.bonus_skills.erase(wc)
+		if u.weapon_class == wc:
+			u.weapon_class = to
+			u.weapon_model = _stand_in_model(u.weapon_model, to, "")
+	u.sync_weapon()
+	u.refresh_effects()
+
+
+## D420: convert one item in place if it's a benched class's weapon. True if it was.
+static func unbench_item(it: Dictionary, p_seed: int) -> bool:
+	if not benched_item(it):
+		return false
+	var to := active_class(str(it.weight))
+	var ench := str(it.get("enchant", ""))
+	var old := BWData.row("equipment", str(it.get("base", "")))
+	var base := _stand_in_model(str(it.get("base", "")), to, ench)
+	var row := BWData.row("equipment", base)
+	if row.is_empty():
+		return false
+	var vals: Array = []
+	for s in BWData.list(old.get("stat_lines", "")):
+		vals.append(int(Dictionary(it.get("stats", {})).get(s, 0)))
+	var stats := {}
+	var lines := BWData.list(row.stat_lines)
+	for i in lines.size():
+		stats[lines[i]] = int(vals[i]) if i < vals.size() else 0
+	it["base"] = base
+	it["weight"] = str(row.weight)
+	it["stats"] = stats
+	if ench != "" and not base in BWData.list(BWData.row("enchantments", ench).get("applies_to", "")):
+		var pool: Array = []
+		for e in BWData.table("enchantments"):
+			var w := ench_weight(e, str(it.get("tier", "E")))
+			if w > 0 and base in BWData.list(e.applies_to) and enchant_active(e):
+				pool.append([str(e.id), w])
+		var r := RandomNumberGenerator.new()
+		r.seed = hash("unbench|%d|%s" % [p_seed, str(it.get("uid", ""))])
+		it["enchant"] = _weighted(pool, r)
+	return true
+
+
+## D420: the stand-in class's model for `model`: the old model's index among
+## its class's models, wrapped, then onward until one `ench` applies to.
+static func _stand_in_model(model: String, to: String, ench: String) -> String:
+	var old := BWData.row("equipment", model)
+	var from_models: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == str(old.get("weight", ""))).map(func(r): return str(r.id))
+	var models: Array = BWData.table("equipment").filter(func(r): return str(r.slot) == "main_hand" and str(r.weight) == to).map(func(r): return str(r.id))
+	if models.is_empty():
+		return model
+	var start := maxi(from_models.find(model), 0)
+	var applies := BWData.list(BWData.row("enchantments", ench).get("applies_to", "")) if ench != "" else PackedStringArray()
+	for k in models.size():
+		var m: String = models[(start + k) % models.size()]
+		if ench == "" or m in applies:
+			return m
+	return str(models[start % models.size()])
 
 
 ## D121 save v3: JSON brings the counts back as floats; a v1/v2 save has no

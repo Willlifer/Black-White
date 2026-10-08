@@ -18,13 +18,10 @@ extends RefCounted
 ##     next turn. Empowered once (the stronger one stands).
 ## DAWN: an ally starting its turn on light 2+ takes 1 off its longest skill
 ## cooldown, once per turn.
-## Keystones (BWKeystones ids):
-##   prism     a holder's team bends a beam once at a third ally on light: two
-##             ends that aren't in line still beam through the bend ally (each
-##             segment straight and clear, 2..MAX_GAP); the bend ally is on the
-##             beam but spends no end slot. Allies on a beam the holder is part
-##             of heal PRISM_HEAL_PCT at the tick.
-##   overflow  light healing a holder lays (its light tiles, its Prism heals)
+## Item enchantments since Keystones v3 (D443; Prism was REMOVED, so beams
+## never bend; BWKeystones.has still answers the old ids):
+##   overflow  ("{item} of the Ward of Light", renamed: thunder has the new
+##             Overflow keystone) light healing a holder lays (its light tiles, its Prism heals)
 ##             beyond max HP becomes a Ward of Light: a shield of the excess,
 ##             up to WARD_PCT of max HP, until hit or WARD_CYCLES cycles. A beam
 ##             the holder is part of Empowers +OVERFLOW_EMPOWER_PCT%.
@@ -41,7 +38,6 @@ const BASE_PCT := 4.0
 const PER_LIGHT_PCT := 2.0
 const EMPOWER_PCT := 15
 const OVERFLOW_EMPOWER_PCT := 25
-const PRISM_HEAL_PCT := 5.0
 const WARD_PCT := 15.0
 const WARD_CYCLES := 2
 const DAWN_LIGHT := 2
@@ -118,29 +114,6 @@ static func _team_beams(b: BWBattle, team: String) -> Array:
 		ends[c.id] = int(ends.get(c.id, 0)) + 1
 		paired[_pk(a, c)] = true
 		out.append(_beam(b, team, [a, c], null, p[3]))
-	# Prism: a bent beam through a third ally on light, ends not already paired
-	var prisms := cands.filter(func(x): return ks(x, "prism"))
-	if not prisms.is_empty():
-		for i in cands.size():
-			for j in range(i + 1, cands.size()):
-				var a: BWUnit = cands[i]
-				var c: BWUnit = cands[j]
-				if paired.has(_pk(a, c)) or int(ends.get(a.id, 0)) >= MAX_ENDS or int(ends.get(c.id, 0)) >= MAX_ENDS:
-					continue
-				for m in cands:
-					if m == a or m == c:
-						continue
-					if not (ks(a, "prism") or ks(c, "prism") or ks(m, "prism")):
-						continue
-					var s1 = span(b, a.pos, m.pos)
-					var s2 = span(b, m.pos, c.pos)
-					if s1 == null or s2 == null:
-						continue
-					ends[a.id] = int(ends.get(a.id, 0)) + 1
-					ends[c.id] = int(ends.get(c.id, 0)) + 1
-					paired[_pk(a, c)] = true
-					out.append(_beam(b, team, [a, c], m, (s1 as Array) + (s2 as Array)))
-					break
 	return out
 
 
@@ -155,7 +128,7 @@ static func _beam(b: BWBattle, team: String, ends: Array, bend: BWUnit, hexes: A
 	var light := 3
 	for w in who:
 		light = mini(light, lit(b, w))
-	var prism := who.any(func(w): return ks(w, "prism"))
+	var prism := false                              # D443: Prism is gone
 	var overflow := who.any(func(w): return ks(w, "overflow"))
 	var pts: Array = [ends[0].pos]
 	if bend != null:
@@ -207,7 +180,6 @@ static func tick(b: BWBattle) -> void:
 		return
 	var hit := {}            # unit -> [pct, source id]
 	var emp := {}            # unit -> pct
-	var heal := {}           # unit -> source id (Prism)
 	for bm in all:
 		var on: Array = []
 		for u in b.units:
@@ -224,8 +196,6 @@ static func tick(b: BWBattle) -> void:
 				allies.append(x)
 		for x in allies:
 			emp[x] = maxi(int(emp.get(x, 0)), int(bm.empower))
-			if bool(bm.prism):
-				heal[x] = _prism_holder(b, bm)
 	b._emit({ "type": "light_beams", "beams": all.map(func(x): return { "team": x.team, "points": x.points,
 		"hexes": x.hexes, "pct": x.pct, "ends": x.ends, "bend": x.bend }),
 		"hit": hit.keys().map(func(u): return u.id), "empowered": emp.keys().map(func(u): return u.id) })
@@ -235,17 +205,6 @@ static func tick(b: BWBattle) -> void:
 	for u in b.units:
 		if emp.has(u) and u.alive() and not b.over:
 			empower(b, u, int(emp[u]))
-	for u in b.units:
-		if heal.has(u) and u.alive() and not b.over:
-			light_heal(b, u, PRISM_HEAL_PCT, str(heal[u]))
-
-
-static func _prism_holder(b: BWBattle, bm: Dictionary) -> String:
-	for id in bm.ends + [bm.bend]:
-		var x := b._unit(str(id))
-		if x != null and ks(x, "prism"):
-			return x.id
-	return str(bm.ends[0])
 
 
 # ---------------------------------------------------------------- Empowered
@@ -258,6 +217,8 @@ static func empowered(u: BWUnit) -> int:
 static func empower(b: BWBattle, u: BWUnit, pct: int) -> void:
 	if empowered(u) >= pct:
 		return
+	if BWKs3Dark.buff_blocked(b, u, "Empowered"):
+		return                                       # D450 Hopekiller: no buffs on its dark
 	u.fx["empowered"] = { "pct": pct }
 	b._emit({ "type": "empowered", "unit": u.id, "pct": pct })
 
@@ -304,8 +265,8 @@ static func turn_start(b: BWBattle, u: BWUnit) -> void:
 	b._emit({ "type": "dawn", "unit": u.id, "skill": best, "cd": int(u.cooldowns[best]) })
 
 
-## A light heal on `u` laid by `source` (a tile, a Prism beam): Overflow turns
-## the excess into a Ward of Light.
+## A light heal on `u` laid by `source` (a tile): Ward of Light (the old
+## light Overflow) turns the excess into a shield.
 static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> void:
 	if pct <= 0.0 or not u.alive():
 		return
@@ -321,7 +282,7 @@ static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> vo
 	var cap := roundi(u.max_hp() * WARD_PCT / 100.0)
 	var cur := int((u.fx.get("light_ward", {}) as Dictionary).get("hp", 0))
 	var hp := mini(cap, cur + excess)
-	if hp <= cur:
+	if hp <= cur or BWKs3Dark.buff_blocked(b, u, "Ward of Light"):
 		return
 	u.fx["light_ward"] = { "hp": hp, "until": b.cycle + WARD_CYCLES, "by": src.id }
 	b._emit({ "type": "light_ward", "unit": u.id, "hp": hp, "by": src.id })
@@ -330,6 +291,7 @@ static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> vo
 ## Damage about to land on `u`: a Ward of Light absorbs what it can, then
 ## breaks (it lasts until hit).
 static func ward_absorb(b: BWBattle, u: BWUnit, dmg: int) -> int:
+	dmg = BWKit2.barrier_absorb(b, u, dmg)        # D429: Consume's barrier soaks first
 	var w: Dictionary = u.fx.get("light_ward", {})
 	if dmg <= 0 or w.is_empty():
 		return dmg

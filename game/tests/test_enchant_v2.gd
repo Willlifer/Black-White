@@ -578,7 +578,7 @@ func test_waterwalking_first_water_hex_free(t) -> void:
 # ------------------------------------------------------------------ the consolidation (D243-D247)
 
 func test_consolidation_counts(t) -> void:
-	t.eq(BWData.table("enchantments").size(), 83, "D243-D244, D283: 139 -> 97 -> 83 (the 14 held rows went to perks and sets)")
+	t.eq(BWData.table("enchantments").size(), 94, "D243-D244, D283: 139 -> 97 -> 83 (the 14 held rows went to perks and sets); D443: + the 11 old keystones")
 	for id in BWRun.ENCH_HELD:
 		t.ok(BWData.row("enchantments", id).is_empty(), "held row gone: %s" % id)
 	t.eq(BWData.table("abilities").size(), 25, "D245: 46 -> 25 abilities")

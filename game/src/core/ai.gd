@@ -95,7 +95,14 @@ static func _take_one(b: BWBattle) -> void:
 		return
 	if BWObjectives.ai_turn(b, u):
 		return                                        # D327: a mode plays this turn (grunts walk for the exit)
+	BWKs3Water.ai_resolve(b, u)                       # D451: a Leviathan's form, picked before acting
 	_consider_swap(b, u)                              # D181: draw the carried weapon if it scores better
+	_open_free(b, u)                                  # D437: a free opener (Hook)
+	if b.over:
+		return
+	if not u.alive():
+		b.end_turn()
+		return
 	var best := _best_target(b, u, u.pos)
 	if not best.is_empty() and b.objective_mode() and u.team == "player":
 		# D145: a stone within a move beats the foe in reach (move, then strike)
@@ -107,6 +114,7 @@ static func _take_one(b: BWBattle) -> void:
 		var dest := _best_hex(b, u)
 		if dest != u.pos:
 			b.move(u, dest)
+			BWKs3Water.ai_resolve(b, u)                   # D451: submerge where it can't strike anyway
 		best = _best_target(b, u, u.pos)
 	if not b.over:
 		# A multi-hex unit (the boss) keeps to move-and-hit: its skills' shapes
@@ -125,12 +133,18 @@ static func _take_one(b: BWBattle) -> void:
 				var fu := _best_target(b, u, u.pos)       # Transfer / Inversion: then a basic
 				if not fu.is_empty():
 					b.attack(u, fu.target)
+			elif not b.over and u.alive() and not u.follow_up.is_empty():
+				var fs := _best_skill(b, u)               # D426: a granted skill follow-up (En Passant's Passing Cut)
+				if not fs.is_empty():
+					b.use_skill(u, fs.key, fs.element, fs.target)
 		elif not best.is_empty():
 			b.attack(u, best.target)
 			if not b.over and u.alive() and "basic" in u.follow_up:
 				var again := _best_target(b, u, u.pos)    # D197 Relentless: the extra attack
 				if not again.is_empty():
 					b.attack(u, again.target)
+	if not b.over and u.alive():
+		BWKit2.ai_dance(b, u)                         # D427: Blade Dance's free step (or skip)
 	if not b.over and u.alive() and u.follow_up.is_empty():
 		_guard_up(b, u)
 	if not b.over:
@@ -187,6 +201,21 @@ static func _guard_up(b: BWBattle, u: BWUnit) -> void:
 				if safe != u.pos:
 					b.move(u, safe)
 			return
+
+
+## D437: free actions that open a turn (Hook pulls a foe in, then the turn
+## goes on as normal). One opener per turn; a multi-hex unit skips.
+static func _open_free(b: BWBattle, u: BWUnit) -> void:
+	if u.size > 1:
+		return
+	for row in b.skills_for(u):
+		if not row.get("free_action", false) or (row.elements as Array).is_empty():
+			continue
+		var o: Dictionary = BWSkillRegistry.get_def(str(row.key)).ai_opener(b, u, row)
+		if o.is_empty() or not o.target in b.skill_targets(u, row.key, str(o.element)):
+			continue
+		b.use_skill(u, row.key, str(o.element), o.target)
+		return
 
 
 ## D112: a support skill worth the action, scored by its def; a granted
@@ -270,9 +299,9 @@ static func _best_skill(b: BWBattle, u: BWUnit, previews: int = -1) -> Dictionar
 					continue
 				var score := d.ai_score(b, u, pv)
 				score += BWOverheat.ai_skill(b, u, pv)                      # D285: Overheat rings and setups
+				score += BWKs3.ai_skill(b, u, pv)                           # D447/D459: lava past 3, pillars
 				sims += 1
 				if per <= 0 or BIG_SIMS <= 0 or sims <= BIG_SIMS:            # D323: big boards cap the simulated extras
-					score += BWThunderKeys.ai_skill(b, u, row.key, el, h, pv)   # D291: the Blast Rider dive (simulated)
 					score += BWOverfreeze.ai_skill(b, u, row.key, el, h, pv)   # D314: Overfreeze bursts (simulated, ice on glazed water only)
 					score += BWSquall.ai_skill(b, u, row.key, el, h, pv)       # D314: a squall's front (simulated, light/dark 2+ only)
 				if score > 0.0 and (best.is_empty() or score > best.score):
@@ -295,7 +324,6 @@ static func _best_target(b: BWBattle, u: BWUnit, from: Vector2i) -> Dictionary:
 		var score := ev + (1000.0 if ev >= f.hp else 0.0)   # finishing blows first
 		score += float(fc.get("arc_ev", 0.0))               # D86 chain lightning
 		score += objective_bonus(b, u, f, ev)               # D145
-		score += BWThunderKeys.ai_target(b, u, f, from)     # D290: a Static Blades backstab bursts
 		score *= w
 		if best.is_empty() or score > best.score:
 			best = { "target": f, "score": score }
@@ -331,6 +359,8 @@ static func _best_hex(b: BWBattle, u: BWUnit) -> Vector2i:
 			score = -nearest
 			score -= hz * 0.3                             # D253: ~3 hexes of approach for a 10% hazard
 		score += BWKeystoneFx.ai_hex(b, u, h)          # D297: Riptide reach, Event Horizon wariness
+		var lc := BWKit2.ai_avoid(b, u, h)              # D428: off a foe's set Lance Charge line
+		score -= lc if not t.is_empty() else lc * 0.3
 		score -= reach[h].cost * 0.01
 		score += BWBeams.ai_hex(b, u, h)                  # D287: form a beam on light, step off a foe's beam
 		if score > best_score:

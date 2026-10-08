@@ -46,13 +46,24 @@ Hair colour per element:
 | lance | martial (str) | str +2 | lance, javelin, halberd, glaive |
 | daggers | dexterous (dex) | dex +2 | dagger, jagged_dagger |
 | bow | dexterous (dex) | dex +2 | shortbow, recurve_bow, compound_bow |
-| pistols | dexterous (dex) | dex +2 | pistol, flintlock, m1911 |
+| pistols | dexterous (dex) | dex +2 | pistol, flintlock, m1911 · **benched (D419)** |
 | staff | spell (wil) | wil +2 | staff, moon_staff |
-| fists | martial (str) | str +2 | hand_wraps, brass_knuckles, gauntlets (D76; worn on both hands) |
+| fists | martial (str) | str +2 | hand_wraps, brass_knuckles, gauntlets (D76; worn on both hands) · **benched (D419)** |
 
 Weapon skills come from V8 (`MeleeSkills`). Pistols inherit the flintlock's
 skills; staff skills are new, and so are the fists' (Flurry, Uppercut,
 Palm Burst; D76).
+
+**Benched classes (D419).** `weapons.csv` has a `benched` column (1 = benched).
+A benched class keeps its rows, skills, models and rules but never appears in
+play: no drops, shop stock, wander or downtime finds, roster or reserve rolls,
+enemy gear, recruit gifts, Branch out cards, skill picks for it, or
+enchantments whose every item is benched (`pummeling`, `rebound`, `welling`).
+The one source of truth is `BWRun.is_benched(wc)` / `BWRun.weapon_classes()`
+(active only; `all_weapon_classes()` lists every row) and `BWRun.gear_rows()`
+(equipment.csv without benched weapons). Saves holding a benched class are
+converted on load (D420: pistols → bow, fists → daggers, `BWRun.BENCH_SWAP`).
+Clear the cell to bring a class back.
 
 ## Ranks and tiers
 
@@ -75,6 +86,7 @@ Affinity: ranks 0–10, at 10 points per rank. Each rank gives +5% damage with t
 - **No XP (D179).** Every squad unit, deployed or benched, gains exactly 1 level after **every fight, won or lost** (D194: `BWProgression.LEVEL_ON_LOSS` = true; false would level on wins only). Squad level = the fight number. Each level adds 1–2 to stats, biased by equipped weapon and armour (see the brief).
 - An attack gives +1 affinity in the element used and +1 expertise in the weapon used.
 - A knockout gives +3 affinity and +3 expertise.
+- **At most 3 elements (D417).** A unit is attuned to an element once it has any affinity points in it; it holds at most `BWUnit.MAX_ELEMENTS` = 3. Every gain goes through `BWUnit.add_affinity`, which drops a gain in a 4th element (battle awards, Whistling/Attuned bonuses, downtime). Branch out offers no new element and Wander's "+1 rank in a random element" picks only owned elements once a unit holds 3. A save with more: the 3 with the most points are kept (ties: native, focus, element order; the native element is always kept, it's the hair), each dropped element's points are cleared and half of them (rounded down) go to the focus element (else native), and its perks and keystones are removed; whatever the new ranks owe is asked through the normal pick flow (`BWUnit.enforce_element_cap`).
 - Recruits join at the squad's level. Enemies are levelled by the room's stage (`BWRooms`), not the squad.
 - HP = 100 + 2·CON + 15·level (D178).
 
@@ -83,8 +95,8 @@ Affinity: ranks 0–10, at 10 points per rank. Each rank gives +5% damage with t
 Each unit takes one choice a day. **A day offers each unit 2 of the 3** (`BWRun.day_choices`: seeded by the run, the day and the unit, stable all day), shown by name only:
 
 - **Specialize**: +½ rank in the focus element and the held class; 50% a free skill pick (else a weapon of the class), 50% a free perk pick (else armour attuned to the element).
-- **Branch out**: two cards, each a new element (rank 0) + a new class (at E). **The cards are rolled when the day starts and shown on the Branch out tile** (`BWRun.branch_preview`); pressing a card is the choice. It gives a full rank in each, a weapon of the class and armour of the element, both at the fight's tier (D192: no cap at the new expertise letter). Choosing another activity discards the cards. Nothing new left: +1 to a random stat.
-- **Wander**: nine effects, each at 20%: +1 to a random stat (permanent); +1 rank in a random element; +1 rank in a random class; a weapon find; an armour find; a recruit from the last fight (one a day, squad-wide); a status immunity, an element brace and +10 to a stat for the next fight. All nine missed: +1 to a random stat, unless the 5% jackpot roll lands: "a being of unlimited benevolence" rerolls the nine at 30% each (still one recruit a day); if that misses too, +1 to a random stat.
+- **Branch out**: two cards, each a new element (rank 0; none once the unit holds 3 elements, D417) + a new class (at E). **The cards are rolled when the day starts and shown on the Branch out tile** (`BWRun.branch_preview`); pressing a card is the choice. It gives a full rank in each, a weapon of the class and armour of the element, both at the fight's tier (D192: no cap at the new expertise letter). Choosing another activity discards the cards. Nothing new left: +1 to a random stat.
+- **Wander**: nine effects, each at 20%: +1 to a random stat (permanent); +1 rank in a random element (an owned one once the unit holds 3, D417); +1 rank in a random class; a weapon find; an armour find; a recruit from the last fight (one a day, squad-wide); a status immunity, an element brace and +10 to a stat for the next fight. All nine missed: +1 to a random stat, unless the 5% jackpot roll lands: "a being of unlimited benevolence" rerolls the nine at 30% each (still one recruit a day); if that misses too, +1 to a random stat.
 - No XP from any choice (D179). There is no rogue (D177).
 
 ## Equipment slots

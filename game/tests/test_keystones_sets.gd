@@ -54,26 +54,29 @@ func _ev(b: BWBattle, type: String) -> Array:
 
 # ------------------------------------------------------------------ the contract
 
+## D443: Keystones v3: 14 keystones, 2 per element, each with a title.
 func test_keystone_table(t) -> void:
 	var ids := BWKeystones.all_ids()
-	t.eq(ids.size(), 21, "21 keystones")
+	t.eq(ids.size(), 14, "14 keystones")
 	for el in BWFormulas.ELEMENTS:
+		t.eq(BWKeystones.of_element(el).size(), 2, "two %s keystones" % el)
 		for id in BWKeystones.of_element(el):
 			var r := BWKeystones.row(str(id))
 			t.ok(not r.is_empty(), "%s has a row" % id)
 			t.eq(str(r.get("element", "")), el, "%s is %s" % [id, el])
 			t.ok(str(r.get("kind", "")) in ["passive", "action"], "%s: a known kind" % id)
 			t.ok(str(r.get("text", "")).length() > 40, "%s: real text" % id)
-	t.eq(BWKeystones.all_ids().filter(func(id): return BWKeystones.is_action(str(id))), ["wind_wall", "flash_freeze", "tidal_release"], "the three action keystones")
-	t.ok(not str(BWKeystones.row("blast_rider").text).contains("full"), "Blast Rider: no full ring (ruling)")
-	t.ok(str(BWKeystones.row("magnify").text).contains("+1 radius"), "Magnify: the light enabler (ruling)")
+			t.ok(BWKeystones.title_of(str(id)) != "", "%s: a title" % id)
+	t.eq(BWKeystones.all_ids().filter(func(id): return BWKeystones.is_action(str(id))), ["abyssal", "sunburst"], "the two action keystones")
 	var u := _u("k", "sword", "wind")
-	t.ok(BWKeystones.grant(u, "wind_wall"), "grant")
-	t.ok(not BWKeystones.grant(u, "wind_wall"), "no duplicate")
+	t.ok(BWKeystones.grant(u, "la_nina"), "grant")
+	t.ok(not BWKeystones.grant(u, "la_nina"), "no duplicate")
 	t.ok(not BWKeystones.grant(u, "nope"), "unknown refused")
-	t.eq(BWKeystones.actions(u), ["wind_wall"], "actions() lists the menu rows")
-	t.eq(BWKeystones.of(u), ["wind_wall"], "of()")
-	t.eq(BWKeystones.line(u), "Keystone: Wind Wall", "the card line")
+	t.ok(BWKeystones.grant(u, "abyssal"), "a second, another element")
+	t.eq(BWKeystones.actions(u), ["abyssal"], "actions() lists the action keystones")
+	t.eq(BWKeystones.skills(u), ["pitch_black"], "skills() its menu rows")
+	t.eq(BWKeystones.of(u), ["la_nina", "abyssal"], "of()")
+	t.eq(BWKeystones.line(u), "Keystones: La Niña, Abyssal", "the card line")
 
 
 # ------------------------------------------------------------------ enemies by stage (D279)
@@ -91,7 +94,7 @@ func test_enemy_keystones_by_stage(t) -> void:
 			t.eq(with.size(), 1, "fight %d: one enemy per squad" % n)
 		elif n == BWRun.TWINS_FIGHT:
 			var ks: Array = es.map(func(u): return u.keystones)
-			t.eq(ks, [["prism"], ["event_horizon"]], "the Twins: Prism (Noon) and Event Horizon (Dusk)")
+			t.eq(ks, [["judicator"], ["hopekiller"]], "the Twins (D454): Judicator (Noon) and Hopekiller (Dusk)")
 		elif n < BWRun.BOSS_FIGHT:
 			t.eq(with.size(), es.size(), "fight %d: every enemy has one" % n)
 		else:

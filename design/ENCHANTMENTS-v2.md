@@ -20,7 +20,7 @@ Tiers are E–A.
 | Column | Meaning |
 |---|---|
 | `tier` | E–A. The lowest tier the row can drop at (§3). |
-| `family` | `elemental`, `weapon` (the originals), `on_kill`, `recovery`, `rng`, `momentum`, `defensive`, `cursed`, `team`. Docs and tools only. |
+| `family` | `elemental`, `weapon` (the originals), `on_kill`, `recovery`, `rng`, `momentum`, `defensive`, `cursed`, `team`, `keystone` (D443: the eleven old keystones, effect_key `keystone`, ELEMENTS.md §20.3). Docs and tools only. |
 | `cursed` | 1 = a cursed row (§2 G): it shows the curse mark and its cost. |
 | `cost_text` | The cost, spelled out on the item card under the passive. |
 | `also` | Extra records on the same row: `key(a=1;b=2) \| key(...)`. Hollow and Leaden add a `damage_taken_mod`. |

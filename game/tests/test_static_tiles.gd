@@ -97,9 +97,7 @@ func test_persists_through_ticks(t) -> void:
 func test_opposite_painting(t) -> void:
 	var tl := BWTiles.new(_board({ C: { "h": -3 } }))
 	tl.apply([C], "fire", "a")
-	t.eq(_hv(tl, C), Vector2i(-2, 0), "fire steps it to water 2 for the cycle")
-	tl.apply([C], "fire", "a", 2)
-	t.ok(tl.at(C).is_empty(), "three steps: dry for the cycle")
+	t.ok(tl.at(C).is_empty(), "D421: fire douses the static water: dry for the cycle")
 	tl.tick()
 	t.eq(_hv(tl, C), Vector2i(-3, 0), "re-forms at the next tick")
 	tl.apply([C], "water", "a")

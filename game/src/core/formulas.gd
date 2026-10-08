@@ -46,6 +46,30 @@ const SKILL := "skill"
 const SPELL := "spell"
 
 
+## D424 (author: "Ranged attacks damage reduced by 10% if an enemy is within
+## 2 tiles. Does not apply to AOE-targeted spells."): a ranged blow (reach
+## PRESSURE_MIN_RANGE+: a ranged class's basic, or a single-target skill with
+## that range) made while any foe stands within PRESSURE_RADIUS of the
+## attacker deals ×PRESSURE_MULT. Lance (reach 2) is melee; areas are exempt.
+const PRESSURE_RADIUS := 2
+const PRESSURE_MULT := 0.9
+const PRESSURE_MIN_RANGE := 3
+const PRESSURE_TAG := "Pressured"
+
+
+## D424: is this blow ranged? `reach` = the weapon's range for a basic, the
+## skill's range otherwise; `single` = it targets one unit or one hex (no
+## area, line or self shape).
+static func is_ranged(reach: int, single: bool) -> bool:
+	return single and reach >= PRESSURE_MIN_RANGE
+
+
+## D424: the forecast modifier (a ×0.9 dmg stage, a named line).
+static func pressure_mod() -> Dictionary:
+	return { "stage": "dmg", "value": PRESSURE_MULT, "tag": PRESSURE_TAG,
+		"label": "Pressured (enemy within %d) −%d%%" % [PRESSURE_RADIUS, roundi((1.0 - PRESSURE_MULT) * 100)] }
+
+
 static func calc(label: String, value: float, formula: String, values: String) -> Dictionary:
 	return { "label": label, "value": value, "formula": formula, "values": values }
 
@@ -328,7 +352,7 @@ static func resist_chance(dfn: BWUnit, element: String, mods: Array = []) -> Dic
 ##   PHYSICAL   weapon basic attacks, even with an imbued weapon; weapon skills
 ##              cast without an element; slams (a body hitting rock or a unit)
 ##   ELEMENTAL  any skill cast with an element, staff spells (basic or skill),
-##              tile damage (fire, dark, shroud, steam, eruptions), detonations
+##              tile damage (fire, dark, shroud, eruptions), detonations
 ##              and chain arcs
 ##   ""         neither: obelisk pulses, thorns, Death Knell, Covering shares
 ## `action`: { source: "basic" | "skill" | "tile" | "detonation" | "chain" |
