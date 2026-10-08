@@ -23,4 +23,4 @@ unbowed,Unbowed,passive,platemail|platelegs,"You cannot be knocked back, pulled 
 acrobat,Acrobat,passive,leather_cuirass|tights,The first attack on you each battle misses.,immune,what=first_attack;once=1
 sure_stride,Sure Stride,passive,chaps|robe_bottoms,Muddy ground and water never slow you.,immune,what=muddy+water_wading;radius=0
 quick_draw,Quick Draw,passive,bandolier,"Once per battle, a weapon skill comes back 1 turn early.",skill_cd_minus,amount=1;once_per_battle=1
-ammo_belt,Ammo Belt,passive,bandolier,+1 range with bows and pistols.,range_mod,mult=1;plus=1;dmg_pct=100;ranged_only=1
+ammo_belt,Ammo Belt,passive,bandolier,+1 range with bows.,range_mod,mult=1;plus=1;dmg_pct=100;ranged_only=1

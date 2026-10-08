@@ -156,7 +156,7 @@ func _subtitle() -> String:
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		var n := BWPicks.perks_of(el).size()
-		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank 3 brings a keystone, rank 6 a second." % [
+		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank 3 brings a keystone and a title, rank 6 a second." % [
 			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n]
 	if request.get("kind", "") == "leviathan":
 		if str(request.get("step", "")) == "submerge":

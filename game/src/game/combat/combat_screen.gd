@@ -908,6 +908,9 @@ func _play(e: Dictionary) -> void:
 		"weather":                             # ---- D252: the weather's tick
 			if weather_view:
 				await weather_view.on_event(e)
+		"fatigue":                             # ---- D474: heals wane in long fights
+			ui.feed("[b]Fatigue[/b]: healing is halved" if float(e.get("heal_mult", 0.0)) > 0.0
+					else "[b]Fatigue[/b]: healing stops")
 		"overheat", "light_beams", "empowered", "blade_burst", "launch", "static_arm", "daisy", "magnify", "dawn", \
 				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze":   # ---- D285-D292
 			if elements_view:

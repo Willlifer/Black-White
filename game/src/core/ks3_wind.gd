@@ -49,7 +49,7 @@ static func widen(b: BWBattle, u: BWUnit, d: BWSkillDef, p: Dictionary) -> void:
 static func la_nina(b: BWBattle, u: BWUnit) -> void:
 	if not ks(u, NINA) or not u.alive() or b.over:
 		return
-	var pct := BWKeystones.param(NINA, "pct", 2.5)
+	var pct := BWKeystones.param(NINA, "pct", 1.5)
 	var rows: Array = []
 	for f in b.foes_of(u):
 		if BWObelisk.is_objective(f) or not f.alive():

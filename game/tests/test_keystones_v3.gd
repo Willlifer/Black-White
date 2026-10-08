@@ -476,7 +476,8 @@ func test_la_nina(t) -> void:
 	var e0 := BWHex.distance(C, g.pos)
 	var fh := f.hp
 	_give_turn(b, me)
-	t.eq(fh - f.hp, b._tile_dmg(f, 2.5, "wind"), "2.5% to every foe")
+	var pct := BWKeystones.param("la_nina", "pct", 1.5)          # D476: 1.5 (was 2.5)
+	t.eq(fh - f.hp, b._tile_dmg(f, pct, "wind"), "%.1f%% to every foe" % pct)
 	t.eq(BWHex.distance(C, f.pos), d0 - 1, "pulled 1 toward it")
 	t.eq(BWHex.distance(C, g.pos), e0 - 1, "every foe")
 	t.ok(not _ev(b, "la_nina").is_empty(), "the event")
@@ -665,3 +666,22 @@ func test_duo_blizzard(t) -> void:
 	BWWind.push(b, f, 0, 1, "push", me, false, false)
 	t.ok(b.tiles.is_glazed(f.pos), "the landing hex glazes")
 	t.ok(BWUnsteady.unsteady_at(b, f, f.pos), "the foe stands Unsteady")
+
+
+## D474 Fatigue (not a keystone: lives here beside the heal hooks): round 15
+## halves every heal, round 20 ends them; the overheal shield wanes too.
+func test_fatigue_d474(t) -> void:
+	var me := _u("fa", "sword", "light")
+	var f := _u("f", "axe", "fire")
+	var b := _duel(me, [f], [_nb(C, 0, 3)])
+	var got := []
+	for cyc in [1, BWFormulas.FATIGUE_HALF, BWFormulas.FATIGUE_NONE]:
+		b.cycle = cyc
+		me.hp = me.max_hp() / 2
+		var h0 := me.hp
+		b._heal(me, 20.0, "test")
+		got.append(me.hp - h0)
+	t.eq(got[0], roundi(me.max_hp() * 0.2), "a heal before round 15 is whole")
+	t.eq(got[1], roundi(me.max_hp() * 0.1), "round 15 halves it")
+	t.eq(got[2], 0, "round 20 ends it")
+	t.eq(BWFormulas.fatigue_heal_mult(14), 1.0, "round 14 untouched")

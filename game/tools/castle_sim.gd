@@ -35,6 +35,10 @@ func _init() -> void:
 		BWHordeMode.ELITE_MULT = float(hk[2]); BWHordeMode.FELLA_PCT = float(hk[3])
 	if OS.get_environment("WAVES") != "":                  # D351: "c:g:e;c:g:e;..."
 		BWHordeMode.WAVES = Array(OS.get_environment("WAVES").split(";")).map(func(w): return Array(w.split(":")).map(func(x): return int(x)))
+	if OS.get_environment("CFM") != "":                    # D478 tuning: "mode:fight:mult,..." into BWCastle.FIGHT_MULT
+		for part in OS.get_environment("CFM").split(","):
+			var q := part.split(":")
+			BWCastle.FIGHT_MULT[q[0]][int(q[1])] = float(q[2])
 	if OS.get_environment("EMULT") != "":
 		BWCastle.ENEMY_MULT = float(OS.get_environment("EMULT"))
 	if OS.get_environment("EHP") != "":

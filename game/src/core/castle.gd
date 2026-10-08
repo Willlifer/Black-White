@@ -38,7 +38,7 @@ static var ENEMY_HP := 1.0
 ## D357: per mode and fight, a factor on the soldiers' stats and HP (absent =
 ## 1). D353 puts castle cards at fights 7-10; D341 tuned 8 and 10, and 7 and 9
 ## measured ~25-40 points harder on campaign squads (castle_sim CFIGHT).
-static var FIGHT_MULT := { "defend": { 7: 0.85, 9: 0.87 }, "storm": { 7: 0.8, 9: 0.6 } }
+static var FIGHT_MULT := { "defend": { 7: 0.85, 9: 0.87 }, "storm": { 7: 0.8, 8: 0.7, 9: 0.6 } }   # D478: Storm at 8 (35% in whole runs at 1.0)
 
 
 static func fight_mult(mode: String, n: int) -> float:

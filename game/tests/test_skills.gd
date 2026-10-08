@@ -268,7 +268,9 @@ func test_consume(t) -> void:
 	t.ok(b.skill_targets(me, "consume").is_empty(), "nothing to eat on bare ground")
 	b.tiles.apply([E], "water", "x")
 	t.ok(b.skill_targets(me, "consume").is_empty(), "cannot eat an unlearned element")
-	b.tiles.apply([E], "fire", "x", 4)                 # water 1 -> fire 3
+	b.tiles.apply([E], "fire", "x", 1)                 # D421: fire meets water, both douse away
+	t.ok(b.tiles.at(E).is_empty(), "fire on the water douses it (no steam)")
+	b.tiles.apply([E], "fire", "x", 3)                 # D470: then fire 3 on the bare hex
 	var pv := b.skill_preview(me, "consume", "", E)
 	var fc: Dictionary = pv.forecasts[foe.id]
 	t.eq(fc.power.value, 20, "14 + 2 × 3 points eaten")

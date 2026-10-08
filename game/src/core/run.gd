@@ -978,7 +978,7 @@ const ENEMY_STAGE_LAG := 2        # the D99 lag; fights past the table use it
 ## card policy: Standard 71% (before) -> 75% (122 fights) at 0.93 on 1, 2, 3, 6, 9.
 const ENEMY_CURVE := [
 	[0, 0.97, false, 0, 0.93], [0, 1.05, false, 1, 0.93],               # 1-2: gentle start (fight 1 under full strength), no perks
-	[2, 1.95, true, 2, 0.93], [2, 0.7, true, 3, 1.0], [2, 1.35, true, 3, 1.0],   # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
+	[2, 1.95, true, 2, 0.8], [2, 0.7, true, 3, 1.0], [2, 1.35, true, 3, 1.0],   # 3-5: two fights behind (4: the obelisks; the stones set its pace, not this)
 	[1, 1.15, true, 3, 0.93], [1, 1.1, true, 3, 1.0], [1, 1.1, true, 3, 1.0],    # 6-8: one behind
 	[0, 1.0, true, 3, 0.93], [0, 1.03, true, 3, 1.0],                   # 9-10: level with you
 ]

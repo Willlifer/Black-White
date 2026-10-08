@@ -22,7 +22,7 @@ extends BWUnit
 ## and BWBattle.setup() places them, so every caller (the game, the sims,
 ## --combat) gets the mode from the map alone.
 
-const HP_MAX := 220                   # D378: the SHARED pool, sim-tuned to ~70% at fight 4 (was D155's 350 a stone; D144 320; the original 500)
+const HP_MAX := 280                   # D477: 280 (whole runs: 220 won 86-95%, 280 66%); D378: the SHARED pool, was 220 (was D155's 350 a stone; D144 320; the original 500)
 const DODGE_PCT := 50.0               # flat: the hit chance is halved (D142)
 const TEAM := "neutral"
 
@@ -35,7 +35,7 @@ const KINDS := {
 		"def": 6, "res": 6, "dex": 0, "look": "bright",
 		"veil": "Glare",
 		"codex": "A chalk-white pillar that hums. Arrows bend around its glare, and when it breathes out the world is shoved away.",
-		"rule": "50%% of ranged attacks miss it (bows, pistols, thrown daggers, staff spells from range). Each turn: every unit takes %d and is pushed one hex away.",
+		"rule": "50%% of ranged attacks miss it (bows, thrown daggers, staff spells from range). Each turn: every unit takes %d and is pushed one hex away.",
 	},
 	"well": {
 		"name": "The Black Well", "dodge": "melee", "pulse": "pull", "spd": 7,

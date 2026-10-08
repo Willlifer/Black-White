@@ -138,7 +138,10 @@ func _make_pillar(h: Vector2i) -> Array:
 	var ice := BWLook.element_color("ice")
 	var bot := BWLook.hex_corners(c + Vector3(0, -0.02, 0), PILLAR_R)
 	var top := BWLook.hex_corners(c + Vector3(0, PILLAR_H, 0), PILLAR_R * 0.86)
-	var tip := c + Vector3(0.06, PILLAR_H + 0.55, -0.04)
+	# D471: a Sculptor's pillar is a platform (units stand on it, D459), so
+	# its crown is flat; a pointed crown poked up through the one standing there
+	var flat := bv.tiles != null and BWKs3Ice.sculpted(bv.tiles, h)
+	var tip := c + (Vector3(0, PILLAR_H, 0) if flat else Vector3(0.06, PILLAR_H + 0.55, -0.04))
 	for i in 6:
 		var n := (i + 1) % 6
 		var shade := 0.55 + 0.45 * absf(sin(i * 1.05 + 0.4))
@@ -161,7 +164,8 @@ func _make_pillar(h: Vector2i) -> Array:
 		_strip(st, bot[i], top[i], 0.11, INK, c)
 		_strip(st, bot[i], bot[n], 0.05, INK, c)
 		_strip(st, top[i], top[n], 0.04, INK, c)
-		_strip(st, top[i], tip, 0.035, INK, c)
+		if not flat:
+			_strip(st, top[i], tip, 0.035, INK, c)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = material("pillar")
@@ -170,7 +174,7 @@ func _make_pillar(h: Vector2i) -> Array:
 	# D299: an inked silhouette: a slightly larger black hull drawn back faces
 	# only, so the column's sides always carry an outline whatever the angle
 	var hull := MeshInstance3D.new()
-	hull.mesh = _hull(c, ice)
+	hull.mesh = _hull(c, ice, flat)
 	hull.material_override = material("hull")
 	hull.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.add_child(hull)
@@ -183,7 +187,7 @@ func _make_pillar(h: Vector2i) -> Array:
 	l.outline_size = 10
 	l.modulate = Color.WHITE
 	l.outline_modulate = Color(ice.darkened(0.55))
-	l.position = c + Vector3(0, PILLAR_H + 0.95, 0)
+	l.position = c + (Vector3(0, PILLAR_H * 0.55, 0) if flat else Vector3(0, PILLAR_H + 0.95, 0))   # D471: on its face, under whoever stands on it
 	l.render_priority = 12
 	l.outline_render_priority = 11
 	add_child(l)
@@ -191,13 +195,13 @@ func _make_pillar(h: Vector2i) -> Array:
 
 
 ## D299: the pillar's ink hull (the prism and crown grown outward ~5 cm).
-func _hull(c: Vector3, _ice: Color) -> ArrayMesh:
+func _hull(c: Vector3, _ice: Color, flat: bool = false) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var g := 0.055
 	var bot := BWLook.hex_corners(c + Vector3(0, -0.02, 0), PILLAR_R + g)
 	var top := BWLook.hex_corners(c + Vector3(0, PILLAR_H + g * 0.5, 0), PILLAR_R * 0.86 + g)
-	var tip := c + Vector3(0.06, PILLAR_H + 0.55 + g * 1.6, -0.04)
+	var tip := c + (Vector3(0, PILLAR_H + g * 0.5, 0) if flat else Vector3(0.06, PILLAR_H + 0.55 + g * 1.6, -0.04))
 	for i in 6:
 		var n := (i + 1) % 6
 		_quad(st, bot[i], bot[n], top[n], top[i], INK)

@@ -94,6 +94,11 @@ Notes:
 - Hit-chance terms are percentage points added to the brief's hit-chance
   basis before avoid is subtracted, and shown as their own line in the
   forecast hover ("Target on Dark 2: −14").
+- **Fatigue (D474):** from round 15 every heal (light tiles, skills,
+  enchantments, keystones, the Twins' own colour) is halved, and from round
+  20 heals do nothing; the overheal shields (Ward of Light, Overflow) shrink
+  with them. Normal fights end by round 6-9 and never meet it; it ends the
+  heal-tile standoff (LEDGER L-46).
 - Crossing damage counts every hex entered along the path, excluding the
   starting hex (V8). Displacement (Charge's shove) is not moving and deals no
   crossing damage.
@@ -1634,7 +1639,7 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 | Thunder | **Superconductor** | Your explosions and reactions reach radius 2. A reaction your action sets off on your own hex can't hurt you from that action. Grants **Self-detonate** (kept provisionally: free, once a turn). |
 | Thunder | **Overflow** (the Overflowing) | Every explosion or reaction you set off heals you 5% (20% an action); overheal becomes a shield up to 30%, until hit. |
 | Wind | **El Niño** | Your wind areas grow a ring (radius 1-3 → +1); your gales spread 1 further. |
-| Wind | **La Niña** | At your turn start every foe takes 2.5% and is pulled 1 toward you. |
+| Wind | **La Niña** | At your turn start every foe takes 1.5% (D476; was 2.5%) and is pulled 1 toward you. |
 | Ice | **Shatterer** | Your Shatter breaks the glaze around the target too: 8% to anyone on it, +15% to your blow per hex. |
 | Ice | **Sculptor** | Your ice on ice or glaze raises a pillar (6 at most). Your side climbs your pillars as high ground (2 levels). They shatter for double. |
 

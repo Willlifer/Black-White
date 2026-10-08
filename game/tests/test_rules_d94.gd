@@ -391,16 +391,20 @@ func test_enemy_curve(t) -> void:
 		t.ok(not c.perks, "fight %d: no perks" % n)
 		for u in run.enemies_for(n):
 			t.eq(u.perks, [], "fight %d: %s has no perks" % [n, u.name])
-			var row := BWData.row("roster", u.id.split("_f")[0])
+			var row := run.roster_row(u.id.split("_f")[0])   # D470: the run's own row (pool identities too, D379)
+			t.ok(not row.is_empty(), "fight %d: %s has a roster row" % [n, u.id])
+			if row.is_empty():
+				continue
 			var base := 0
 			var now := 0
 			for k in BWUnit.STATS:
 				base += int(row[k])
 				now += int(u.stats[k])
+			var mult := float(c.mult) * float(c.get("three", 1.0))   # D385: the 3v3 scale on a plain room of three
 			if u.level == 1:
-				t.eq(now, roundi(base * c.mult), "fight %d: %s's base stats total x%.2f" % [n, u.name, c.mult])
+				t.eq(now, roundi(base * mult), "fight %d: %s's base stats total x%.2f" % [n, u.name, mult])
 			else:                        # D194: levelled first (its stage), then scaled
-				t.ok(now >= roundi(base * c.mult), "fight %d: %s levelled, then x%.2f" % [n, u.name, c.mult])
+				t.ok(now >= roundi(base * mult), "fight %d: %s levelled, then x%.2f" % [n, u.name, mult])
 			t.eq(u.hp, u.max_hp(), "HP follows CON")
 	t.ok(BWRun.enemy_curve(1).mult < 1.0, "fight 1: below full strength")
 	# D139: armour 0 / 1 / 2 / full by fight, at the stage's tier

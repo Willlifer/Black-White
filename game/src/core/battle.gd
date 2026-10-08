@@ -2142,6 +2142,8 @@ func _new_cycle() -> void:
 	queue = BWTurnQueue.build(units)
 	turn_index = 0
 	_emit({ "type": "cycle", "cycle": cycle, "order": queue.map(func(u): return u.id) })
+	if cycle == BWFormulas.FATIGUE_HALF or cycle == BWFormulas.FATIGUE_NONE:   # D474
+		_emit({ "type": "fatigue", "cycle": cycle, "heal_mult": BWFormulas.fatigue_heal_mult(cycle) })
 	BWPhases.new_cycle(self)               # D255: pending phases come due (the rage)
 	_begin_turn()
 
@@ -2151,6 +2153,8 @@ func _begin_turn() -> void:
 	var u := current()
 	if u == null:
 		return
+	var stayed: bool = u.fx.get("turn_hex", Vector2i(-99, -99)) == u.pos   # D473: began its last turn here too
+	u.fx["turn_hex"] = u.pos
 	u.moved = false
 	u.acted = false
 	u.follow_up = []
@@ -2204,7 +2208,9 @@ func _begin_turn() -> void:
 		_tile_hurt(u, _tile_dmg(u, st.drain, "dark"), "dark", st.source)
 	var heal := 0.0 if own else _light_heal(u, st)  # D93 Sanctuary / Glare
 	if heal > 0 and u.alive():
+		_heal_tag = _light_tag(u, st, stayed)        # D473: the sim's heal ledger (no rule effect)
 		BWBeams.light_heal(self, u, heal, str(st.source))   # D288: Overflow turns the excess into a Ward of Light
+		_heal_tag = ""
 	BWBeams.turn_start(self, u)                    # D287: Dawn, -1 on the longest cooldown on light 2+
 	if over:
 		return
@@ -2274,6 +2280,9 @@ func in_group_turn() -> bool:
 
 
 func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
+	pct *= BWFormulas.fatigue_heal_mult(cycle)         # D474 Fatigue: round 15 halves heals, 20 ends them
+	if pct <= 0.0:
+		return
 	if BWKs3.heal_hook(self, u, pct, cause):           # D450 Hopekiller: the heal hurts instead
 		return
 	if BWKeystoneFx.heal_blocked(self, u):              # D296 Event Horizon: no heals on its dark 3
@@ -2289,6 +2298,8 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 	var e := { "type": "heal", "unit": u.id, "amount": healed, "hp": u.hp }
 	if cause != "":
 		e["cause"] = cause
+	if _heal_tag != "":
+		e["tag"] = _heal_tag
 	_emit(e)
 	BWEnchant.on_healed(self, u, healed, cause)         # v2 hook: Mend-Link
 	BWCurse.on_heal(self, u, cause)                     # D275: a light heal cleans 1 Rot
@@ -2910,6 +2921,26 @@ func _sanctuary_check(v: BWUnit, before: int) -> void:
 				_emit({ "type": "perk", "unit": o.id, "perk": e.name, "target": v.id, "hex": v.pos })
 				paint([v.pos], "light", o, int(BWEffects.p(e, "steps", 2)), false)
 				return
+
+
+## D473: a light heal's ledger tag for the sims ("judicator", "solar_wind",
+## "foe" = the tile's layer is the other side's, "+stay" = the unit began its
+## last turn on this hex too). Read only by tools; no rule reads it.
+var _heal_tag := ""
+
+
+func _light_tag(u: BWUnit, st: Dictionary, stayed: bool) -> String:
+	var parts: Array = []
+	if st.has("judicator"):
+		parts.append("judicator")
+	if st.has("solar_wind"):
+		parts.append("solar_wind")
+	var src := _unit(str(st.get("source", "")))
+	if src != null and src.team != u.team:
+		parts.append("foe")
+	if stayed:
+		parts.append("stay")
+	return "+".join(parts) if not parts.is_empty() else "plain"
 
 
 ## Light healing at a turn start, with Sanctuary (the tile's layer heals its

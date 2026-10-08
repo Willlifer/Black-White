@@ -19,11 +19,17 @@ var tut: BWTutorial
 var _fails: PackedStringArray = []
 var _passes := 0
 var _shots := ""
+## D468: SHOT_STEPS=<id,id,...> also saves those steps as SHOT_PREFIX<id>.png (default "tut3_")
+var _steps_shot: PackedStringArray = []
+var _prefix := "tut3_"
 var _seen_rear := false
 
 
 func _ready() -> void:
 	_shots = OS.get_environment("SHOTS")
+	_steps_shot = OS.get_environment("SHOT_STEPS").split(",", false)
+	if OS.get_environment("SHOT_PREFIX") != "":
+		_prefix = OS.get_environment("SHOT_PREFIX")
 	_run.call_deferred()
 
 
@@ -71,6 +77,9 @@ func _run() -> void:
 		if SHOT_AT.has(str(s.id)) and str(s.wait) != "results":
 			await get_tree().create_timer(0.35).timeout
 			await _shot(SHOT_AT[str(s.id)])
+		if str(s.id) in _steps_shot:
+			await get_tree().create_timer(0.5).timeout
+			await _shot(_prefix + str(s.id))
 		var done_before := tut.done_ids.size()
 		await _perform(s)
 		var t2 := 0.0
@@ -102,17 +111,16 @@ func _lessons() -> void:
 	_check(has.call(func(e): return e.type == "attack" and "Shatter" in e.get("tags", [])), "lesson 5: a Shatter blow")
 	_check(has.call(func(e): return e.type == "skill" and e.skill == "bolt" and e.results.any(func(r): return "Spark" in r.get("tags", [])) ), "lesson 5: a Spark bolt")
 	_check(has.call(func(e): return e.type == "chain"), "lesson 5: a chain arc")
-	_check(has.call(func(e): return e.type == "paint" and e.has("gales")), "lesson 6: a gale spread")
-	_check(has.call(func(e): return e.type == "skill" and e.skill == "thread_needle"), "lesson 7: a skill used")
-	_check(has.call(func(e): return e.type == "swap"), "lesson 7: the weapon swap")
-	_check(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "burt"), "lesson 8: Burt Pinned (D419: was a pistol whip's Stagger)")
-	_check(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "rui"), "lesson 8: Rui Pinned")
-	_check(has.call(func(e): return e.type == "attack" and "Rear" in e.get("tags", [])), "lesson 9: a rear attack")
-	_check(has.call(func(e): return e.type == "battle_end" and e.winner == "player"), "lesson 10: the fight was won")
-	_check(tut.run.squad.all(func(u): return u.level == 2), "lesson 10: every unit levelled once")
+	_check(has.call(func(e): return e.type == "skill" and e.skill == "thread_needle"), "lesson 6: a skill used")
+	_check(has.call(func(e): return e.type == "swap"), "lesson 6: the weapon swap")
+	_check(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "burt"), "lesson 7: Burt Pinned (D419: was a pistol whip's Stagger)")
+	_check(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "rui"), "lesson 7: Rui Pinned")
+	_check(has.call(func(e): return e.type == "attack" and "Rear" in e.get("tags", [])), "lesson 8: a rear attack")
+	_check(has.call(func(e): return e.type == "battle_end" and e.winner == "player"), "lesson 9: the fight was won")
+	_check(tut.run.squad.all(func(u): return u.level == 2), "lesson 9: every unit levelled once")
 	var della := tut.run.unit("della")
-	_check(della != null and della.perks.size() >= 2, "lesson 10: a perk was picked on top of the drawn first one (D233) (%s)" % [della.perks if della else []])
-	_check(della != null and int(della.skill_picks.get("sword", 0)) >= 1, "lesson 10: a skill was picked")
+	_check(della != null and della.perks.size() >= 2, "lesson 9: a perk was picked on top of the drawn first one (D233) (%s)" % [della.perks if della else []])
+	_check(della != null and int(della.skill_picks.get("sword", 0)) >= 1, "lesson 9: a skill was picked")
 
 
 ## Wait for the next step to be up and waiting for input.

@@ -128,6 +128,10 @@ func _init() -> void:
 		BWTwins.TWINS_HP = float(tw[0])
 		if tw.size() > 1:
 			BWTwins.TWINS_MULT = float(tw[1])
+		if tw.size() > 2:                                  # D477: "hp,mult,heal"
+			BWTwins.HEAL_PCT = float(tw[2])
+	if OS.get_environment("OB_HP") != "":                  # D477 tuning: the Obelisks' shared pool
+		BWObelisk.hp_override = int(OS.get_environment("OB_HP"))
 	if OS.get_environment("ELVL") != "":                   # tuning: enemy levels per stage
 		BWRooms.LEVELS_PER_STAGE = float(OS.get_environment("ELVL"))
 	print("Curve: %s, 3v3 scale %s, levels per stage %.2f" % [str((BWRun.curve_override if not BWRun.curve_override.is_empty() else BWRun.ENEMY_CURVE).map(func(r): return r[1])),
@@ -159,6 +163,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 		var boss_left: Array = []
 		var by_room := {}       # D188: "n|kind" -> [wins, played]
 		var ks_fights := {}     # D308: keystone -> [wins, fights a deployed holder fought]
+		led = { "recs": [], "heal": {}, "dmg": { "player": 0, "enemy": 0 }, "kind": {}, "stall": 0, "long": 0 }   # D473
 		for s in runs:
 			var rng := RandomNumberGenerator.new()
 			var base := int(OS.get_environment("SEED0")) if OS.get_environment("SEED0") != "" else 9000   # D353: shards
@@ -167,10 +172,11 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 			for i in range(pick.size() - 1, 0, -1):
 				var j := rng.randi() % (i + 1)
 				var t = pick[i]; pick[i] = pick[j]; pick[j] = t
+			pick_rng.seed = (base + s) * 7 + 1               # D473 PICKS=random
 			var run := BWRun.start(pick.slice(0, BWRun.SQUAD), base + s)
 			run.force_map = OS.get_environment("MAP")         # D319: MAP=commons plays every fight there (6v6)
 			for u in run.squad:
-				BWPicks.auto_resolve(u)
+				_resolve(u)
 			var healthy := true
 			var hurt := false                           # D353: lost, or under half the deployed standing
 			var alt := { "six": 0, "mix": 0 }          # D353: the sim's alternation over 6v6 cards
@@ -256,6 +262,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 					print("run %d fight %d %s %dv%d turns %d cycles %d %d ms (worst turn %.0f ms) %s" % [s, n, mname, deployed.size(), enemies.size(),
 						guard, b.cycle, Time.get_ticks_msec() - t0, worst_us / 1000.0, b.winner])
 				var won := b.winner == "player"
+				_ledger(b, deployed, won, n, kind, guard >= 1500)   # D473
 				if won:
 					wins[n - 1] += 1
 				rounds[n - 1].append(b.cycle)
@@ -279,7 +286,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 				run.after_fight(won, deployed, defeated, enemies, b.history)
 				for u in run.squad:
 					u.hp = u.max_hp()
-					BWPicks.auto_resolve(u)
+					_resolve(u)
 				if n >= BWRun.BOSS_FIGHT or (OS.get_environment("STOP_AT") != "" and n >= int(OS.get_environment("STOP_AT"))):
 					break
 				var plan: Array = []
@@ -287,7 +294,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 					plan.append([run.squad[i].id, choice_for(pol, i, run.day_choices(run.squad[i]))])
 				run.progress_day(plan)
 				for u in run.squad:
-					BWPicks.auto_resolve(u)
+					_resolve(u)
 		var out: PackedStringArray = ["POLICY %s, ROOMS %s (%d runs)" % [pol, room_pol, runs]]
 		for f in BWRun.BOSS_FIGHT:
 			var r: Array = rounds[f]
@@ -352,6 +359,7 @@ func _sim(pol: String, room_pol: String, runs: int, ids: Array) -> void:
 			var kp: Array = ks_fights[kid]
 			krow.append("%s %d%% (%d)" % [BWKeystones.name_of(str(kid)), 100 * int(kp[0]) / maxi(int(kp[1]), 1), int(kp[1])])
 		out.append("  keystones (squad, fights 1-10 with a deployed holder): " + (", ".join(krow) if not krow.is_empty() else "none"))
+		out.append_array(_ledger_report())                   # D473
 		print("\n".join(out))
 	quit()
 
@@ -498,3 +506,234 @@ static func _maps_label(counts: Dictionary) -> String:
 	if keys.size() == 1:
 		return str(keys[0])
 	return ", ".join(keys.map(func(k): return "%s %d" % [k, counts[k]]))
+
+
+# ---------------------------------------------------------------- D473 ledger
+
+## D473 PICKS=random: every pick (perk, keystone, duo, skill) takes a random
+## unowned card (seeded per run) instead of BWPicks.auto_choice's first card,
+## so every keystone and duo perk gets measured (the first card is always the
+## element's first keystone, and a duo perk is never the first card).
+var pick_rng := RandomNumberGenerator.new()
+
+
+func _resolve(u: BWUnit) -> void:
+	if OS.get_environment("PICKS") != "random":
+		BWPicks.auto_resolve(u)
+		return
+	for guard in 64:
+		BWPicks.settle(u)
+		var p := BWPicks.pending(u)
+		if p.is_empty():
+			break
+		var req: Dictionary = p[0]
+		var choice := ""
+		if req.has("ai"):
+			choice = str(req.ai)
+		else:
+			var opts: Array = BWPicks.options(u, req).filter(func(o): return not o.owned)
+			if not opts.is_empty():
+				choice = str(opts[pick_rng.randi() % opts.size()].id)
+		if BWPicks.apply(u, req, choice).is_empty():
+			break
+
+
+## D473 the balance ledger: per fight (1-11, as played) the card, the result,
+## the rounds, and what the deployed side brought (focus elements, weapon
+## classes, keystones, duo perks); the healing by source against the HP lost
+## (both sides, BWBattleStats' "taken"), shields soaked, Hopekiller's turned
+## heals, and stalls (the 1500-turn guard) and long fights (20+ rounds).
+## LEDGER_OUT=<file> also writes the raw records as JSON (merging shards).
+var led := {}
+
+
+func _ledger(b: BWBattle, deployed: Array, won: bool, n: int, kind: String, stalled: bool) -> void:
+	var keys := {}
+	for u in deployed:
+		keys["el:" + u.focus()] = true
+		keys["wc:" + u.weapon_class] = true
+		for kid in u.keystones:
+			keys["ks:" + str(kid)] = true
+		for pid in u.perks:
+			var row := BWData.row("perks", str(pid))
+			if not row.is_empty() and str(row.get("duo", "")) != "":
+				keys["duo:" + str(pid)] = true
+	var card := "giant" if n == BWRun.BOSS_FIGHT else ("opener" if n <= 2 else kind)
+	var team := {}
+	var real := {}
+	for u in b.units:
+		team[u.id] = u.team
+		real[u.id] = not BWObelisk.is_objective(u)
+	var t := BWBattleStats.tally(b.history, b.units)
+	var dmg := { "player": 0, "enemy": 0 }
+	for id in t.units:
+		if real.get(id, false) and dmg.has(str(team[id])):
+			dmg[str(team[id])] += int(t.units[id].taken)
+	var heal := {}
+	var ward_name := {}
+	var evs := {}               # counted event kinds, self-damage by cause, skill uses
+	var ov := ""                # the unit whose Overload is resolving
+	for e in b.history:
+		var src := ""
+		var amt := 0
+		var who := str(e.get("unit", ""))
+		var ty := str(e.get("type", ""))
+		if ty in ["fizzle", "la_nina", "rain", "submerge", "shatterer", "superconductor", "overflow", "hopekiller", "overload"]:
+			_led_add(evs, "ev:" + ty, who, team, 1)
+		match ty:
+			"turn":
+				ov = ""
+			"overload":
+				ov = who
+			"leviathan_form":
+				_led_add(evs, "ev:form " + str(e.get("form", "")), who, team, 1)
+			"skill":
+				_led_add(evs, "use:" + str(e.skill), who, team, 1)
+				if str(team.get(who, "")) == "player":
+					keys["sk:" + str(e.skill)] = true
+			"tile_damage":
+				if str(e.get("source", "")) == who and who != "":
+					var c := str(e.get("cause", ""))
+					_led_add(evs, "self:" + ("overload" if who == ov and c == "detonation" else c), who, team, int(e.amount))
+		match ty:
+			"heal":
+				amt = int(e.amount)
+				var c := str(e.get("cause", "?"))
+				if c == "light":
+					var tag := str(e.get("tag", "plain"))
+					src = "light (Judicator)" if "judicator" in tag else ("light (Solar Wind)" if "solar_wind" in tag else "light tile")
+					if "foe" in tag:
+						_led_add(heal, "  of which on a foe's light", who, team, amt)
+					if "stay" in tag:
+						_led_add(heal, "  of which unmoved (same hex as last turn)", who, team, amt)
+				else:
+					src = _enchant_key(c)
+			"light_ward":
+				ward_name[who] = str(e.get("name", "Ward of Light"))
+			"light_ward_break":
+				amt = int(e.absorbed)
+				src = "shield: " + str(ward_name.get(who, "Ward of Light"))
+			"barrier_hit":
+				amt = int(e.absorbed)
+				src = "shield: Consume barrier"
+			"hopekiller":
+				_led_add(heal, "(Hopekiller: heals turned to harm)", who, team, int(e.amount))
+		if src != "" and amt > 0 and real.get(who, true):
+			_led_add(heal, src, who, team, amt)
+	led.recs.append({ "n": n, "card": card, "won": won, "rounds": b.cycle, "keys": keys.keys(), "dmg": dmg, "heal": heal,
+		"stall": stalled, "evs": evs })
+
+
+## "enchant:Leeching Recurve Bow" -> "enchant:Leeching {item}" (one row per enchantment).
+static func _enchant_key(c: String) -> String:
+	if not c.begins_with("enchant:"):
+		return c
+	var name := c.substr(8)
+	for r in BWData.table("equipment"):
+		var n := str(r.name)
+		if n != "" and name.contains(n):
+			return "enchant:" + name.replace(n, "{item}")
+	return c
+
+
+func _led_add(heal: Dictionary, src: String, who: String, team: Dictionary, amt: int) -> void:
+	var k := "%s|%s" % [src, str(team.get(who, "?"))]
+	heal[k] = int(heal.get(k, 0)) + amt
+
+
+func _ledger_report() -> PackedStringArray:
+	var path := OS.get_environment("LEDGER_OUT")
+	if path != "":
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		f.store_string(JSON.stringify(led.recs))
+		f.close()
+	return ledger_lines(led.recs)
+
+
+## The report from a list of fight records (one sim, or merged shards).
+static func ledger_lines(recs: Array) -> PackedStringArray:
+	var out: PackedStringArray = ["  --- D473 ledger (%d fights) ---" % recs.size()]
+	var kind := {}
+	var byf := {}
+	var pn := {}
+	var heal := {}
+	var dmg := { "player": 0, "enemy": 0 }
+	var stall := 0
+	var longf := 0
+	for r in recs:
+		var hsum := 0
+		for k in r.heal:
+			heal[k] = int(heal.get(k, 0)) + int(r.heal[k])
+			if not str(k).begins_with(" ") and not str(k).begins_with("("):
+				hsum += int(r.heal[k])
+		var d := int(r.dmg.player) + int(r.dmg.enemy)
+		dmg.player += int(r.dmg.player)
+		dmg.enemy += int(r.dmg.enemy)
+		var kp: Array = kind.get(str(r.card), [0, 0, 0, 0, 0])   # heal, dmg, fights, rounds, wins
+		kind[str(r.card)] = [kp[0] + hsum, kp[1] + d, kp[2] + 1, kp[3] + int(r.rounds), kp[4] + (1 if r.won else 0)]
+		var f: Array = byf.get(int(r.n), [0, 0, 0])
+		byf[int(r.n)] = [f[0] + (1 if r.won else 0), f[1] + 1, f[2] + int(r.rounds)]
+		stall += 1 if r.get("stall", false) else 0
+		longf += 1 if int(r.rounds) >= 20 else 0
+	out.append("  card        fights  win%  rounds(mean)  heal+shield / HP lost")
+	for c in ["opener", "standard", "hard", "obelisks", "twins", "splitfront", "fords", "defend", "storm", "horde", "giant"]:
+		if kind.has(c):
+			var k: Array = kind[c]
+			out.append("  %-11s %5d  %4d  %6.1f  %5.1f%%" % [c, k[2], roundi(100.0 * k[4] / k[2]), float(k[3]) / k[2], 100.0 * k[0] / maxf(k[1], 1)])
+	var fl: PackedStringArray = []
+	for n in range(1, BWRun.BOSS_FIGHT + 1):
+		if byf.has(n):
+			pn[n] = float(byf[n][0]) / byf[n][1]
+			fl.append("%d: %d%% %.1fr (%d)" % [n, roundi(100.0 * pn[n]), float(byf[n][2]) / byf[n][1], byf[n][1]])
+	out.append("  by fight (win, mean rounds, n): " + " | ".join(fl))
+	out.append("  stalls (1500-turn guard) %d, fights of 20+ rounds %d" % [stall, longf])
+	var tot := { "player": 0, "enemy": 0 }
+	var srcs := {}
+	for k in heal:
+		var p: PackedStringArray = str(k).split("|")
+		srcs[p[0]] = true
+		if not p[0].begins_with(" ") and not p[0].begins_with("(") and tot.has(p[1]):
+			tot[p[1]] += int(heal[k])
+	out.append("  healing+shields / HP lost: player %d / %d (%.1f%%), enemy %d / %d (%.1f%%)" % [tot.player, dmg.player,
+		100.0 * tot.player / maxf(dmg.player, 1), tot.enemy, dmg.enemy, 100.0 * tot.enemy / maxf(dmg.enemy, 1)])
+	var sl: Array = srcs.keys()
+	sl.sort_custom(func(a, c): return int(heal.get(a + "|player", 0)) + int(heal.get(a + "|enemy", 0)) > int(heal.get(c + "|player", 0)) + int(heal.get(c + "|enemy", 0)))
+	for s in sl:
+		var hp := int(heal.get(s + "|player", 0))
+		var he := int(heal.get(s + "|enemy", 0))
+		out.append("    %-44s player %6d (%4.1f%%)  enemy %6d (%4.1f%%)" % [s, hp, 100.0 * hp / maxf(dmg.player, 1), he, 100.0 * he / maxf(dmg.enemy, 1)])
+	var evs := {}
+	for r in recs:
+		for k in r.get("evs", {}):
+			evs[k] = int(evs.get(k, 0)) + int(r.evs[k])
+	var el: Array = evs.keys()
+	el.sort()
+	var evl: PackedStringArray = []
+	for k in el:
+		if not str(k).begins_with("use:"):
+			evl.append("%s %d" % [k, evs[k]])
+	out.append("  events / self-damage (key|side total): " + ", ".join(evl))
+	var ul: Array = el.filter(func(k): return str(k).begins_with("use:") and str(k).ends_with("|player"))
+	ul.sort_custom(func(a, c): return int(evs[a]) > int(evs[c]))
+	out.append("  player skill uses: " + ", ".join(ul.map(func(k): return "%s %d" % [str(k).substr(4).trim_suffix("|player"), evs[k]])))
+	var cnt := {}
+	var n10 := 0
+	var w10 := 0
+	for r in recs:
+		if int(r.n) >= BWRun.BOSS_FIGHT:
+			continue
+		n10 += 1
+		w10 += 1 if r.won else 0
+		for k in r.keys:
+			var c: Array = cnt.get(k, [0, 0, 0.0])
+			cnt[k] = [c[0] + 1, c[1] + (1 if r.won else 0), c[2] + ((1.0 if r.won else 0.0) - float(pn.get(int(r.n), 0.0)))]
+	var ks: Array = cnt.keys()
+	ks.sort()
+	out.append("  picks (fights 1-10: %d, %d%% won): key  fights-with (share)  win%% with / without  vs-fight-avg" % [n10, roundi(100.0 * w10 / maxf(n10, 1))])
+	for k in ks:
+		var c: Array = cnt[k]
+		var wo_n: int = n10 - int(c[0])
+		var wo_w: int = w10 - int(c[1])
+		out.append("    %-26s %4d (%3d%%)  %3d%% / %4s  %+5.1f" % [k, c[0], roundi(100.0 * c[0] / maxf(n10, 1)), roundi(100.0 * c[1] / c[0]),
+			("%d%%" % roundi(100.0 * wo_w / wo_n)) if wo_n > 0 else "-", 100.0 * float(c[2]) / c[0]])
+	return out

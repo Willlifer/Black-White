@@ -632,7 +632,7 @@ a "+N" for the rest of a crowd.
 
 **Intent.** Two stones on the centre row, at the west and east ends, so both
 teams (top and bottom, exact mirror) are equally far from each. **The stones
-share one life (D378):** one pool of 220 HP (`BWObelisk.HP_MAX`), every blow on either
+share one life (D378):** one pool of 280 HP (`BWObelisk.HP_MAX`; D477, was 220), every blow on either
 stone lowers it, and at 0 both crumble and the player wins. Each stone keeps
 its own rules (the Lantern dodges ranged and pushes, the Well dodges melee
 and pulls), so the squad picks whichever stone its weapons hit best; there's

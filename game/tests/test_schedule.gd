@@ -190,7 +190,7 @@ func test_twins_at_fight_4(t) -> void:
 	var tw := r.enemies_for(4)
 	t.eq(tw.map(func(u): return u.encounter), ["twin", "twin"], "Noon and Dusk")
 	t.eq(tw[0].level, r.squad_level(), "built at the squad's level (fight 4)")
-	t.ok(BWTwins.TWINS_MULT < 1.25, "stats tuned down from the fight-7 values (D355: HP x%.2f, stats x%.2f)" % [BWTwins.TWINS_HP, BWTwins.TWINS_MULT])
+	t.ok(BWTwins.TWINS_HP * BWTwins.TWINS_MULT < 2.6 * 1.25, "tuned down from the fight-7 values (D355/D477: HP x%.2f, stats x%.2f)" % [BWTwins.TWINS_HP, BWTwins.TWINS_MULT])
 	var ob := _run(4242, 4)
 	BWRooms.offer(ob)
 	BWRooms.choose(ob, 0)

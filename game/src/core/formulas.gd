@@ -46,6 +46,21 @@ const SKILL := "skill"
 const SPELL := "spell"
 
 
+## D474 Fatigue (LEDGER L-46, the heal-tile standoff): a long fight's healing
+## wanes. From round FATIGUE_HALF every heal is halved (and the shields made of
+## overheal with it); from round FATIGUE_NONE heals do nothing. Normal fights
+## end by round 6-9 and never meet it; a boss that heals (the Twins) and a
+## standoff of two units out-healing each other's blows do.
+const FATIGUE_HALF := 15
+const FATIGUE_NONE := 20
+
+
+static func fatigue_heal_mult(cycle: int) -> float:
+	if cycle >= FATIGUE_NONE:
+		return 0.0
+	return 0.5 if cycle >= FATIGUE_HALF else 1.0
+
+
 ## D424 (author: "Ranged attacks damage reduced by 10% if an enemy is within
 ## 2 tiles. Does not apply to AOE-targeted spells."): a ranged blow (reach
 ## PRESSURE_MIN_RANGE+: a ranged class's basic, or a single-target skill with

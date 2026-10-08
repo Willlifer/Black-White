@@ -11,7 +11,7 @@ extends RefCounted
 ## (tests/test_tutorial.gd), with the same turn-passing rule as the screen.
 ##
 ## Step keys:
-##   lesson  1..11 (0 = the opening card)
+##   lesson  1..10 (0 = the opening card)
 ##   text    the prompt; glossary terms link themselves (BWGlossary.markup)
 ##   actor   whose turn it must be ("" = no change); `fresh`: a new turn
 ##   wait    next | move | undo | forecast | aim | act | hover | over | results | pick | card
@@ -22,24 +22,28 @@ extends RefCounted
 const MAP := "res://maps/tutorial/yard.json"
 const SEED := 3
 const RUN_SEED := 4242
-## D419: the battle rng at the "worn" stage (lesson 10), so the Surge hits all three.
+## D419: the battle rng at the "worn" stage (lesson 9), so the Surge hits all three.
 const WORN_SEED := 1
 
 ## The yard's landmarks (odd-r offset, as the map JSON's q/r).
 const A_START := Vector2i(2, 6)
 const FRONT := Vector2i(3, 3)          # Della's spot: in front of Burt
-const F_HEX := Vector2i(2, 2)          # the fire tile (lessons 4 and 6)
+const F_HEX := Vector2i(2, 2)          # the fire tile (lesson 4)
 const C0 := Vector2i(4, 2)             # the bare hex between the three enemies (fuse, detonation, Surge)
 const SEEDED := [Vector2i(4, 1), Vector2i(6, 4), Vector2i(1, 4)]   # water 2, light 1, dark 2
 
+## D468: the wind lesson (a staff Saturate, Wind) is gone: one staff can't hold
+## five elements under the 3-element cap (D417); wind is named in lesson 5.
 const LESSONS := ["Practice fight", "Moving", "Attacking", "Turn order", "Elements on tiles", "Operators",
-	"Wind", "Skills and weapons", "Statuses", "Facing", "Winning", "Between fights"]
+	"Skills and weapons", "Statuses", "Facing", "Winning", "Between fights"]
+## The lesson the fight is won in (BWTutorial's skip rule).
+const WIN_LESSON := 9
 
 ## Identity comes from data/roster.csv; the kits are fixed here (the roster
 ## roll never touches the tutorial).
 const KITS := {
 	"della": { "weapon_class": "sword", "weapon_model": "flamberge", "element": "fire", "con": 4, "str": 5, "dex": 4, "wil": 2, "def": 4, "res": 3, "spd": 4, "top": "tank_top", "bottom": "tight_pants", "clothing_shade": "dark" },
-	"jericho": { "weapon_class": "staff", "weapon_model": "moon_staff", "element": "light", "con": 3, "str": 1, "dex": 3, "wil": 6, "def": 2, "res": 6, "spd": 5, "top": "sweater_scarf", "bottom": "sweatpants", "clothing_shade": "light" },
+	"jericho": { "weapon_class": "staff", "weapon_model": "moon_staff", "element": "thunder", "con": 3, "str": 1, "dex": 3, "wil": 6, "def": 2, "res": 6, "spd": 5, "top": "sweater_scarf", "bottom": "sweatpants", "clothing_shade": "light" },
 	"gail": { "weapon_class": "bow", "weapon_model": "recurve_bow", "element": "wind", "con": 3, "str": 3, "dex": 5, "wil": 3, "def": 3, "res": 3, "spd": 5, "top": "tshirt", "bottom": "shorts", "clothing_shade": "mid" },
 	"burt": { "weapon_class": "axe", "weapon_model": "double_axe", "element": "fire", "con": 5, "str": 6, "dex": 3, "wil": 1, "def": 4, "res": 3, "spd": 3, "top": "tank_top", "bottom": "shorts", "clothing_shade": "dark" },
 	"rui": { "weapon_class": "lance", "weapon_model": "halberd", "element": "dark", "con": 5, "str": 5, "dex": 2, "wil": 3, "def": 5, "res": 4, "spd": 2, "top": "sweater", "bottom": "tight_pants", "clothing_shade": "mid" },
@@ -53,7 +57,7 @@ static func steps() -> Array:
 	return [
 		# ---- 0. the opening card
 		{ "id": "intro", "lesson": 0, "wait": "next",
-			"text": "A practice fight with fixed rolls, so it plays the same every time. The enemies hold still while you learn." },
+			"text": "A practice fight with fixed rolls; the enemies hold still. The game: paint the ground with elements, then cash it in with a reaction." },
 		# ---- 1. moving
 		{ "id": "rim", "lesson": 1, "actor": "della", "fresh": true, "wait": "next", "hl": { "unit": "della" },
 			"text": "It's Della's turn. The rimmed hexes show how far she can move." },
@@ -77,18 +81,18 @@ static func steps() -> Array:
 		{ "id": "saturate", "lesson": 4, "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "saturate", "element": "fire", "hex": F_HEX }, "hl": { "ui": "skill" },
 			"text": "Jericho's staff lays elements on the ground. Open Saturate in his menu and pick Fire." },
 		{ "id": "paint", "lesson": 4, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "saturate", "element": "fire", "hex": F_HEX }, "hl": { "hex": F_HEX },
-			"text": "Click the marked hex. Saturate pours two steps, so the ground there becomes fire 2." },
+			"text": "Click the marked hex. Saturate pours two steps: the ground there is painted fire 2." },
 		{ "id": "tile_hover", "lesson": 4, "wait": "hover", "hex": F_HEX, "hl": { "hex": F_HEX },
 			"text": "Hover the fire to read the tile. Whoever starts a turn on fire takes damage." },
 		{ "id": "seeded", "lesson": 4, "wait": "next", "hl": { "hexes": SEEDED },
 			"text": "The map seeded these three. Water slows you, light heals but makes you easier to hit, dark hides you." },
 		# ---- 5. operators
 		{ "id": "fuse_aim", "lesson": 5, "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "saturate", "element": "thunder", "hex": C0 }, "hl": { "ui": "skill" },
-			"text": "Thunder, ice and wind are operators: they act on what a tile holds. Pick Saturate, Thunder." },
+			"text": "Thunder, ice and wind are operators: they cash in what the ground holds. Pick Saturate, Thunder." },
 		{ "id": "fuse", "lesson": 5, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "saturate", "element": "thunder", "hex": C0 }, "hl": { "hex": C0 },
 			"text": "Click the bare hex between the three. Thunder on bare ground arms a fuse." },
 		{ "id": "det_aim", "lesson": 5, "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "saturate", "element": "fire", "hex": C0 }, "hl": { "ui": "skill" },
-			"text": "Any element landing on a fuse makes it detonate. Pick Saturate, Fire." },
+			"text": "Any other element landing on a fuse ignites it, even ice or wind. Pick Saturate, Fire." },
 		{ "id": "preview", "lesson": 5, "actor": "jericho", "wait": "hover", "hex": C0, "hl": { "hex": C0, "preview": true },
 			"text": "Hover the fuse first. The blast preview tags every unit the blast would hurt, red for your own side." },
 		{ "id": "detonate", "lesson": 5, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "saturate", "element": "fire", "hex": C0 }, "hl": { "hex": C0, "preview": true },
@@ -109,59 +113,54 @@ static func steps() -> Array:
 			"text": "Rui stands on a fuse, so he's conductive. Click him." },
 		{ "id": "chain", "lesson": 5, "actor": "gail", "wait": "act", "act": { "kind": "attack", "target": "rui" }, "hl": { "ui": "notes" },
 			"text": "Half of what he takes arcs to his nearest ally: the forecast names who. Press Enter." },
-		# ---- 6. wind
-		{ "id": "gale_aim", "lesson": 6, "stage": "fire_at_f", "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "saturate", "element": "wind", "hex": F_HEX }, "hl": { "ui": "skill" },
-			"text": "Wind copies a tile's charge onto the six hexes around it. Pick Saturate, Wind." },
-		{ "id": "gale", "lesson": 6, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "saturate", "element": "wind", "hex": F_HEX }, "hl": { "hex": F_HEX },
-			"text": "Click the fire and watch it spread, under Burt too." },
-		# ---- 7. skills, cooldowns, the second weapon
-		{ "id": "skill_tip", "lesson": 7, "stage": "thread", "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "skill", "key": "thread_needle" },
+		# ---- 6. skills, cooldowns, the second weapon
+		{ "id": "skill_tip", "lesson": 6, "stage": "thread", "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "skill", "key": "thread_needle" },
 			"text": "Skills are stronger moves than Attack. Hover one to see its range and cooldown." },
-		{ "id": "skill_aim", "lesson": 7, "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
+		{ "id": "skill_aim", "lesson": 6, "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
 			"text": "Pick Thread the Needle: strike a foe standing on your fire (on a longer fire line you'd dash on through it)." },
-		{ "id": "skill_use", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
+		{ "id": "skill_use", "lesson": 6, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "thread_needle", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
 			"text": "Click Burt, then press Enter." },
-		{ "id": "cooldown", "lesson": 7, "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "menu" },
+		{ "id": "cooldown", "lesson": 6, "actor": "della", "fresh": true, "wait": "next", "hl": { "ui": "menu" },
 			"text": "Thread the Needle's cooldown is 2, so it's missing from the menu until it's ready again." },
-		{ "id": "swap", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "swap" }, "hl": { "ui": "swap" },
+		{ "id": "swap", "lesson": 6, "actor": "della", "wait": "act", "act": { "kind": "swap" }, "hl": { "ui": "swap" },
 			"text": "Della carries a second weapon. Swap weapon is free: draw her bow." },
-		{ "id": "swapped", "lesson": 7, "actor": "della", "wait": "next", "hl": { "ui": "menu" },
+		{ "id": "swapped", "lesson": 6, "actor": "della", "wait": "next", "hl": { "ui": "menu" },
 			"text": "Range, damage and skills follow the weapon in hand. You can swap back any time." },
-		# ---- 8. statuses
-		{ "id": "whip_aim", "lesson": 8, "stage": "bow", "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
+		# ---- 7. statuses
+		{ "id": "whip_aim", "lesson": 7, "stage": "bow", "actor": "della", "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "ui": "skill" },
 			"text": "Statuses change what a unit can do. Pick Pinning Shot." },
-		{ "id": "whip", "lesson": 8, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
+		{ "id": "whip", "lesson": 7, "actor": "della", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "fire", "target": "burt" }, "hl": { "unit": "burt" },
 			"text": "Click Burt and press Enter. He'll be Pinned: 2 less move." },
-		{ "id": "pin_aim", "lesson": 8, "actor": "gail", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "ui": "skill" },
+		{ "id": "pin_aim", "lesson": 7, "actor": "gail", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "ui": "skill" },
 			"text": "Gail has one too. Pin Rui: pick Pinning Shot." },
-		{ "id": "pin", "lesson": 8, "actor": "gail", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "unit": "rui" },
+		{ "id": "pin", "lesson": 7, "actor": "gail", "wait": "act", "act": { "kind": "skill", "key": "pinning_shot", "element": "wind", "target": "rui" }, "hl": { "unit": "rui" },
 			"text": "Click Rui and press Enter." },
-		{ "id": "blinded", "lesson": 8, "actor": "gail", "wait": "next", "hl": { "unit": "rui" },
+		{ "id": "blinded", "lesson": 7, "actor": "gail", "wait": "next", "hl": { "unit": "rui" },
 			"text": "Also: Staggered (no skills next turn) and Blinded (no crits, targets within 2). Hover a status icon over a unit for its rule." },
-		# ---- 9. facing
-		{ "id": "facing", "lesson": 9, "actor": "della", "fresh": true, "wait": "next", "hl": { "unit": "burt" },
+		# ---- 8. facing
+		{ "id": "facing", "lesson": 8, "actor": "della", "fresh": true, "wait": "next", "hl": { "unit": "burt" },
 			"text": "Units face their last foe. A blow from behind gets +15 hit; one from the front may glance." },
-		{ "id": "rear_move", "lesson": 9, "stage": "rear", "actor": "della", "wait": "move", "act": { "kind": "move", "hex": "rear" }, "hl": { "hex": "rear" },
+		{ "id": "rear_move", "lesson": 8, "stage": "rear", "actor": "della", "wait": "move", "act": { "kind": "move", "hex": "rear" }, "hl": { "hex": "rear" },
 			"text": "Move Della behind Burt." },
-		{ "id": "rear_foe", "lesson": 9, "actor": "della", "wait": "forecast", "act": { "kind": "attack", "target": "burt" }, "hl": { "unit": "burt" },
+		{ "id": "rear_foe", "lesson": 8, "actor": "della", "wait": "forecast", "act": { "kind": "attack", "target": "burt" }, "hl": { "unit": "burt" },
 			"text": "Now click Burt." },
-		{ "id": "rear", "lesson": 9, "actor": "della", "wait": "act", "act": { "kind": "attack", "target": "burt" }, "hl": { "ui": "hit_row" },
+		{ "id": "rear", "lesson": 8, "actor": "della", "wait": "act", "act": { "kind": "attack", "target": "burt" }, "hl": { "ui": "hit_row" },
 			"text": "Hover Hit chance to find \"Rear attack +15 hit\". Then press Enter." },
-		# ---- 10. winning
-		{ "id": "worn", "lesson": 10, "stage": "worn", "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "surge", "element": "light", "hex": C0 }, "hl": { "ui": "skill" },
-			"text": "They're worn down now. Pick Surge, Light: it bursts over a hex and everything beside it." },
-		{ "id": "finish", "lesson": 10, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "surge", "element": "light", "hex": C0 }, "hl": { "hex": C0, "preview": true },
-			"text": "Click the hex between them, then press Enter to win." },
-		{ "id": "won", "lesson": 10, "wait": "over",
+		# ---- 9. winning
+		{ "id": "worn", "lesson": 9, "stage": "worn", "actor": "jericho", "fresh": true, "wait": "aim", "act": { "kind": "skill", "key": "surge", "element": "thunder", "hex": C0 }, "hl": { "ui": "skill" },
+			"text": "They're worn down now. Pick Surge, Thunder: it bursts over a hex and everything beside it." },
+		{ "id": "finish", "lesson": 9, "actor": "jericho", "wait": "act", "act": { "kind": "skill", "key": "surge", "element": "thunder", "hex": C0 }, "hl": { "hex": C0, "preview": true },
+			"text": "Click the hex between them: the thunder also detonates the painted ground there. Press Enter to win." },
+		{ "id": "won", "lesson": 9, "wait": "over",
 			"text": "Knock out whoever is left: any attack or skill will do." },
-		{ "id": "results", "lesson": 10, "wait": "results", "hl": { "ui": "level_up" },
+		{ "id": "results", "lesson": 9, "wait": "results", "hl": { "ui": "level_up" },
 			"text": "The summary shows who did what. Every fight, won or lost, gives every unit one level." },
-		{ "id": "perk", "lesson": 10, "wait": "pick", "pick": { "unit": "della", "kind": "perk", "element": "fire" },
-			"text": "Element ranks earn perks; ranks 3 and 6 earn a gold keystone that breaks a rule. Pick one of the two cards." },
-		{ "id": "skill_pick", "lesson": 10, "wait": "pick", "pick": { "unit": "della", "kind": "skill", "weapon": "sword" },
+		{ "id": "perk", "lesson": 9, "wait": "pick", "pick": { "unit": "della", "kind": "perk", "element": "fire" },
+			"text": "Element ranks earn perks; ranks 3 and 6 earn a gold keystone that breaks a rule and a title. Pick one of the two cards." },
+		{ "id": "skill_pick", "lesson": 9, "wait": "pick", "pick": { "unit": "della", "kind": "skill", "weapon": "sword" },
 			"text": "Ranks with a weapon earn skill picks: improve a skill you have or learn a new one." },
-		# ---- 11. the closing card
-		{ "id": "closing", "lesson": 11, "wait": "card",
+		# ---- 10. the closing card
+		{ "id": "closing", "lesson": 10, "wait": "card",
 			"text": "That's a fight. Between fights there's more to choose." },
 	]
 
@@ -205,8 +204,8 @@ static func make_run() -> BWRun:
 				u.equipment[BWUnit.SECOND] = run.make_item("shortbow", "E", "")   # D419: was the m1911 (pistols benched)
 				_learn(u, "sword", ["thread_needle", "striketwice"])   # D438: was Heart Seeker
 				_learn(u, "bow", ["pinning_shot", "arcing_shot"])
-			"jericho":
-				for el in ["fire", "thunder", "ice", "wind"]:
+			"jericho":                  # D468: thunder by nature + fire + ice = the 3-element cap (D417)
+				for el in ["fire", "ice"]:
 					u.affinity[el] = BWUnit.POINTS_PER_RANK
 				_learn(u, "staff", ["bolt", "saturate", "surge"])
 			"gail":

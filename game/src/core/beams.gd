@@ -271,7 +271,8 @@ static func light_heal(b: BWBattle, u: BWUnit, pct: float, source: String) -> vo
 	if pct <= 0.0 or not u.alive():
 		return
 	var room := u.max_hp() - u.hp
-	var amt := maxi(1, roundi(u.max_hp() * pct / 100.0))
+	var fade := BWFormulas.fatigue_heal_mult(b.cycle)   # D474: the overheal shield wanes with the heal
+	var amt := maxi(1, roundi(u.max_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
 	b._heal(u, pct, "light")
 	var src := b._unit(source)
 	if src == null or src.team != u.team or not ks(src, "overflow"):

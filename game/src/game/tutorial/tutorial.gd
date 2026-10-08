@@ -493,8 +493,8 @@ func _skip_lesson() -> void:
 		exit()
 		return
 	# a skipped fight goes straight to the summary
-	if int(steps[_skip_to].get("lesson", 0)) == 10 and str(steps[_skip_to].get("wait", "")) != "results" and battle() and battle().over:
-		_skip_to = BWTutorialScript.lesson_start(steps, 10)
+	if int(steps[_skip_to].get("lesson", 0)) == BWTutorialScript.WIN_LESSON and str(steps[_skip_to].get("wait", "")) != "results" and battle() and battle().over:
+		_skip_to = BWTutorialScript.lesson_start(steps, BWTutorialScript.WIN_LESSON)
 	if screen and is_instance_valid(screen) and not screen._busy and battle() and not battle().over:
 		_clear_aim()
 	_abort = true
@@ -534,9 +534,9 @@ class ClosingCard:
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.add_child(row)
 		row.add_child(_panel("Downtime", "downtime",
-			"Each unit spends the day on one of two activities. Specialize trains what it has, Branch out adds an element and a weapon, Wander is a gamble."))
+			"Each unit spends the day on one activity. Specialize trains what it has, Branch out adds an element (3 at most) and a weapon, Wander is a gamble."))
 		row.add_child(_panel("Rooms", "rooms",
-			"From fight 3 you pick a room: Standard, or Hard for better spoils. Some Hard rooms are special encounters."))
+			"From fight 3 you often pick a room: Standard, or Hard for better spoils. Some fights are bosses, 6v6 battles or special encounters."))
 		row.add_child(_panel("The shop", "shop",
 			"Trade gear one for one. An imbuement scroll is free and adds an element's enchantment to any item."))
 		var b := Button.new()

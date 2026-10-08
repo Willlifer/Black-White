@@ -18,13 +18,19 @@ func test_tutorial_script_plays_every_lesson(t) -> void:
 	t.ok(has.call(func(e): return e.type == "attack" and "Shatter" in e.get("tags", [])), "5: Shatter on the glazed tile")
 	t.ok(has.call(func(e): return e.type == "skill" and e.skill == "bolt" and e.results.any(func(x): return "Spark" in x.get("tags", []))), "5: Spark")
 	t.ok(has.call(func(e): return e.type == "chain" and e.from == "rui"), "5: the arc from conductive Rui")
-	t.ok(has.call(func(e): return e.type == "paint" and e.has("gales") and e.hexes.has(Vector2i(3, 2))), "6: the gale spreads under Burt")
-	t.ok(has.call(func(e): return e.type == "swap" and e.weapon_class == "bow"), "7: the swap draws the bow (D419: pistols benched)")
-	t.ok(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "burt"), "8: Burt Pinned")
-	t.ok(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "rui"), "8: Rui Pinned")
-	t.ok(has.call(func(e): return e.type == "attack" and "Rear" in e.get("tags", [])), "9: a rear attack")
-	t.ok(b.over and b.winner == "player", "10: the Surge wins it")
-	t.ok(not has.call(func(e): return e.type == "tile_damage" and e.unit == "della" and e.cause == "fire_cross"), "9: the way behind Burt doesn't cross fire")
+	t.ok(has.call(func(e): return e.type == "swap" and e.weapon_class == "bow"), "6: the swap draws the bow (D419: pistols benched)")
+	t.ok(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "burt"), "7: Burt Pinned")
+	t.ok(has.call(func(e): return e.type == "status" and e.status == "pinned" and e.unit == "rui"), "7: Rui Pinned")
+	t.ok(has.call(func(e): return e.type == "attack" and "Rear" in e.get("tags", [])), "8: a rear attack")
+	t.ok(b.over and b.winner == "player", "9: the Surge wins it")
+	# D468: the squad shows the rules as they are now: 3 elements at most (D417)
+	for u in r.run.squad:
+		t.ok(u.attuned_elements().size() <= BWUnit.MAX_ELEMENTS, "%s holds %d elements, the cap is %d" % [u.id, u.attuned_elements().size(), BWUnit.MAX_ELEMENTS])
+	# D468: the board-painting core and the new rules are named on the way
+	var said := " ".join(BWTutorialScript.steps().map(func(s): return str(s.text)))
+	for w in ["paint", "cash it in", "ignites", "Unsteady", "Shatter", "keystone", "title"]:
+		t.ok(said.contains(w), "a step says \"%s\"" % w)
+	t.ok(not has.call(func(e): return e.type == "tile_damage" and e.unit == "della" and e.cause == "fire_cross"), "8: the way behind Burt doesn't cross fire")
 
 
 ## The run is the tutorial's own: the summary levels every unit once and
@@ -52,4 +58,4 @@ func test_tutorial_prompts(t) -> void:
 		t.ok(sentences <= 2 and text.length() <= 150, "%s: short (%d sentences, %d chars)" % [s.id, sentences, text.length()])
 		t.ok(int(s.lesson) >= last, "%s: lessons in order" % s.id)
 		last = int(s.lesson)
-	t.eq(last, 11, "the closing card is lesson 11")
+	t.eq(last, BWTutorialScript.LESSONS.size() - 1, "the closing card is the last lesson")

@@ -303,7 +303,7 @@ func _build_body(e: String) -> String:
 [color=#%s]◈ Keystones[/color] %s
 %s %s · 3: [hint=%s]%s[/hint]" % [
 		_faint("Perks (ranks 1, 2, 4, 5)"), " · ".join(perks),
-		gold, _faint("(rank 3: 1 of 2; rank 6: a second; 2 per unit)") + " " + " · ".join(ks),
+		gold, _faint("(rank 3: 1 of these 2; rank 6: one from another element you know; each names you with a title)") + " " + " · ".join(ks),
 		_faint("Set (head, chest, legs, drawn weapon's imbue)"), _dim("2: " + str(st.get("two_text", ""))),
 		hint.call(str(st.get("three_text", ""))), str(st.get("three", ""))]
 
@@ -318,7 +318,7 @@ func _element_body(e: String) -> String:
 			return hdr + _row("Turn start", func(i): return "%d%% HP dmg" % (BWTiles.FIRE_STAND_PCT * i)) \
 				+ _row("Each hex crossed", func(i): return "%d%% HP" % (BWTiles.FIRE_CROSS_PCT * i)) \
 				+ _row("On grass", func(i): return "lights the grass around" if i >= BWTiles.GRASS_IGNITE_MIN else "just burns") \
-				+ "[/table]\nFire on a glazed tile melts the glaze."
+				+ "[/table]\nFire on a glazed tile melts the glaze. Fire meeting water douses both."
 		"water":
 			return hdr + _row("Move cost", func(i): return "+%d" % BWTiles.WATER_MOVE[i]) \
 				+ _row("Thunder hits on it", func(i): return "+%d%% dmg" % roundi(BWTiles.CONDUCT_HIT_MULT * 100 * i)) \
@@ -336,14 +336,16 @@ func _element_body(e: String) -> String:
 			return "[b]On charged ground: detonate.[/b] The tile explodes and is erased. Whoever stands on it takes "\
 				+ "%d%% + %d%% per charge point of their max HP (+%d%% per water intensity), each neighbour takes half, ×%.1f if glazed.\n" \
 				% [BWTiles.DETONATE_BASE_PCT, BWTiles.DETONATE_PER_POINT_PCT, BWTiles.CONDUCT_DET_PCT, BWTiles.SHATTER_MULT] \
-				+ "[b]On empty ground:[/b] arms a fuse for %d cycles; the next element cast there blows it." % BWTiles.MARK_CYCLES
+				+ "[b]On empty ground:[/b] arms a fuse for %d cycles; ANY element cast there ignites it (water electrifies instead)." % BWTiles.MARK_CYCLES
 		"ice":
 			return "[b]On charged ground: glaze.[/b] Locks the tile for %d cycles: it stops fading and can't be painted over. " % BWTiles.GLAZE_CYCLES \
-				+ "Fire melts a glaze; thunder shatters it for ×%.1f.\n" % BWTiles.SHATTER_MULT \
+				+ "Fire melts a glaze; thunder shatters it for ×%.1f. " % BWTiles.SHATTER_MULT \
+				+ "A unit standing on glaze is Unsteady (−%d avoid, −%d glance) and takes Shatter.\n" % [int(BWUnsteady.AVOID_PCT), int(BWUnsteady.GLANCE_PCT)] \
 				+ "[b]On empty ground:[/b] arms stasis for %d cycles; the next element cast there is glazed." % BWTiles.MARK_CYCLES
 		"wind":
 			return "[b]On charged ground: gale.[/b] Copies the tile's charge onto its six neighbours (the copies last 1 cycle, never ignite, and skip glazed or marked hexes).\n" \
-				+ "[b]On empty ground:[/b] arms a gale for %d cycles; the next element cast there spreads." % BWTiles.MARK_CYCLES
+				+ "[b]On empty ground:[/b] arms a gale for %d cycles; the next element cast there spreads.\n" % BWTiles.MARK_CYCLES \
+				+ "A landed wind basic attack pushes its target 1 hex away."
 	return ""
 
 

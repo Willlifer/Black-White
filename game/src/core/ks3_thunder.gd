@@ -67,7 +67,8 @@ static func overflow(b: BWBattle, u: BWUnit, n: int) -> void:
 		return
 	u.fx["of_used"] = float(u.fx.of_used) + pct
 	var room := u.max_hp() - u.hp
-	var amt := maxi(1, roundi(u.max_hp() * pct / 100.0))
+	var fade := BWFormulas.fatigue_heal_mult(b.cycle)   # D474: the overheal shield wanes with the heal
+	var amt := maxi(1, roundi(u.max_hp() * pct * fade / 100.0)) if fade > 0.0 else 0
 	b._emit({ "type": "overflow", "unit": u.id, "pct": pct, "n": n })
 	b._heal(u, pct, "overflow")
 	var excess := amt - room

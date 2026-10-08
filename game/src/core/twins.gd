@@ -34,11 +34,11 @@ const TITLE := "The Twins: Noon and Dusk"
 const MODEL := "glaive"
 
 ## Tuning (tools/campaign_sim.gd, env TWINS="hp,mult").
-static var TWINS_HP := 2.6          # x the unit's own D137 HP (D259; D308: 2.6 at fight 7; D355: 2.6 at fight 4, whole-run 58%)
-static var TWINS_MULT := 1.1        # base-stat multiplier (D259; D308: 1.25 at fight 7; D355: 1.1 at fight 4)
+static var TWINS_HP := 2.0          # x the unit's own D137 HP (D259; D308: 2.6 at fight 7; D355: 2.6 at fight 4, whole-run 58%; D477: 2.0 with stats 1.3, rounds 10.3 -> 8.2)
+static var TWINS_MULT := 1.3        # base-stat multiplier (D259; D308: 1.25 at fight 7; D355: 1.1 at fight 4; D477: 1.3)
 const PAINT_STEPS := 2
 const PAINT_RADIUS := 1
-const HEAL_PCT := 2.0               # % max HP per point of own colour
+static var HEAL_PCT := 2.0          # % max HP per point of own colour (static var: campaign_sim TWINS= tunes it, D477)
 const BEAM_GAP := 4                 # beam when more than this many hexes apart
 const BEAM_PCT := 10.0
 const FEEDBACK_PCT := 5.0
