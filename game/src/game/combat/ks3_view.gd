@@ -8,7 +8,7 @@ extends Node3D
 ##   Drowned     a dark water ring at its feet, a DROWNED tag on its bar
 ##   overcharge  a pulsing ring over an overcharged dark 4 / light 4 hex
 ## One-shots (on_event, from BWCombatScreen._play):
-##   fizzle         a grey puff and FIZZLE over each hex lava turned away
+##   lava_react     D494: AS FIRE 1 over each lava hex an arrival met (a reaction spends a step)
 ##   pitch_black    an ink-violet burst of the burst's radius, a shake, a beat
 ##   solar_flare    a white-gold burst, the same
 ##   rain_cloud     a small grey cloud that follows the walker (not awaited)
@@ -149,15 +149,17 @@ func on_event(e: Dictionary) -> void:
 	var b := screen.battle
 	var kv: BWKeystoneView = screen.ks_view
 	match str(e.type):
-		"fizzle":
+		"lava_react":                              # D494: met as fire 1 (no more fizzle)
 			var hs: Array = e.get("hexes", [])
+			var el := str(e.get("element", ""))
 			for i in mini(hs.size(), 6):
 				var at: Vector3 = screen.board_view.top_center(hs[i])
-				if kv:
-					kv.blast(at, Color(0.55, 0.55, 0.55), 0.8, true)
-				_word(at + Vector3(0, 1.0, 0), "FIZZLE", Color(0.85, 0.85, 0.85))
-			screen.ui.feed("[b]Lava[/b]: %s fizzles on it" % str(e.get("element", "")).capitalize())
-			await get_tree().create_timer(0.3).timeout
+				_word(at + Vector3(0, 1.0, 0), "AS FIRE 1", BWLook.element_color("fire").lightened(0.3))
+			if el in ["fire", "light", "dark"]:
+				screen.ui.feed("[b]Lava[/b]: %s lands beside it (the lava stands)" % el.capitalize())
+			else:
+				screen.ui.feed("[b]Lava[/b]: %s meets it as fire 1, a step burns off" % el.capitalize())
+			await get_tree().create_timer(0.2).timeout
 		"pitch_black", "solar_flare":
 			var dark := str(e.type) == "pitch_black"
 			var at: Vector3 = screen.board_view.top_center(e.hex)

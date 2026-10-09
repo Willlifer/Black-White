@@ -133,28 +133,57 @@ func test_lava_walker(t) -> void:
 	var b := _duel(me, [f], [Vector2i(9, 9)], [al], [_nb(x, 0)])
 	b.paint([x], "fire", me, 3)
 	b.paint([x], "fire", me, 3)
-	t.eq(b.tiles.intensity(x, "fire"), 5, "your fire climbs to 5")
+	t.eq(b.tiles.intensity(x, "fire"), 4, "D494: your fire climbs to 4")
 	t.ok(b.tiles.is_lava(x), "it is lava")
+	t.eq(BWTileFX.layers(b.tiles.at(x)).h.tier, 4, "the tile draws it at tier 4")
+	t.eq(int(b.tiles.standing(x).fire), 20, "fire 4 burns 5% a step: 20%")
+	t.eq(int(b.tiles.crossing_pct(x)), 12, "crossing 3% a step")
 	b.history.clear()
+	# D494: no more fizzle. Water meets it as fire 1: a douse, one step spent
 	var r := b.paint([x], "water", f, 3)
-	t.eq(b.tiles.intensity(x, "fire"), 5, "water fizzles on it")
-	t.ok(x in r.fizzled and not _ev(b, "fizzle").is_empty(), "a fizzle event")
+	t.eq(b.tiles.intensity(x, "fire"), 3, "water douses one step: lava 4 -> 3")
+	t.ok(b.tiles.is_lava(x) and str(b.tiles.at(x).source) == "lw", "still the walker's lava")
+	t.ok(x in r.doused and x in r.lava_hit and not _ev(b, "lava_react").is_empty(), "a douse, and the lava_react event")
+	t.ok(_ev(b, "fizzle").is_empty(), "no fizzle event")
+	# thunder: a detonation of fire 1 (1 point), the lava steps down
 	var r2 := b.paint([x], "thunder", f, 1)
-	t.ok(r2.detonations.is_empty() and b.tiles.is_lava(x), "thunder fizzles too: no detonation")
+	t.eq(r2.detonations.size(), 1, "thunder detonates it")
+	if r2.detonations.size() == 1:
+		t.eq(int(r2.detonations[0].points), 1, "the blast reads fire 1 (1 point)")
+		t.near(float(r2.detonations[0].pct), float(BWTiles.DETONATE_BASE_PCT + BWTiles.DETONATE_PER_POINT_PCT), 0.01, "a fire-1 blast's %")
+	t.eq(b.tiles.intensity(x, "fire"), 2, "lava 3 -> 2")
+	# ice (even its own) freezes it: a glaze, a step spent
 	b.paint([x], "ice", me, 1)
-	t.ok(not b.tiles.is_glazed(x), "even its own ice")
-	var r3 := b.paint([x], "fire", f, 1)
-	t.ok(x in r3.fizzled, "anyone else's fire fizzles")
-	t.eq(int(b.tiles.standing(x).fire), 25, "fire 5 burns 5% a step: 25%")
-	t.eq(int(b.tiles.crossing_pct(x)), 15, "crossing 3% a step")
+	t.ok(b.tiles.is_glazed(x) and b.tiles.intensity(x, "fire") == 1 and b.tiles.is_lava(x), "ice glazes it: lava 2 -> 1, glazed")
+	# anyone else's fire leaves it standing (it melts the glaze, as fire does)
+	b.paint([x], "fire", f, 1)
+	t.ok(b.tiles.intensity(x, "fire") == 1 and b.tiles.is_lava(x) and not b.tiles.is_glazed(x), "another's fire: the lava stands, the glaze melts")
+	# light lays beside it
+	b.paint([x], "light", f, 2)
+	t.ok(b.tiles.intensity(x, "fire") == 1 and b.tiles.intensity(x, "light") == 2 and b.tiles.is_lava(x), "light lays beside lava 1")
+	# the last step: a douse leaves only the light
+	b.paint([x], "water", f, 1)
+	t.ok(not b.tiles.is_lava(x) and b.tiles.intensity(x, "fire") == 0 and b.tiles.intensity(x, "light") == 2, "lava 1 doused: gone, the light stays")
+	# a gale carries fire 1 off: lava 4 -> 3, fire 1 on the ring
+	var g := _nb(C, 1, 3)
+	b.paint([g], "fire", me, 3)
+	b.paint([g], "fire", me, 1)
+	var rg := b.paint([g], "wind", f, 1)
+	t.eq(b.tiles.intensity(g, "fire"), 3, "a gale carries one step off: lava 4 -> 3")
+	var cps: Array = (rg.gales[0].copies as Array) if not rg.gales.is_empty() else []
+	t.ok(not cps.is_empty() and cps.all(func(c): return b.tiles.intensity(c, "fire") == 1 and not b.tiles.is_lava(c)), "its copies are plain fire 1")
+	# Inversion flips one step (fire 1 -> water 1 douses against the rest)
+	var inv := BWSkillRegistry.get_def("inversion")
+	t.eq(inv.swap_text(b.tiles.at(g)), "lava 3 → 2", "Inversion's text")
+	inv.ground(b, f, "", g, { "hexes": [g] })
+	t.ok(b.tiles.intensity(g, "fire") == 2 and b.tiles.is_lava(g) and b.tiles.intensity(g, "water") == 0, "Inversion: lava 3 -> 2, no water")
 	# Overheat only at the cap
 	var y := _nb(C, 3, 2)
 	b.paint([y], "fire", me, 3)
 	var r4 := b.paint([y], "fire", me, 1)
 	t.ok((r4.get("overheat", []) as Array).is_empty(), "fire 3 + 1 climbs to 4, no eruption")
-	b.paint([y], "fire", me, 1)
 	var r5 := b.paint([y], "fire", me, 1)
-	t.ok(not (r5.get("overheat", []) as Array).is_empty(), "fresh fire on its fire 5 erupts")
+	t.ok(not (r5.get("overheat", []) as Array).is_empty(), "fresh fire on its fire 4 erupts")
 	# the aura: no fire ground damage for it and allies next to it
 	al.pos = _nb(me.pos, 0)
 	_lay(b, me.pos, 3)
@@ -590,8 +619,13 @@ func test_duo_wildfire_and_powder_keg(t) -> void:
 	b2.units.append(me2)
 	me2.fx["duo:powder_keg"] = true
 	b2.paint([x], "fire", lw, 3)
+	b2.paint([x], "fire", lw, 1)
+	b2.history.clear()
 	var r2 := b2.paint([x], "thunder", me2)
-	t.ok(r2.detonations.is_empty(), "Lava Walker wins: the fuse fizzles on lava")
+	t.eq(r2.detonations.size(), 1, "D494: thunder on lava detonates it as fire 1")
+	var dets := _ev(b2, "detonate")
+	t.ok(not dets.is_empty() and int(dets[0].radius) == 2, "Powder Keg: fire 1 is fire, the blast goes 1 wider")
+	t.eq(b2.tiles.intensity(x, "fire"), 3, "and the lava drops a step: 4 -> 3")
 
 
 func test_duo_storm_drain_and_flash_flood(t) -> void:

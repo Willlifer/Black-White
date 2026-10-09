@@ -26,7 +26,7 @@ float smoke_h(vec4 data) {
 }
 
 float card_height(vec4 data, float t) {
-	float hf = flame_h(data, t) * (1.0 - 0.45 * clamp(tier - 3.0, 0.0, 1.0));   // D447: low licks over lava
+	float hf = flame_h(data, t) * (1.0 + 0.15 * clamp(tier - 3.0, 0.0, 1.0));   // D494: lava's flames stand taller than 3's
 	return max(hf * (1.0 + 0.6 * t3()), smoke_h(data));
 }
 
@@ -79,8 +79,9 @@ void fragment() {
 		c = mix(c, deep, smoothstep(0.55, 1.0, v) * 0.6);
 		float rim = body * (1.0 - smoothstep(0.006, 0.02, m));
 		c = mix(c, lin(vec3(0.45, 0.06, 0.0)), rim * 0.9);
-		float lava = clamp(tier - 3.0, 0.0, 1.0);   // D447: lava glows from below; its flames run low
-		over(acc, c, body * (0.9 - 0.25 * smoothstep(0.6, 1.0, v)) * (1.0 - 0.6 * lava));
+		float lava = clamp(tier - 3.0, 0.0, 1.0);   // D494: lava burns whiter, full strength (it read as fire 1)
+		c = mix(c, hot, 0.35 * lava * (1.0 - v));
+		over(acc, c, body * (0.9 - 0.25 * smoothstep(0.6, 1.0, v)));
 	}
 
 	// Sparks (tier 3): a few hot points rising above the flame tips.

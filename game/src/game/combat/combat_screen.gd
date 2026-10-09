@@ -80,7 +80,7 @@ var twins_fx: BWTwinsFX         # ---- D260: the Twins (beam, swap, rage, plate,
 var wind_view: BWWindView       # ---- D269-D276: walls, gravity, Rot marks (D406: no fields)
 var wind_shape: BWWindShapeView # ---- D365-D370: the wind shaping step on a wind skill's confirm
 var ks_view: BWKeystoneView         # ---- D293-D299: Frozen, Doom, gale 3, the wave, droplets, jump lines
-var ks3_view: BWKs3View             # ---- D443-D463: Keystones v3 (lava fizzles, Pitch Black, the rain cloud, Drowned)
+var ks3_view: BWKs3View             # ---- D443-D463: Keystones v3 (lava met as fire 1 (D494), Pitch Black, the rain cloud, Drowned)
 var elements_view: BWElementsView   # ---- D285-D292: beams, Overheat rims, Static fuses, Empowered, their VFX
 var squall_view: BWSquallView       # ---- D309-D313: squall fronts, Overfreeze bursts
 var mode_view: BWModeView           # ---- D327-D333: the 6v6 modes (waves, exits, the divider)
@@ -921,7 +921,7 @@ func _play(e: Dictionary) -> void:
 		"tidal", "wellspring", "contagion", "doomed", "doom", "frozen", "thaw", "frozen_skip", "frozen_hold", 				"pillar_shatter", "riptide", "event_horizon":   # ---- D293-D299
 			if ks_view:
 				await ks_view.on_event(e)
-		"fizzle", "pitch_black", "solar_flare", "overcharge_end", "hopekiller", "hopekiller_mark", "superconductor", 				"overflow", "la_nina", "la_nina_pull", "shatterer", "blizzard", "rain_cloud", "rain", "leviathan_offer", 				"submerge", "leviathan_form", "drowned_lunge", "drowned_return":   # ---- D443-D463 Keystones v3
+		"lava_react", "pitch_black", "solar_flare", "overcharge_end", "hopekiller", "hopekiller_mark", "superconductor", 				"overflow", "la_nina", "la_nina_pull", "shatterer", "blizzard", "rain_cloud", "rain", "leviathan_offer", 				"submerge", "leviathan_form", "drowned_lunge", "drowned_return":   # ---- D443-D463 Keystones v3
 			if ks3_view:
 				await ks3_view.on_event(e)
 		"wave_incoming", "spawn", "wave", "escape", "divider_break", "divider_open", "divider_breach", "divider_gust":   # ---- D327-D333

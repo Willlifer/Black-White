@@ -57,8 +57,8 @@ var _leg_l: Node3D
 var _leg_r: Node3D
 var _head: Node3D
 var _label: Label3D
-## D215: the floating bar (BWHPBar3D): black with white pips at/above 50%,
-## white with black pips below; the "hp / max" label shows only on hover.
+## D215: the floating bar (BWHPBar3D); D495: by team, the player's side black
+## with white pips, enemies white with black pips; "hp / max" only on hover.
 var _hp_bar: BWHPBar3D
 var _bar_bg: MeshInstance3D        # the bar's quad (_hp_bar.quad)
 var _hp_label: Label3D             # "hp / max" (_hp_bar.label), visible while hovered

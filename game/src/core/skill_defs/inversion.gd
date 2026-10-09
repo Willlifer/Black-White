@@ -54,6 +54,12 @@ func flips(b: BWBattle, h: Vector2i) -> bool:
 ## preview's tags and the log. Pure.
 static func swap_text(e: Dictionary) -> String:
 	var parts: Array = []
+	if bool(e.get("lava", false)) and int(e.get("h", 0)) > 0:         # D494: lava flips one step, as fire 1
+		parts.append("lava %d → %d" % [int(e.h), int(e.h) - 1])
+		if int(e.get("v", 0)) != 0:
+			var lv := "light" if int(e.v) > 0 else "dark"
+			parts.append("%s %d → %s %d" % [lv, absi(int(e.v)), PAIR[lv], absi(int(e.v))])
+		return ", ".join(parts)
 	for pair in [["h", "fire", "water"], ["v", "light", "dark"]]:
 		var n := int(e.get(pair[0], 0))
 		if n != 0:
@@ -72,6 +78,16 @@ func ground(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: Dicti
 		if e.is_empty():
 			continue
 		swaps.append({ "hex": h, "text": swap_text(e) })
+		if b.tiles.is_lava(h):
+			# D494: lava flips as fire 1: that step turns to water and douses
+			# against the rest, so the lava drops a step (light / dark still flip)
+			e.h = int(e.h) - 1
+			e.v = -int(e.v)
+			if int(e.h) <= 0:
+				e.erase("lava")
+			if int(e.h) == 0 and int(e.v) == 0:
+				b.tiles.entries.erase(h)
+			continue
 		e.h = -int(e.h)
 		e.v = -int(e.v)
 		e.marker = SWAP.get(str(e.marker), str(e.marker))

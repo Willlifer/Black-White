@@ -11,9 +11,11 @@ extends RefCounted
 
 const AXIS_MAX := 3
 ## D447 Lava Walker: its fire climbs to LAVA_MAX; an entry it laid carries
-## `lava` (nothing else reacts with it: every other arrival fizzles) and burns
-## LAVA_STAND_PCT / LAVA_CROSS_PCT a step (not 4% / 2%).
-const LAVA_MAX := 5
+## `lava` and burns LAVA_STAND_PCT / LAVA_CROSS_PCT a step (not 4% / 2%).
+## D494: the cap is 4 (was 5), and lava no longer fizzles what lands on it:
+## any other arrival reacts with ONE step of it, as if the hex were fire 1,
+## and a reaction spends that step (lava n -> n - 1): see _lava_route.
+const LAVA_MAX := 4
 const LAVA_STAND_PCT := 5
 const LAVA_CROSS_PCT := 3
 const STEP_CYCLES := 2
@@ -296,27 +298,35 @@ func author(hex: Vector2i, h: int, v: int, marker: String = "") -> void:
 
 ## Apply one action's element to a shape, simultaneously (§3.5).
 ## Returns { detonations: [{hex, pct, source}], changed: [hex], marker_fired: [hex],
-##           gales: [{origin, copies}], doused: [hex] (D421) }.
+##           gales: [{origin, copies}], doused: [hex] (D421), lava_hit: [hex] (D494) }.
 ## FX hook `opts` (BWEffects.paint_opts): timer_plus / glaze_plus /
 ## gale_timer_plus (tile_duration_plus), ring {hex: steps} (element_area_plus,
 ## resolved in the same simultaneous pass), gale_radius (Gusting), erupt (a
 ## tile_erupt countdown stamped on every hex this cast leaves carrying it).
 func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: Dictionary = {}) -> Dictionary:
-	var out := { "detonations": [], "changed": [], "marker_fired": [], "gales": [], "doused": [], "fizzled": [] }
+	var out := { "detonations": [], "changed": [], "marker_fired": [], "gales": [], "doused": [], "lava_hit": [] }
 	var plans := {}
 	# D199: `propagated` = the charge arrives as spread (on-kill paint, ENCHANTMENTS
 	# §5.3): it never fires a marker and skips glazed hexes.
 	var fresh: bool = not opts.get("propagated", false)
-	# D447 Lava Walker: nothing reacts with lava. Every arrival on a lava hex
-	# fizzles there (out.fizzled), unless it is its own walker's fire.
-	hexes = _lava_filter(hexes, element, caster, out.fizzled)
+	# D494 Lava Walker: an arrival on a lava hex that isn't its own walker's
+	# fire reacts with the lava as fire 1 (_lava_route), planned here and kept
+	# out of the pools / Overheat / Overfreeze passes below. (D447's fizzle is gone.)
+	var lava_plans := {}
+	var plain: Array = []
+	for h in hexes:
+		if _lava_ok(h, element, caster):
+			plain.append(h)
+		elif can_hold(h) and not lava_plans.has(h):
+			lava_plans[h] = _lava_route(at(h), element, fresh, steps, caster, opts)
+	hexes = plain
 	if opts.has("ring"):
 		var kept := {}
 		for h in opts.ring:
 			if _lava_ok(h, element, caster):
 				kept[h] = opts.ring[h]
-			elif not h in out.fizzled:
-				out.fizzled.append(h)
+			elif can_hold(h) and not lava_plans.has(h):
+				lava_plans[h] = _lava_route(at(h), element, true, int(opts.ring[h]), caster, opts)
 		opts["ring"] = kept
 	var pre_ice := {}                         # D459 Sculptor: ice or glaze before this paint
 	if element == "ice" and fresh and opts.get("sculpt", false):
@@ -339,6 +349,9 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	for hex in ring:
 		if can_hold(hex) and not plans.has(hex) and not fuse_guarded(hex, guard):
 			plans[hex] = _route(at(hex), element, true, int(ring[hex]), caster, opts)
+	for hex in lava_plans:
+		if not plans.has(hex):
+			plans[hex] = lava_plans[hex]
 	var gales: Array = []
 	for hex in plans:
 		var p: Dictionary = plans[hex]
@@ -361,6 +374,8 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 			out.marker_fired.append(hex)
 		if p.get("doused", false):
 			out.doused.append(hex)                  # D421: fire met water here
+		if p.get("lava_hit", false):
+			out.lava_hit.append(hex)                # D494: it met lava as fire 1
 	BWPools.finish(self, spine, element, caster, fresh, out, int(opts.get("glaze_plus", 0)))   # D262/D264
 	if not pre_ice.is_empty():
 		BWKs3Ice.sculpt(self, pre_ice.keys(), caster, out, opts)   # D459 Sculptor: ice on ice raises a pillar
@@ -386,22 +401,67 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	return out
 
 
-## D447 Lava Walker: may `element` from `caster` land on `h`? Only its own
-## walker's fire lands on lava; everything else fizzles there.
+## D447 Lava Walker: does `element` from `caster` land on `h` the plain way?
+## Off lava, always; on lava, only its own walker's fire (it climbs to the
+## cap). Anything else goes through _lava_route (D494).
 func _lava_ok(h: Vector2i, element: String, caster: String) -> bool:
 	if not is_lava(h):
 		return true
 	return element == "fire" and str(at(h).get("source", "")) == caster
 
 
-func _lava_filter(hexes: Array, element: String, caster: String, fizzled: Array) -> Array:
-	var out: Array = []
-	for h in hexes:
-		if _lava_ok(h, element, caster):
-			out.append(h)
-		elif not h in fizzled:
-			fizzled.append(h)
+## D494: what `element` arriving on lava entry `e` (fire n) does. The lava
+## acts as FIRE 1 for it: the arrival is routed onto a fire-1 copy of the hex
+## (its light / dark and glaze kept). A reaction (a detonation, a douse, a
+## gale carrying the fire off, ice freezing it) spends that one step, so the
+## lava is left at n - 1 (still lava, still its walker's; at 0 it's gone).
+## A detonation reads 1 fire point (plus the light / dark it blows). Arrivals
+## that don't react leave the lava at n: light / dark lay on the other axis,
+## another unit's fire meets hotter fire (nothing changes; on a glaze it
+## melts it, as fire does). Same plan shape as _route.
+func _lava_route(e: Dictionary, element: String, fresh: bool, steps: int, caster: String, opts: Dictionary = {}) -> Dictionary:
+	var n := int(e.h)
+	var proxy := e.duplicate()
+	proxy.h = 1
+	proxy.erase("lava")
+	var p := _route(proxy, element, fresh, steps, caster, opts)
+	if str(p.op) == "none":
+		return p
+	var reacted: bool = p.has("detonate") or bool(p.get("doused", false)) or p.has("gale") 		or (element == "ice" and str(p.op) == "set" and int((p.entry as Dictionary).get("glaze", 0)) > int(e.get("glaze", 0)))
+	var left := n - 1 if reacted else n
+	var after: Dictionary = {} if str(p.op) == "erase" else (p.entry as Dictionary).duplicate()
+	if after.is_empty():
+		after = _entry(0, 0, "", str(e.get("source", "")), str(e.get("origin", "cast")))
+	if not reacted and element == "fire":
+		after = e.duplicate()                      # another's fire on lava: the lava stands (a glaze melts)
+		after.glaze = int((p.entry as Dictionary).get("glaze", 0))
+	after.h = left
+	if left > 0:
+		after["lava"] = true
+		after.source = str(e.get("source", ""))    # still the walker's lava
+		after.marker = ""
+	else:
+		after.erase("lava")
+	after.erase("seeded")
+	var out := p.duplicate()
+	out["lava_hit"] = true
+	if int(after.h) == 0 and int(after.v) == 0 and str(after.get("marker", "")) == "":
+		out.op = "erase"
+		out.erase("entry")
+	else:
+		out.op = "set"
+		out.entry = after
+	if p.has("gale"):
+		out.gale = [1, int((p.entry as Dictionary).get("v", 0))]   # the step the gale carries off is fire 1
 	return out
+
+
+## D494: route `element` onto `hex` as a paint would, lava included (squalls,
+## the rings that call _route directly).
+func route_at(hex: Vector2i, element: String, fresh: bool, steps: int, caster: String, opts: Dictionary = {}) -> Dictionary:
+	if _lava_ok(hex, element, caster):
+		return _route(at(hex), element, fresh, steps, caster, opts)
+	return _lava_route(at(hex), element, fresh, steps, caster, opts)
 
 
 ## D307 Static Field: a fuse whose owner is in `guard` (allies of the painter
@@ -725,8 +785,24 @@ func _gale_copy(origin: Vector2i, hv: Array, caster: String, changed: Array, rad
 		if n == origin or not can_hold(n) or n in changed:
 			continue
 		var cur := at(n)
-		if not cur.is_empty() and (cur.marker != "" or cur.glaze > 0 or bool(cur.get("lava", false))):
-			continue                                   # D447: lava never takes a gale copy
+		if not cur.is_empty() and (cur.marker != "" or cur.glaze > 0):
+			continue
+		if is_lava(n):
+			# D494: a gale's copy reaching lava meets it as fire 1: water douses
+			# a step (lava n - 1), light / dark lay beside it, fire changes nothing
+			var lv := cur
+			if int(hv[0]) < 0:
+				lv.h = int(lv.h) - 1
+				if int(lv.h) <= 0:
+					lv.h = 0
+					lv.erase("lava")
+			if int(hv[1]) != 0:
+				lv.v = int(hv[1])
+			if int(lv.h) == 0 and int(lv.v) == 0:
+				entries.erase(n)
+			changed.append(n)
+			copies.append(n)
+			continue
 		var copy := _entry(hv[0], hv[1], "", caster, "spread")
 		copy.timer = 1 + timer_plus
 		entries[n] = copy

@@ -1,7 +1,7 @@
 extends SceneTree
 ## D215-D218 review renders (needs a window):
 ##   [SHOTS=<dir>] [MODE=all|combat|cards] [TAG=<suffix>] [RES=1920x1080] godot --path . --resolution 1920x1080 --script res://tools/hpbar_shots.gd
-## hpbar_combat.png      a fight: units above and below 50% HP, no numbers
+## hpbar_combat.png      a fight: units above and below 50% HP, no numbers (D495: allies black, enemies white)
 ## hpbar_hover.png       the same, one unit hovered: its "hp / max"
 ## hpbar_colossus.png    the Colossus's bar (same rule, big), clamped under the turn order
 ## hpbar_colossus_top.png the camera low and close: the bar would sit behind the turn order
@@ -107,7 +107,7 @@ func _combat() -> void:
 	await _wait(0.3)
 	await _shot("hpbar_hover")
 	BWHPBar3D.hover_unit = null
-	# a live hit across 50%: the ghost and the flip pulse, mid-animation
+	# a live hit across 50%: the ghost mid-drain (D495: no colour flip any more)
 	ps[0].hp = int(ps[0].max_hp() * 0.36)
 	s._views[ps[0].id].refresh()
 	await _wait(0.12)

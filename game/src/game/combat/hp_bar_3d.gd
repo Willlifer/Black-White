@@ -2,9 +2,10 @@ class_name BWHPBar3D
 extends Node3D
 ## D215: the floating HP bar over a unit, a Giant, the Colossus or a stone
 ## (BWUnitView, BWObeliskView). One billboarded quad (shaders/hp_bar.gdshader):
-## black with white pips at or above 50% HP, white with black pips below,
-## pips every 10% of max HP, a mid-grey ghost for the chunk just lost, and a
-## two-ring outline. The flip at 50% pulses once.
+## D495: by team (it was by HP, D215): the player's side black with white
+## pips on a dark-grey well, everyone else white with black pips on a
+## light-grey well; pips every 10% of max HP, a grey ghost for the chunk
+## just lost, and a two-ring outline. No colour flip at 50% any more.
 ##
 ## The "hp / max" label shows only while the unit is hovered (combat sets
 ## `hover_unit` from the hex under the mouse) or the mouse is on the bar.
@@ -52,6 +53,7 @@ func _init(u: BWUnit = null, w: float = 1.25, h: float = 0.13) -> void:
 	m.render_priority = 11
 	m.set_shader_parameter("bar_size", Vector2(w, h))
 	m.set_shader_parameter("pad", PAD)
+	m.set_shader_parameter("ally", ally_side(u))      # D495
 	quad = MeshInstance3D.new()
 	quad.name = "bar"
 	quad.mesh = q
@@ -87,7 +89,6 @@ func place(y: float) -> void:
 func set_hp(hp: int, max_hp: int, animate: bool = true) -> void:
 	var f := clampf(float(hp) / maxf(max_hp, 1), 0.0, 1.0)
 	label.text = "%d / %d" % [hp, max_hp]
-	var flipped := (f >= 0.5) != (_f >= 0.5)
 	if f < _f - 0.001 and animate and is_inside_tree():
 		if _tween and _tween.is_valid():
 			_tween.kill()
@@ -101,16 +102,27 @@ func set_hp(hp: int, max_hp: int, animate: bool = true) -> void:
 		_set_ghost(f)
 	_f = f
 	_mat().set_shader_parameter("fill", f)
-	if flipped and animate and is_inside_tree():
-		pulse()
+	_mat().set_shader_parameter("ally", ally_side(unit))   # D495: by team
 
 
 func fraction() -> float:
 	return _f
 
 
+## D495: "black" (black fill, white pips: the player's side) or "white".
 func mode() -> String:
-	return "black" if _f >= 0.5 else "white"
+	return "black" if ally_side(unit) else "white"
+
+
+## D495: does `u`'s bar wear the ally colours? The player's team, and an
+## objective that belongs to the player (the Lil Fella, a Defend gate).
+## Enemies, the Giant, the Twins and the neutral stones read as enemies.
+static func ally_side(u: BWUnit) -> bool:
+	if u == null:
+		return true
+	if u.team == "player":
+		return true
+	return u is BWObjective and str((u as BWObjective).allegiance) == "player"
 
 
 ## The tiny pulse at the 50% flip: a quick swell and settle.

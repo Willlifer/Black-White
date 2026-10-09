@@ -2343,7 +2343,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	var wsnap := BWWind.before_paint(self, hexes)   # the gales about to fire (their owner; D406: no modes)
 	var ks3pre := BWKs3.before_paint(self)        # D459: the pillars before (a Sculptor's shatters x2)
 	var r := tiles.apply(hexes, element, by.id, steps + int(o.steps_plus), o)
-	BWKs3.after_apply(self, by, element, r)       # D447 fizzles; D452 Superconductor's own-hex immunity
+	BWKs3.after_apply(self, by, element, r)       # D494 lava met as fire 1; D452 Superconductor's own-hex immunity
 	BWThunderKeys.inject_self_det(self, by, o, r)    # D306: Self-detonate on the holder's own empty fuse
 	BWThunderKeys.after_apply(self, by, element, r)   # D291: Daisy Chain
 	if cast:

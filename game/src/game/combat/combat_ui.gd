@@ -227,7 +227,7 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 		_fill_obelisk_card(c, u as BWObelisk)       # D145
 		return
 	c.icon.set_unit(u)
-	c.bar.enemy = u.team == "enemy"
+	c.bar.enemy = not BWHPBar3D.ally_side(u)          # D495: colours by team
 	c.bar.set_hp(u.hp, u.max_hp())
 	var el := BWLook.element_color(u.element).to_html(false)
 	var lines: PackedStringArray = []
@@ -471,7 +471,7 @@ func _order_icon(u: BWUnit, current: bool, next_round: bool) -> Control:
 		icon.modulate = Color(1, 1, 1, 0.7)
 	box.add_child(icon)
 	var bar := BWWidgets.HPBar.new(Vector2(px, 5))
-	bar.enemy = u.team == "enemy"
+	bar.enemy = not BWHPBar3D.ally_side(u)            # D495
 	bar.set_hp(u.hp, u.max_hp())
 	box.add_child(bar)
 	if current:
@@ -663,7 +663,7 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	if what != "":
 		_fc_title.text = "%s: %s → %s%s" % [att.name, what, dfn.name, "  (+%d more)" % extra if extra > 0 else ""]
 	_fc_bar.visible = true
-	_fc_bar.enemy = dfn.team == "enemy"
+	_fc_bar.enemy = not BWHPBar3D.ally_side(dfn)      # D495
 	_fc_bar.set_hp(dfn.hp, dfn.max_hp(), maxi(0, dfn.hp - int(fc.damage.value)))
 	for c in _fc_rows.get_children():
 		c.queue_free()
@@ -1502,7 +1502,7 @@ func set_objectives(stones: Array) -> void:
 		nm.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 		col.add_child(nm)
 		var bar := BWWidgets.HPBar.new(Vector2(220, 10))
-		bar.enemy = false
+		bar.enemy = true                                # D495: the stones wear the enemy's colours
 		bar.track = true
 		col.add_child(bar)
 		row.add_child(col)
@@ -1530,7 +1530,7 @@ func objective_texts() -> Array:
 ## the pulse in numbers, the codex line.
 func _fill_obelisk_card(c: Dictionary, o: BWObelisk) -> void:
 	c.icon.set_unit(o)                              # D156: the stone's own portrait, not a head
-	c.bar.enemy = o.look() != "bright"
+	c.bar.enemy = not BWHPBar3D.ally_side(o)          # D495
 	c.bar.set_hp(o.hp, o.max_hp())
 	var dim := BWStyle.TEXT_DIM.to_html(false)
 	var lines: PackedStringArray = []

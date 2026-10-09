@@ -11,7 +11,7 @@ extends RefCounted
 ## ask has(u, id) (tiles, battle, wind, pools; each marked "D45x duo").
 ##
 ##   wildfire_gale  (fire+wind)    fire your gales carry spreads 1 ring further, full steps
-##   powder_keg     (fire+thunder) a fuse set off on your fire blows +1 radius (Lava Walker fizzles it first)
+##   powder_keg     (fire+thunder) a fuse set off on your fire blows +1 radius (on lava too: D494, it blows as fire 1, a step burns off)
 ##   storm_drain    (water+thunder) your electrified water: the whole connected pool
 ##   flash_flood    (water+ice)    your ice on your water glazes the whole pool at once
 ##   permafrost     (ice+dark)     your dark 3 counts as glazed (Unsteady, Shatter)

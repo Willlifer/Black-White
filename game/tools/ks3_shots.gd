@@ -5,7 +5,7 @@ extends SceneTree
 ##                                 naming the title it gives ("Name, the Lava Walker")
 ##   ks3_pick_titled.png           the same unit's card in battle after taking one (its titled name)
 ##   ks3_duo.png                   a fire perk pick showing the Wildfire Gale duo card
-##   ks3_lava.png                  a Lava Walker's fire 5 / 4 / 3 beside a foe's water that fizzled on it; the
+##   ks3_lava.png                  a Lava Walker's fire 4 / 4 / 3, a foe's water doused a step off one (D494); the
 ##                                 tile card on the lava
 ##   ks3_pitch_black.png           Abyssal's Pitch Black going off on a dark 3 among foes
 ##   ks3_drowned.png               a Drowned Leviathan (ring, DROWNED tag) aiming a basic across the board
@@ -171,12 +171,12 @@ func _go() -> void:
 		_place(enemies[0], _step(y, 1, 1))
 		_place(enemies[1], _step(x, 5, 1))
 		b.paint([x], "fire", lw, 3)
-		b.paint([x], "fire", lw, 2)                  # fire 5
+		b.paint([x], "fire", lw, 2)                  # fire 4 (D494: the cap)
 		b.paint([y], "fire", lw, 3)
 		b.paint([y], "fire", lw, 1)                  # fire 4
 		b.paint([z], "fire", lw, 3)                  # fire 3 (lava, still)
 		var r := b.paint([y, _step(y, 1, 1)], "water", enemies[0], 2)
-		print("lava: x %d y %d z %d, fizzled %s" % [b.tiles.intensity(x, "fire"), b.tiles.intensity(y, "fire"), b.tiles.intensity(z, "fire"), r.fizzled])
+		print("lava: x %d y %d z %d, met as fire 1 %s" % [b.tiles.intensity(x, "fire"), b.tiles.intensity(y, "fire"), b.tiles.intensity(z, "fire"), r.lava_hit])
 		await _settle()
 		_turn(lw)
 		s._show_options()

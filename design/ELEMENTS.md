@@ -1636,7 +1636,7 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 
 | Element | Keystone (title) | Rule |
 |---|---|---|
-| Fire | **Lava Walker** (the Lava Walker) | Your fire climbs to 4 and 5. **Nothing reacts with your fire**: any other element, anyone else's fire and fuses **fizzle** on it ("lava 5 reigns supreme"); fresh fire erupts only at 5. It burns 5%/step standing, 3%/step crossing (fire 5: 25%). You and allies within 1 take no fire walking/standing damage. |
+| Fire | **Lava Walker** (the Lava Walker) | Your fire climbs to **4** (lava; D494, was 5). **Lava acts as fire 1 in every reaction** (D494; the D447 fizzle is gone): another element, or a reaction reaching it, meets one step of it as fire 1, and a reaction **spends that step** (lava n → n − 1, still the walker's; at 0 it's gone). Thunder detonates it as a fire-1 blast (1 point, plus any light/dark); water douses a step; a wind gale carries fire 1 off (its copies are plain fire 1); ice glazes it and spends a step; Inversion flips a step (fire 1 → water 1 douses against the rest); a gale's water copy douses a step; rain steps it down as before. Light and dark lay beside it (no step spent); anyone else's fire leaves it standing (it melts a glaze). Fresh fire erupts only at your cap, 4. It burns 5%/step standing, 3%/step crossing (fire 4: 20%). You and allies within 1 take no fire walking/standing damage. |
 | Fire | **Island Maker** | Your Overheats and fire eruptions reach 1 ring further (radius 2). You take 75% less from the reactions you set off, your own fire included. |
 | Dark | **Abyssal** | Free, once a turn, range 3: overcharge a dark 3 hex. **Pitch Black**: 15% and +1 Rot to every foe within 1. The hex stays, dark 4 until your turn ends. |
 | Dark | **Hopekiller** | Foes on your dark can't be healed or buffed; a heal hurts them for the same amount. A foe KO'd on your dark leaves dark 3. |
@@ -1662,7 +1662,7 @@ Offered on a perk pick of the first element, only to a unit holding an ordinary 
 | Duo | Elements | Rule |
 |---|---|---|
 | **Wildfire Gale** (renamed: "Wildfire" is a fire perk) | fire + wind | Fire your gales carry spreads one ring further, at full steps. |
-| **Powder Keg** | fire + thunder | A fuse set off on your fire blows 1 ring wider. Lava Walker wins: lava fizzles the fuse. |
+| **Powder Keg** | fire + thunder | A fuse set off on your fire blows 1 ring wider. On lava (D494) the fuse blows the lava as fire 1, so Powder Keg's +1 ring applies, and the lava drops a step. |
 | **Storm Drain** | water + thunder | Water you electrify is electrified across its whole connected pool. |
 | **Flash Flood** | water + ice | Your ice on your water glazes the whole pool at once (every foe on it Unsteady). |
 | **Permafrost** | ice + dark | Your dark 3 counts as glazed for your foes (Unsteady, Shatter). |

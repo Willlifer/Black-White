@@ -1,9 +1,11 @@
 // D215: the floating HP bar over a unit (BWHPBar3D), drawn in one quad.
-// At or above 50% HP the fill is BLACK with WHITE pips; below 50% it is
-// WHITE with BLACK pips. Pips sit at every 10% of max HP (9 internal ticks).
-// The lost chunk lingers mid-grey (`ghost`) before it drains. A two-ring
-// outline (the fill's opposite inside, the fill's own colour outside) lets
-// a black bar read on the black sky and a white bar on white tiles.
+// D495: coloured by TEAM, not HP: an ally's (the player's side, `ally`) fill
+// is BLACK with WHITE pips over a dark-grey empty well; an enemy's is WHITE
+// with BLACK pips over a light-grey well. Pips sit at every 10% of max HP
+// (9 internal ticks). The lost chunk lingers (`ghost`, a grey on the far
+// side of the well's) before it drains. A two-ring outline (the fill's
+// opposite inside, the fill's own colour outside) lets a black bar read on
+// the black sky and a white bar on white tiles. Greys: BWWidgets.HPBar.palette.
 // Rings and pips are sized in screen pixels (fwidth), so they stay crisp
 // at any zoom. `dim` (instance) fades the bar with BWLook.set_dim.
 shader_type spatial;
@@ -14,6 +16,7 @@ uniform vec2 bar_size = vec2(1.25, 0.13);
 uniform float pad = 0.06;
 uniform float fill : hint_range(0.0, 1.0) = 1.0;
 uniform float ghost : hint_range(0.0, 1.0) = 1.0;
+uniform bool ally = true;                        // D495: the player's side
 
 void vertex() {
 	// billboard, keeping the node's scale (the Giant's bar is 2.6x)
@@ -29,8 +32,7 @@ void fragment() {
 	vec2 full = bar_size + 2.0 * pad;
 	vec2 p = UV * full - pad;                    // bar space: (0,0)..bar_size
 	vec2 px = max(fwidth(p), vec2(1e-5));        // world units per screen pixel
-	bool bright = fill >= 0.5 - 1e-4;
-	float fc = bright ? 0.0 : 1.0;               // fill colour (screen grey)
+	float fc = ally ? 0.0 : 1.0;                 // fill colour (screen grey): D495 by team
 	float oc = 1.0 - fc;                         // its opposite: pips, inner ring
 	vec2 dout = max(max(-p, p - bar_size), vec2(0.0)) / px;
 	float d = max(dout.x, dout.y);
@@ -45,9 +47,9 @@ void fragment() {
 		}
 	} else {
 		float x = p.x / bar_size.x;
-		g = bright ? 0.80 : 0.16;                // the empty well
+		g = ally ? 0.36 : 0.64;                  // the empty well (BWWidgets.HPBar.palette)
 		if (x < ghost) {
-			g = 0.5;                             // the chunk just lost: mid-grey in both modes
+			g = ally ? 0.68 : 0.32;              // the chunk just lost: a grey past the well's
 		}
 		if (x < fill) {
 			g = fc;

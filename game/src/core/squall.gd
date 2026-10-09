@@ -127,7 +127,7 @@ static func advance(b: BWBattle, s: Dictionary) -> void:
 	for h in ring:
 		if not _paintable(t, h):
 			continue
-		var p := t._route(t.at(h), str(s.element), false, 1, owner)
+		var p := t.route_at(h, str(s.element), false, 1, owner)      # D494: lava meets it as fire 1
 		match str(p.op):
 			"none":
 				continue

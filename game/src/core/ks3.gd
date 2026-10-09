@@ -45,7 +45,7 @@ static func paint_opts(by: BWUnit, element: String, o: Dictionary) -> void:
 	match element:
 		"fire":
 			if ks(by, "lava_walker"):
-				o["fire_max"] = BWTiles.LAVA_MAX            # D447: your fire climbs to 5
+				o["fire_max"] = BWTiles.LAVA_MAX            # D447 / D494: your fire climbs to 4
 				o["lava"] = true
 			var r := 2 if sc else 1                         # D452: reactions radius 2
 			if ks(by, "island_maker"):
@@ -84,12 +84,12 @@ static func before_paint(b: BWBattle) -> Dictionary:
 	return { "pillars": b.tiles.pillars.duplicate(true) }
 
 
-## Right after BWTiles.apply, before any damage: the fizzles, Superconductor's
-## own-hex immunity for this action.
+## Right after BWTiles.apply, before any damage: the lava it met (D494: as
+## fire 1), Superconductor's own-hex immunity for this action.
 static func after_apply(b: BWBattle, by: BWUnit, element: String, r: Dictionary) -> void:
-	var fz: Array = r.get("fizzled", [])
-	if not fz.is_empty():
-		b._emit({ "type": "fizzle", "hexes": fz.duplicate(), "element": element, "unit": by.id if by else "" })
+	var lh: Array = r.get("lava_hit", [])
+	if not lh.is_empty():
+		b._emit({ "type": "lava_react", "hexes": lh.duplicate(), "element": element, "unit": by.id if by else "" })
 	BWKs3Thunder.mark_own_hex(b, by, r)
 
 

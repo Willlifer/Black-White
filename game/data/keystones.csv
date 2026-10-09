@@ -1,5 +1,5 @@
 id,element,name,title,text,kind,params
-lava_walker,fire,Lava Walker,the Lava Walker,"Your fire climbs to 4 and 5, and nothing reacts with it: every element fizzles on it, fuses too. It burns 5% a step standing, 3% crossing. You and allies beside you never burn on fire.",passive,max=5;stand_pct=5;cross_pct=3;aura=1
+lava_walker,fire,Lava Walker,the Lava Walker,"Your fire climbs to 4: lava. Reactions treat it as fire 1 and burn off one step. It burns 5% a step standing, 3% crossing. You and allies beside you never burn on fire.",passive,max=4;stand_pct=5;cross_pct=3;aura=1
 island_maker,fire,Island Maker,the Island Maker,"Your fire's Overheats and eruptions reach 1 ring further (an Overheat ring of radius 2). You take 75% less damage from the reactions you set off, your own fire included.",passive,radius=1;own_taken_pct=25
 abyssal,dark,Abyssal,the Abyssal,"Free, once per turn, range 3: overcharge a dark 3 hex. It explodes as Pitch Black: 15% to every foe within 1, and +1 Rot each. The hex isn't consumed: it counts as dark 4 until your turn ends, then it's dark 3 again.",action,range=3;pct=15;rot=1;radius=1
 hopekiller,dark,Hopekiller,the Hopekiller,"Foes standing on your dark can't be healed or buffed: any heal they'd get hurts them for the same amount instead. A foe KO'd on your dark leaves dark 3 behind.",passive,dark=3

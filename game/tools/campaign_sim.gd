@@ -592,7 +592,7 @@ func _ledger(b: BWBattle, deployed: Array, won: bool, n: int, kind: String, stal
 		var amt := 0
 		var who := str(e.get("unit", ""))
 		var ty := str(e.get("type", ""))
-		if ty in ["fizzle", "la_nina", "rain", "submerge", "shatterer", "superconductor", "overflow", "hopekiller", "overload"]:
+		if ty in ["lava_react", "la_nina", "rain", "submerge", "shatterer", "superconductor", "overflow", "hopekiller", "overload"]:
 			_led_add(evs, "ev:" + ty, who, team, 1)
 		match ty:
 			"turn":

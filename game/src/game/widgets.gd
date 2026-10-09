@@ -391,12 +391,12 @@ static func draw_stone(ci: CanvasItem, s: Vector2, bright: bool) -> void:
 		ci.draw_line(Vector2(cx - s.x * 0.06, y), Vector2(cx + s.x * 0.06, y), line, 1.5)
 
 
-## D215: the HP bar. At or above 50% HP the fill is BLACK with WHITE pips,
-## below 50% it is WHITE with BLACK pips; pips mark every 10% of max HP (9
-## ticks). A two-ring outline (the fill's opposite inside, its own colour
-## outside) reads on dark panels and light ones. A drop leaves a mid-grey
-## ghost that drains; the forecast cut (`preview`) is the same grey. Crossing
-## 50% pulses once. No numbers unless the bar or its card (the nearest
+## D215: the HP bar. D495: coloured by TEAM (`enemy`), not HP: an ally's fill
+## is BLACK with WHITE pips over a dark-grey empty well, an enemy's WHITE with
+## BLACK pips over a light-grey well (`palette`); pips mark every 10% of max
+## HP (9 ticks). A two-ring outline (the fill's opposite inside, its own
+## colour outside) reads on dark panels and light ones. A drop leaves a grey
+## ghost that drains; the forecast cut (`preview`) is the same grey. No numbers unless the bar or its card (the nearest
 ## PanelContainer, or a row that takes the mouse) is hovered: then "hp / max"
 ## sits on the bar (bars under 9 px tall stay silent; their icons carry a tooltip).
 class HPBar:
@@ -404,11 +404,13 @@ class HPBar:
 	var hp := 100
 	var max_hp := 100
 	var preview := -1        # forecast: HP after the hit, drawn as a grey cut
-	var enemy := false       # kept for callers; the colour follows HP now (D215)
+	var enemy := false:      # D495: the colours follow the team (false = the player's side)
+		set(v):
+			enemy = v
+			queue_redraw()
 	var track := false       # one unit for life (a stone's row): animate the ghost and the flip
 	var _ghost := -1.0       # fraction the grey chunk drains from (-1 = none)
 	var _ghost_tw: Tween
-	var _pulse := 0.0
 	var _hover := false
 	var _host: Control
 
@@ -431,10 +433,14 @@ class HPBar:
 			_ghost_tw.tween_interval(0.35)
 			_ghost_tw.tween_method(func(x: float): _ghost = x; queue_redraw(), _ghost, f, 0.45)
 			_ghost_tw.tween_callback(func(): _ghost = -1.0; queue_redraw())
-		if same_unit and is_inside_tree() and (f >= 0.5) != (old_f >= 0.5):
-			var tw := create_tween()
-			tw.tween_method(func(x: float): _pulse = x; queue_redraw(), 1.0, 0.0, 0.3)
 		queue_redraw()
+
+	## D495: the bar's colours by team: { fill, pip, well, ghost }. The 3D
+	## bar's shader (hp_bar.gdshader) uses the same greys.
+	static func palette(ally: bool) -> Dictionary:
+		if ally:
+			return { "fill": Color.BLACK, "pip": Color.WHITE, "well": Color(0.36, 0.36, 0.36), "ghost": Color(0.68, 0.68, 0.68) }
+		return { "fill": Color.WHITE, "pip": Color.BLACK, "well": Color(0.64, 0.64, 0.64), "ghost": Color(0.32, 0.32, 0.32) }
 
 	func _ready() -> void:
 		var n := get_parent()
@@ -456,15 +462,14 @@ class HPBar:
 	func _draw() -> void:
 		var s := size
 		var f := clampf(float(hp) / max_hp, 0.0, 1.0)
-		var bright := f >= 0.5
-		var fc := Color.BLACK if bright else Color.WHITE
-		var oc := Color.WHITE if bright else Color.BLACK
-		var grow := 1.5 * _pulse                     # the 50% flip: a quick swell
-		var r := Rect2(Vector2(-grow, -grow), s + Vector2(grow, grow) * 2.0)
+		var pal := palette(not enemy)                # D495: by team
+		var fc: Color = pal.fill
+		var oc: Color = pal.pip
+		var r := Rect2(Vector2.ZERO, s)
 		draw_rect(r.grow(2), fc)                     # outer ring: the fill's own colour
 		draw_rect(r.grow(1), oc)                     # inner ring: its opposite
-		draw_rect(r, Color(0.8, 0.8, 0.8) if bright else Color(0.16, 0.16, 0.16))
-		var grey := Color(0.5, 0.5, 0.5)
+		draw_rect(r, pal.well)
+		var grey: Color = pal.ghost
 		if _ghost > f:
 			draw_rect(Rect2(r.position, Vector2(r.size.x * _ghost, r.size.y)), grey)
 		draw_rect(Rect2(r.position, Vector2(r.size.x * f, r.size.y)), fc)

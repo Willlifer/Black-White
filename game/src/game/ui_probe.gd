@@ -167,6 +167,7 @@ func _run() -> void:
 	_check(screen.last_tiers.any(func(x): return x[0] == "attack" and (x[1] == "minimal" or x[1] == "full")), "basic attacks play minimal (or full on a crit / KO)")
 	await _gear_tooltip_probe()                  # D171: the author's stuck tooltip
 	await _autoequip_probe()                     # D315-D318
+	await _split_gear_probe()                    # D493: the Split Front plate over the gear panel
 	_finish()
 
 
@@ -644,6 +645,102 @@ func _autoequip_probe() -> void:
 	_check(sig.call() == before, "unequip all: Undo puts everything back")
 	layer.queue_free()
 	await get_tree().process_frame
+
+
+## D493 (the author: "in split front, the tool tip does not allow me to select
+## equipment options"): the Split Front pre-battle, Equipment clicked open: the
+## mode plate (its own canvas layer, over the panel's header) is hidden, a
+## header option under where it stood takes the click, a piece equips by
+## double-click; Close brings the plate back. The Horde's plate hides for the Shop.
+func _split_gear_probe() -> void:
+	screen.queue_free()
+	await get_tree().process_frame
+	for md in ["splitfront", "horde"]:
+		var ids: Array = BWData.table("roster").slice(0, 6).map(func(r): return str(r.id))
+		var run := BWRun.start(ids, 1)
+		var n := BWRun.SPLIT_FIGHT if md == "splitfront" else 8
+		for u in run.squad:
+			BWProgression.level_up(u, n - u.level)
+			BWPicks.auto_resolve(u)
+		run.fight = n
+		run.mode_override = { n: md }
+		for i in 6:
+			run.inventory.append(run.random_item(["D", "C"][i % 2]))
+		var pre := BWPrebattleScreen.new()
+		pre.run = run
+		get_parent().add_child(pre)
+		for k in 20:
+			await get_tree().process_frame
+		var mp := pre._mode_plate
+		_check(mp != null and mp.plate_visible, "%s pre-battle: the mode plate shows" % md)
+		if mp == null:
+			pre.queue_free()
+			continue
+		var plate_rect: Rect2 = (mp._layer.get_child(0) as Control).get_global_rect()   # same canvas space as the gear panel (no layer transforms)
+		var bar_btn := "Equipment" if md == "splitfront" else "Shop"
+		var btn: Button = null
+		for b in pre._root.find_children("*", "Button", true, false):
+			if (b as Button).text == bar_btn and b.get_parent() is HBoxContainer and not pre._equip.is_ancestor_of(b) and not pre._shop.is_ancestor_of(b):
+				btn = b
+		_check(btn != null, "%s pre-battle: the %s button" % [md, bar_btn])
+		if btn == null:
+			pre.queue_free()
+			continue
+		await _move(_ctl_center(btn))
+		await _press(_ctl_center(btn), true)
+		await _press(_ctl_center(btn), false)
+		await get_tree().create_timer(0.3).timeout
+		var panel: Control = pre._equip if md == "splitfront" else pre._shop
+		_check(panel.visible, "%s pre-battle: clicking %s opens it" % [md, bar_btn])
+		_check(not mp.plate_visible, "%s pre-battle: the mode plate hides while %s is open" % [md, bar_btn])
+		if md == "splitfront":
+			var gp: BWGearPanel = pre._equip
+			var want := ""                         # a filter option under where the plate stood
+			for f in ["chest", "legs", "head", "main_hand", ""]:
+				var fb: Button = gp._filter_btns[f]
+				if want == "" and f != "" and plate_rect.intersects(fb.get_global_rect()):
+					want = f
+			_check(want != "", "split front: a gear option sits where the plate stood (plate %s)" % plate_rect)
+			if want == "":
+				want = "chest"
+			var opt: Button = gp._filter_btns[want]
+			var at := _ctl_center(opt)
+			await _move(at)
+			await _press(at, true)
+			await _press(at, false)
+			await get_tree().create_timer(0.2).timeout
+			_check(gp._filter == want, "split front: clicking the gear panel's %s option works (filter %s)" % [opt.text, gp._filter])
+			var u: BWUnit = gp.unit
+			var tile: BWItemTile = null
+			for c in gp._grid.get_children():
+				if c is BWItemTile and run.can_equip(u, c.item) and not c.is_queued_for_deletion():
+					tile = c
+					break
+			_check(tile != null, "split front: a chest piece %s can wear" % u.name)
+			if tile:
+				var it: Dictionary = tile.item
+				var tp := _ctl_center(tile)
+				await _move(tp)
+				await _press(tp, true)
+				await _press(tp, false)
+				await _press(tp, true, true)
+				await _press(tp, false)
+				await get_tree().create_timer(0.2).timeout
+				_check(u.equipment.get(str(it.slot), {}) == it, "split front: a double-click equips the item")
+			var close: Button = null
+			for b in gp.find_children("*", "Button", true, false):
+				if (b as Button).text.begins_with("Close"):
+					close = b
+			if close:
+				await _press(_ctl_center(close), true)
+				await _press(_ctl_center(close), false)
+		else:
+			await _key(KEY_ESCAPE)
+		await get_tree().create_timer(0.2).timeout
+		_check(not panel.visible and mp.plate_visible, "%s pre-battle: closing the panel brings the plate back" % md)
+		pre.queue_free()
+		await get_tree().process_frame
+		await get_tree().process_frame
 
 
 func _ctl_center(c: Control) -> Vector2:

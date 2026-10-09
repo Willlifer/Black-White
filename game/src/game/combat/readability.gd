@@ -372,8 +372,10 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 	if BWPools.is_water(b.tiles, h):                 # D264: thunder on water electrifies, never blasts
 		lines.append("[color=#%s]Thunder here: electrifies the water within 1 (%d%% + Staggered at turn start)%s[/color]" % [
 			_hx(BWLook.element_color("thunder")), int(BWPools.SHOCK_PCT), "; already live, nothing" if b.tiles.shock.has(h) else ""])
-	elif b.tiles.is_lava(h):                         # D447: nothing reacts with lava
-		lines.append("[color=#%s]Thunder here: fizzles on the lava (no blast)[/color]" % _hx(BWLook.element_color("thunder")))
+	elif b.tiles.is_lava(h):                         # D494: lava reacts as fire 1, a step burns off
+		var lp: Dictionary = b.tiles._lava_route(e, "thunder", true, 1, "")
+		lines.append("[color=#%s]Thunder here: %d%% blast as fire 1, the lava drops to %d[/color]" % [_hx(BWLook.element_color("thunder")),
+			roundi(float(lp.get("detonate", 0.0))), maxi(0, hv - 1)])
 	elif hv != 0 or vv != 0:
 		var plan: Dictionary = b.tiles._route(e, "thunder", true, 1, "")
 		if plan.has("detonate"):

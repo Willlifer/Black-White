@@ -2,16 +2,19 @@ class_name BWKs3Fire
 extends RefCounted
 ## D447-D448 fire's keystones (Keystones v3, design/ELEMENTS.md).
 ##
-## Lava Walker   your fire climbs to fire 4 and 5 (BWTiles.LAVA_MAX; the paint
-##               option fire_max, the entry flag `lava`). NOTHING reacts with
-##               your fire: any other element, and anyone else's fire, fizzles
-##               on it (BWTiles._lava_filter; thunder's fuses and the Powder
-##               Keg duo included: "lava 5 reigns supreme"). Fresh fire erupts
-##               only at your cap (fire 5), and an eruption's ring never cools
-##               lava. Your fire burns harder: 5% a step standing, 3% a step
-##               crossing (not 4% / 2%), so fire 5 burns 25% at a turn start.
-##               You and allies next to you never take fire walking or
-##               standing damage (any fire).
+## Lava Walker   your fire climbs to fire 4 (BWTiles.LAVA_MAX; D494, was 5;
+##               the paint option fire_max, the entry flag `lava`). Lava acts
+##               as FIRE 1 in every reaction (D494; D447's fizzle is gone):
+##               another element, or anyone else's fire, meets one step of it
+##               (BWTiles._lava_route): a detonation blows fire 1, water
+##               douses it, a gale carries it off, ice freezes it, Inversion
+##               flips it, and that step is spent: lava n -> n - 1. Light and
+##               dark lay beside it; another's fire leaves it standing. Fresh
+##               fire erupts only at your cap (fire 4), and an eruption's ring
+##               never cools lava. Your fire burns harder: 5% a step
+##               standing, 3% a step crossing (not 4% / 2%), so fire 4 burns
+##               20% at a turn start. You and allies next to you never take
+##               fire walking or standing damage (any fire).
 ## Island Maker  your fire's Overheats (and a fire tile_erupt you own) reach 1
 ##               ring further: the ring is radius 2 (3 with Superconductor).
 ##               You take 75% less from the reactions you set off, your own
@@ -69,7 +72,7 @@ static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 	var out: Array = []
 	if b.tiles.is_lava(h):
 		var src := b._unit(str(b.tiles.at(h).get("source", "")))
-		out.append("Lava (%s, Lava Walker): fire %d. Nothing reacts with it: every other element fizzles here. Burns %d%% a step standing, %d%% crossing" % [
+		out.append("Lava (%s, Lava Walker): fire %d. Reactions meet it as fire 1 and burn off a step. Burns %d%% a step standing, %d%% crossing" % [
 			src.name if src else "?", b.tiles.intensity(h, "fire"), BWTiles.LAVA_STAND_PCT, BWTiles.LAVA_CROSS_PCT])
 	var u := b._centre_at(h)
 	if u != null and u.alive():

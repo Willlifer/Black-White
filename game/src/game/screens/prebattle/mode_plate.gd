@@ -16,6 +16,8 @@ var screen: BWPrebattleScreen
 var mode := ""
 var element := ""
 var shown := {}                  # probes / review: { title, lines, west, east }
+var plate_visible: bool:
+	get: return _layer != null and _layer.visible
 var _front_tags := {}            # "west" / "east" -> Label3D
 var _layer: CanvasLayer
 var _lines: Label
@@ -84,7 +86,26 @@ func _build() -> void:
 	_lines.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
 	_lines.add_theme_color_override("font_color", BWStyle.LABEL)
 	v.add_child(_lines)
+	for c in [v, t, _lines]:
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE   # D493: the plate never takes a click
 	shown = { "title": t.text, "lines": Array(lines), "element": element }
+	_sync_cover()
+
+
+## D493: the plate sits on its own layer over the screen's UI, so it hides
+## while the Equipment or Shop panel or the codex is open over the pre-battle
+## (it covered the gear panel's header and ate its clicks) and returns after.
+func _process(_d: float) -> void:
+	_sync_cover()
+
+
+func covered() -> bool:
+	return screen != null and (screen._overlay_open() or is_instance_valid(screen._codex))
+
+
+func _sync_cover() -> void:
+	if _layer:
+		_layer.visible = not covered()
 
 
 # ---------------------------------------------------------------- Split Front
