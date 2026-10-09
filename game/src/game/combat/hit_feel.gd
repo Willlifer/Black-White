@@ -20,6 +20,7 @@ const STOP_BIG := 0.2             # share of max HP that earns a hit-stop
 const STOP_HUGE := 0.35
 const STOP_SECS := [0.045, 0.075] # real seconds frozen (big, huge)
 const STOP_SCALE := 0.03
+const CRIT_STOP := 0.1            # D530: a FULL crit's hit-stop on the impact (its flash plays before the swing)
 const NUM_MIN := 30               # font size: a miss / tiny chip
 const NUM_MAX := 46               # a hit for 40%+ of max HP (D344: was 58)
 const NUM_CRIT := 1.3
@@ -128,21 +129,20 @@ func impact(a: Node3D, targets: Array, results: Array, flash: String) -> void:
 	var vfx = screen.get("vfx") if screen else null
 	if vfx:
 		vfx.impact(a, targets, results)
-	var crit_full := false
 	var stop := 0.0
 	for k in mini(targets.size(), results.size()):
 		var res: Dictionary = (results[k] as Dictionary).get("result", {})
 		if not bool(res.get("hit", true)):
 			continue
-		if bool(res.get("crit", false)) and flash == "full":
-			crit_full = true                  # D101 already froze this frame
+		if bool(res.get("crit", false)) and flash != "none":
+			stop = maxf(stop, CRIT_STOP if flash == "full" else STOP_SECS[0])   # D530: the flash came before the swing; the hit keeps a stop
 		var t: Node = targets[k]
 		var mh: int = t.unit.pct_base_hp() if t and t.get("unit") else 100
 		stop = maxf(stop, hitstop_for(int(res.get("damage", 0)), mh))
 	if final_blow(results):
 		await final_ko(targets, results)
 		return
-	if stop > 0.0 and not crit_full and not _skipping() and _mode() != "minimal" and not bool(screen.get("_freezing")):
+	if stop > 0.0 and not _skipping() and _mode() != "minimal" and not bool(screen.get("_freezing")):
 		await _freeze(stop, STOP_SCALE)
 
 

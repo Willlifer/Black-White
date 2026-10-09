@@ -620,7 +620,7 @@ func test_glare(t) -> void:
 	foe2.hp -= 50
 	b2.tiles.apply([E], "light", me.id, 1)
 	_turn(b2, foe2)
-	t.ok(_ev(b2, "heal").is_empty() and not foe2.statuses.has("blinded"), "light 1: no heal, no blind")
+	t.ok(_ev(b2, "heal").is_empty() and foe2.statuses.has("blinded"), "light 1 (D496): no heal, Blinded")
 
 
 func test_sanctuary(t) -> void:

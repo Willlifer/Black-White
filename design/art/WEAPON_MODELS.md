@@ -1,6 +1,7 @@
 # Weapon models (v1)
 
-There are 25 low-poly main-hand weapons (22 + the 3 fists, D76), built on the base rig (`RIG.md`).
+There are 36 low-poly main-hand weapons (22 + the 3 fists, D76, + 11 more, D501), built on the base rig (`RIG.md`),
+plus 4 cosmetic shields that come with the lance class (D505-D507, "Shields" below).
 Each one is a white body with a black inverted hull (D42), plus a small
 `accent` surface that the element aura tints.
 
@@ -12,6 +13,9 @@ Each one is a white body with a black inverted hull (D42), plus a small
 | `game/art/weapons/weapons.json` | **sidecar metadata, the single source of truth** | generated |
 | `game/art/source/weapons.blend` | every weapon in a row, metadata points as empties | generated, reference only |
 | `game/src/game/character/weapon_view.gd` | `BWWeaponView`: load, attach, aura, trail points | yes |
+| `game/art/weapons/shields/<id>.glb` | the 4 lance-class shields (D505) | generated |
+| `game/src/game/character/shield_view.gd` | `BWShieldView`: load, mount on the off hand / forearm | yes |
+| `game/tools/wpn501_shots.gd` | D501/D505 review sheets (lineup, in hand, shields, icons) | yes |
 | `game/shaders/weapon.gdshader` | unlit fill, with a tintable accent | yes |
 | `game/shaders/aura.gdshader` | fresnel rim on an inflated shell | yes |
 | `game/tests/test_weapon_models.gd` | coverage vs equipment.csv, classes, sockets, aura, budget | yes |
@@ -60,10 +64,10 @@ class, hands, triangle count and length.
 
 | hands | socket | second hand | used by |
 |---|---|---|---|
-| `one` | `socket_weapon_r` | none | sword, scimitar, axe, hatchet, javelin, pistol, flintlock, m1911 |
-| `two` | `socket_weapon_r` | `second_hand = {hand:"l", point}`: the **left** hand's IK target on the grip | flamberge, double_axe, warhammer, anchor, lance, halberd, glaive, staff, moon_staff |
-| `pair` | `socket_weapon_r`, plus an identical copy on `offhand_socket = socket_offhand_l` | none | dagger, jagged_dagger |
-| `bow` | **`socket_offhand_l`** (bows are held in the left hand) | `{hand:"r", point}`: the right hand's **draw / nock** target on the string | shortbow, recurve_bow, compound_bow |
+| `one` | `socket_weapon_r` | none | sword, scimitar, rapier, axe, hatchet, javelin, pistol, flintlock, m1911 |
+| `two` | `socket_weapon_r` | `second_hand = {hand:"l", point}`: the **left** hand's IK target on the grip | flamberge, katana, double_axe, warhammer, anchor, scythe, lance, halberd, glaive, trident, naginata, staff, moon_staff, divine_staff, orb_scepter |
+| `pair` | `socket_weapon_r`, plus an identical copy on `offhand_socket = socket_offhand_l` | none | dagger, jagged_dagger, kunai, karambit |
+| `bow` | **`socket_offhand_l`** (bows are held in the left hand) | `{hand:"r", point}`: the right hand's **draw / nock** target on the string | shortbow, recurve_bow, compound_bow, longbow, ancestral_bow |
 | `fists` | `socket_weapon_r` plus a **mirrored** piece (`offhand_glb`, `<id>_l.glb`) on `socket_offhand_l` | none | hand_wraps, brass_knuckles, gauntlets |
 
 For swords and heavy weapons the left-hand point is below the right hand
@@ -259,10 +263,109 @@ clip set yet (static poses only; ANIMATION.md).
 | m1911 | pistols | one | 132 | boxy slide and frame, steep square grip (×1.4) |
 | staff | staff | two | 270 | gnarled shaft, three-prong claw around a dark gem |
 | moon_staff | staff | two | 296 | straight shaft, crescent head, gem floating in the hollow |
+| rapier | sword | one | 198 | D501: long thin blade (1.08 tip), swept hilt: cup, quillons, knuckle bow down the edge side of the fist |
+| katana | sword | two | 272 | D501: gently curved single edge (the sori bends back to the spine), kissaki, round tsuba, long dark grip with wrap diamonds; left fist at the pommel end |
+| scythe | axe | two | 242 | D501: bent snath with a nib, blade off the top pointing forward and curving down, edge on the inner curve, back spur. Sized to the heavy set's envelope (D503) |
+| trident | lance | two | 252 | D501: crossbar and three prongs fanned in the (f, u) plane, accent points, two outer barbs |
+| naginata | lance | two | 294 | D501: long pole, wrapped neck, round guard, curved blade widening toward the tip, iron butt cap |
+| kunai | daggers | pair | 186 | D501: leaf blade straight off a wrapped grip, no guard, ring pommel (x1.2) |
+| karambit | daggers | pair | 188 | D501: claw blade curving forward, edge on the inner curve, finger ring at the butt (x1.2) |
+| longbow | bow | bow | 320 | D501: tall plain D self bow (1.46), horn nocks on the accent |
+| ancestral_bow | bow | bow | 592 | D501: carved reflex bow: eye stone on the riser (accent), dark carved bands, three feathers tied on cords with beads (static) |
+| divine_staff | staff | two | 526 | D501: banded shaft, halo ring with five rays round a dark gem, a crossbar with two baubles hanging on short chains (static meshes, no sway) |
+| orb_scepter | staff | two | 402 | D501: short staff (1.84), four-rib iron cage round a dark accent orb, finial; leading fist at 0.33 |
 
-Total: 4,454 triangles for the 22 above, plus the fists (2 × 972 for the
-three pairs); the largest is still the flamberge at 462. The test
+Total: 4,454 triangles for the first 22, 3,472 for the D501 eleven, plus the
+fists (2 × 972 for the three pairs); the largest is the ancestral bow at 592
+(its feathers), then the divine staff at 526. The test
 budget is 600 per weapon.
+
+## Shields (D505-D507)
+
+Every lance-class weapon comes with a cosmetic shield: no slot, no stats.
+The author kept confusing lances with staves in the UI; the shield on the
+icon (and on the figure) is the fix. Built by the same script
+(`SHIELDS`, `SHIELD_FOR` in `build_weapons.py`) into
+`game/art/weapons/shields/<id>.glb`, with the weapon look (white fill, black
+hull, an accent boss the element tints).
+
+| shield | tris | read | mount | comes with |
+|---|---|---|---|---|
+| kite_shield | 220 | tall kite: rounded top, long point, dark cross, accent boss | `hand` | lance |
+| buckler | 260 | small round buckler: shallow dome, iron rim and rivets, pointed accent boss | `hand` | javelin |
+| square_shield | 174 | square plank shield: iron frame, corner rivets, accent boss | `hand` | trident |
+| hand_guard | 172 | a vamplate-sized domed disc (r 0.08) with an accent stud, strapped bracer-style | `forearm` | halberd, glaive, naginata |
+
+**Data.** `weapons.json` → each lance-class weapon carries `"shield": <id>`
+(the pairing, D506/D507); the top-level `"shields"` map holds each shield's
+`kind`, `socket`, `bone`, `mount` {`position`, `face`, `up`}, `center`,
+`radius`, `aabb`, `tris`, `glb`, `used_by`. Change the pairing or the mount
+in `build_weapons.py` (`SHIELD_FOR`; `SHIELDS` rows: `along` up the forearm
+from the fist, `out` off the back of the hand) and rebuild, or retune live
+with `BWShieldView.set_mount()`.
+
+**Shield space:** origin = the arm strap on the back face, +Z the face, +Y
+the shield's top. The mount is given in `socket_offhand_l`'s **rest** frame
+(world-aligned at rest: +Y up, +Z her forward, +X her left): `face` is where
+the shield's +Z goes (out from the back of the left hand), `up` where its +Y
+goes (up the forearm, toward the elbow).
+
+**On the character.** `BWWeaponView.attach_to(rig)` hangs the weapon's
+shield as `w.shield_view` (a `BWShieldView`); `detach()` (a swap to another
+class, a re-dress) frees it. So the shield follows the equipped main hand
+everywhere a weapon is attached (combat, pre-battle, portraits); a slung
+second weapon (`stowed`) brings none.
+- `kind "hand"` (kite, buckler, square): parented to `socket_offhand_l`
+  (bone `hand_l`), so it is held: the polearm clips (animation lane) put the
+  off hand where the shield should be.
+- `kind "forearm"` (hand_guard): a `BoneAttachment3D` named
+  `shield_forearm_l` on bone `forearm_l`, with a child `frame` that
+  reproduces the off-hand socket's rest frame; the wrist turns under it and
+  the hand stays free to grip the shaft (halberd, glaive, naginata keep their
+  two-handed grips).
+
+```gdscript
+w.shield_view                         # BWShieldView or null (non-lance weapons)
+BWShieldView.shield_for("lance")      # "kite_shield"; "" for other classes
+BWShieldView.meta_for("kite_shield")  # kind, mount, ...
+BWShieldView.mount_for(id)            # Transform3D in the holder frame
+s.set_mount(pos, face, up)            # retune at runtime
+s.kind(); s.face_global(); s.set_accent(color); s.set_outline_width(w)
+w.with_shield = false                 # before attach_to: no shield (tools only)
+```
+
+The accent follows the weapon: imbue and aura tint the boss like the
+weapon's own accent (no aura shell on the shield).
+
+**Icons.** `BWItemIcons` (v2) adds the shield to a lance-class weapon's icon
+(`BWItemIcons.icon_shield(id)`): facing the icon camera, halfway from the
+butt to the tip (`ICON_SHIELD_AT`), a touch in front of the shaft, at ×1.35
+(`ICON_SHIELD_SCALE`) so it reads at 128 px. Every place an item icon shows
+(pre-battle gear panel, item tiles, downtime) goes through it.
+
+Review renders: `design/art/wpn501_shield_icons.png` (the six lance icons
+with the four staves, plain and fire), `wpn501_shield_inhand.png` (each
+shield on its weapon: idle 3/4, idle from her left, the strike, the combat
+camera at true scale).
+
+**Open (animation lane):** lance and trident still carry `hands: "two"` and
+a left-hand `second_hand` point, so today's polearm clips may still reach the
+off hand to the shaft; the animation agent is moving the off hand to hold the
+shield. To make them one-handed in data, change their `hands` in `WEAPONS`
+(that also changes their style to `spear`), which is their call.
+
+## D501 additions: sizing against the clip sets (D503)
+
+New models of an existing class ride that class's clip set unchanged, and
+`test_animation`'s solved checks (floor lifts < 8 cm outside the fall, no
+blade across the face in the standing clips) bound how big they can be. The
+first cut of the scythe (2.2 long, blade 0.85 forward), longbow (1.78) and
+divine staff (2.72) failed them, so they were cut to the siblings' envelope:
+scythe ≈ the double axe's reach (blade 0.57 forward, top 1.50), longbow 1.46
+(the recurve's height), divine staff top 1.70 (the staff's), rapier tip
+1.08. A bigger reaper scythe needs the heavy set's clips to carry it higher
+(animation lane). `game/tools/wpn501_shots.gd` renders the review sheets
+(`wpn501_lineup.png`, `wpn501_inhand_a.png` / `_b.png`).
 
 ## Adding a weapon
 
@@ -275,7 +378,10 @@ budget is 600 per weapon.
    `dict(tip, trail_base, aura, second?)` in weapon space (x, f, u).
 3. Add `(id, class, hands, builder, notes)` to `WEAPONS`, plus a `SCALE`
    entry if the weapon is small.
-4. Rebuild, run `--import` and `--self-test`, render the lineup, and look
+4. Add the id to the `enchantments.csv` rows it should roll (D501 copied a
+   sibling's rows), and, for the lance class, a `SHIELD_FOR` entry.
+5. Rebuild, run `--import` and `--self-test` (`test_animation` checks the new
+   model against its clip set: floor and face), render the lineup, and look
    at it.
 
 ## Decisions I made

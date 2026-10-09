@@ -41,8 +41,8 @@ const BODY := ["root", "hips", "spine", "chest", "neck", "head", "squash", "head
 static func clips(st: String) -> Array:
 	var out: Array = []
 	if st == "polearm":
-		out.append_array([walk_colossus(), stomp_colossus(), strike_colossus()])
-	if st in ["one", "polearm"]:
+		out.append_array([walk_colossus(st), stomp_colossus(st), strike_colossus(st)])
+	if st in ["one", "polearm", "spear"]:   # D520: the Horde's lances too
 		out.append(jab(BWAnimAction.strike(st), "strike_jab"))
 	if st == "one":
 		out.append(jab(BWAnimAction.strike_axe(st), "strike_axe_jab"))
@@ -69,9 +69,9 @@ static func _r(c: BWAnimClips.Clip, d: Vector3) -> Vector3:
 
 ## WALK_COLOSSUS (polearm, 32 f loop, 0.36 hex per cycle in model space:
 ## the 2.6x figure covers a hex in ~0.74 s at a step every 0.67 s).
-static func walk_colossus() -> BWAnimClips.Clip:
+static func walk_colossus(st: String = "polearm") -> BWAnimClips.Clip:
 	var T := 32.0
-	var c := BWAnimClips.new_clip("walk_colossus", int(T), true, "polearm")
+	var c := BWAnimClips.new_clip("walk_colossus", int(T), true, st)
 	var D := 1.2
 	var beta := 0.62
 	c.meta = { "stride": D, "speed": D / (T / BWAnimClips.FPS), "beta": beta, "gait": "walk" }
@@ -106,8 +106,8 @@ static func walk_colossus() -> BWAnimClips.Clip:
 ## (f15), then is driven down: the foot lands flat on f17 ("stomp"), the
 ## whole body drops after it (f19, a deep squash, the head nods), the
 ## spear jolts, a slow rise back to the guard.
-static func stomp_colossus() -> BWAnimClips.Clip:
-	var c := BWAnimClips.new_clip("stomp_colossus", 40, false, "polearm")
+static func stomp_colossus(st: String = "polearm") -> BWAnimClips.Clip:
+	var c := BWAnimClips.new_clip("stomp_colossus", 40, false, st)
 	c.marker("stomp", 17).marker("recovered", 36).marker("pose", 12)
 	c.meta = { "kind": "stomp" }
 	c.at_base(0, BODY + _hand_chans())
@@ -157,8 +157,8 @@ static func stomp_colossus() -> BWAnimClips.Clip:
 ## line, arm long, "hit" on f31 with a squash. Held follow-through f31-f46
 ## (a slow settle into the lunge), then hauled back, the front foot steps
 ## home (f54), recovered f60.
-static func strike_colossus() -> BWAnimClips.Clip:
-	var c := BWAnimClips.new_clip("strike_colossus", 64, false, "polearm")
+static func strike_colossus(st: String = "polearm") -> BWAnimClips.Clip:
+	var c := BWAnimClips.new_clip("strike_colossus", 64, false, st)
 	c.marker("coil", 22).marker("launch", 26).marker("land", 30).marker("hit", 31).marker("recovered", 60).marker("pose", 33)
 	c.meta = { "hand_frame": "root", "kind": "melee", "engage": 99.0 }
 	c.at_base(0, BODY + _hand_chans())

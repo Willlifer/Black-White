@@ -88,6 +88,11 @@ Notes:
 
 - Light both heals and exposes, and dark both hides and (at 3) drains. Each
   axis is a trade, as in V8, so neither is a pure buff to stand on.
+- **Light heals only its owner's side (D496).** A hex remembers whose light it
+  is (`lsrc`, beside `source`: fire laid on your light leaves the light yours;
+  light laid on it takes it over; Inversion's flipped light is the inverter's).
+  A foe's light never heals you; authored map light (no owner) heals anyone.
+  `BWTiles.light_owner`. Glare is now "a foe on your light is Blinded" (light 1+).
 - Fire with light (e.g. h = 2, v = 2) burns 8% and heals 6% on the same turn
   start. Damage is applied first, then healing (so a unit at 5% HP on that
   tile is knocked out, not saved).
@@ -757,7 +762,7 @@ tile_damage = max_hp × pct × (1 + 0.05 × detonator_thunder_rank)   # detonati
 | Damage | thunder vs target on water: × (1 + 0.10 × water intensity), after mitigation | "Conducted through Water 3: ×1.3" |
 | Resist chance | none (tiles never roll) | — |
 | Avoid / glance | none; painting happens anyway | — |
-| Damage (D424, not a tile term) | a **ranged** blow while any foe stands within 2 of the attacker: ×0.9 after mitigation | "Pressured (enemy within 2) −10%" |
+| Damage (D424/D499, not a tile term) | a **ranged** blow while any foe stands within 2 of the attacker: −25% on an adjacent target, −18% at 2, −10% at 3+ | "Pressured (enemy within 2; target adjacent) −25%" |
 
 **Pressured (D424).** Ranged = a basic of a class with reach 3+ (bow, pistols,
 staff; the lance's reach 2 is melee) or a skill aimed at one unit or one hex
@@ -1076,7 +1081,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Light | Sunpath | +1 move starting on light, +2 on light 3. D307: an ally on your beam (its hexes, the bend or the other end) starts its turn with +1 move, read live. | `start_move` |
 | Light | Radiant Guard | Light's hit bonus doesn't apply to attacks on you (shown as a 0 line). | `radiant_guard` |
 | Light | Judgement | Your attacks on a foe standing on light can't glance. | `judgement` |
-| Light | Glare | A foe starting its turn on light you laid isn't healed; on light 2+ it's Blinded. | `glare` |
+| Light | Glare | A foe starting its turn on light you laid is Blinded (D496: no foe heals on your light anyway). | `glare` |
 | Light | Sanctuary | Your light heals your side 5/9/14% (base 3/6/9). Once per battle, an ally within 3 dropping under 35% HP gets light 2 on its hex. | `sanctuary` |
 
 **Negation (D93).** "Elemental effect" = tile damage from an element (fire
@@ -1657,7 +1662,7 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 - **Saves (v13):** a removed keystone is refunded (the slot reopens); a converted one is refunded and comes back as the matching enchanted item in the inventory.
 
 ### 20.4 Duo perks (D455-D458)
-Offered on a perk pick of the first element, only to a unit holding an ordinary perk in **both** elements, as the second card on about a third of such picks; it fills that perk slot.
+Offered on a perk pick of the first element, once the unit has learned **3 picks of each element's tree** (ordinary perks + that element's keystone; `BWDuo.MIN_TREE`), and then **always** as the second card (D498, author; was 1 perk each at 35%); it fills that perk slot.
 
 | Duo | Elements | Rule |
 |---|---|---|

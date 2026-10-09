@@ -11,7 +11,7 @@ const ONCE_CD := 999
 
 func _init() -> void:
 	define({
-		"key": "tempest", "name": "Tempest", "weapon": "staff", "clip": "",
+		"key": "tempest", "name": "Tempest", "weapon": "staff", "clip": "tempest",   # D519: the floating cast (cast_tempest)
 		"desc": "Once per battle: a storm on a tile up to 4 away; every enemy within 2 of it is hit and all 19 tiles take your element",
 		"targeting": "hex", "needs_element": true, "range": RANGE, "cd": 0, "once_per_battle": true,
 		"power": POWER, "radius": RADIUS, "min_range": 0, "los": true, "spell": true, "aoe": true,

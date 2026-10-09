@@ -327,7 +327,7 @@ func _element_body(e: String) -> String:
 		"light":
 			return hdr + _row("Turn start", func(i): return "heals %d%% HP" % (BWTiles.LIGHT_HEAL_PCT * i)) \
 				+ _row("Attacks on it", func(i): return "%+d hit" % (BWTiles.HIT_PER_POINT * i)) \
-				+ "[/table]\nLight heals and exposes: a trade, not a pure buff."
+				+ "[/table]\nLight heals only the side that laid it, and exposes whoever stands on it."
 		"dark":
 			return hdr + _row("Attacks on it", func(i): return "%+d hit" % (-BWTiles.HIT_PER_POINT * i)) \
 				+ _row("Turn start", func(i): return "drains %d%% HP" % BWTiles.DARK3_DRAIN_PCT if i == 3 else "—") \

@@ -682,7 +682,7 @@ func forecast_basic(u: BWUnit, target: BWUnit, share: float = 1.0, share_label: 
 	if share != 1.0:
 		mods.append({ "stage": "dmg", "label": share_label, "value": share })
 	if BWFormulas.is_ranged(int(w.get("range", 1)), true) and pressured(u, from):   # D424
-		mods.append(BWFormulas.pressure_mod())
+		mods.append(BWFormulas.pressure_mod(_reach_dist(u, u.pos if from == NOWHERE else from, target)))   # D499
 	var fcb := _annotate(_guarded(BWFormulas.forecast(u, target, kind, power, el, 0.0, 0.0, 1.0, mods), target), target, u)
 	if el == "wind":                           # D407: what a wind basic does, in words
 		fcb["notes"] = (fcb.get("notes", []) as Array) + ["Gust: a landed hit pushes it 1 away"]
@@ -934,6 +934,8 @@ func attack(u: BWUnit, target: BWUnit) -> Dictionary:
 			e["strike"] = i
 			e["strikes"] = strikes.size()
 			e["pattern"] = s.pattern
+		if behind(v, u.pos):
+			e["behind"] = true                 # ---- D517: view only (the dagger backstab); no rule reads it
 		_emit(e)
 		if first.is_empty():
 			first = res
@@ -1484,6 +1486,15 @@ func pressured(u: BWUnit, at: Vector2i = NOWHERE) -> bool:
 	return false
 
 
+## D499: hexes from `u` (standing at `at`) to `v`, nearest footprint hexes.
+func _reach_dist(u: BWUnit, at: Vector2i, v: BWUnit) -> int:
+	var best := 999
+	for mh in u.footprint(at):
+		for th in v.footprint():
+			best = mini(best, BWHex.distance(mh, th))
+	return best
+
+
 ## D424: a ranged single-target skill: one unit or one hex, no area, reach
 ## 3+ (bow and staff shots, Bolt, Saturate, a thrown pair, Hook). Areas
 ## (radius / aoe), lines, leaps and self shapes are exempt; a skill that
@@ -1517,7 +1528,7 @@ func _skill_forecast(u: BWUnit, s: Dictionary, el: String, v: BWUnit, p: Diction
 		mods.append({ "stage": "dmg", "value": pct / 100.0,
 			"label": "%s: strike %d of %d at %d%%" % [s.name, strike + 1, hits, int(pct)] })
 	if ranged_skill(s) and pressured(u):            # D424: a foe within 2 of a ranged single-target skill
-		mods.append(BWFormulas.pressure_mod())
+		mods.append(BWFormulas.pressure_mod(_reach_dist(u, u.pos, v)))   # D499: scaled by the target's distance
 	# The skill's own riders (D87), labelled for the breakdown.
 	var notes: Array = []
 	d.forecast_mods(self, u, el, v, p, strike, mods, notes)
@@ -2210,7 +2221,7 @@ func _begin_turn() -> void:
 	var heal := 0.0 if own else _light_heal(u, st)  # D93 Sanctuary / Glare
 	if heal > 0 and u.alive():
 		_heal_tag = _light_tag(u, st, stayed)        # D473: the sim's heal ledger (no rule effect)
-		BWBeams.light_heal(self, u, heal, str(st.source))   # D288: Overflow turns the excess into a Ward of Light
+		BWBeams.light_heal(self, u, heal, str(st.get("light_src", st.source)))   # D288: Overflow turns the excess into a Ward of Light
 		_heal_tag = ""
 	BWBeams.turn_start(self, u)                    # D287: Dawn, -1 on the longest cooldown on light 2+
 	if over:
@@ -2958,18 +2969,17 @@ func _light_tag(u: BWUnit, st: Dictionary, stayed: bool) -> String:
 
 
 ## Light healing at a turn start, with Sanctuary (the tile's layer heals its
-## own side more) and Glare (it heals no foe of its layer).
+## own side more). D496: light heals only its owner's side (map light, no
+## owner, heals anyone), so a foe's light never heals you.
 func _light_heal(u: BWUnit, st: Dictionary) -> float:
 	var heal: float = st.heal * BWWeather.heal_mult(weather)   # D250: Eclipse, light heals x2
 	if heal <= 0.0:
 		return 0.0
-	var src := _unit(str(st.source))
+	var src := _unit(str(st.get("light_src", st.source)))
 	if src == null:
 		return heal
 	if src.team != u.team:
-		for e in BWEffects.list(src, "glare"):
-			_emit({ "type": "perk", "unit": src.id, "perk": e.name, "target": u.id, "what": "no_heal" })
-			return 0.0
+		return 0.0
 	else:
 		for e in BWEffects.list(src, "sanctuary"):
 			return maxf(heal, BWEffects.by_level(e, tiles.intensity(u.pos, "light")))
@@ -3092,7 +3102,7 @@ func _perk_turn_start(u: BWUnit) -> void:
 				break
 	var lt := tiles.intensity(u.pos, "light")
 	if lt > 0 and u.alive():
-		var lsrc := _unit(str(tiles.at(u.pos).get("source", "")))
+		var lsrc := _unit(tiles.light_owner(u.pos))
 		if lsrc != null and lsrc.team != u.team:
 			for e in BWEffects.list(lsrc, "glare"):
 				if lt >= int(BWEffects.p(e, "min", 2)):
@@ -3767,9 +3777,9 @@ func ground_report(hex: Vector2i) -> Dictionary:
 		t.lines.append(["Dark 3 drains", -dd])
 	if st.heal > 0:
 		var pct := float(st.heal) * BWWeather.heal_mult(weather)   # D250: Eclipse
-		var s := _unit(str(st.source))
-		if s != null and s.team != u.team and BWEffects.has(s, "glare"):
-			pct = 0.0
+		var s := _unit(str(st.get("light_src", st.source)))
+		if s != null and s.team != u.team:
+			pct = 0.0                              # D496: a foe's light heals no one of yours
 		elif s != null and s.team == u.team:
 			for fx in BWEffects.list(s, "sanctuary"):
 				pct = maxf(pct, BWEffects.by_level(fx, tiles.intensity(hex, "light")))

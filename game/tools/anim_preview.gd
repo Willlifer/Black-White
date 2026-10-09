@@ -31,7 +31,7 @@ extends SceneTree
 
 const DT := 1.0 / 60.0
 ## One roster character per style; axe clips use an axe user of the style.
-const REPS := { "one": "stryker", "heavy": "della", "polearm": "rui", "spear": "dragtol",
+const REPS := { "one": "stryker", "heavy": "della", "polearm": "rui", "spear": "bob",
 	"staff": "jericho", "pair": "rem", "bow": "gail", "pistol": "sala", "fists": "will" }
 ## No roster character starts with fists (D76): the fists rep wears hand wraps.
 const REP_WEAPON := { "fists": "hand_wraps" }
@@ -99,6 +99,11 @@ func _run() -> void:
 		"showcase":
 			for st in _styles():
 				await _showcase(st)
+		"clipgif":
+			# D510: one character, one clip (or several, comma-separated), two
+			# cameras (cutscene-like 3/4 and side): frames for anim_gif.py
+			for clip in clip_only.split(","):
+				await _clip_gif(style_only, clip, _arg(OS.get_cmdline_user_args(), "--rep", ""), _arg(OS.get_cmdline_user_args(), "--name", ""))
 		"stricken":
 			await _variants_gif()
 			await _variants_strip(style_only if style_only != "" else "one")
@@ -117,7 +122,8 @@ func _run() -> void:
 
 func _unit_for(st: String, clip: String) -> BWUnit:
 	var id: String = REPS[st]
-	if clip in ["strike_axe", "walk_heavy", "run_heavy", "strike_hook", "strike_axe_jab"] and AXE_REPS.has(st):
+	if clip in ["strike_axe", "walk_heavy", "run_heavy", "strike_hook", "strike_axe_jab", "strike_sweep_under", "strike_throw_under"] and AXE_REPS.has(st) \
+			or (clip.begins_with("strike_smash") and st == "one"):   # D510: the axe alternates
 		id = AXE_REPS[st]
 	var u := BWRosterKits.unit(id)
 	if REP_WEAPON.has(st):
@@ -601,6 +607,72 @@ func _lineup(clip: String) -> void:
 	for e in entries:
 		e.c.free()
 		e.vp.queue_free()
+
+
+## D510: one clip on one character from two cameras (the cutscene's 3/4
+## and a side view), the root driven as in combat (the dash and hop home),
+## a beat of idle before and after. Frames -> <frames>/anim_<name>/.
+func _clip_gif(st: String, clip: String, rep: String, gif_name: String) -> void:
+	var nm := gif_name if gif_name != "" else "%s_%s" % [st, clip]
+	if "," in clip_only and gif_name != "":
+		nm = "%s_%s" % [gif_name, clip]
+	var dir := frames_dir.path_join("anim_" + nm)
+	_clean(dir)
+	var cell := Vector2i(360, 360)
+	var cams: Array = []
+	var chars: Array = []
+	for k in 2:
+		var vp := _viewport(cell, true)
+		var stage := Node3D.new()
+		vp.add_child(stage)
+		for z in range(-2, 4):
+			_tile(stage, Vector3(0, 0, z * BWAnimClips.HEX_STEP))
+		var c := _character(stage, BWRosterKits.unit(rep) if rep != "" else _unit_for(st, clip))
+		var cam := Camera3D.new()
+		cam.fov = 30.0
+		vp.add_child(cam)
+		cam.make_current()
+		_step(c, 30)
+		chars.append(c)
+		cams.append([vp, cam, deg_to_rad(-62.0) if k == 0 else deg_to_rad(40.0)])   # the cutscene side, and her left (the off hand)
+	var lib: AnimationLibrary = chars[0].animator.library
+	if not lib.has_animation(clip):
+		print("no clip ", st, " ", clip)
+		return
+	var scs: Array = []
+	for c in chars:
+		scs.append(_scenario(c, clip))
+	var pre := 12
+	var steps := int(scs[0].steps) + 24
+	var frame := 0
+	for i in range(-pre, steps + 1):
+		for k in 2:
+			var c: BWCharacter = chars[k]
+			if i == 0:
+				scs[k].setup.call(c)
+			elif i > 0:
+				scs[k].drive.call(c, i)
+			_step(c)
+		if i % 2 != 0:
+			continue
+		for k in 2:
+			var c: BWCharacter = chars[k]
+			var focus := c.global_position + Vector3(0, 1.1, 0.4)
+			var b := Basis.from_euler(Vector3(deg_to_rad(-8.0), float(cams[k][2]), 0))
+			(cams[k][1] as Camera3D).global_transform = Transform3D(b, focus + b.z * 9.0)
+		await _frame()
+		var img := Image.create(cell.x * 2, cell.y, false, Image.FORMAT_RGB8)
+		for k in 2:
+			var im: Image = (cams[k][0] as SubViewport).get_texture().get_image()
+			im.convert(Image.FORMAT_RGB8)
+			img.blit_rect(im, Rect2i(Vector2i.ZERO, cell), Vector2i(k * cell.x, 0))
+		img.save_png(dir.path_join("%04d.png" % frame))
+		frame += 1
+	print("frames ", dir, " ", frame)
+	for c in chars:
+		c.free()
+	for e in cams:
+		(e[0] as SubViewport).queue_free()
 
 
 ## The cutscene choreography for one style: run three hexes in (the move

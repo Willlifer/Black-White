@@ -205,6 +205,10 @@ static func hold_pose(st: String, h: String) -> Dictionary:
 			d[k] = float(spec[k])
 	if spec.has("raw"):
 		d.merge(spec.raw, true)
+	if st in BWAnimClips.SHIELD_SETS:
+		# D520: the off hand keeps the shield in guard in every hold (the bake's shield pass)
+		d.merge(BWAnimClips.shield_hand(0.0), true)
+		d["hand_l_grip"] = 0.0
 	return d
 
 

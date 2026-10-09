@@ -239,6 +239,8 @@ static func ashfall(t: BWTiles) -> Array:
 				t.entries.erase(n)
 			continue
 		t.entries[n] = t._entry(1, int(cur.get("v", 0)), "", seeds[n], "spread")
+		if int(cur.get("v", 0)) > 0:
+			t.entries[n]["lsrc"] = BWTiles._lsrc(cur, "fire", "")   # D496
 		lit.append(n)
 	return lit
 

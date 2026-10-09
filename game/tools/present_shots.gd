@@ -3,8 +3,8 @@ extends SceneTree
 ## combat screen (needs a window, not headless):
 ##   SHOTS=<dir> MODE=callout|crit|status godot --path . --resolution 1920x1080 --script res://tools/present_shots.gd
 ## callout  a skill cutscene paused on its callout -> <dir>/present_callout_<w>x<h>.png
-## crit     the same cutscene with a crit: every frame from just before the
-##          impact to just after the flash -> <dir>/crit_frames/NNN.png
+## crit     the same cutscene with a crit: every frame from the camera settling
+##          (the flash plays before the swing, D530) to past the impact -> <dir>/crit_frames/NNN.png
 ##          (tools/present_strip.py makes the strip and the GIF)
 ## status   Pinned / Staggered / Blinded floating, a Frost Ward on one unit,
 ##          its card, a gale 2 hex beside a gale 1 hex, then the ward shattering
@@ -81,8 +81,8 @@ func _go() -> void:
 			DirAccess.make_dir_recursive_absolute(_cap_dir)
 			BWCombatUI.flash_slow = float(OS.get_environment("SLOW")) if OS.get_environment("SLOW") != "" else 1.0
 			s._cutscene(a.id, results, "", [], "", "")
-			await _wait(0.5)
-			await _capture_for(2.6 + 0.3 * BWCombatUI.flash_slow)
+			await _wait(0.3)                                    # D530: the flash comes as the camera settles
+			await _capture_for(2.8 + 0.3 * BWCombatUI.flash_slow)
 			await _wait(2.0)
 		"status":
 			await _status(p, e)

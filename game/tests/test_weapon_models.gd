@@ -5,7 +5,11 @@ extends RefCounted
 
 const HANDS := ["one", "two", "pair", "bow", "fists"]
 const FISTS := ["hand_wraps", "brass_knuckles", "gauntlets"]
-const TWO_HANDED := ["lance", "halberd", "glaive", "staff", "moon_staff", "warhammer", "anchor", "double_axe", "flamberge"]
+const TWO_HANDED := ["lance", "halberd", "glaive", "staff", "moon_staff", "warhammer", "anchor", "double_axe", "flamberge",
+	"scythe", "katana", "divine_staff", "orb_scepter", "trident", "naginata"]
+## D501: the 11 additions (each an existing class; no new clips)
+const D501 := { "scythe": "axe", "rapier": "sword", "katana": "sword", "divine_staff": "staff", "orb_scepter": "staff",
+	"trident": "lance", "naginata": "lance", "kunai": "daggers", "karambit": "daggers", "longbow": "bow", "ancestral_bow": "bow" }
 
 
 func _main_hand() -> Array:
@@ -26,12 +30,12 @@ func test_metadata_file(t) -> void:
 	var m := BWWeaponView.load_meta(true)
 	t.eq(int(m.get("version", 0)), BWWeaponView.META_VERSION, "weapons.json version")
 	t.eq(int(m.get("rig_version", 0)), BWCharacterRig.RIG_VERSION, "fitted to the current rig version")
-	t.eq(BWWeaponView.ids().size(), 25, "25 weapon models (22 + 3 fists, D76)")
+	t.eq(BWWeaponView.ids().size(), 36, "36 weapon models (22 + 3 fists, D76, + 11, D501)")
 
 
 func test_every_main_hand_has_model(t) -> void:
 	var rows := _main_hand()
-	t.eq(rows.size(), 25, "25 main_hand rows in equipment.csv")
+	t.eq(rows.size(), 36, "36 main_hand rows in equipment.csv")
 	for row in rows:
 		var id := str(row.id)
 		var m := BWWeaponView.meta_for(id)
@@ -265,4 +269,76 @@ func test_fists_static_poses(t) -> void:
 		var g := (c.poser.globals["hand_" + s] as Transform3D)
 		t.ok(g.origin.y > 1.25 and g.origin.z > 0.1, "guard: %s fist up and in front (%s)" % [s, g.origin])
 	c.free()
+
+
+## D501: the 11 new models sit in their classes, keep each class's first
+## model (the class default) first, and every one drops: an equipment row,
+## a style with a clip set, and enchantments it can roll.
+func test_d501_additions(t) -> void:
+	for id in D501:
+		var m := BWWeaponView.meta_for(id)
+		t.eq(str(m.get("class", "")), str(D501[id]), "%s is a %s" % [id, D501[id]])
+		t.ok(BWAnimClips.set_for(m) != "", "%s has a clip set (style %s)" % [id, BWCharacterPose.style_for(m)])
+		var row := BWData.row("equipment", id)
+		t.eq(str(row.get("weight", "")), str(D501[id]), "%s equipment row" % id)
+		t.eq(BWData.list(row.get("stat_lines", "")).size(), 2, "%s has two stat lines" % id)
+		var n := 0
+		for e in BWData.table("enchantments"):
+			if id in BWData.list(e.applies_to):
+				n += 1
+		t.ok(n >= 5, "%s can roll enchantments (%d)" % [id, n])
+	var first := {}
+	for id in BWWeaponView.ids():
+		var c := str(BWWeaponView.meta_for(id).get("class", ""))
+		if not first.has(c):
+			first[c] = id
+	t.eq(first, { "sword": "sword", "axe": "axe", "lance": "lance", "daggers": "dagger", "bow": "shortbow",
+		"pistols": "pistol", "staff": "staff", "fists": "hand_wraps" }, "class defaults unchanged")
+
+
+## D505-D507: every lance-class weapon comes with a cosmetic shield (data:
+## weapons.json "shield"); attach_to puts it on the off hand (full shields on
+## socket_offhand_l, the hand guard on the forearm_l bone); other classes
+## bring none; detaching frees it.
+func test_shields(t) -> void:
+	t.eq(BWShieldView.ids().size(), 4, "4 shield models")
+	for sid in BWShieldView.ids():
+		var s := BWShieldView.create(sid)
+		t.ok(s != null, "%s builds" % sid)
+		if s == null:
+			continue
+		var tris := s.triangle_count()
+		t.ok(tris >= 40 and tris <= 600, "%s within budget (%d)" % [sid, tris])
+		t.eq(tris, int(s.meta.tris), "%s tris match the build" % sid)
+		t.ok(s.kind() in ["hand", "forearm"], "%s mount kind" % sid)
+		s.free()
+	var r := _rig()
+	for id in BWWeaponView.ids():
+		var m := BWWeaponView.meta_for(id)
+		var sid := BWShieldView.shield_for(id)
+		t.eq(sid != "", str(m.get("class", "")) == "lance", "%s: a shield iff lance class" % id)
+		var w := BWWeaponView.create(id)
+		w.attach_to(r)
+		if sid == "":
+			t.ok(w.shield_view == null, "%s: no shield" % id)
+		else:
+			var s := w.shield_view
+			t.ok(s != null and s.shield_id == sid, "%s: carries %s" % [id, sid])
+			if s:
+				if s.kind() == "hand":
+					t.ok(s.get_parent() == r.socket("offhand_l"), "%s: shield on the off hand" % id)
+				else:
+					var p := s.get_parent().get_parent() as BoneAttachment3D
+					t.ok(p != null and p.bone_name == "forearm_l", "%s: guard on the forearm" % id)
+				# at rest the shield sits on the left forearm, its face turned out to her left
+				var hand := r.socket_rest("offhand_l").origin
+				var at := r.socket_rest("offhand_l") * s.transform.origin
+				var face := (r.socket_rest("offhand_l").basis * s.transform.basis.z).normalized()
+				t.ok(at.distance_to(hand) < 0.25, "%s: shield by the left hand at rest (%s vs %s)" % [id, at, hand])
+				t.ok(face.x > 0.5, "%s: shield faces out (%s)" % [id, face])
+		w.detach()
+		t.eq(r.socket("offhand_l").get_child_count(), 0, "%s: off hand empty after detach" % id)
+		t.eq(r.skeleton.find_children("shield_forearm_l", "", false, false).size(), 0, "%s: forearm holder freed" % id)
+		w.free()
+	r.free()
 

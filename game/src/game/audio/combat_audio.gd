@@ -25,9 +25,10 @@ extends Node
 ##                                        (tile_glaze, pitched up), at the blow's impact
 ##   skill_called (D100, screen signal)   a quick whoosh (cast_whoom pitched up) as the
 ##                                        skill's name wipes in
-##   crit_flashed (D101, screen signal)   the crit sting: hit_crit pitched high and hard,
-##                                        a bright tick of tile_glaze on top (2D, so the
-##                                        frozen world doesn't matter)
+##   crit_flashed (D101, screen signal)   the crit sting, before the swing since D530: a
+##                                        bright tile_glaze glint and a rising cast_whoom
+##                                        (2D, so the frozen world doesn't matter); the
+##                                        crack is the impact's hit_crit
 ##   ward_broken (D102, screen signal)    glass: tile_glaze pitched up twice, a hit_glance
 ##                                        crack under it
 ## D393 placeholders (ph_*, tools/audio/make_placeholders.py; the author replaces them):
@@ -197,10 +198,12 @@ func _on_callout(_unit_id: String, _text: String, _element: String) -> void:
 	BWSfx.ui("cast_whoom", { "pitch": 1.45, "gain_db": -3.0, "tag": "callout" })
 
 
-## The crit sting: a hard, high crack as the screen goes white.
+## The crit sting. D530: the flash now comes BEFORE the swing, so the sting is
+## an anticipation, a bright glint and a rising whoosh, not a crack: the crack
+## is the impact's own hit_crit (unit_audio), which lands with the blow.
 func _on_crit_flash(_unit_id: String) -> void:
-	BWSfx.ui("hit_crit", { "pitch": 1.75, "gain_db": 2.0, "stack": true, "tag": "crit_flash" })
-	BWSfx.ui("tile_glaze", { "pitch": 2.4, "gain_db": -4.0, "stack": true, "tag": "crit_flash" })
+	BWSfx.ui("tile_glaze", { "pitch": 2.4, "gain_db": 0.0, "stack": true, "tag": "crit_flash" })
+	BWSfx.ui("cast_whoom", { "pitch": 1.9, "gain_db": -3.0, "stack": true, "tag": "crit_flash" })
 
 
 func _on_ward_break(unit_id: String) -> void:

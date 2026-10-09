@@ -10,6 +10,7 @@ extends Node3D
 ##   w.set_aura("fire", 1.0)           # fresnel shell + billboard particles; ("", 0) clears
 ##   w.tip_global()                    # trail tip (world); trail_points() gives base + tip
 ##   w.second_hand_target()            # Marker3D for the other hand's IK (two-handers, bows)
+##   w.shield_view                     # D505: lance class: its BWShieldView on the off hand, else null
 ##
 ## All placement data comes from the sidecar art/weapons/weapons.json (one
 ## source of truth, written by the same build script as the glbs). Points
@@ -47,6 +48,9 @@ var weapon_id := ""
 var meta := {}
 var model: Node3D                ## the instanced glb
 var offhand_view: BWWeaponView   ## daggers / fists: the piece on socket_offhand_l (owned by this view)
+var shield_view: BWShieldView    ## D505: lance class: the cosmetic shield on the off hand (owned by this view)
+## D505: false keeps attach_to() from hanging the shield (tools only; the game always shows it)
+var with_shield := true
 var rig: BWCharacterRig
 var aura_element := ""
 var aura_strength := 0.0
@@ -86,7 +90,10 @@ static func ids() -> PackedStringArray:
 
 
 static func meta_for(id: String) -> Dictionary:
-	return load_meta().get("weapons", {}).get(id, {})
+	var m: Dictionary = load_meta().get("weapons", {}).get(id, {})
+	if not m.is_empty() and not m.has("id"):
+		m["id"] = id          # ---- D520: style_for tells the shield spears (lance, trident) from the 2h polearms
+	return m
 
 
 static func create(id: String) -> BWWeaponView:
@@ -198,7 +205,41 @@ func attach_to(r: BWCharacterRig) -> bool:
 			offhand_view.set_aura(aura_element, aura_strength)
 		elif imbue_element != "":
 			offhand_view.set_imbue(imbue_element)
+	_attach_shield(r)
 	return true
+
+
+## D505: a lance-class weapon brings its shield (weapons.json "shield") onto
+## the off hand; any other weapon brings none. Owned by this view.
+func _attach_shield(r: BWCharacterRig) -> void:
+	var sid := str(meta.get("shield", ""))
+	if sid == "" or is_offhand_copy or not with_shield:
+		return
+	shield_view = BWShieldView.create(sid)
+	if shield_view == null:
+		return
+	shield_view.set_outline_width(_outline)
+	if not shield_view.attach_to(r):
+		shield_view.free()
+		shield_view = null
+		return
+	_shield_accent()
+
+
+func _shield_accent() -> void:
+	if not is_instance_valid(shield_view):
+		return
+	if aura_element != "":
+		shield_view.set_accent(Color(aura_colors(BWLook.element_color(aura_element))[1], clampf(aura_strength, 0.0, 1.0)))
+	else:
+		shield_view.set_accent(_imbue_accent())
+
+
+func _free_shield() -> void:
+	if is_instance_valid(shield_view):
+		shield_view.detach()
+		shield_view.free()
+	shield_view = null
 
 
 ## Take the weapon (and its off-hand copy) off the rig. The view survives.
@@ -206,6 +247,7 @@ func detach() -> void:
 	if is_instance_valid(offhand_view):
 		offhand_view.free()
 	offhand_view = null
+	_free_shield()
 	if get_parent():
 		get_parent().remove_child(self)
 	rig = null
@@ -225,8 +267,10 @@ func weapon_class() -> String:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and is_instance_valid(offhand_view):
-		offhand_view.free()
+	if what == NOTIFICATION_PREDELETE:
+		if is_instance_valid(offhand_view):
+			offhand_view.free()
+		_free_shield()
 
 
 # ------------------------------------------------------------- points
@@ -351,6 +395,8 @@ func set_outline_width(width: float) -> void:
 	_string_bent = false
 	if is_instance_valid(offhand_view):
 		offhand_view.set_outline_width(width)
+	if is_instance_valid(shield_view):
+		shield_view.set_outline_width(width)
 
 
 ## Turn on (or update) the element aura: an inflated fresnel shell of the
@@ -392,6 +438,7 @@ func set_aura(element: String, strength: float = 1.0) -> void:
 		mi.set_instance_shader_parameter("accent", Color(cols[1], clampf(strength, 0.0, 1.0)))
 	if is_instance_valid(offhand_view):
 		offhand_view.set_aura(element, strength)
+	_shield_accent()
 
 
 func clear_aura() -> void:
@@ -402,6 +449,7 @@ func clear_aura() -> void:
 		mi.set_instance_shader_parameter("accent", _imbue_accent())
 	if is_instance_valid(offhand_view):
 		offhand_view.clear_aura()
+	_shield_accent()
 
 
 ## D182: an imbued weapon's accent (edges, gems, fletching side) carries its
@@ -416,6 +464,7 @@ func set_imbue(element: String) -> void:
 			mi.set_instance_shader_parameter("accent", _imbue_accent())
 	if is_instance_valid(offhand_view):
 		offhand_view.set_imbue(element)
+	_shield_accent()
 
 
 func _imbue_accent() -> Color:

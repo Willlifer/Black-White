@@ -33,7 +33,7 @@ extends RefCounted
 ## Bump ANIM_VERSION when the source changes; test_animation checks that the
 ## saved library matches a fresh bake of this file.
 
-const ANIM_VERSION := 9                # D389: strike_haymaker, strike_chamber, the bigger jab
+const ANIM_VERSION := 10               # D510-D520: the alternates (BWAnimAlt), the spear set's shield arm
 const FPS := 24.0
 const BAKE_HZ := 60.0
 const DIR := "res://art/animations/"
@@ -107,6 +107,7 @@ static func actions_for(set_id: String, weapon_class: String = "") -> Dictionary
 	# D221: the fit sweep's routes (brace, leap, land, war_cry, aim, tumble,
 	# reload, and the skill strikes: thrust, hook, cut, sweep, throw, grapple, hundred)
 	out.merge(BWAnimSkill.actions(set_id, strike))
+	out.merge(BWAnimAlt.actions(set_id))                  # D510-D519: smash, sweep_under, throw_under, thrust_2h, lunge, flourish, backstab, shot_jump, cast_tempest
 	return out
 
 ## Channel id -> [pose key, sub key]. Order is the track order.
@@ -160,6 +161,19 @@ class Clip:
 	var calm_hands := true    # false: the calm pass leaves the hands (weapon handling stays readable)
 	var base := {}            # channel -> value (the set's guard pose)
 	var style := "heavy"
+	var shield_keys: Array = []   # D520: [frame, Vector2(raise, weight), mode] for the shield arm (SHIELD_SETS)
+
+	## D520: the shield arm at frame f: raise 0 = the guard (forearm across
+	## the chest), 1 = up and out (a block); w = how much of the clip's own
+	## free hand gives way to the shield (1 = all of it, 0 = the clip's arm).
+	func shield(f: float, raise: float, w: float = 1.0, mode: String = "a") -> Clip:
+		for i in shield_keys.size():
+			if is_equal_approx(float(shield_keys[i][0]), f):
+				shield_keys[i] = [f, Vector2(raise, w), mode]
+				return self
+		shield_keys.append([f, Vector2(raise, w), mode])
+		shield_keys.sort_custom(func(a, b): return a[0] < b[0])
+		return self
 
 	func key(ch: String, f: float, v: Variant, mode: String = "a") -> Clip:
 		assert(BWAnimClips.CHANNELS.has(ch), "unknown channel " + ch)
@@ -404,6 +418,7 @@ static func clips(set_id: String) -> Array:
 	out.append_array(BWAnimHandling.clips(set_id))
 	out.append_array(BWAnimSkill.clips(set_id))           # D221: brace, leap, the sweep's skill clips
 	out.append_array(BWAnimEncounter.clips(set_id))       # D219-D220: the Colossus, the Horde's jab
+	out.append_array(BWAnimAlt.clips(set_id))             # D510-D519: the alternate clips
 	return out
 
 
@@ -462,6 +477,7 @@ static func bake(c: Clip) -> Animation:
 			arr.append(c.value(ch, i * FPS / BAKE_HZ))
 		samples[ch] = arr
 	_pass_edge_lead(c, samples, n)
+	_pass_shield(c, samples, n)            # D520: the spear set's shield arm
 	_pass_calm(c, samples, n)
 	_pass_contacts(samples, n)
 	_pass_skid(c, samples, n)
@@ -520,6 +536,121 @@ static func _pass_edge_lead(c: Clip, s: Dictionary, n: int) -> void:
 			var e0: Vector3 = s[hk + "_edge"][i]
 			e0 = (e0 - aim * aim.dot(e0)).normalized()
 			s[hk + "_edge"][i] = e0.slerp(vel.normalized(), ramp) if e0.dot(vel.normalized()) > -0.99 else vel.normalized()
+
+
+## D520: the sets whose off hand carries a shield (the lance, the javelin,
+## the trident: one-handed spear + shield). The bake replaces the free left
+## hand of every clip with the shield arm: the GUARD (forearm across the
+## chest, the shield facing out), raised toward UP where a clip blocks with
+## it. Clips key it with Clip.shield(); SHIELD_CLIPS gives the shared ones
+## (block, fumble, brace, the reactions that let it swing) their curves.
+## Values are raw hand channels, like at_base: chest frame in chest-frame
+## clips; in root-frame (aimed) clips the shield holds its line to the target.
+const SHIELD_SETS: PackedStringArray = ["spear"]
+const SHIELD_GUARD := { "hand_l_pos": Vector3(0.05, -0.06, 0.29), "hand_l_pole": Vector3(1.0, -0.75, 0.15) }
+const SHIELD_UP := { "hand_l_pos": Vector3(0.03, 0.12, 0.36), "hand_l_pole": Vector3(1.0, -0.25, 0.3) }
+## Where the shield's face and top point (chest frame) in the guard and
+## raised: out in front, a touch to her left; raised, tipped back to cover
+## the head. The off hand's socket is turned so the mounted shield
+## (weapons.json "shields", BWShieldView) does exactly that.
+const SHIELD_FACE := [Vector3(0.3, 0.05, 1.0), Vector3(0.12, 0.3, 1.0)]
+const SHIELD_TOP := [Vector3(-0.1, 1.0, 0.0), Vector3(-0.05, 1.0, -0.3)]
+
+
+## The shield hand at raise 0 (guard) .. 1 (up): pos, pole and the socket's
+## aim / edge (the solver holds the off-hand socket like a weapon grip).
+static func shield_hand(raise: float, face := Vector3.ZERO, top := Vector3.ZERO) -> Dictionary:
+	var m: Dictionary = BWShieldView.meta_for("kite_shield").get("mount", {})
+	var fm := BWWeaponView.v3(m.get("face", [1, 0, 0])).normalized()
+	var um := BWWeaponView.v3(m.get("up", [0, 1, 0])).normalized()
+	var fd := (SHIELD_FACE[0] as Vector3).lerp(SHIELD_FACE[1], raise).normalized() if face == Vector3.ZERO else face.normalized()
+	var ud := (SHIELD_TOP[0] as Vector3).lerp(SHIELD_TOP[1], raise).normalized() if top == Vector3.ZERO else top.normalized()
+	var r := _frame_of_dirs(fd, ud) * _frame_of_dirs(fm, um).inverse()
+	return { "hand_l_pos": (SHIELD_GUARD.hand_l_pos as Vector3).lerp(SHIELD_UP.hand_l_pos, raise),
+		"hand_l_pole": (SHIELD_GUARD.hand_l_pole as Vector3).lerp(SHIELD_UP.hand_l_pole, raise),
+		"hand_l_aim": (r * Vector3.UP).normalized(), "hand_l_edge": (r * Vector3.BACK).normalized(), "hand_l_grip": 0.0 }
+
+
+static func _frame_of_dirs(face: Vector3, up: Vector3) -> Basis:
+	var z := face.normalized()
+	var x := up.cross(z).normalized()
+	return Basis(x, z.cross(x), z)
+## clip -> [[frame, raise, weight], ...] (a clip's own Clip.shield keys win)
+const SHIELD_CLIPS := {
+	"block": [[0, 0.0, 1.0], [3, 1.0, 1.0], [5, 1.05, 1.0], [14, 1.0, 1.0], [20, 0.0, 1.0]],
+	"brace": [[0, 0.0, 1.0], [5, 0.8, 1.0], [7, 1.0, 1.0], [25, 1.0, 1.0], [30, 0.0, 1.0]],
+	"fumble": [[0, 0.0, 1.0], [2, 0.9, 1.0], [4, 0.4, 0.7], [10, 0.2, 0.75], [20, 0.0, 1.0]],
+	"fall": [[0, 0.0, 1.0], [3, 0.3, 1.0], [6, 0.0, 0.6], [16, 0.0, 0.35]],
+	"kneel": [[0, 0.0, 1.0], [3, 0.5, 1.0], [8, 0.2, 0.8], [30, 0.0, 1.0]],
+	"stricken_stumble": [[0, 0.0, 1.0], [2, 0.3, 1.0], [6, 0.0, 0.55], [30, 0.0, 0.8], [40, 0.0, 1.0]],
+	"stricken_rage": [[0, 0.0, 1.0], [3, 0.2, 1.0], [14, 0.0, 0.5], [28, 0.0, 0.6], [44, 0.0, 1.0]],
+	"stricken_flinch": [[0, 0.0, 1.0], [2, 0.8, 1.0], [6, 0.6, 1.0], [12, 0.0, 1.0]],
+	"cheer": [[0, 0.3, 1.0]], "cheer_jump": [[0, 0.4, 1.0]],
+}
+
+
+static var _fposer: BWCharacterPose
+
+
+## A poser bound to the base rig's rest pose, for frame conversions at bake time.
+static func _frame_poser() -> BWCharacterPose:
+	if _fposer == null:
+		var scene := load(BWCharacterRig.DEFAULT_PATH) as PackedScene
+		if scene == null:
+			return null
+		var root := scene.instantiate()
+		var sks := root.find_children("*", "Skeleton3D", true, false)
+		if not sks.is_empty():
+			_fposer = BWCharacterPose.new(sks[0])
+			_fposer.skeleton = null           # only the rest transforms are kept
+		root.free()
+	return _fposer
+
+
+static func _pass_shield(c: Clip, s: Dictionary, n: int) -> void:
+	if not c.style in SHIELD_SETS:
+		return
+	var ks: Array = c.shield_keys.duplicate()
+	if ks.is_empty() and SHIELD_CLIPS.has(c.name):
+		for k in SHIELD_CLIPS[c.name]:
+			ks.append([float(k[0]), Vector2(float(k[1]), float(k[2])), "a"])
+	var kr: Array = []
+	var kw: Array = []
+	for k in ks:
+		kr.append([k[0], (k[1] as Vector2).x, k[2]])
+		kw.append([k[0], (k[1] as Vector2).y, k[2]])
+	var side := shield_hand(0.0, Vector3(1.0, 0.1, -0.35), Vector3(0.0, 1.0, 0.1))
+	var root_frame := str(c.meta.get("hand_frame", "chest")) == "root"
+	var fp := _frame_poser() if root_frame else null
+	var xb := Transform3D()
+	if fp != null:
+		var bp := { "root": c.base.root, "hips": c.base.hips, "spine": c.base.spine, "chest": c.base.chest, "squash": 0.0 }
+		xb = (fp.frame_of(bp, "root").affine_inverse() * fp.frame_of(bp, "chest")).affine_inverse()
+	for i in n + 1:
+		var f := i * FPS / BAKE_HZ
+		var rw := Vector2(0, 1) if ks.is_empty() else Vector2(float(eval_keys(kr, f, c.loop, float(c.frames))), float(eval_keys(kw, f, c.loop, float(c.frames))))
+		var w := clampf(rw.y, 0.0, 1.0)
+		var sh := shield_hand(rw.x)
+		var pos: Vector3 = sh.hand_l_pos
+		var pole: Vector3 = sh.hand_l_pole
+		var aim: Vector3 = sh.hand_l_aim
+		var edge: Vector3 = sh.hand_l_edge
+		if fp != null:
+			# an aimed (root-frame) clip: the shield still rides the chest's
+			# turn away from the guard (exactly the guard at the guard)
+			var p := { "root": s.root[i], "hips": s.hips[i], "spine": s.spine[i], "chest": s.chest[i], "squash": s.squash[i] }
+			var x := fp.frame_of(p, "root").affine_inverse() * fp.frame_of(p, "chest") * xb
+			pos = x * pos
+			pole = x.basis * pole
+			aim = x.basis * aim
+			edge = x.basis * edge
+		s["hand_l_pos"][i] = (s["hand_l_pos"][i] as Vector3).lerp(pos, w)
+		s["hand_l_pole"][i] = (s["hand_l_pole"][i] as Vector3).lerp(pole, w)
+		s["hand_l_grip"][i] = lerpf(float(s["hand_l_grip"][i]), 0.0, w)
+		# the socket's turn: where the clip keeps its own arm (w < 1: a fall, the
+		# lunge's flung-back arm) the shield turns flat to her side
+		s["hand_l_aim"][i] = (side.hand_l_aim as Vector3).lerp(aim, w).normalized()
+		s["hand_l_edge"][i] = (side.hand_l_edge as Vector3).lerp(edge, w).normalized()
 
 
 ## Calm (D65): every channel's motion scaled by c.calm about a centre:

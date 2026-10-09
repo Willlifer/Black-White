@@ -16,7 +16,11 @@ func _pressured(fc: Dictionary) -> bool:
 func test_constants(t) -> void:
 	t.eq(BWFormulas.PRESSURE_MULT, 0.9, "×0.9")
 	t.eq(BWFormulas.PRESSURE_RADIUS, 2, "within 2")
-	t.eq(str(BWFormulas.pressure_mod().label), "Pressured (enemy within 2) −10%", "the forecast line")
+	t.eq(str(BWFormulas.pressure_mod().label), "Pressured (enemy within 2; target 3+ away) −10%", "the forecast line")
+	t.eq(BWFormulas.pressure_pct(1), 25, "D499: adjacent −25%")
+	t.eq(BWFormulas.pressure_pct(2), 18, "D499: 2 away −18%")
+	t.eq(BWFormulas.pressure_pct(3), 10, "D499: 3 away −10%")
+	t.eq(BWFormulas.pressure_pct(6), 10, "D499: farther stays −10%")
 
 
 func test_bow_basic(t) -> void:
@@ -30,7 +34,7 @@ func test_bow_basic(t) -> void:
 	var fc: Dictionary = b2.forecast_basic(me2, b2.units[1])
 	t.ok(_pressured(fc), "a foe 2 away: Pressured")
 	t.eq(float(fc.damage.value), maxf(1.0, roundf(float(free.damage.value) * 0.9)), "×0.9 on the damage")
-	t.ok((fc.notes as Array).has("Pressured (enemy within 2) −10%"), "a named forecast line: %s" % [fc.notes])
+	t.ok((fc.notes as Array).has("Pressured (enemy within 2; target 3+ away) −10%"), "a named forecast line: %s" % [fc.notes])
 	var me3: BWUnit = K._u("me", "bow", "fire")
 	var b3: BWBattle = K._fight(me3, [K._foe("a"), K._foe("n")], [far[3], far[2]])
 	t.ok(not _pressured(b3.forecast_basic(me3, b3.units[1])), "3 away doesn't press")

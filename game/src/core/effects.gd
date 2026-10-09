@@ -361,7 +361,14 @@ static func paint_opts(u: BWUnit, element: String, hexes: Array, board: BWBoard,
 				if step <= 0:
 					continue
 				var ring: Dictionary = o.get("ring", {})
-				for h in BWHex.fringe(hexes, r):
+				# D497 Haloed: on=self lays the caster's own hex and the ring around it
+				var around: Array = []
+				if str(p(e, "on", "")) == "self":
+					around.append(u.pos)
+					around.append_array(BWHex.fringe([u.pos], r))
+				else:
+					around.append_array(BWHex.fringe(hexes, r))
+				for h in around:
 					if not h in hexes and board.exists(h) and not ring.has(h):
 						ring[h] = step
 				o["ring"] = ring
@@ -439,7 +446,19 @@ static func basic_range(u: BWUnit) -> int:
 		if base <= 1.0 and e.params.has("melee_plus"):
 			plus = float(p(e, "melee_plus"))
 		r = r * float(p(e, "mult", 1)) + plus
+	if bow_mastery(u):
+		r += BOW_MASTERY_RANGE                 # D500 Eagle Eye: a bow at expertise A
 	return int(r)
+
+
+## D500 (author): the bow lost 1 range (6 -> 5); maxing its expertise (A)
+## gives it back as the bow's mastery keystone, Eagle Eye.
+const BOW_MASTERY_RANGE := 1
+const BOW_MASTERY_NAME := "Eagle Eye"
+
+
+static func bow_mastery(u: BWUnit) -> bool:
+	return u != null and u.weapon_class == "bow" 		and u.expertise_rank("bow") >= BWUnit.EXPERTISE_RANKS.size() - 1
 
 
 # ----------------------------------------------------------------- forecast

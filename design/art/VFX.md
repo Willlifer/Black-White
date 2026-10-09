@@ -88,7 +88,13 @@ hit-stop and the final-KO slow-mo are skipped while skipping.
 - Shake = 0.018 + 0.30 × (damage / max HP), ×1.3 on a crit, capped 0.14
   (the old fixed crit shake was 0.12). One shake per blow event (the biggest).
 - Hit-stop: ≥ 20 % of max HP → 0.045 s, ≥ 35 % → 0.075 s, at time scale 0.03.
-  Not on a FULL crit (D101 already froze) nor in Minimal / while skipping.
+  A landed crit always stops: 0.1 s on FULL, 0.045 s otherwise (D530). Never in Minimal / while skipping.
+- **Crit flash (D530, amends D101):** the flash plays the moment BEFORE the
+  attacker's animation starts (after the camera settles and the callout), not
+  on the impact frame: FULL's white-out with its freeze, else the tiny pulse;
+  group turns none. One flash per blow; a multi-hit clip's later crit flashes
+  0.14 s before its own hit marker. The sting (`crit_flashed`) is a glint and
+  a rising whoosh; the crack is the impact's `hit_crit`.
 - Numbers: font 34 → 74 by √(share / 0.4); a crit ×1.3; cap 96; a miss 30.
   They pop in from 1.25–1.75× scale.
 - Final knockout (the rules ended the fight and no later blow KOs anyone):

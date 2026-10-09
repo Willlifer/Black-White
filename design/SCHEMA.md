@@ -41,13 +41,13 @@ Hair colour per element:
 
 | Class | Damage type | Level-up bias | Variants |
 |---|---|---|---|
-| sword | martial (str) | str +2 | sword, scimitar, flamberge |
-| axe | martial (str) | str +2 | axe, double_axe, hatchet, warhammer, anchor |
-| lance | martial (str) | str +2 | lance, javelin, halberd, glaive |
-| daggers | dexterous (dex) | dex +2 | dagger, jagged_dagger |
-| bow | dexterous (dex) | dex +2 | shortbow, recurve_bow, compound_bow |
+| sword | martial (str) | str +2 | sword, scimitar, flamberge, rapier, katana (D501) |
+| axe | martial (str) | str +2 | axe, double_axe, hatchet, warhammer, anchor, scythe (D501) |
+| lance | martial (str) | str +2 | lance, javelin, halberd, glaive, trident, naginata (D501); each comes with a cosmetic shield (D505) |
+| daggers | dexterous (dex) | dex +2 | dagger, jagged_dagger, kunai, karambit (D501) |
+| bow | dexterous (dex) | dex +2 | shortbow, recurve_bow, compound_bow, longbow, ancestral_bow (D501) |
 | pistols | dexterous (dex) | dex +2 | pistol, flintlock, m1911 · **benched (D419)** |
-| staff | spell (wil) | wil +2 | staff, moon_staff |
+| staff | spell (wil) | wil +2 | staff, moon_staff, divine_staff, orb_scepter (D501) |
 | fists | martial (str) | str +2 | hand_wraps, brass_knuckles, gauntlets (D76; worn on both hands) · **benched (D419)** |
 
 Weapon skills come from V8 (`MeleeSkills`). Pistols inherit the flintlock's

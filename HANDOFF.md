@@ -32,6 +32,12 @@
   - Pre-battle rows show real gear and elements.
 - **Audio:** stings retuned to A (the C originals one switch away); music ducks under stings; 21 `ph_*` placeholders for the author to replace (`design/audio/AUDIO-NEEDS.md`).
 
+## 2026-10-09 (later): the author's playtest rulings, built (D496-D500)
+Light heals only its owner's side (`lsrc`, `BWTiles.light_owner`), Glare now Blinds from light 1; Haloed light enchant (your hex + ring); duos always offered at 3 tree picks in each element; Pressured −25/−18/−10% by target distance; bow range 5, Eagle Eye +1 at expertise A. La Niña already foes-only (no change). Lava Walker confirmed by play (L-52 settled). Green: self-test 832/832, ui-probe 119/119, flow-probe 0. Committed on internal `dev`; **not yet exported to GitHub** (`dev` / `main` still at D495 / D492).
+
+## 2026-10-09 (evening): direction doc build, shipped as a final
+Crit flash before the swing (D530); Axe Throw (D531); gear panel fits every window, 4 rows, discard by tier (D532, D534); 11 weapons + 4 shields paired with every lance-class weapon, shields on spear icons (D501-D509); alternate clips with data weights in `BWClipRoute.ALTERNATES` (D510-D521): smash/flip (crits flip), underhand sweep (Earthsplitter) + throw, sword 2h thrust + lunge, lance lunge 50/50, dagger flourish (Self-detonate), backstab sneak, bow jump shot, Tempest float; lance / javelin / trident one-handed + shield. Green: 842/842, ui-probe 129, flow 0. Known: Colossus still shows the kite shield with both hands on the shaft; lance now uses the lighter audio set (`unit_audio.HEAVY_SETS`); jump-shot / flourish legs hang straight in the air.
+
 ## Do this first
 1. **Wait for the author's playtest notes**, then act on them. Don't stress-test unasked.
 2. On "push a final": run the Shipping steps above.

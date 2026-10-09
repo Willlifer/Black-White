@@ -1,7 +1,7 @@
 id,term,aliases,category,definition,see
 fire,Fire,burning|burns|burn,element,Axis element. A fire tile deals 4/8/12% max HP at the occupant's turn start and 2/4/6% per fire hex entered; fire 2+ on grass spreads.,water
 water,Water,wet,element,"Axis element, opposite of fire. Entering costs +0/+1/+2 move at levels 1/2/3; thunder hits on the occupant gain +10% per level.",conduction
-light,Light,,element,"Axis element, opposite of dark. Heals the occupant 3/6/9% max HP at its turn start, but attacks on it gain +7 hit per level.",dark
+light,Light,,element,"Axis element, opposite of dark. Heals your side 3/6/9% max HP at its turn start, only on light your team laid (a foe's light heals no one of yours), but attacks on it gain +7 hit per level.",dark
 dark,Dark,,element,"Axis element, opposite of light. Attacks on the occupant get -7 hit per level; dark 3 also drains 3% max HP at its turn start.",light
 ice,Ice,,element,Operator element. On a charged tile it glazes it for 2 cycles; on empty ground it arms a stasis marker. Ice ranks resist every other element.,glaze
 thunder,Thunder,lightning,element,Operator element. On a charged tile it detonates the charge; on empty ground it arms a fuse. Thunder hits on uncharged tiles gain Spark.,detonate
@@ -59,7 +59,7 @@ affinity_rank,Affinity Rank,affinity|affinities|affinity ranks,progression,Every
 expertise,Expertise,expertise rank|weapon expertise,progression,"Weapon skill, ranked E, D, C, B, A every 10 points. Each letter adds +5 hit with that weapon and owes one skill pick.",improve
 xp,Level up,experience|XP,progression,"Every unit in the squad, benched too, gains a level after every fight, won or lost. There is no XP. Attacks still give +1 affinity and +1 expertise, a knockout +3 of each.",affinity_rank
 attuned_element,Attuned Element,attuned|attunement,progression,"The element a unit last used this battle, its own element at the start. Basic attacks carry it for damage, resist and growth.",affinity_rank
-perk,Perk,perks,progression,"A passive element bonus, four per element. Affinity ranks 1, 2, 4 and 5 each give one pick of two drawn cards; rank 3 brings a keystone. Now and then a duo perk is one of the two cards.",keystone
+perk,Perk,perks,progression,"A passive element bonus, four per element. Affinity ranks 1, 2, 4 and 5 each give one pick of two drawn cards; rank 3 brings a keystone. Once a unit has 3 picks in each of two elements, a duo perk is always one of the two cards.",keystone
 improve,Improve,improved|improve rider,progression,An expertise pick that gives a known skill its upgrade rider. Only skills with a listed rider can be improved.,expertise
 loadout,Loadout,loadouts,progression,"The skills a unit brings into battle: up to 3 per weapon class, 4 for the staff.",overcap
 overcap,Overcap,over-cap,progression,"A skill learned mid-fight while the loadout is full. It is usable at once, for that battle only.",loadout
@@ -137,7 +137,7 @@ draw_in,Draw in,,rule,"A wind area skill's shaping (the default): BEFORE the hit
 burst_out,Burst out,,rule,"A wind area skill's shaping: hit first, then every foe in the area is pushed 1 away from its centre (a blocked push slams both for 8%).",draw_in
 wind_hold,Hold,,rule,A wind skill's shaping for any shape: the foes it touches are Becalmed instead of moved.,becalm
 updraft,Updraft,updrafts,rule,"Part of the wind perk Tailwind: its holder gets +1 jump after every other jump modifier (a lance 5, a HighGrounder bow 5), and any unit of the holder's team that starts its turn on one of the holder's gale markers gets +1 jump for that turn. They stack, +2 at most. Shown as Updraft +1 (Tailwind) in the Move breakdown.",jump
-pressured,Pressured,pressure,rider,"A ranged blow (a bow or staff basic, or a skill aimed at one target from 3+ away) deals -10% while any enemy stands within 2 of the attacker. Area spells and shots are exempt; the lance's reach 2 is melee.",
+pressured,Pressured,pressure,rider,"A ranged blow (a bow or staff basic, or a skill aimed at one target from 3+ away) made while any enemy stands within 2 of the attacker deals less the closer its target: -25% adjacent, -18% at 2, -10% at 3+. Area spells and shots are exempt; the lance's reach 2 is melee.",
 title,Keystone title,keystone titles,progression,"Taking a keystone names the unit: Will, the Lava Walker. With two, the most recent names it; the hover lists both.",keystone
 lava_walker,Lava Walker,,rule,"Fire keystone: your fire climbs to fire 4 (lava). Reactions treat lava as fire 1 and burn off one step of it. It burns 5% a step standing and 3% crossing, and you and allies beside you never burn on fire.",lava
 lava,Lava,fire 4,tile,"A Lava Walker's fire, past 3 up to 4. Another element (a detonation, water, a gale, ice, Inversion) reacts with it as fire 1 and burns off that step: lava 4 becomes 3. Light and dark lie beside it; anyone else's fire leaves it as it is. Fresh fire erupts on it only at 4.",lava_walker
@@ -157,7 +157,7 @@ el_nino,El Niño,el nino,rule,"Wind keystone: your wind areas reach 1 ring furth
 la_nina,La Niña,la nina,rule,Wind keystone: at the start of your turn every foe takes 1.5% of its max HP and is pulled 1 toward you.,push
 shatterer,Shatterer,,rule,"Ice keystone: when your blow Shatters, the glaze around the target shatters too, 8% to anyone on it, and your blow gains 15% for each hex shattered.",shatter
 sculptor,Sculptor,,rule,"Ice keystone: your ice landing on ice or glaze raises a pillar there (6 at most). Your side can climb your pillars as high ground, 2 levels up; they shatter for double.",pillar
-duo_perk,Duo perk,duo perks,progression,"A perk of two elements, offered now and then on a perk pick to a unit with a perk in both: Wildfire Gale, Powder Keg, Storm Drain, Flash Flood, Permafrost, Solar Wind, Eclipse, Blizzard.",perk
+duo_perk,Duo perk,duo perks,progression,"A perk of two elements, always offered on a perk pick once a unit has 3 picks (perks or keystone) in each: Wildfire Gale, Powder Keg, Storm Drain, Flash Flood, Permafrost, Solar Wind, Eclipse, Blizzard.",perk
 overcharged,Overcharged,overcharge|overcharges,tile,"A dark or light hex pushed to 4 by Pitch Black or a Solar Flare. It counts as 4 until the caster's turn ends, then it is 3 again.",pitch_black
 element_cap,Element cap,max elements|three elements|3 elements,progression,"A unit is attuned to at most 3 elements (any affinity points count). A gain in a 4th is dropped, and Branch out offers no new element once a unit holds 3.",affinity_rank
 ignites_fuse,Ignite,ignited|igniting,operator,"What any element does to a fuse it lands on: it sets it off. Fire, light, dark, ice and wind detonate it; water electrifies the water around it; thunder re-arms it.",fuse
@@ -167,3 +167,4 @@ blade_dance,Blade Dance,,progression,A sword passive you pick (in the sword's sk
 fissure,Fissure,fissures,rule,"Sunder's split in the earth: a straight 5-hex line from you through the target, painted with your element, every other foe on it hit at 60%. Rock stops it. Bellow doubles it to 10.",push
 lance_line,Set line,lance charge line|charge line,rule,"Lance Charge's telegraph: a straight line up to 10 hexes, drawn on the board. At its holder's next turn start the lance runs it, piercing and painting it, then takes a full turn.",zone
 fatigue,Fatigue,fatigued,rule,"Long fights wear everyone down: from round 15 every heal (and overheal shield) is halved, and from round 20 heals do nothing. The Giant fight is a long one: there it waits until round 45 and 60.",
+eagle_eye,Eagle Eye,bow mastery,progression,"The bow's mastery keystone: a bow at expertise A gets +1 range (the bow's base range is 5).",pressured

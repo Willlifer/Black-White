@@ -84,7 +84,7 @@ func _use(t, b: BWBattle, u: BWUnit, key: String, el: String, h: Vector2i) -> Di
 func test_new_skills_join_their_pools(t) -> void:
 	var want := {
 		"sword": ["thread_needle", "tapestry", "whirlwind_blade", "lunge", "en_passant"],   # D426, D438, D439
-		"axe": ["reckless_arc", "hook", "sunder", "earthsplitter", "bellow"],               # D435-D437
+		"axe": ["reckless_arc", "hook", "sunder", "earthsplitter", "bellow", "axe_throw"],  # D435-D437, D531
 		"lance": ["sweep", "set_spear", "phalanx", "dragoon_dive", "lance_charge"],   # D428; D442: no Guardrush
 		"bow": ["split_arrow", "retreating_shot", "pinning_shot", "rain_of_arrows"],  # D442: no Aimed Shot
 		"staff": ["bolt", "transfer", "inversion", "tempest"],                         # D442: no Aegis
@@ -232,6 +232,50 @@ func test_earthsplitter_line(t) -> void:
 		var was: Vector2i = line[0] if r.target == "a" else line[2]
 		var back: Vector2i = BWHex.neighbors(was)[0]
 		t.eq(v.pos, back if r.result.secondary else was, "%s heaved 1 back iff the secondary landed" % r.target)
+
+
+## D531 Axe Throw: "basically Saturate but only one level of element". Range 3,
+## cd 1, the blow on the foe there and 1 step of the element on the hex; an
+## empty hex just takes the step; a ranged single-target blow, so Pressured.
+func test_axe_throw(t) -> void:
+	var row := BWSkills.get_skill("axe_throw")
+	t.eq([str(row.weapon), int(row.range), int(row.cd), int(row.steps), str(row.clip)], ["axe", 3, 1, 1, "throw_under"],
+		"axe, range 3, cd 1, 1 step, the underhand clip")
+	t.ok(BWBattle.ranged_skill(row), "a ranged single-target skill (Pressured applies)")
+	var line := _line(4)
+	var me := _equip(_u("me", "axe", "fire"), ["axe_throw"])
+	var foe := _foe("f")
+	var b := _fight(me, [foe, _foe("g")], [line[2], line[3]])
+	var tg := b.skill_targets(me, "axe_throw", "fire")
+	t.ok(line[2] in tg and line[0] in tg, "reaches 1 to 3 tiles")
+	t.ok(not line[3] in tg and not C in tg, "not 4, not its own tile")
+	var hp0 := foe.hp
+	var ev := _use(t, b, me, "axe_throw", "fire", line[2])
+	t.eq(ev.results.size(), 1, "one blow, on the foe there")
+	var res: Dictionary = ev.results[0].result
+	t.eq(foe.hp, hp0 - int(res.damage), "it takes the blow (%d)" % int(res.damage))
+	t.eq(b.tiles.intensity(line[2], "fire"), 1, "its tile takes fire 1")
+	t.eq(b.tiles.intensity(line[1], "fire"), 0, "only the one tile")
+	var cd := 0
+	for k in me.cooldowns:
+		if str(k).begins_with("axe_throw"):
+			cd = int(me.cooldowns[k])
+	t.eq(cd, 1, "cooldown 1")
+	t.eq(me.weapon_class, "axe", "a new axe is drawn: still holding one")
+	# an empty tile: just the step (Saturate's pour, one level)
+	var me2 := _equip(_u("me", "axe", "water"), ["axe_throw"])
+	var b2 := _fight(me2, [_foe("f")], [line[3]])
+	var ev2 := _use(t, b2, me2, "axe_throw", "water", line[1])
+	t.ok((ev2.results as Array).is_empty() and b2.tiles.intensity(line[1], "water") == 1, "an empty tile takes water 1, no blow")
+	# Pressured: a foe within 2 of the thrower
+	var me3 := _equip(_u("me", "axe", "fire"), ["axe_throw"])
+	var b3 := _fight(me3, [_foe("a"), _foe("n")], [line[2], line[0]])
+	var fc: Dictionary = b3.skill_preview(me3, "axe_throw", "fire", line[2]).forecasts["a"]
+	t.ok(fc.mods.any(func(m): return str(m.get("tag", "")) == BWFormulas.PRESSURE_TAG), "Pressured with a foe beside the thrower")
+	var me4 := _equip(_u("me", "axe", "fire"), ["axe_throw"])
+	var b4 := _fight(me4, [_foe("a")], [line[2]])
+	var fc4: Dictionary = b4.skill_preview(me4, "axe_throw", "fire", line[2]).forecasts["a"]
+	t.ok(not fc4.mods.any(func(m): return str(m.get("tag", "")) == BWFormulas.PRESSURE_TAG), "a clean throw with nobody near")
 
 
 func test_cleave_plus(t) -> void:

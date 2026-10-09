@@ -29,7 +29,7 @@ static func standing(b: BWBattle, u: BWUnit, st: Dictionary) -> void:
 	var light := b.tiles.intensity(u.pos, "light")
 	if light <= 0:
 		return
-	var src := b._unit(str(st.get("source", "")))
+	var src := b._unit(str(st.get("light_src", st.get("source", ""))))   # D496
 	if src == null:
 		return
 	var ally := src.team == u.team
@@ -56,7 +56,7 @@ static func standing(b: BWBattle, u: BWUnit, st: Dictionary) -> void:
 static func ai_hex(b: BWBattle, u: BWUnit, h: Vector2i) -> float:
 	if b.tiles.intensity(h, "light") <= 0:
 		return 0.0
-	var src := b._unit(str(b.tiles.at(h).get("source", "")))
+	var src := b._unit(b.tiles.light_owner(h))
 	if src == null or not ks(src, JUDICATOR):
 		return 0.0
 	var amt := BWTiles.LIGHT_HEAL_PCT * b.tiles.intensity(h, "light") * 2.0 * u.pct_base_hp() / 100.0
@@ -68,7 +68,7 @@ static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 	var lt := b.tiles.intensity(h, "light")
 	if lt <= 0:
 		return out
-	var src := b._unit(str(b.tiles.at(h).get("source", "")))
+	var src := b._unit(b.tiles.light_owner(h))
 	if src != null and ks(src, JUDICATOR):
 		out.append("Judicator (%s): its side heals %d%% here at a turn start; its foes burn %d%% instead" % [
 			src.name, BWTiles.LIGHT_HEAL_PCT * lt * 2, BWTiles.LIGHT_HEAL_PCT * lt * 2])

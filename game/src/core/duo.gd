@@ -4,9 +4,9 @@ extends RefCounted
 ## "Duo perks"). A duo perk is a perks.csv row with a `duo` column (the second
 ## element; `element` is the first, the slot it fills) and effect_key "duo"
 ## (params id=<duo id>). It is OFFERED only on a perk pick of its first element,
-## only to a unit holding at least one ordinary perk in each of its two
-## elements (so both are among the unit's <= 3), at a modest RATE: when one is
-## eligible, RATE% of those picks show it as the second card. Taking it fills
+## only to a unit that has learned MIN_TREE picks of each element's tree
+## (ordinary perks + that element's keystone; D498, was 1 perk each) and then
+## ALWAYS (RATE 100, D498; was 35): the duo shows as the second card. Taking it fills
 ## that element's perk slot like any perk. The rules live in the hooks that
 ## ask has(u, id) (tiles, battle, wind, pools; each marked "D45x duo").
 ##
@@ -20,7 +20,9 @@ extends RefCounted
 ##   eclipse        (light+dark)   your light and dark on one hex both stay (the hex holds both)
 ##   blizzard       (wind+ice)     your wind pushes glaze the landing hex
 
-const RATE := 35
+const RATE := 100
+## D498: picks a unit must hold in each element's tree (perks + keystone).
+const MIN_TREE := 3
 const TABLE := "perks"
 
 
@@ -51,6 +53,11 @@ static func base_perks(u: BWUnit, el: String) -> int:
 	return n
 
 
+## D498: how much of `el`'s tree `u` has learned: ordinary perks + keystones.
+static func tree(u: BWUnit, el: String) -> int:
+	return base_perks(u, el) + BWPicks.keystones_owned(u, el).size()
+
+
 ## The duo rows `u` could be offered on a perk pick of `el`.
 static func eligible(u: BWUnit, el: String) -> Array:
 	var out: Array = []
@@ -58,7 +65,7 @@ static func eligible(u: BWUnit, el: String) -> Array:
 		if str(r.element) != el or str(r.id) in u.perks:
 			continue
 		var e2 := str(r.duo)
-		if u.affinity_rank(e2) < 1 or base_perks(u, el) < 1 or base_perks(u, e2) < 1:
+		if u.affinity_rank(e2) < 1 or tree(u, el) < MIN_TREE or tree(u, e2) < MIN_TREE:
 			continue
 		out.append(r)
 	return out

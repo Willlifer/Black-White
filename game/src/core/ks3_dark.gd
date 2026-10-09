@@ -193,6 +193,7 @@ static func on_ko(b: BWBattle, victim: BWUnit) -> void:
 		return
 	e.v = -3
 	e.source = hk.id
+	e.erase("lsrc")
 	e.timer = BWTiles.STEP_CYCLES
 	e.permanent = false
 	e.erase("seeded")

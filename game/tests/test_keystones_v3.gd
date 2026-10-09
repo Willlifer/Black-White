@@ -581,9 +581,9 @@ func test_duo_offers(t) -> void:
 	for k in 60:
 		var u := _u("d%d" % k, "staff", "fire")
 		u.pick_seed = k * 7919
-		u.affinity["fire"] = 20
-		u.affinity["wind"] = 20
-		u.perks = ["fire_rush", "wind_tail"]
+		u.affinity["fire"] = 50                   # D498: rank 5 owes the 4th fire perk
+		u.affinity["wind"] = 40
+		u.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye", "wind_force"]
 		var req := { "kind": "perk", "element": "fire" }
 		var o := BWPicks.options(u, req)
 		t.eq(BWPicks.options(u, req), o, "%s: the same cards each time" % u.id)
@@ -592,7 +592,12 @@ func test_duo_offers(t) -> void:
 			t.ok(not BWPicks.apply(u, req, "duo_wildfire").is_empty(), "%s: take it" % u.id)
 			u.refresh_effects()
 			t.ok(BWDuo.has(u, "wildfire_gale"), "%s: it holds Wildfire Gale" % u.id)
-	t.ok(seen >= 8 and seen <= 35, "a modest rate: %d of 60" % seen)
+	t.eq(seen, 60, "D498: eligible = always offered: %d of 60" % seen)
+	var thin := _u("th", "staff", "fire")
+	thin.affinity["fire"] = 20
+	thin.affinity["wind"] = 20
+	thin.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye"]
+	t.ok(BWDuo.eligible(thin, "fire").is_empty(), "D498: 2 wind picks: not yet")
 	var lone := _u("l", "staff", "fire")
 	lone.affinity["fire"] = 20
 	lone.perks = ["fire_rush"]

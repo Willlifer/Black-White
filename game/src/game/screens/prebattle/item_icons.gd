@@ -18,7 +18,7 @@ extends Node
 
 signal icon_ready(key: String)
 
-const VERSION := 1
+const VERSION := 2               # 2: D505 lance-class icons carry their shield
 const SIZE := 128
 const DIR := "user://item_icons/v%d/" % VERSION
 
@@ -222,10 +222,41 @@ func _build(base_id: String, element: String) -> Node3D:
 		if element != "":
 			for mi in w.meshes():
 				mi.set_instance_shader_parameter("accent", Color(BWLook.element_color(element), 0.9))
+		var sh := icon_shield(base_id)       # D505: lances carry their shield
+		if sh:
+			if element != "":
+				sh.set_accent(Color(BWLook.element_color(element), 0.9))
+			w.add_child(sh)
 		return w
 	if not BWEquipmentView.has_model(base_id):
 		return null
 	return BWEquipmentView.instantiate(base_id, element)
+
+
+## D505: a lance-class weapon's icon carries its shield (the fix for lances
+## read as staves): the shield faces the icon camera (+X in weapon space, the
+## view axis above) about midway up the shaft, a touch in front of it. The
+## small hand guard (D507) shows the same way, small. ICON_SHIELD_SCALE
+## enlarges the shield a little so it reads at 128 px against a 2.6-long spear.
+const ICON_SHIELD_SCALE := 1.35
+const ICON_SHIELD_AT := 0.5      # along the shaft, butt (0) to tip (1)
+
+static func icon_shield(weapon_id: String) -> BWShieldView:
+	var sid := BWShieldView.shield_for(weapon_id)
+	if sid == "":
+		return null
+	var sh := BWShieldView.create(sid)
+	if sh == null:
+		return null
+	var m := BWWeaponView.meta_for(weapon_id)
+	var lo := BWWeaponView.v3(m.get("aabb", {}).get("min", [0, 0, 0]))
+	var tip := BWWeaponView.v3(m.get("tip", [0, 1, 0]))
+	var y := lerpf(lo.y, tip.y, ICON_SHIELD_AT)
+	# face +X (toward the icon camera), top along the shaft (+Y); the strap
+	# just in front of the shaft
+	var b := Basis(Vector3(0, 0, -1), Vector3(0, 1, 0), Vector3(1, 0, 0)).scaled(Vector3.ONE * ICON_SHIELD_SCALE)
+	sh.transform = Transform3D(b, Vector3(0.035, y, 0))
+	return sh
 
 
 static func _bounds(n: Node) -> AABB:

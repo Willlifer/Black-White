@@ -4,6 +4,9 @@ extends RefCounted
 
 const SETS_OF := { "sword": ["one", "heavy"], "axe": ["one", "heavy"], "lance": ["polearm", "spear"], "daggers": ["pair"],
 	"fists": ["fists"], "pistols": ["pistol"], "bow": ["bow"], "staff": ["staff"] }
+## D531: clips a def names while the animation lane authors them; skipped
+## only while a style doesn't map them yet (the class strike plays meanwhile).
+const PENDING_CLIPS := {}          # D513: throw_under (Axe Throw, D531) landed; kept for clips in flight
 
 
 ## Every def that names a clip gets a real clip in every style of its class
@@ -16,6 +19,8 @@ func test_every_named_clip_resolves(t) -> void:
 		if clip == "":
 			continue
 		for st in SETS_OF.get(str(row.weapon), []):
+			if PENDING_CLIPS.has(clip) and not BWAnimClips.actions_for(st, "axe" if str(row.weapon) == "axe" else "").has(clip):
+				continue                     # D531: being authored in the animation lane; the class strike plays meanwhile
 			var cls := "axe" if str(row.weapon) == "axe" else ""
 			var acts := BWAnimClips.actions_for(st, cls)
 			if not acts.has(clip) or not BWAnimClips.load_set(st).has_animation(StringName(str(acts[clip].clip))):

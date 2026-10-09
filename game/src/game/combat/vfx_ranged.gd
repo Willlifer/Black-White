@@ -179,7 +179,16 @@ func handles(a: Node3D, _spell: bool = false) -> bool:
 	var cls := str(a.unit.weapon_class)
 	if cls == "bow":
 		return true
+	if cls == "axe" and (str(context.get("skill", "")) == "axe_throw" or _tossing(a)):   # ---- D531: the axe itself flies; D513: off the underhand throw
+		return true
 	return cls == "daggers" and str(context.get("skill", "")) in THROWN
+
+
+## D513: an axe leaves the hand on the underhand throw's release (the clip
+## on top is strike_throw_under; it hides the held axe until its draw).
+static func _tossing(a: Node3D) -> bool:
+	var c: BWCharacter = a.get("character")
+	return c != null and c.animator != null and c.animator.top_clip() == "strike_throw_under"
 
 
 ## Skills this node plays whole (camera, clip, arrows, impacts).
@@ -208,6 +217,8 @@ func shoot(a: BWUnitView, d: BWUnitView, element: String = "", hit: bool = true)
 	var key := str(context.get("skill", ""))
 	if str(a.unit.weapon_class) == "daggers":
 		return _throw_blade(a, d, hit)
+	if key == "axe_throw" or (str(a.unit.weapon_class) == "axe" and _tossing(a)):
+		return _throw_blade(a, d, hit, true)                          # ---- D531; D513
 	var nocks: Array = []
 	if a.character:
 		nocks = a.character.nocked_arrows()
@@ -335,8 +346,10 @@ func _shoot_pin(a: BWUnitView, d: Node3D, from: Transform3D, element: String, hi
 
 ## Dualthrow: the dagger leaves the hand spinning end over end; a hit
 ## sticks in the chest, a miss tumbles past into the ground.
-func _throw_blade(a: BWUnitView, d: Node3D, hit: bool) -> float:
-	var id := BWCharacter.weapon_id_for(a.unit, "dagger")
+## D531 `underhand`: Axe Throw: the thrower's own axe model, let go at the
+## hip and lobbed (a higher arc), tumbling end over end like a blade.
+func _throw_blade(a: BWUnitView, d: Node3D, hit: bool, underhand: bool = false) -> float:
+	var id := BWCharacter.weapon_id_for(a.unit, "axe" if underhand else "dagger")
 	var b: BWWeaponView = null
 	if _blades.has(id) and not (_blades[id] as Array).is_empty():
 		b = (_blades[id] as Array).pop_back()
@@ -348,11 +361,13 @@ func _throw_blade(a: BWUnitView, d: Node3D, hit: bool) -> float:
 		add_child(b)
 	b.visible = true
 	b.scale = Vector3.ONE
-	var p0: Vector3 = a.global_position + Vector3(0, 1.45, 0) + (d.global_position - a.global_position).normalized() * 0.3
+	var p0: Vector3 = a.global_position + Vector3(0, 0.95 if underhand else 1.45, 0) + (d.global_position - a.global_position).normalized() * 0.3
+	if underhand and _tossing(a) and a.character.weapon != null:
+		p0 = a.character.weapon.global_position      # ---- D513: out of the hand on the throw_under clip's release
 	var to := _chest(d)
 	var pts := [p0, to] if hit else _miss_path(p0, to, d)
 	var rec := _rec(b, pts, Basis(), { "stick": "unit" if hit else "skitter", "target": d, "speed": BLADE_SPEED, "blade": true,
-		"arc": 0.25 })
+		"arc": 0.9 if underhand else 0.25 })
 	return float(rec.dur) * (1.0 if hit else 0.8)
 
 
@@ -708,6 +723,7 @@ func play_area(e: Dictionary, tc: Dictionary, call: Dictionary) -> void:
 	var reacts: Array = []
 	for k in results.size():
 		reacts.append(s._pick_reaction(targets[k], results[k], false, "%s|%s|%d" % [a.unit.id, key, k]))
+	await s._crit_pre(a, results, str(tc.get("flash", "full")))   # ---- D530: the crit flash before the volley
 	a.skill = clip_for(key)
 	a.pose_named("windup")
 	await get_tree().create_timer(maxf(a.time_to_marker("coil"), 0.0) + 0.1).timeout
@@ -913,10 +929,8 @@ func _rain(a: BWUnitView, e: Dictionary, targets: Array, reacts: Array, centre: 
 				var k3 := int(ev[2])
 				_numbers(results, targets, k3)
 				var res: Dictionary = results[k3].result
-				if bool(res.get("crit", false)) and bool(res.get("hit", true)) and str(tc.get("flash", "none")) != "none":
-					s.crit_flashed.emit(a.unit.id)
-					s.ui.crit_flash_tiny()
-				s._shake(0.05)
+				# ---- D530: a crit flashed before the volley; here it only lands harder
+				s._shake(0.09 if bool(res.get("crit", false)) and bool(res.get("hit", true)) else 0.05)
 	# let the last arrows land
 	await get_tree().create_timer(RAIN_FALL + 0.05).timeout
 

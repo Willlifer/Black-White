@@ -15,8 +15,8 @@ const HEAVE := 1
 
 func _init() -> void:
 	define({
-		"key": "earthsplitter", "name": "Earthsplitter", "weapon": "axe", "clip": "",
-		"desc": "An overhead blow that splits the ground 3 tiles ahead: every enemy on the line is hit and heaved 1 tile back along it",
+		"key": "earthsplitter", "name": "Earthsplitter", "weapon": "axe", "clip": "sweep_under",   # D512: the underhand sweep
+		"desc": "A rising underhand blow that splits the ground 3 tiles ahead: every enemy on the line is hit and heaved 1 tile back along it",
 		"targeting": "dir", "needs_element": true, "range": LEN, "cd": CD,
 		"power": POWER, "aoe": true,
 	}, 314)

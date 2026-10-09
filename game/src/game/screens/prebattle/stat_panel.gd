@@ -238,6 +238,11 @@ class _Derived:
 		cl.text = caption
 		cl.add_theme_font_size_override("font_size", BWStyle.F_MENU_TITLE - 4)
 		cl.add_theme_color_override("font_color", BWStyle.FAINT)
+		# D532: "hexes per turn · jump 2" (an axe, a lance) pushed the panel off the
+		# screen's right edge; the caption wraps inside its tile instead
+		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cl.custom_minimum_size = Vector2(96, 0)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		v.add_child(cl)
 
 

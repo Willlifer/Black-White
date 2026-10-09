@@ -182,7 +182,24 @@ func standing(hex: Vector2i) -> Dictionary:
 		"drain": DARK3_DRAIN_PCT if intensity(hex, "dark") >= 3 else 0,
 		"heal": LIGHT_HEAL_PCT * light * (pot(hex, "light") if light > 0 else 1.0),
 		"source": str(at(hex).get("source", "")),
+		"light_src": light_owner(hex),             # D496: whose side the light heals
 	}
+
+
+## D496: who laid this hex's light. Light heals only its owner's side (an
+## authored / map light, owner "", heals anyone). `lsrc` rides beside
+## `source` because another element on the hex (fire on light) changes the
+## entry's source without changing whose light it is.
+func light_owner(hex: Vector2i) -> String:
+	var e := at(hex)
+	return str(e.get("lsrc", e.get("source", "")))
+
+
+## D496: the light owner an entry built from `e` by `caster`'s `element` keeps.
+static func _lsrc(e: Dictionary, element: String, caster: String) -> String:
+	if element == "light":
+		return caster
+	return str(e.get("lsrc", e.get("source", caster)))
 
 
 func crossing_pct(hex: Vector2i) -> float:
@@ -519,6 +536,8 @@ func siphon(hex: Vector2i) -> void:
 		entries.erase(hex)
 		return
 	entries[hex] = _entry(h, v, "", e.source, e.origin)
+	if e.has("lsrc") and v > 0:
+		entries[hex]["lsrc"] = e.lsrc            # D496
 
 
 ## The per-cycle tick (§5.1): eruptions, decay, grass spread, then the
@@ -706,11 +725,16 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 			nh = 0
 			if nv == 0:
 				return { "op": "erase", "doused": true }
-			return { "op": "set", "doused": true, "entry": _entry(0, nv, "", str(e.get("source", caster)), str(e.get("origin", "cast"))) }
+			var dz := _entry(0, nv, "", str(e.get("source", caster)), str(e.get("origin", "cast")))
+			if nv > 0:
+				dz["lsrc"] = _lsrc(e, element, caster)   # D496
+			return { "op": "set", "doused": true, "entry": dz }
 		if marker != "":
 			if not fresh:
 				return { "op": "none" }      # containment rule 1
 			var arrived := _entry(nh, nv, "", caster, "cast", int(opts.get("timer_plus", 0)))
+			if nv > 0:
+				arrived["lsrc"] = _lsrc(e, element, caster)   # D496
 			if marker == "gale":
 				arrived["gale_level"] = int(e.get("gale_level", 1))
 			var p := _operate(arrived, marker, str(e.get("source", caster)))
@@ -721,6 +745,8 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 		var ne := _entry(nh, nv, "", caster, "cast" if fresh else "spread", int(opts.get("timer_plus", 0)) if fresh else 0)
 		if element == "fire" and nh > 0 and opts.get("lava", false):
 			ne["lava"] = true                       # D447: a Lava Walker's fire
+		if nv > 0 or int(e.get("ecl", 0)) > 0:
+			ne["lsrc"] = _lsrc(e, element, caster)  # D496: fire on your light leaves it yours
 		if int(e.get("ecl", 0)) > 0 and nv != 0 and signi(nv) == signi(v):
 			ne["ecl"] = int(e.ecl)                  # D461: an eclipsed hex keeps its other half
 		return { "op": "set", "entry": ne }
@@ -852,6 +878,8 @@ func _grass_spread() -> Array:
 				entries.erase(n)
 			continue
 		var seed := _entry(1, int(cur.get("v", 0)), "", seeds[n][0], "spread")
+		if int(seed.v) > 0:
+			seed["lsrc"] = _lsrc(cur, "fire", "")  # D496: the light under a seed stays its owner's
 		entries[n] = seed
 		seeded.append(n)
 	return seeded

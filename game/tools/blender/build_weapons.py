@@ -1,4 +1,4 @@
-"""Black | White weapons: all 25 main-hand models, built from nothing.
+"""Black | White weapons: all 36 main-hand models (+ 3 shields, D505), built from nothing.
 
     blender -b --factory-startup --python game/tools/blender/build_weapons.py
     blender -b --factory-startup --python game/tools/blender/build_weapons.py -- --only sword,axe
@@ -44,6 +44,7 @@ ROOT = os.path.dirname(GAME)
 OUT_DIR = os.path.join(GAME, "art", "weapons")
 JSON_OUT = os.path.join(OUT_DIR, "weapons.json")
 BLEND_OUT = os.path.join(GAME, "art", "source", "weapons.blend")
+SHIELD_DIR = os.path.join(OUT_DIR, "shields")
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
@@ -632,6 +633,373 @@ def build_moon_staff(w):
                 aura=[(0, 0, 1.53), (0, 0.24, 1.66), (0, -0.24, 1.66), (0, 0.22, 1.32), (0, -0.22, 1.32), (0, 0, 1.2)])
 
 
+# ------------------------------------------------- D501: the 11 additions
+# New models in existing classes: same grip conventions, palette and
+# detail density as their siblings (no new animations; the class's clip
+# set holds them and the solver puts the fists on each grip).
+
+def build_scythe(w):
+    # axe class, two hands like the double axe: the left fist below the right.
+    # A bent snath, the blade off the top pointing forward and curving down;
+    # the cutting edge is the inner (lower) curve. Sized to the heavy clip
+    # set's envelope (the double axe's reach), D503.
+    w.tube([(0, 0, -0.40), (0, 0.012, 0.25), (0, -0.01, 0.90), (0, 0.0, 1.40)],
+           [0.029, 0.03, 0.029, 0.027], sides=6, val=WOOD)
+    w.ellipsoid((0, 0, -0.42), 0.038, sides=6, rings=3)                     # butt cap
+    grip(w, -0.33, 0.10, r=0.033)
+    w.tube([(0, 0, 0.62), (0, 0.035, 0.66), (0, 0.075, 0.64)], [0.016, 0.014, 0.016], sides=4, val=GRIP)  # the nib
+    w.tube([(0, 0, 1.22), (0, 0, 1.34)], [0.036, 0.034], sides=6, val=IRON)  # ferrule
+    w.box((0, 0.0, 1.37), (0.034, 0.05, 0.04), val=WHITE)                  # tang block
+    spine = [(-0.10, 1.36), (0.02, 1.45), (0.16, 1.50), (0.30, 1.49), (0.42, 1.43), (0.51, 1.33),
+             (0.555, 1.21), (0.565, 1.09)]
+    inner = [(0.48, 1.21), (0.40, 1.28), (0.29, 1.33), (0.17, 1.35), (0.06, 1.34)]
+    pts = [(-0.04, 1.30)] + spine + inner
+    n_sp = len(spine)
+    edges = tuple(range(n_sp, n_sp + len(inner)))       # tip -> heel along the inner curve
+    w.plate(pts, h=0.03, bevel=0.028, edges=edges)
+    w.tube([(0, -0.10, 1.36), (0, -0.17, 1.31)], [0.03, 0.0], sides=4)     # back spur
+    return dict(tip=(0, 0.565, 1.09), trail_base=(0, 0, 0.80), second=(0, 0, -0.25),
+                aura=[(0, 0.56, 1.16), (0, 0.47, 1.30), (0, 0.33, 1.40), (0, 0.18, 1.42), (0, 0.04, 1.38),
+                      (0, 0, 1.1)])
+
+
+def build_rapier(w):
+    # sword class, one hand: a long thin blade, a swept hilt (cup, quillons,
+    # knuckle bow running down the edge side of the fist to the pommel)
+    grip(w, -0.11, 0.09, r=0.024)
+    w.ellipsoid((0, 0, -0.145), (0.036, 0.036, 0.034), sides=6, rings=3)   # pommel
+    w.tube([(0, 0, 0.065), (0, 0, 0.13)], [0.072, 0.03], sides=8)          # the cup, open toward the fist
+    w.tube([(0, -0.16, 0.13), (0, 0.16, 0.13)], 0.012, sides=4)            # quillons, along the edge
+    w.ellipsoid((0, -0.17, 0.13), 0.02, sides=5, rings=3)
+    w.ellipsoid((0, 0.17, 0.13), 0.02, sides=5, rings=3)
+    w.tube([(0, 0.07, 0.10), (0, 0.085, 0.0), (0, 0.075, -0.09), (0, 0.03, -0.135)], 0.01, sides=4)  # knuckle bow
+    w.tube([(0, 0.0, 0.10), (0, -0.07, 0.03), (0, -0.06, -0.03)], 0.008, sides=4)                     # rear sweep
+    w.plate([(0.026, 0.13), (0.024, 0.86), (0.0, 1.08), (-0.024, 0.86), (-0.026, 0.13)],
+            h=0.017, bevel=0.012, edges=(0, 1, 2, 3))
+    return dict(tip=(0, 0, 1.08), trail_base=(0, 0, 0.20),
+                aura=[(0, 0, u) for u in (0.25, 0.46, 0.67, 0.88, 1.02)] + [(0, 0.17, 0.13), (0, -0.17, 0.13)])
+
+
+def build_katana(w):
+    # sword class, two hands like the flamberge: a long wrapped grip (left
+    # fist at the pommel end), a round tsuba, a gently curved single edge
+    grip(w, -0.32, 0.10, r=0.027)
+    for u in (-0.24, -0.15, -0.06, 0.03):                                  # the wrap's diamonds
+        w.tube([(0, 0, u - 0.012), (0, 0, u + 0.012)], 0.03, sides=4, phase=0.0, val=GRIP)
+    w.tube([(0, 0, -0.34), (0, 0, -0.32)], [0.026, 0.031], sides=6, val=IRON)     # kashira
+    w.tube([(0, 0, 0.105), (0, 0, 0.135)], 0.085, sides=10, val=WHITE)              # tsuba
+    w.tube([(0, 0, 0.135), (0, 0, 0.175)], [0.034, 0.03], sides=6, val=IRON)        # habaki
+    n = 9
+    u0, u1 = 0.16, 1.24
+    front, back = [], []
+    for k in range(n):
+        t = k / (n - 1)
+        u = u0 + (u1 - u0) * t
+        c = -0.10 * t * t                       # the sori: the blade bends back toward the spine
+        front.append((c + 0.03 - 0.004 * t, u))
+        back.append((c - 0.024 + 0.002 * t, u))
+    tip = (-0.115, 1.34)
+    pts = front + [tip] + back[::-1]
+    edges = tuple(range(0, n))                  # the edge and the kissaki
+    w.plate(pts, h=0.022, bevel=0.024, edges=edges)
+    return dict(tip=(0, tip[0], tip[1]), trail_base=(0, 0, 0.22), second=(0, 0, -0.22),
+                aura=[(0, -0.002, 0.3), (0, -0.015, 0.55), (0, -0.04, 0.8), (0, -0.07, 1.05), (0, -0.105, 1.28)])
+
+
+def build_divine_staff(w):
+    # staff class: straight banded shaft, a halo ring with rays round a gem,
+    # and baubles hanging off a crossbar on short chains (static meshes)
+    w.tube([(0, 0, -0.72), (0, 0, 1.30)], [0.027, 0.031], sides=6, val=WOOD)
+    w.ellipsoid((0, 0, -0.72), 0.035, sides=6, rings=3)                             # butt cap
+    grip(w, -0.10, 0.10, r=0.034)
+    grip(w, 0.40, 0.56, r=0.034)
+    for u in (0.22, 0.86, 1.06):
+        w.ring((0, 0, u), 0.034, 0.011, axis="z", segs=6, sides=4, val=WHITE)       # carved bands
+    w.tube([(0, 0, 1.18), (0, 0, 1.30), (0, 0, 1.36)], [0.032, 0.05, 0.036], sides=6)  # collar
+    w.tube([(0, -0.19, 1.31), (0, 0.19, 1.31)], 0.016, sides=4)                     # crossbar, along f
+    w.ring((0, 0, 1.46), 0.17, 0.022, axis="x", segs=12, sides=5)                   # the halo
+    for a in (90, 45, 135, 0, 180):                                                  # rays
+        d = Vector((0, math.cos(deg(a)), math.sin(deg(a))))
+        base = Vector((0, 0, 1.46)) + d * 0.19
+        w.tube([base, base + d * (0.05 if a == 90 else 0.05)], [0.022, 0.0], sides=4)
+    w.tube([(0, 0, 1.33), (0, 0, 1.46), (0, 0, 1.59)], [0.0, 0.075, 0.0], sides=6, val=GEM, mat=ACCENT)  # the gem
+    for s in (1, -1):                                                                # the dangling baubles
+        f = 0.17 * s
+        w.tube([(0, f, 1.30), (0, f, 1.17)], 0.0075, sides=3, val=IRON)
+        w.ellipsoid((0, f, 1.15), 0.016, sides=5, rings=3)
+        w.tube([(0, f, 1.135), (0, f, 1.08)], 0.0075, sides=3, val=IRON)
+        w.tube([(0, f, 1.08), (0, f, 1.04), (0, f, 0.98)], [0.0, 0.032, 0.0], sides=5, val=GEM, mat=ACCENT)
+    return dict(tip=(0, 0, 1.70), trail_base=(0, 0, 1.0), second=(0, 0, 0.48),
+                aura=[(0, 0, 1.46), (0, 0.17, 1.46), (0, -0.17, 1.46), (0, 0, 1.64), (0, 0.17, 1.02), (0, -0.17, 1.02)])
+
+
+def build_orb_scepter(w):
+    # staff class, shorter: an iron cage of four ribs round a dark orb
+    w.tube([(0, 0, -0.40), (0, 0, 0.92)], [0.025, 0.029], sides=6)
+    w.ellipsoid((0, 0, -0.42), 0.036, sides=6, rings=3)                           # pommel
+    grip(w, -0.10, 0.10, r=0.032)
+    grip(w, 0.26, 0.40, r=0.032)
+    w.ring((0, 0, 0.80), 0.032, 0.011, axis="z", segs=6, sides=4, val=WHITE)
+    w.tube([(0, 0, 0.88), (0, 0, 0.96), (0, 0, 1.00)], [0.03, 0.052, 0.04], sides=6)  # collar cup
+    c = Vector((0, 0, 1.13))
+    w.ellipsoid(tuple(c), 0.095, sides=8, rings=5, val=GEM, mat=ACCENT)             # the orb
+    for a in (45, 135, 225, 315):                                                    # the cage
+        d = Vector((math.cos(deg(a)), math.sin(deg(a)), 0))
+        pts = [Vector((0, 0, 0.99)) + d * 0.04, c + d * 0.09 + Vector((0, 0, -0.075)),
+               c + d * 0.122, c + d * 0.09 + Vector((0, 0, 0.085)), Vector((0, 0, 1.26)) + d * 0.02]
+        w.tube(pts, 0.011, sides=4, val=WHITE)
+    w.ellipsoid((0, 0, 1.27), 0.026, sides=6, rings=3)
+    w.tube([(0, 0, 1.28), (0, 0, 1.38)], [0.02, 0.0], sides=4)                     # finial
+    return dict(tip=(0, 0, 1.38), trail_base=(0, 0, 0.6), second=(0, 0, 0.33),
+                aura=[(0, 0, 1.13), (0, 0.1, 1.13), (0, -0.1, 1.13), (0, 0, 1.26), (0, 0, 1.0)])
+
+
+def build_trident(w):
+    # lance class, two hands like the halberd and glaive (leading fist up the
+    # shaft): a crossbar and three barbed prongs fanned in the (f, u) plane
+    haft(w, -0.62, 1.40, 0.027)
+    w.tube([(0, 0, -0.62), (0, 0, -0.74)], [0.027, 0.0], sides=4)
+    grip(w, -0.10, 0.10, r=0.032)
+    grip(w, 0.40, 0.56, r=0.032)
+    w.tube([(0, 0, 1.34), (0, 0, 1.44)], [0.034, 0.04], sides=6, val=WHITE)
+    w.tube([(0, -0.17, 1.46), (0, -0.08, 1.43), (0, 0.08, 1.43), (0, 0.17, 1.46)], 0.024, sides=5)
+    w.tube([(0, 0, 1.44), (0, 0, 1.80)], [0.024, 0.02], sides=5)                  # middle prong
+    w.tube([(0, 0, 1.80), (0, 0, 1.86)], [0.02, 0.045], sides=4, phase=0.0)
+    w.tube([(0, 0, 1.86), (0, 0, 2.02)], [0.045, 0.0], sides=4, phase=0.0, val=EDGE, mat=ACCENT)
+    for s in (1, -1):
+        pr = [(0, s * 0.17, 1.46), (0, s * 0.19, 1.56), (0, s * 0.18, 1.70)]
+        w.tube(pr, [0.022, 0.02, 0.018], sides=5)
+        w.tube([(0, s * 0.18, 1.70), (0, s * 0.175, 1.85)], [0.032, 0.0], sides=4, phase=0.0, val=EDGE, mat=ACCENT)
+        barb = [(s * 0.16, 1.70), (s * 0.25, 1.66), (s * 0.20, 1.76)]
+        w.plate(barb if s > 0 else mirror_f(barb), h=0.012, bevel=0.008, edges=(0,) if s > 0 else (0,))
+    return dict(tip=(0, 0, 2.02), trail_base=(0, 0, 0.90), second=(0, 0, 0.48),
+                aura=[(0, 0, 1.94), (0, 0.18, 1.80), (0, -0.18, 1.80), (0, 0, 1.6), (0, 0, 1.2)])
+
+
+def build_naginata(w):
+    # lance class, two hands: a long pole, a round guard, a curved blade
+    # that widens toward the tip and sweeps back toward the spine
+    haft(w, -0.62, 1.16, 0.027)
+    w.tube([(0, 0, -0.62), (0, 0, -0.70)], [0.03, 0.03], sides=6, val=IRON)        # ishizuki
+    w.tube([(0, 0, -0.70), (0, 0, -0.76)], [0.03, 0.0], sides=6, val=IRON)
+    grip(w, -0.10, 0.10, r=0.032)
+    grip(w, 0.40, 0.56, r=0.032)
+    grip(w, 0.98, 1.14, r=0.031)                                                   # the wrapped neck
+    w.tube([(0, 0, 1.14), (0, 0, 1.17)], 0.07, sides=10, val=WHITE)                 # guard
+    w.tube([(0, 0, 1.17), (0, 0, 1.21)], [0.032, 0.028], sides=6, val=IRON)
+    n = 9
+    u0, u1 = 1.20, 1.80
+    front, back = [], []
+    for k in range(n):
+        t = k / (n - 1)
+        u = u0 + (u1 - u0) * t
+        c = -0.17 * t * t
+        front.append((c + 0.03 + 0.032 * t, u))         # widens toward the tip
+        back.append((c - 0.026, u))
+    tip = (-0.215, 1.90)
+    pts = front + [tip] + back[::-1]
+    w.plate(pts, h=0.024, bevel=0.026, edges=tuple(range(0, n)))
+    return dict(tip=(0, tip[0], tip[1]), trail_base=(0, 0, 1.0), second=(0, 0, 0.48),
+                aura=[(0, 0.03, 1.32), (0, 0.02, 1.48), (0, -0.04, 1.64), (0, -0.12, 1.78), (0, -0.2, 1.87)])
+
+
+def build_kunai(w):
+    # daggers class (a pair, x1.2): a leaf blade straight off the wrapped
+    # grip, no guard, a ring pommel
+    grip(w, -0.08, 0.065, r=0.021)
+    for u in (-0.055, -0.02, 0.015, 0.05):                                         # the wrap
+        w.tube([(0, 0, u - 0.008), (0, 0, u + 0.008)], 0.025, sides=4, phase=0.0, val=GRIP)
+    w.ring((0, 0, -0.125), 0.038, 0.01, axis="x", segs=8, sides=4)                # ring pommel
+    w.tube([(0, 0, 0.06), (0, 0, 0.085)], [0.026, 0.02], sides=4, phase=0.0, val=IRON)
+    w.plate([(0.02, 0.08), (0.06, 0.17), (0.04, 0.29), (0.0, 0.42), (-0.04, 0.29), (-0.06, 0.17), (-0.02, 0.08)],
+            h=0.022, bevel=0.02, edges=(1, 2, 3, 4))
+    return dict(tip=(0, 0, 0.42), trail_base=(0, 0, 0.12),
+                aura=[(0, 0, 0.15), (0, 0, 0.27), (0, 0, 0.38)])
+
+
+def build_karambit(w):
+    # daggers class (a pair, x1.2): a claw blade curving forward off the
+    # grip, the edge on its inner curve; a finger ring at the butt
+    w.tube([(0, 0.0, -0.085), (0, -0.004, 0.0), (0, 0.006, 0.07)], [0.023, 0.023, 0.022], sides=6, val=GRIP)
+    w.ring((0, -0.01, -0.135), 0.042, 0.011, axis="x", segs=8, sides=4)            # finger ring
+    w.tube([(0, 0.004, 0.065), (0, 0.008, 0.085)], [0.03, 0.026], sides=6, val=IRON)  # bolster
+    spine = [(-0.028, 0.08), (-0.02, 0.18), (0.02, 0.27), (0.09, 0.32), (0.17, 0.33), (0.23, 0.30)]
+    edge = [(0.15, 0.27), (0.08, 0.255), (0.045, 0.20), (0.034, 0.12), (0.03, 0.08)]
+    pts = spine + edge
+    w.plate(pts, h=0.021, bevel=0.016, edges=(5, 6, 7, 8, 9))
+    return dict(tip=(0, 0.23, 0.30), trail_base=(0, 0, 0.12),
+                aura=[(0, 0.0, 0.15), (0, 0.05, 0.27), (0, 0.15, 0.31)])
+
+
+def build_longbow(w):
+    # bow: a tall, plain D-shaped self bow: one arc, a leather grip, horn nocks
+    n = 11
+    tip_u, depth = 0.68, 0.185
+    up = [(0, -depth * (u / tip_u) ** 2, u) for u in (0.10 + (tip_u - 0.10) * k / (n - 1) for k in range(n))]
+    for s in (1, -1):
+        w.tube([(x, f, s * u) for x, f, u in up], [0.03 - 0.016 * k / (n - 1) for k in range(n)], sides=6, val=WHITE)
+        w.tube([(0, -depth, s * tip_u), (0, -depth - 0.005, s * (tip_u + 0.05))], [0.016, 0.0], sides=5,
+               val=EDGE, mat=ACCENT)
+    w.tube([(0, 0, -0.12), (0, 0, 0.12)], [0.031, 0.031], sides=6, val=WHITE)
+    grip(w, -0.10, 0.10, r=0.034)
+    _string(w, [(0, -depth - 0.002, tip_u), (0, -depth - 0.002, -tip_u)])
+    return dict(tip=(0, 0.04, 0.05), trail_base=(0, -depth, 0.0), second=(0, -depth - 0.002, 0.0),
+                aura=[(0, -depth, tip_u), (0, -depth, -tip_u), (0, -0.06, 0.45), (0, -0.06, -0.45), (0, 0.03, 0.0)])
+
+
+def _feather(w, top, length=0.15, width=0.03):
+    """A feather hanging straight down from `top` (x, f, u) on a short cord:
+    a white vane in the (f, u) plane with a dark tip and a quill."""
+    x, f, u = top
+    w.tube([(x, f, u), (x, f, u - 0.045)], 0.006, sides=3, val=STRING, mat=BODY)   # the cord
+    w.tube([(x, f, u - 0.04), (x, f, u - 0.065)], [0.013, 0.011], sides=4, val=GRIP)  # a bead
+    u0 = u - 0.065
+    vane = [(0.0, 0.0), (width, -0.03), (width * 1.1, -length * 0.6), (0.0, -length),
+            (-width * 1.1, -length * 0.6), (-width, -0.03)]
+    w.plate([(f + a, u0 + b) for a, b in vane], h=0.007, bevel=0.006, o=(x, 0, 0))
+    tipv = [(width * 0.75, -length * 0.8), (0.0, -length * 1.01), (-width * 0.75, -length * 0.8)]
+    w.plate([(f + a, u0 + b) for a, b in tipv], h=0.0095, bevel=0.004, val=GRIP, o=(x, 0, 0))
+
+
+def build_ancestral_bow(w):
+    # bow: an old carved reflex bow: a carved riser with an eye stone,
+    # banded limbs that flick forward at the tips, and feathers tied on
+    w.plate([(-0.035, -0.2), (0.03, -0.2), (0.05, -0.1), (0.035, 0.0), (0.05, 0.1), (0.03, 0.2), (-0.035, 0.2),
+             (-0.05, 0.08), (-0.05, -0.08)], h=0.032, bevel=0.012)
+    grip(w, -0.075, 0.075, r=0.036)
+    w.box((0, 0.045, 0.14), (0.012, 0.016, 0.024), val=GEM, mat=ACCENT)             # the eye stone
+    limb = [(0.0, 0.18), (-0.06, 0.305), (-0.13, 0.44), (-0.17, 0.54), (-0.16, 0.62), (-0.12, 0.665)]
+    radii = [0.03, 0.027, 0.024, 0.021, 0.018, 0.015]
+    for s in (1, -1):
+        w.tube([(0, f, s * u) for f, u in limb], radii, sides=6)
+        for f, u in ((-0.03, 0.25), (-0.10, 0.40)):                                 # carved bands
+            w.tube([(0, f + 0.01, s * (u - 0.014)), (0, f - 0.01, s * (u + 0.014))], 0.03, sides=5, val=GRIP)
+        w.tube([(0, -0.12, s * 0.665), (0, -0.095, s * 0.715)], [0.017, 0.0], sides=5, val=EDGE, mat=ACCENT)
+    _string(w, [(0, -0.125, 0.655), (0, -0.172, 0.55)], mat=BODY)                  # over the tips: stays put
+    _string(w, [(0, -0.172, 0.55), (0, -0.172, -0.55)])
+    _string(w, [(0, -0.172, -0.55), (0, -0.125, -0.655)], mat=BODY)
+    # feathers tied on: two off the upper limb's band, one under the grip
+    _feather(w, (0.035, -0.10, 0.40))
+    _feather(w, (-0.035, -0.10, 0.40), length=0.12)
+    _feather(w, (0.035, -0.03, -0.25), length=0.13)
+    return dict(tip=(0, 0.06, 0.05), trail_base=(0, -0.17, 0.0), second=(0, -0.172, 0.0),
+                aura=[(0, -0.12, 0.665), (0, -0.12, -0.665), (0, -0.10, 0.30), (0, -0.10, -0.40), (0, 0.045, 0.14)])
+
+
+# ------------------------------------------------------ D505: shields
+# Cosmetic shields that come with every lance-class weapon (D505-D507). No
+# slot, no stats. Shield space (x, f, u): the face looks along +f, the
+# shield stands in the (x, u) plane with +u its top, and the ORIGIN is the
+# arm strap on its back face. BWShieldView hangs it on the off hand
+# (socket_offhand_l) by the per-shield mount below.
+
+def _disc(w, f, radius, u0=0.0, segs=12):
+    """A closed ring polyline in the (x, u) plane at depth f."""
+    return [(radius * math.cos(2 * math.pi * (k + 0.5) / segs), f, u0 + radius * math.sin(2 * math.pi * (k + 0.5) / segs))
+            for k in range(segs)]
+
+
+def _shield_plate(w, outline, f0, h, val=WHITE, bevel=0.02, mat=BODY):
+    """A flat plate in the (x, u) plane, its centre plane at depth f0."""
+    w.plate(outline, h=h, bevel=bevel, val=val, edge_mat=mat,
+            o=(0, f0, 0), A=(1, 0, 0), B=(0, 0, 1), N=(0, 1, 0))
+
+
+def _strap(w, half_u):
+    w.box((0, -0.004, 0), (0.03, 0.008, half_u), val=GRIP)                       # the arm strap
+    w.box((0, -0.004, 0), (0.07, 0.006, 0.016), val=GRIP)                         # the hand loop
+
+
+def build_buckler(w):
+    # small round buckler: a shallow dome, a raised rim, a pointed boss
+    w.tube([(0, 0.0, 0), (0, 0.022, 0), (0, 0.05, 0), (0, 0.068, 0)], [0.155, 0.155, 0.10, 0.0],
+           sides=12, ref=(0, 0, 1))
+    w.tube(_disc(w, 0.024, 0.155), 0.014, sides=4, val=IRON, closed=True, ref=(0, 1, 0))
+    for k in range(6):                                                              # rivets
+        a = 2 * math.pi * k / 6
+        w.ellipsoid((0.118 * math.cos(a), 0.034, 0.118 * math.sin(a)), 0.011, sides=4, rings=2, val=IRON)
+    w.tube([(0, 0.05, 0), (0, 0.08, 0), (0, 0.115, 0)], [0.045, 0.036, 0.0], sides=6, val=EDGE, mat=ACCENT, ref=(0, 0, 1))
+    _strap(w, 0.07)
+    return dict(center=(0, 0.06, 0), radius=0.17)
+
+
+def build_kite_shield(w):
+    # tall kite: rounded top, long point, a dark cross and an accent boss
+    half = [(0.0, 0.29), (0.11, 0.275), (0.19, 0.22), (0.205, 0.12), (0.18, -0.02), (0.13, -0.17), (0.065, -0.29)]
+    outline = half + [(0.0, -0.37)] + [(-x, u) for x, u in reversed(half[1:])]
+    _shield_plate(w, outline, 0.022, 0.022, bevel=0.024)
+    _shield_plate(w, [(-0.026, 0.255), (0.026, 0.255), (0.026, -0.27), (0.0, -0.31), (-0.026, -0.27)], 0.046, 0.004,
+                  val=GRIP, bevel=0.006)
+    _shield_plate(w, [(-0.17, 0.12), (0.17, 0.12), (0.165, 0.07), (-0.165, 0.07)], 0.046, 0.004, val=GRIP, bevel=0.006)
+    w.ellipsoid((0, 0.055, 0.095), (0.05, 0.03, 0.05), sides=6, rings=3, val=EDGE, mat=ACCENT)
+    _strap(w, 0.12)
+    return dict(center=(0, 0.05, 0.0), radius=0.33)
+
+
+def build_square_shield(w):
+    # square: plank face, an iron frame with corner rivets, a square boss
+    s = 0.215
+    _shield_plate(w, [(-s, -s), (s, -s), (s, s), (-s, s)], 0.022, 0.022, bevel=0.016)
+    for u in (-0.072, 0.072):                                                       # plank seams
+        w.box((0, 0.045, u), (s - 0.03, 0.003, 0.004), val=GRIP)
+    fr = 0.022
+    for p0, p1 in (((-s, s - fr), (s, s - fr)), ((-s, -s + fr), (s, -s + fr))):
+        w.box((0, 0.048, p0[1]), (s, 0.008, fr), val=IRON)
+    for x in (-s + fr, s - fr):
+        w.box((x, 0.048, 0), (fr, 0.008, s - 2 * fr), val=IRON)
+    for x in (-s + fr, s - fr):
+        for u in (-s + fr, s - fr):
+            w.ellipsoid((x, 0.06, u), 0.012, sides=4, rings=2, val=WHITE)
+    w.box((0, 0.055, 0), (0.06, 0.012, 0.06), val=WHITE)
+    w.tube([(0, 0.066, 0), (0, 0.10, 0)], [0.042, 0.0], sides=4, phase=0.0, val=EDGE, mat=ACCENT, ref=(0, 0, 1))
+    _strap(w, 0.1)
+    return dict(center=(0, 0.05, 0), radius=0.3)
+
+
+# id, builder, along (up the forearm from the fist), out (off the back of the
+# hand), notes. The mount is written to weapons.json "shields" (BWShieldView).
+def build_hand_guard(w):
+    # D507: the small guard for the two-handed polearms: a vamplate-sized
+    # domed disc strapped bracer-style on the forearm, an accent stud
+    w.tube([(0, 0.0, 0), (0, 0.014, 0), (0, 0.032, 0), (0, 0.042, 0)], [0.078, 0.078, 0.05, 0.0],
+           sides=10, ref=(0, 0, 1))
+    w.tube(_disc(w, 0.015, 0.078, segs=10), 0.009, sides=4, val=IRON, closed=True, ref=(0, 1, 0))
+    w.tube([(0, 0.032, 0), (0, 0.05, 0), (0, 0.068, 0)], [0.024, 0.02, 0.0], sides=6, val=EDGE, mat=ACCENT, ref=(0, 0, 1))
+    w.box((0, -0.004, 0), (0.05, 0.007, 0.012), val=GRIP)                          # the bracer strap, round the arm
+    return dict(center=(0, 0.03, 0), radius=0.08)
+
+
+# id, builder, kind, along, out, notes. kind "hand" rides socket_offhand_l
+# (the shield is held); "forearm" rides the forearm_l bone (bracer-style, so
+# the hand stays free to grip the shaft). `along` = up the forearm from the
+# fist, `out` = off the back of the hand. The mount is written to
+# weapons.json "shields" (BWShieldView); tune it there or here.
+SHIELDS = [
+    ("buckler", build_buckler, "hand", 0.05, 0.06, "Small round buckler: shallow dome, iron rim and rivets, pointed accent boss."),
+    ("kite_shield", build_kite_shield, "hand", 0.13, 0.06, "Tall kite: rounded top, long point, dark cross, accent boss."),
+    ("square_shield", build_square_shield, "hand", 0.10, 0.06, "Square plank shield: iron frame, corner rivets, accent boss."),
+    ("hand_guard", build_hand_guard, "forearm", 0.20, 0.045, "Small domed guard disc strapped on the forearm, accent stud (D507)."),
+]
+
+# D506/D507: which shield each lance-class weapon comes with (weapons.json "shield").
+SHIELD_FOR = {
+    "lance": "kite_shield", "javelin": "buckler", "trident": "square_shield",
+    "halberd": "hand_guard", "glaive": "hand_guard", "naginata": "hand_guard",
+}
+
+
+def shield_mount(along, out):
+    """The shield's mount in the socket_offhand_l frame (Godot space): its
+    back on the outside of the left forearm, `along` up the forearm from the
+    fist and `out` off the back of the hand, facing out (away from the body)."""
+    k = _rig_hand_dir(1.0)                      # left hand rest direction (x, f, u), wrist -> knuckles
+    a = -k                                       # up the forearm, toward the elbow
+    lateral = Vector((1.0, 0.0, 0.0))            # the wielder's left: the back of the left hand
+    n = (lateral - a * lateral.dot(a)).normalized()
+    pos = a * along + n * out
+    return {"position": gd(tuple(pos)), "face": gd(tuple(n)), "up": gd(tuple(a))}
+
+
 # fists (D76): worn on both hands. Each builder models the RIGHT hand's piece
 # in a hand-local frame (lx = along the knuckle row, lf = the back of the
 # hand, lu = the punching direction, out through the knuckles); fist_frame()
@@ -736,25 +1104,36 @@ WEAPONS = [
     ("sword", "sword", "one", build_sword, "Straight double edge, flared guard, round pommel."),
     ("scimitar", "sword", "one", build_scimitar, "Single edge, sweeps back and widens to a clipped point."),
     ("flamberge", "sword", "two", build_flamberge, "Wavy two-hander: undulating blade, parrying lugs, horned guard."),
+    ("rapier", "sword", "one", build_rapier, "Long thin blade, swept hilt: cup, quillons, knuckle bow (D501)."),
+    ("katana", "sword", "two", build_katana, "Gently curved single edge, round tsuba, long wrapped grip (D501)."),
     ("axe", "axe", "one", build_axe, "Bearded head on a one-hand haft, square poll."),
     ("double_axe", "axe", "two", build_double_axe, "Labrys: twin crescents and a top spike on a long haft."),
     ("hatchet", "axe", "one", build_hatchet, "Short, compact wedge head with a hammer poll."),
     ("warhammer", "axe", "two", build_warhammer, "Block head, grey striking face, back spike, top spike."),
     ("anchor", "axe", "two", build_anchor, "Ship's anchor held at the ring end; flukes point back at the wielder."),
+    ("scythe", "axe", "two", build_scythe, "Reaper's scythe: long bent snath, the blade forward off the top, edge on its inner curve (D501)."),
     ("lance", "lance", "two", build_lance, "Vamplate cone over the hand, long tapering cone, steel point."),
     ("javelin", "lance", "one", build_javelin, "Thin, light, bound in the middle, four-sided head."),
     ("halberd", "lance", "two", build_halberd, "Spear top, axe blade forward, hook back."),
     ("glaive", "lance", "two", build_glaive, "Long single-edged knife blade on a pole, back spur."),
+    ("trident", "lance", "two", build_trident, "Crossbar and three barbed prongs on a pole (D501)."),
+    ("naginata", "lance", "two", build_naginata, "Curved blade widening to the tip, round guard, wrapped neck (D501)."),
     ("dagger", "daggers", "pair", build_dagger, "Leaf blade, small guard; carried as a pair."),
     ("jagged_dagger", "daggers", "pair", build_jagged_dagger, "Hooked tip, sawtooth spine, spike pommel; a pair."),
+    ("kunai", "daggers", "pair", build_kunai, "Leaf blade, wrapped grip, ring pommel; a pair (D501)."),
+    ("karambit", "daggers", "pair", build_karambit, "Claw blade curving forward, finger ring at the butt; a pair (D501)."),
     ("shortbow", "bow", "bow", build_shortbow, "Simple D arc, plain string."),
     ("recurve_bow", "bow", "bow", build_recurve_bow, "Taller, chunky riser, tips curl forward, string on the curls."),
     ("compound_bow", "bow", "bow", build_compound_bow, "Angular riser, split limbs, cams, cable, stabiliser rod."),
+    ("longbow", "bow", "bow", build_longbow, "Tall plain D-shaped self bow, horn nocks (D501)."),
+    ("ancestral_bow", "bow", "bow", build_ancestral_bow, "Old carved reflex bow: eye stone, banded limbs, feathers tied on (D501)."),
     ("pistol", "pistols", "one", build_pistol, "Revolver: hex cylinder bulge, thin barrel."),
     ("flintlock", "pistols", "one", build_flintlock, "Long thin barrel, curved stock, ball butt, cock on top."),
     ("m1911", "pistols", "one", build_m1911, "Boxy slide and frame, steep square grip."),
     ("staff", "staff", "two", build_staff, "Gnarled shaft, three-prong claw around a dark gem."),
     ("moon_staff", "staff", "two", build_moon_staff, "Straight shaft, crescent head, gem floating in the hollow."),
+    ("divine_staff", "staff", "two", build_divine_staff, "Banded shaft, halo with rays round a gem, baubles hanging on chains (D501)."),
+    ("orb_scepter", "staff", "two", build_orb_scepter, "Short staff, four-rib cage round a dark orb (D501)."),
     ("hand_wraps", "fists", "fists", build_hand_wraps, "Wrapped fists: a fat cloth mitten, bands over the knuckles and up the wrist."),
     ("brass_knuckles", "fists", "fists", build_brass_knuckles, "Four-ring duster: striking bar and studs over a black fist, palm rest, wrist wrap."),
     ("gauntlets", "fists", "fists", build_gauntlets, "Plated fist, ridged knuckle plate, overlapping back plates, flared cuff."),
@@ -763,7 +1142,7 @@ WEAPONS = [
 # Readability scale, applied about the grip after building. Pistols and
 # daggers are true-ish to the 2.2 figure when modelled; at the combat camera
 # (24 u, FOV 34) that is ~15 px, so they are drawn oversized, RuneScape-style.
-SCALE = {"pistol": 1.4, "flintlock": 1.3, "m1911": 1.4, "dagger": 1.2, "jagged_dagger": 1.2}
+SCALE = {"pistol": 1.4, "flintlock": 1.3, "m1911": 1.4, "dagger": 1.2, "jagged_dagger": 1.2, "kunai": 1.2, "karambit": 1.2}
 
 # What each class shoots (game/tools/blender/build_projectiles.py builds them;
 # art/weapons/projectiles/projectiles.json). Melee classes: null.
@@ -884,6 +1263,8 @@ def main():
             # the drawable string's ends (Godot weapon space): BWWeaponView
             # bends it to the draw hand between nock and release
             entry["string"] = [gd(tuple(c * k for c in wm.string[0])), gd(tuple(c * k for c in wm.string[1]))]
+        if wid in SHIELD_FOR:
+            entry["shield"] = SHIELD_FOR[wid]           # D506: the cosmetic shield it comes with
         if hands == "fists":
             # the left hand's piece: the same mesh mirrored in x, its own glb
             # (a negative-scale copy would flip the winding and break the hull)
@@ -948,6 +1329,54 @@ def main():
         obj["hands"] = hands
         lay_x += 0.9
 
+    # D505: the shields (always rebuilt: three small meshes), own folder
+    shields = {}
+    os.makedirs(SHIELD_DIR, exist_ok=True)
+    for sid, fn, kind, along, out, notes in SHIELDS:
+        wm = WeaponMesh()
+        info = fn(wm)
+        me = wm.build(sid, [mat_body, mat_accent])
+        obj = bpy.data.objects.new(sid, me)
+        scn.collection.objects.link(obj)
+        tris = sum(len(p.vertices) - 2 for p in me.polygons)
+        acc = sum(len(p.vertices) - 2 for p in me.polygons if p.material_index == ACCENT)
+        xs = [v.x for v in wm.verts]
+        fs = [v.y for v in wm.verts]
+        us = [v.z for v in wm.verts]
+        mount = shield_mount(along, out)
+        shields[sid] = {
+            "kind": kind,
+            "socket": "socket_offhand_l",
+            "bone": "hand_l" if kind == "hand" else "forearm_l",
+            "mount": mount,
+            "center": gd(info["center"]),
+            "radius": info["radius"],
+            "aabb": {"min": gd((min(xs), min(fs), min(us))), "max": gd((max(xs), max(fs), max(us)))},
+            "tris": tris,
+            "accent_tris": acc,
+            "glb": "res://art/weapons/shields/%s.glb" % sid,
+            "used_by": [k for k in [w[0] for w in WEAPONS] if SHIELD_FOR.get(k) == sid],
+            "notes": notes,
+        }
+        print("SHIELD %-14s tris %4d (accent %3d)" % (sid, tris, acc))
+        for o in bpy.context.view_layer.objects:
+            o.select_set(False)
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        glb = os.path.join(SHIELD_DIR, sid + ".glb")
+        bpy.ops.export_scene.gltf(
+            filepath=glb, export_format='GLB', use_selection=True,
+            export_yup=True, export_apply=False, export_texcoords=False, export_normals=True,
+            export_materials='EXPORT', export_vertex_color='ACTIVE', export_all_vertex_colors=False,
+            export_skins=False, export_animations=False, export_morph=False,
+            export_cameras=False, export_lights=False, export_extras=False,
+        )
+        if not os.path.exists(glb + ".import"):
+            with open(glb + ".import", "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(IMPORT_STUB)
+        obj.location = (lay_x, 0, 0)
+        lay_x += 0.6
+
     doc = {
         "version": WEAPONS_VERSION,
         "rig_version": RIG_VERSION,
@@ -964,6 +1393,11 @@ def main():
             "bow": "LEFT hand on socket_offhand_l; second_hand.point is the RIGHT hand's draw (nock) target",
         },
         "weapons": {k: meta[k] for k in [w[0] for w in WEAPONS] if k in meta},
+        "shields_space": "Godot shield-local: origin = the arm strap on the back face, +Z the face direction, "
+                         "+Y the shield's top. mount, in socket_offhand_l's rest frame: position, face (+Z goes here), "
+                         "up (+Y goes here). kind 'hand' rides the socket (hand_l); 'forearm' rides the forearm_l "
+                         "bone in that same rest frame, so the wrist turns under it (bracer).",
+        "shields": shields,
     }
     with open(JSON_OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(doc, fh, indent=1, sort_keys=False)

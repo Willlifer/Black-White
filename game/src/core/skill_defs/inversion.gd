@@ -83,6 +83,8 @@ func ground(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: Dicti
 			# against the rest, so the lava drops a step (light / dark still flip)
 			e.h = int(e.h) - 1
 			e.v = -int(e.v)
+			if int(e.v) > 0:
+				e["lsrc"] = u.id                   # D496
 			if int(e.h) <= 0:
 				e.erase("lava")
 			if int(e.h) == 0 and int(e.v) == 0:
@@ -90,6 +92,8 @@ func ground(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: Dicti
 			continue
 		e.h = -int(e.h)
 		e.v = -int(e.v)
+		if int(e.v) > 0:
+			e["lsrc"] = u.id                       # D496: flipped to light, it's the inverter's
 		e.marker = SWAP.get(str(e.marker), str(e.marker))
 	b._emit({ "type": "paint", "unit": u.id, "element": "", "hexes": p.hexes, "kind": "inversion",
 		"area": p.get("area", p.hexes), "swaps": swaps })

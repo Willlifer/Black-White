@@ -122,7 +122,7 @@ func test_swap_changes_class_range_skills_forecast(t) -> void:
 	t.ok(b.can_swap(u), "can swap")
 	t.ok(b.swap_weapon(u), "swap")
 	t.eq(u.weapon_class, "bow", "the class follows the drawn bow")
-	t.eq(b.weapon_range(u), 6, "the bow reaches 6")
+	t.eq(b.weapon_range(u), 5, "the bow reaches 5 (D500)")
 	t.ok(b.in_range(u, foe), "now the foe is in reach")
 	t.ok(foe in b.attack_targets(u), "the range overlay's targets follow")
 	var bow_keys: Array = b.skills_for(u).map(func(x): return str(x.key))

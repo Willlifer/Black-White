@@ -78,6 +78,7 @@ func ground(b: BWBattle, u: BWUnit, _el: String, target_hex: Vector2i, p: Dictio
 	b.tiles.clear(target_hex)
 	b._emit({ "type": "paint", "unit": u.id, "element": "", "hexes": [target_hex], "kind": "transfer" })
 	e.source = u.id
+	e.erase("lsrc")                            # D496: the lifter set this light down
 	e.permanent = false
 	e.erase("erupt")
 	e.timer = BWTiles.MARK_CYCLES if str(e.marker) != "" else BWTiles.STEP_CYCLES

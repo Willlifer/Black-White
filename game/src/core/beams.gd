@@ -308,7 +308,7 @@ static func ward_absorb(b: BWBattle, u: BWUnit, dmg: int) -> int:
 static func magnifier(b: BWBattle, u: BWUnit) -> BWUnit:
 	if u == null or b.tiles.intensity(u.pos, "light") <= 0:
 		return null
-	var src := b._unit(str(b.tiles.at(u.pos).get("source", "")))
+	var src := b._unit(b.tiles.light_owner(u.pos))
 	if src == null or src == u or src.team != u.team or not ks(src, "magnify"):
 		return null
 	return src
@@ -418,7 +418,7 @@ static func card_lines(b: BWBattle, h: Vector2i) -> Array:
 				a.name if a else "?", c.name if c else "?", ", bent" if str(bm.bend) != "" else "", int(bm.pct), int(bm.empower)])
 	if b.tiles.intensity(h, "light") >= DAWN_LIGHT:
 		out.append("Dawn: a unit starting its turn here takes 1 off its longest cooldown")
-	var src := b._unit(str(b.tiles.at(h).get("source", "")))
+	var src := b._unit(b.tiles.light_owner(h))
 	if b.tiles.intensity(h, "light") > 0 and src != null and ks(src, "magnify"):
 		out.append("Magnify (%s's light): %s's allies here cast magnified, once a turn (+1 radius, or +1 charge step)" % [src.name, src.name])
 	var u := b._centre_at(h)

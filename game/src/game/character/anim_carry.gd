@@ -68,8 +68,13 @@ static func guard_fix(style: String, g: Dictionary) -> Dictionary:
 			# upright at her side, but behind the shoulder line and tipped out
 			# and back: a shaft stood in front of the shoulder covered the face
 			# from the front 3/4 (the face-cover test)
-			return { "hand_r_pos": (g.hand_r_pos as Vector3) + Vector3(-0.06, -0.04, -0.24),
+			var out := { "hand_r_pos": (g.hand_r_pos as Vector3) + Vector3(-0.06, -0.04, -0.24),
 				"hand_r_aim": Vector3(-0.2, 0.86, -0.52).normalized() }
+			if style in BWAnimClips.SHIELD_SETS:
+				# D520: the off hand is the shield arm, its forearm across the chest
+				out.merge(BWAnimClips.shield_hand(0.0), true)
+				out["hand_l_grip"] = 0.0
+			return out
 		"pistol":
 			return { "hand_r_pos": Vector3(-0.27, -0.27, 0.22), "hand_r_aim": Vector3(0, 0.87, 0.5).normalized(),
 				"hand_r_edge": Vector3(0, -0.5, 0.87).normalized() }

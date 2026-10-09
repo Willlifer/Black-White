@@ -869,6 +869,27 @@ func trash_item(it: Dictionary) -> bool:
 	return true
 
 
+## D534: set aside every loose item of `tier` or lower (E is lowest). Returns
+## how many went. Worn gear is never touched.
+func trash_tier_and_under(tier: String) -> int:
+	var cap := TIERS.find(tier)
+	if cap < 0:
+		return 0
+	var n := 0
+	for it in inventory.duplicate():
+		if TIERS.find(str(it.get("tier", ""))) <= cap and trash_item(it):
+			n += 1
+	return n
+
+
+## D534: take the whole discard pile back.
+func untrash_all() -> int:
+	var n := trash.size()
+	inventory.append_array(trash)
+	trash.clear()
+	return n
+
+
 ## Take a set-aside item back into the inventory.
 func untrash_item(it: Dictionary) -> bool:
 	if not it in trash:
@@ -1121,6 +1142,7 @@ func _enemies_for(n: int, room: Dictionary = {}) -> Array:
 		if not curve.perks:
 			u.perks.clear()              # D133: no perk picks this fight (skills stand)
 			u.refresh_effects()
+		u.hp = u.max_hp()                # D502: full after gear (a CON stat line raised the max)
 		out.append(u)
 	return out
 

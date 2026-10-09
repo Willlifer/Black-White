@@ -48,6 +48,7 @@ const DIR_KEYS: PackedStringArray = ["aim", "edge", "pole"]
 var skeleton: Skeleton3D
 var style := "one"
 var hold_hand := "r"              ## hand on the weapon socket: r, l (bow) or both (pair)
+var shield_arm := false            ## D520: the off hand holds a shield (its socket turned by hand_l aim / edge)
 var second_point := Vector3.ZERO  ## weapon-local second-hand point (two-handers, bow string)
 var has_second := false
 var stride := 1.0                 ## 1 = authored stance; < 1 narrows it (skirts, robes)
@@ -99,6 +100,13 @@ func bind(sk: Skeleton3D) -> void:
 		_len["leg_" + s] = [(_rest["shin_" + s] as Transform3D).origin.length(), (_rest["foot_" + s] as Transform3D).origin.length()]
 
 
+## D520: lance-class weapons fought one-handed behind a shield (the spear
+## set): the lance, the javelin and the trident, whatever their "hands".
+## The other lance-class weapons (halberd, glaive, naginata) stay two-handed
+## (the polearm set; a small forearm guard only).
+const SHIELD_SPEARS: PackedStringArray = ["lance", "javelin", "trident"]
+
+
 ## Weapon style from weapons.json metadata (class + hands).
 static func style_for(meta: Dictionary) -> String:
 	var cls := str(meta.get("class", ""))
@@ -109,7 +117,7 @@ static func style_for(meta: Dictionary) -> String:
 		"fists": return "fists"
 		"pistols": return "pistol"
 		"staff": return "staff"
-		"lance": return "polearm" if hands == "two" else "spear"
+		"lance": return "spear" if hands != "two" or str(meta.get("id", "")) in SHIELD_SPEARS else "polearm"   # ---- D520
 	if hands == "two":
 		return "heavy"
 	return "one"
@@ -119,6 +127,7 @@ static func style_for(meta: Dictionary) -> String:
 func set_weapon(meta: Dictionary) -> void:
 	style = style_for(meta) if not meta.is_empty() else "one"
 	hold_hand = "l" if style == "bow" else ("both" if style in ["pair", "fists"] else "r")
+	shield_arm = style in BWAnimClips.SHIELD_SETS           # D520: the spear set holds a shield in the off hand
 	weapon_ends = ends_of(meta)
 	var sh: Variant = meta.get("second_hand")
 	has_second = sh is Dictionary
@@ -214,10 +223,14 @@ func apply(p: Dictionary) -> void:
 				grip.origin -= grip.basis * second_point * 0.5 * float(hl.get("grip", 0.0))
 			grip = _clear_floor(_plant(grip, plant))
 			var got := _arm_weapon("r", grip, sr * (hr.pole as Vector3) - sr.origin, G)
-			var hold := _free_target(hl, sl)
-			if has_second:
-				hold = hold.lerp(got * second_point, clampf(float(hl.get("grip", 0.0)), 0.0, 1.0))
-			_arm_free("l", hold, sl * (hl.pole as Vector3) - sl.origin, G)
+			if shield_arm:
+				# D520: the off hand holds the shield: its socket turned by aim / edge like a grip
+				_arm_weapon("l", _weapon_grip(hl, sl, 0.0), sl * (hl.pole as Vector3) - sl.origin, G)
+			else:
+				var hold := _free_target(hl, sl)
+				if has_second:
+					hold = hold.lerp(got * second_point, clampf(float(hl.get("grip", 0.0)), 0.0, 1.0))
+				_arm_free("l", hold, sl * (hl.pole as Vector3) - sl.origin, G)
 		"l":
 			var grip := _clear_floor(_plant(_weapon_grip(hl, sl, p.flat), plant))
 			var got := _arm_weapon("l", grip, sl * (hl.pole as Vector3) - sl.origin, G)

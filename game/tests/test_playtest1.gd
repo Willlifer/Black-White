@@ -66,6 +66,19 @@ func test_trash_pile(t) -> void:
 	t.eq(BWRun.from_dict(d).trash, [], "an older save has no pile")
 
 
+func test_trash_by_tier_d534(t) -> void:
+	var r := BWRun.start(_ids(), 5)
+	r.inventory.clear()
+	for tier in ["E", "D", "C", "B", "A"]:
+		r.inventory.append(r.make_item("vest", tier, ""))
+	t.eq(r.trash_tier_and_under("D"), 2, "D and under: the E and the D")
+	t.eq(r.inventory.map(func(i): return str(i.tier)), ["C", "B", "A"], "C and up stay")
+	t.eq(r.trash_tier_and_under("E"), 0, "nothing left at E")
+	t.ok(not r.squad[0].equipment.main_hand in r.trash, "worn gear untouched")
+	t.eq(r.untrash_all(), 2, "keep all")
+	t.eq(r.inventory.size(), 5, "all back")
+
+
 # ---------------------------------------------------------------- D235
 
 func test_inventory_sort(t) -> void:

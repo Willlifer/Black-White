@@ -79,7 +79,7 @@ func _build_ui() -> void:
 	_panel.offset_left = -24 - 1050
 	_panel.offset_right = -24
 	_panel.offset_top = 86
-	_panel.offset_bottom = -24 - 150
+	_panel.offset_bottom = -24                     # ---- D532: was -24 - 150; the arrow moves bottom-left while it's open
 	_panel.visible = false
 	_panel.closed.connect(_close_panel)
 	BWEsc.track(_panel, _close_panel, { "name": "gear" })          # ---- D171: the hall's gear panel

@@ -31,7 +31,9 @@ static func well_pct(b: BWBattle, a: BWUnit) -> Array:
 	if src == null or src.team != a.team or not has(src, WELLSPRING) or not src.alive():
 		return [0.0, null]
 	var pct := WELL_PCT * lvl
-	var light := float(b.tiles.standing(a.pos).heal)
+	var st := b.tiles.standing(a.pos)
+	var lsrc := b._unit(str(st.light_src))
+	var light := float(st.heal) if lsrc == null or lsrc.team == a.team else 0.0   # D496
 	return [maxf(0.0, pct - light), src]
 
 

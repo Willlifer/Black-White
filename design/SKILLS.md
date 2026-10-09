@@ -52,6 +52,7 @@ to En Passant (known, Improve, loadout slot); it is never offered.
 | Sunder | 3 | adjacent foe, then a fissure | 13 (60% on the fissure) | **D415:** the blow ignores 30% DEF and can't glance; the ground then splits from you through the target, 5 hexes (10 after a Bellow): every hex takes the element (like Ley Line), every other foe on it is hit at 60%. Rock and pillars stop it | — |
 | Earthsplitter | 4 | heading, line 3 | 11 each | **D416:** no paint; each foe on the line is heaved 1 hex back along it (secondary); jagged rock stops the split | — |
 | Bellow *(D436; replaced War Cry)* | 4 | self (uses the action) | — | Your next Cleave or Sunder this battle doubles: Cleave hits the 6 around you + the 5 ring-2 hexes ahead (11); Sunder's fissure runs 10. Held until used (inked spikes at the feet, a card line) · clip `war_cry` | — |
+| Axe Throw *(D531, added: a sixth learnable)* | 1 | a hex 1–3 away, sight needed | 10 | Saturate with one level: toss the axe underhand; a foe on the hex takes the blow, and the hex takes **1 step** of the element whoever stands there (an empty hex just takes the step). A new axe is drawn (no return, nothing unequipped). Ranged single-target, so **Pressured** (D424/D499) applies · clip `throw_under` (until a style has it: the class strike, and the axe model flies, `BWRangedVFX._throw_blade`) | — |
 
 ## Lance — mobile, utility
 

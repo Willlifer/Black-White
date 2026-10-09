@@ -741,7 +741,8 @@ func _play(e: Dictionary) -> void:
 			board_view.refresh_tiles()
 			ui.feed("%s steps back" % _name(e.unit))
 		"attack":
-			var rs := [{ "target": e.target, "result": e.result, "ko": e.ko, "target_hp": e.get("target_hp", -1), "tags": e.get("tags", []), "odds": e.get("odds", {}) }]
+			var rs := [{ "target": e.target, "result": e.result, "ko": e.ko, "target_hp": e.get("target_hp", -1), "tags": e.get("tags", []), "odds": e.get("odds", {}),
+				"behind": e.get("behind", false), "strike": e.get("strike", 0) }]   # ---- D510/D517: the alternate pick's inputs
 			rs.append_array(_take_line(e))                          # ---- D219: the Colossus's thrust runs through them all at once
 			var tc := _tier(e)                                      # ---- D122
 			var what := "strike %d/%d" % [int(e.strike) + 1, int(e.strikes)] if int(e.get("strike", 0)) > 0 				else (str(e.get("pattern", "")).capitalize() if e.has("strikes") else "")
@@ -1238,7 +1239,7 @@ func _animate_slide(v: BWUnitView, path: Array, step: float) -> void:
 	var dash := step < 0.1
 	var next := _next_skill(str(v.unit.id)) if dash else {}
 	if dash and not next.is_empty():
-		v.skill = BWSkillRegistry.clip(str(next.skill))
+		v.skill = _alt_pose(v, BWSkillRegistry.clip(str(next.skill)), next.get("results", []), str(next.skill))   # ---- D510: the cutscene's own pick
 		v.pose_named("windup")
 	else:
 		v.pose_named("strike" if dash else "hit")
@@ -1433,8 +1434,12 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	# ---- end D100
 
 	a.face(centre)
+	var alt := _alt_pose(a, skill_clip, results, skill_name)      # ---- D510: alternates, the backstab (D517), Tempest (D519)
 	for t in targets:
-		t.face(a.global_position)
+		if alt == "backstab":
+			BWBackstab.face(t, a)                                  # ---- D517: the back stays turned
+		else:
+			t.face(a.global_position)
 	var melee := BWHex.distance(a.unit.pos, d.unit.pos) <= 1
 	var spell := str(a.unit.weapon().get("damage_type", "")) == "spell"
 	var home := a.position
@@ -1444,6 +1449,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	var clip := a.has_clip("cast") if use_cast else a.has_clip("strike")
 	var to_impact := 0.0
 	var impacts: Array = []                                        # ---- D387/D389: per-result impact times (Fan, Chamber)
+	await _crit_pre(a, results, str(tc.get("flash", "full")))      # ---- D530: the crit flash before the swing
 	if use_cast and clip:
 		var wind: float = vfx.windup(a) if vfx else 0.0              # ---- D167: casting circle + converge
 		if skill_name != "" and a.has_clip("channel"):
@@ -1451,6 +1457,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 			await _hold(maxf(0.55 if full else 0.25, wind))
 		elif wind > 0.0:
 			await _hold(wind)
+		a.skill = alt                   # ---- D519: Tempest floats (cast_tempest); else the cast
 		a.pose_named("cast")
 		await get_tree().create_timer(maxf(a.time_to_marker("release"), 0.0)).timeout
 		var rel_t: float = vfx.release(a, d, bool(results[0].result.hit)) if vfx else -1.0    # ---- D167: the element's release
@@ -1459,7 +1466,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		# the anticipation is held at "coil", then the clip drives the timing:
 		# melee dashes in while both feet are off the ground (launch..land);
 		# bows and pistols let fly on "release"
-		a.skill = skill_clip            # ---- D102: the def's clip (spin, pistol_whip, flurry ...) when this weapon has it; else the class strike
+		a.skill = alt                   # ---- D102: the def's clip (spin, pistol_whip, flurry ...) when this weapon has it; else the class strike; D510: or an alternate
 		a.pose_named("windup")
 		var heavy: float = vfx.strike_windup(a) if vfx else 0.0       # ---- D169: Triumph's held gleam
 		await get_tree().create_timer(maxf(a.time_to_marker("coil"), 0.0) + 0.1 + heavy).timeout
@@ -1469,7 +1476,9 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 		if ranged:
 			impacts = ranged.fan(a, results)                    # ---- D387: Fan of Knives' thrown ring
 		var launch := a.time_to_marker("launch")
-		if melee and launch >= 0.0:
+		if alt == "backstab":
+			BWBackstab.slide(self, a, d, home)                  # ---- D517: round to the back and home again (view only)
+		elif melee and launch >= 0.0:
 			var land := maxf(a.time_to_marker("land"), launch + 0.05)
 			var gap := home.distance_to(d.position)
 			var engage := float(a.character.animator.clip_meta(a.character.animator.top_clip()).get("engage", gap * 0.58))
@@ -1620,8 +1629,12 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	var r0: Dictionary = results[0]
 	var d: BWUnitView = targets[0]
 	a.face(d.global_position)
+	var alt := _alt_pose(a, skill_clip, results, label_text)      # ---- D510: alternates, the backstab (D517), Tempest (D519)
 	for t in targets:
-		t.face(a.global_position)
+		if alt == "backstab":
+			BWBackstab.face(t, a)                                  # ---- D517
+		else:
+			t.face(a.global_position)
 	var res: Dictionary = r0.result
 	var spell := BWClipRoute.casts(a.unit, str(a.unit.weapon().get("damage_type", "")) == "spell", skill_clip)   # ---- D220: a Being casts
 	var melee := BWHex.distance(a.unit.pos, d.unit.pos) <= 1
@@ -1632,8 +1645,11 @@ func _quick_hit(attacker_id: String, results: Array, label_text: String, element
 	if BWSettings.value("show_odds"):
 		_odds_in(results, element)                   # ---- D113
 	var to_impact := 0.0
-	a.skill = skill_clip                             # the def's clip, else the class strike (never a stale one)
+	await _crit_pre(a, results, str(tc.get("flash", "tiny")))      # ---- D530: the crit flash before the swing
+	a.skill = alt                                    # the def's clip, else the class strike (never a stale one); D510: or an alternate
 	a.pose_named("cast" if spell else "strike")
+	if alt == "backstab":
+		BWBackstab.slide(self, a, d, a.position)     # ---- D517
 	var rel := a.time_to_marker("release")
 	var tint := element if element != "" else a.unit.attuned
 	var impacts: Array = ranged.fan(a, results) if ranged else []   # ---- D387: Fan of Knives' knives fly in place too
@@ -1684,7 +1700,7 @@ func _setup_beat(attacker_id: String, skill_name: String, skill_clip: String = "
 	# ---- D221: the def's pose (brace, war_cry, aim, reload, tumble), else the
 	# channel; a channel aimed at a tile (Transfer, Inversion, Aegis) faces
 	# it and ends in a cast at it
-	var pose := BWClipRoute.setup_pose(skill_clip, a.has_clip, str(a.unit.weapon_class) == "staff")
+	var pose := BWClipRoute.setup_pose_for(str(e.get("skill", "")), skill_clip, a.has_clip, str(a.unit.weapon_class) == "staff")   # ---- D516: Self-detonate's flourish
 	var at: Variant = e.get("target", null)
 	var aimed: bool = at is Vector2i and at != a.unit.pos and battle.board.exists(at)
 	if aimed:
@@ -1784,6 +1800,12 @@ func _play_extras(a: BWUnitView, extra: Array, melee: bool, flash: String) -> Pa
 		if at < 0.0:
 			at = 0.12
 		var react := _pick_reaction(tv, rx, melee, "%s|x%d" % [a.unit.id, int(q.strike)], extra.slice(qi + 1))
+		if flash != "none" and _has_crit([rx]):           # ---- D530: flash just before this strike, not on it
+			var lead := minf(CRIT_PRE_LEAD, at)
+			if at - lead > 0.0:
+				await get_tree().create_timer(at - lead).timeout
+			await _crit_pre(a, [rx], "tiny" if skipping else flash)
+			at = lead
 		await _react_at(a, [tv], [react], at, [rx], "tiny" if flash != "none" else "none")
 		var rk: Dictionary = rx.result
 		var num := ("IMMUNE" if rk.get("immune", false) else "MISS") if not rk.hit else str(rk.damage)
@@ -1883,16 +1905,10 @@ func _react_at(a: BWUnitView, targets: Array, reacts: Array, to_impact: float, r
 			_dodge_shift(a, tv)
 	if to_impact > t:
 		await get_tree().create_timer(to_impact - t).timeout
-	# ---- D101: a crit freezes on its impact frame for the white flash
-	for r in results:
-		var res: Dictionary = (r as Dictionary).get("result", {}) if r is Dictionary else {}
-		if bool(res.get("crit", false)) and bool(res.get("hit", true)):
-			if flash == "full" and not skipping:     # ---- D122: the white-out is FULL's; else a tiny flash
-				await _crit_flash(a.unit.id if a and a.unit else "")
-			elif flash != "none":
-				crit_flashed.emit(a.unit.id if a and a.unit else "")
-				ui.crit_flash_tiny()
-			break
+	# ---- D530: no flash here any more: the crit flashed before the swing
+	# (_crit_pre); the impact keeps its hit-stop (BWHitFeel.impact, CRIT_STOP)
+	if _has_crit(results):
+		crit_log.append({ "unit": a.unit.id if a and a.unit else "", "at": "impact", "ms": Time.get_ticks_msec() })
 	if feel:
 		await feel.impact(a, targets, results, flash)   # ---- D167-D170: impact VFX, hit-stop, final-KO slow-mo
 
@@ -1941,6 +1957,25 @@ func _projectile(a: BWUnitView, d: BWUnitView, spell: bool, element: String = ""
 	var tint := element if element != "" else a.unit.element
 	var f := BWProjectileFlight.launch(self, kind, from, d, tint if (spell or element != "" or kind == "arrow") else "", hit)
 	return f.duration
+
+
+## ---- D510: the pose a blow plays (BWClipRoute.pick: the alternates, the
+## dagger backstab D517, Tempest D519), seeded by the blow itself: the same
+## blow always plays the same clip, and the battle's RNG is never touched.
+func _alt_pose(a: BWUnitView, skill_clip: String, results: Array, skill_name: String = "") -> String:
+	if a == null or a.character == null or a.character.animator == null or results.is_empty():
+		return skill_clip
+	var r0: Dictionary = results[0]
+	var d: BWUnitView = _views.get(str(r0.get("target", "")))
+	var seen := {}
+	for r in results:
+		seen[str((r as Dictionary).get("target", ""))] = true
+	var res: Dictionary = r0.get("result", {})
+	var key := skill_name.to_lower().replace(" ", "_")
+	return BWClipRoute.pick(a.character.animator.set_id, str(a.unit.weapon_class), skill_clip, a.has_clip, {
+		"melee": d != null and BWHex.distance(a.unit.pos, d.unit.pos) <= 1, "single": seen.size() == 1,
+		"crit": bool(res.get("crit", false)) and bool(res.get("hit", true)), "behind": bool(r0.get("behind", false)),
+		"skill_name": key if key != "" and BWSkills.has_skill(key) else "", "salt": BWClipRoute.salt_of(a.unit.id, r0) })
 
 
 func _shake(strength: float) -> void:
@@ -2010,6 +2045,40 @@ func _crit_flash(unit_id: String) -> void:
 	await get_tree().create_timer(dur, true, false, true).timeout
 	_freezing = false
 	Engine.time_scale = SKIP_SCALE if skipping else 1.0     # D123: a hold that began during the freeze keeps going
+
+
+# ---- D530: the crit flash plays the moment BEFORE the swing (author: "get you
+# excited and anticipating the crit"), not on the impact frame. FULL tier: the
+# D101 white-out (its freeze holds the frame before the windup); otherwise the
+# tiny pulse; "none" (group turns) none. One flash per blow; a multi-hit clip's
+# later crit flashes CRIT_PRE_LEAD before its own hit marker (_play_extras).
+const CRIT_PRE_LEAD := 0.14
+var crit_log: Array = []         # probes: { unit, at: "pre"|"impact", flash, ms, clip } per crit beat
+
+static func _has_crit(results: Array) -> bool:
+	for r in results:
+		var res: Dictionary = (r as Dictionary).get("result", {}) if r is Dictionary else {}
+		if bool(res.get("crit", false)) and bool(res.get("hit", true)):
+			return true
+	return false
+
+
+func _crit_pre(a: BWUnitView, results: Array, flash: String) -> void:
+	if flash == "none" or not _has_crit(results):
+		return
+	var id: String = a.unit.id if a and a.unit else ""
+	var clip := ""
+	if a and a.character and a.character.animator:
+		clip = str(a.character.animator.top_clip())
+	crit_log.append({ "unit": id, "at": "pre", "flash": flash, "ms": Time.get_ticks_msec(), "clip": clip })
+	if crit_log.size() > 64:
+		crit_log.pop_front()
+	if flash == "full" and not skipping:
+		await _crit_flash(id)
+	else:
+		crit_flashed.emit(id)
+		ui.crit_flash_tiny()
+# ---- end D530
 
 
 func _exit_tree() -> void:

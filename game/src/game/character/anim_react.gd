@@ -104,7 +104,7 @@ static func block(st: String) -> BWAnimClips.Clip:
 	c.marker("impact", 4).marker("recovered", 20).marker("pose", 5)
 	c.at_base(0, BODY + _hand_chans())
 	c.at_base(26, BODY + _hand_chans())
-	var bk := BWAnimCarry.key_hands("block", st)
+	var bk := _shield_block(st, BWAnimCarry.key_hands("block", st), BWAnimCarry.guard_hands(c.base))   # D520
 	c.pose(1, { "root": Vector3(0, -0.07, 0.0), "squash": -0.015, "head": Vector3(0.1, 0, 0) })
 	c.pose(3, { "root": Vector3(0, -0.11, -0.02), "spine": Vector3(0.05, 0, 0), "chest": Vector3(0.0, 0, 0), "head": Vector3(0.16, 0, 0), "squash": -0.01 }, "f")
 	c.pose(3, bk, "f")
@@ -137,6 +137,20 @@ static func block(st: String) -> BWAnimClips.Clip:
 	return c
 
 
+## D520: a shield set blocks with the shield (the bake's shield pass raises
+## it, BWAnimClips.SHIELD_CLIPS): the spear hand stays low and ready at the
+## guard, drawn back a little, instead of the static two-handed block.
+static func _shield_block(st: String, bk: Dictionary, guard: Dictionary) -> Dictionary:
+	if not st in BWAnimClips.SHIELD_SETS:
+		return bk
+	var out := bk.duplicate()
+	for k in ["hand_r_pos", "hand_r_aim", "hand_r_edge", "hand_r_pole"]:
+		out[k] = guard[k]
+	out["hand_r_pos"] = (guard.hand_r_pos as Vector3) + Vector3(-0.02, -0.04, -0.06)
+	out["flat"] = guard.get("flat", bk.get("flat", 0.5))
+	return out
+
+
 # -------------------------------------------------------------------- fumble
 
 ## FUMBLE (34 f): the block starts up (f0-f2) but the blow (f3, impact)
@@ -148,9 +162,13 @@ static func fumble(st: String) -> BWAnimClips.Clip:
 	c.marker("impact", 3).marker("catch", 10).marker("recovered", 27).marker("pose", 5)
 	c.at_base(0, BODY + _hand_chans())
 	c.at_base(34, BODY + _hand_chans())
-	var bk := BWAnimCarry.key_hands("block", st)
+	var bk := _shield_block(st, BWAnimCarry.key_hands("block", st), BWAnimCarry.guard_hands(c.base))   # D520
 	var fk := BWAnimCarry.key_hands("fumble", st, 0.5)
 	var guard := BWAnimCarry.guard_hands(c.base)
+	if st in BWAnimClips.SHIELD_SETS:
+		# D520: the shield takes the blow, so the spear hand is knocked half as wide
+		fk["hand_r_pos"] = (guard.hand_r_pos as Vector3).lerp(fk.hand_r_pos, 0.5)
+		fk["hand_r_aim"] = (guard.hand_r_aim as Vector3).slerp((fk.hand_r_aim as Vector3).normalized(), 0.5)
 	c.pose(2, BWAnimCarry.shifted(bk, Vector3(0, -0.12, 0.0)), "a")
 	c.pose(2, { "root": Vector3(0, -0.08, 0.0), "head": Vector3(0.12, 0, 0), "squash": -0.01 })
 	c.pose(3, { "root": Vector3(0, -0.07, -0.02) }, "l")

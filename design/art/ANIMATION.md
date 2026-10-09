@@ -23,8 +23,10 @@ remain only as a safety fallback.
 | `.../anim_stricken.gd` | `BWAnimStricken`: the five hit variants (flinch, shrug, stumble, knockback, rage) per style | **yes, source** |
 | `.../anim_handling.gd` | `BWAnimHandling`: weapon handling (D80): holds, their transitions, the handling actions, per style | **yes, source** |
 | `.../anim_skill.gd` | `BWAnimSkill` (D221): brace, leap, strike_thrust / _sweep / _throw(_l) / _hook / _grapple / _hundred, and the skill pose routes (war_cry, aim, reload, tumble, land) | **yes, source** |
+| `.../anim_alt.gd` | `BWAnimAlt` (D510-D519): the alternate clips (smash, smash_flip, sweep_under, throw_under, thrust_2h, lunge, flourish, backstab, shot_jump, cast_tempest) and their pose routes | **yes, source** |
+| `game/src/game/combat/backstab.gd` | `BWBackstab` (D517): the backstab's S-curve slither round to the target's back and home (view only) | yes |
 | `.../anim_encounter.gd` | `BWAnimEncounter` (D219-D220): walk_colossus, stomp_colossus, strike_colossus, the Horde's jab; the runtime layer is `BWAnimator._encounter_layer` | **yes, source** |
-| `game/src/game/combat/clip_route.gd` | `BWClipRoute` (D221): which clip an action plays (cast vs strike, setup poses, multi-blow clips, status poses); `tools/anim_audit.gd` prints the table | yes |
+| `game/src/game/combat/clip_route.gd` | `BWClipRoute` (D221): which clip an action plays (cast vs strike, setup poses, multi-blow clips, status poses); D510: the alternates table and `pick()`; `tools/anim_audit.gd` prints the table | yes |
 | `game/src/game/combat/reaction_pick.gd` | `BWReactionPick`: which reaction a blow gets (the table below) | yes |
 | `game/src/game/combat/projectile_flight.gd` | `BWProjectileFlight`: arrow / bullet / bolt in flight, stick, muzzle flash | yes |
 | `game/tools/build_anims.gd` | bakes every set to `art/animations/<style>.res` (9 sets incl. fists, about 400 ms each) | yes |
@@ -138,7 +140,7 @@ markers. `pose` is meta only.
 | `idle` | 60 | yes | | Home idle. The heavy set keeps the **approved clip**: the same keys, with its aims re-expressed relative to the new guard (below). Other sets use the same body (two weight shifts against two breaths, the look-off) and their own weapon "hup" |
 | `idle_bouncy` | 16 | yes | | Up on the toes, two bounces. **Retired as a home idle (D65)**; kept in the library, played by no one |
 | `idle_fidget` | 48 | no | | Variant: sinks onto a hip, the right foot shuffles out and back, a shoulder roll, a neck stretch, a shake-out |
-| `idle_weapon` | 54 | no | | Variant, per style. **one:** wrist twirl, then sights along the edge. **heavy:** heave onto the shoulder and two bounces. **polearm:** blade check, the shaft turned in the fingers. **spear:** sights a throw, then flips it. **staff:** overhead spin, 1.5 turns. **pair:** both daggers flipped, then a cross-guard. **bow:** two string plucks, head cocked. **pistol:** two spins on the finger, then a muzzle check |
+| `idle_weapon` | 54 | no | | Variant, per style. **one:** wrist twirl, then sights along the edge. **heavy:** heave onto the shoulder and two bounces. **polearm:** blade check, the shaft turned in the fingers. **spear:** sights a throw, then tips it back up (D520: a flip put the 2.6 m lance through the floor). **staff:** overhead spin, 1.5 turns. **pair:** both daggers flipped, then a cross-guard. **bow:** two string plucks, head cocked. **pistol:** two spins on the finger, then a muzzle check |
 | `idle_look` | 56 | no | | Variant: up on the toes with a visor hand, looks off left, sweeps right (chest 40%, hips 15%), down with a squash |
 | `wounded` | 40 | yes | | Idle below 35% HP: hunched over the right side, the right heel up, hand pressed to the side, hard breathing, a wince on f26 |
 | `walk` | 16 | yes | | 1 hex per cycle (2.598 u/s). Heavy keeps the approved clip; others carry their own weapon |
@@ -178,8 +180,8 @@ flamberge strike.
 | one, axe class (hatchet) | `strike_axe`: one-handed overhead chop, the free hand countering | 36 | 7 / 9 / 11 / 12 | 1.05 |
 | heavy (flamberge) | the **approved** two-handed diagonal cut | 40 | 8 / 10 / 13 / 14 | 1.2 |
 | heavy, axe class (double axe, warhammer, anchor) | `strike_axe`: big overhead chop, long held coil, low landing | 46 | 12 / 14 / 17 / 18 | 1.25 |
-| polearm (lance, halberd, glaive) | two-handed thrust: the shaft drops level on the line (head leads), drawn to the rear hip, driven straight in, a quarter twist on the hit | 42 | 9 / 11 / 14 / 15 | 1.6 |
-| spear (javelin) | overhand stab from the shoulder; free hand points, then flung back | 35 | 7 / 9 / 11 / 12 | 1.5 |
+| polearm (halberd, glaive, naginata: two hands, a forearm guard) | two-handed thrust: the shaft drops level on the line (head leads), drawn to the rear hip, driven straight in, a quarter twist on the hit | 42 | 9 / 11 / 14 / 15 | 1.6 |
+| spear (lance, javelin, trident: one hand + shield, D520) | overhand stab from the shoulder; the shield arm holds its guard | 35 | 7 / 9 / 11 / 12 | 1.5 |
 | staff (staff, moon staff) | melee: both hands, over the top and down on the target | 42 | 9 / 11 / 14 / 15 | 1.4 |
 | pair (daggers) | low flurry: right cross-cut on `hit`, left stab on `hit2` (f17.5) | 32 | 5 / 7 / 9 / 10 | 0.9 |
 | bow | **D164, `anim_bow.gd`**: side-on step; nock (the string hand meets the string); push-pull draw (bow arm extends, the string hand pulls along the arrow to the anchor under the jaw, shoulders open, legs sink; the string bends to the hand in two segments); coil; **release** 14: the hand flies back past the ear, the bow rolls forward in the open hand, recoil; follow-through held. Skill variants: `shot_quick` (Retreating, no hold), `shot_aimed` (long hold with an aim tremble that settles on a breath), `shot_sky` (Arcing, 50 deg, leaning back), `shot_volley` (Rain: 4 arrows, release..release4), `shot_fan` (Split: bow canted, 3 arrows) | 36 | nock 6, coil 12, release 14, hit 15 | - |
@@ -555,8 +557,8 @@ and spin; a miss flies past).
 | `loops_and_handovers` | Every loop's last frame equals its first. One-shots start and end on the guard; the exceptions are the start's end, the stop's start and the fall's end. run_start's end = run f0; run_stop(_r)'s start = run f0/f5; channel f0 = cast at coil. |
 | `feet_and_floor` | No sole under the floor in any clip of any set. |
 | `gaits_dont_slide` | Every gait and start/stop: the stance ground point moves with the root (< 3 mm per 60 Hz frame; the limp's hurt-foot scuff < 6 mm). |
-| `weapons_clear_the_floor` | All 22 weapons through every clip of their set: ends above the floor, and floor lifts < 8 cm outside the fall. |
-| `blade_off_the_face` | All 22 weapons through idle, idle_bouncy, wounded, idle_fidget and idle_look, from 9 cameras (azimuth -90..90, 18° down): no weapon point nearer the camera than the head covers the face disc (0.32 m). |
+| `weapons_clear_the_floor` | All 33 weapons through every clip of their set: ends above the floor, and floor lifts < 8 cm outside the fall. |
+| `blade_off_the_face` | All 33 weapons through idle, idle_bouncy, wounded, idle_fidget and idle_look, from 9 cameras (azimuth -90..90, 18° down): no weapon point nearer the camera than the head covers the face disc (0.32 m). |
 | `state_machine` | Holds, releases, reactions, the held fall, start → run → stop → idle, channel → cast at coil, wounded swaps, and the axe variants. |
 | `personality_and_idle_rotation` | Vibes, determinism, the roster spans 4+ vibes, 20 s of standing rotates 2+ variants, variants never block. |
 | `no_pops_any_pair` | 8 styles × 15 × 15 requests mid-clip. Each blended joint step is compared with the outgoing and the incoming clip played alone. A pop is a sudden excess (> 0.1 u and 1.8× the previous step) or any step > 0.35 u. |
@@ -775,3 +777,76 @@ The full table and its reasons: `design/art/ANIMATION-AUDIT.md`.
 - Review: `godot --path . --resolution 1600x900 --script
   res://tools/anim2_shots.gd [-- --only colossus_walk|colossus_thrust|being|horde|blank|jab]`
   (-> `design/art/anim2_*.png`); skill strips through `anim_preview.gd --only strip`.
+
+
+## Alternates (D510-D521)
+
+The author liked the strikes and asked for more variety: a blow can play an
+**alternate clip** instead of its usual one. Source: `anim_alt.gd`
+(`BWAnimAlt`); route: `BWClipRoute.pick` (`clip_route.gd`); the combat
+screen asks through `_alt_pose` in the cutscene, the quick hit and a
+charge's held coil (so the dash's windup and the strike agree).
+
+**The table is data** (`BWClipRoute.ALTERNATES`, tune freely):
+`"<set>|<weapon class>|<base pose>" -> { pose: weight }`. The base pose is
+the def's clip, or `strike` for basic attacks, counters and skills with no
+clip. `""` is the usual clip. Weights are relative.
+
+| Key | Weights (share) |
+|---|---|
+| heavy, sword (flamberge, katana) | strike 1, smash 0.75, smash_flip 0.25 (half / 3⁄8 / 1⁄8) |
+| heavy and one, axe | chop 1, sweep_under 1, smash 0.75, smash_flip 0.25 (a third each; the flip a quarter of smashes) |
+| polearm, lance (halberd, glaive, naginata) | thrust 1, smash 0.75, smash_flip 0.25 |
+| one, sword, basic | cut 1, thrust_2h 0.5, lunge 0.5 |
+| one, sword, "thrust" skills | thrust, thrust_2h, lunge: a third each |
+| spear, lance (lance, javelin, trident) | stab 1, lunge 1 (every stab, basic or skill) |
+| pair, daggers | strike 1, flourish 1 |
+| bow | shot 1, shot_jump 1 |
+
+Rules in `pick()`, in order: a dagger blow from behind (the attack event's
+`behind`, from `BWBattle.behind`) or Assassinate plays `backstab`; only
+single-target blows take alternates; `MELEE_ONLY` poses (smash, sweep,
+flourish, backstab) need arm's length; **a crit always plays
+`smash_flip`** where the table offers it; then the weighted roll.
+**Determinism:** the roll is `BWClipRoute.roll(salt_of(blow))`, a hash of the
+blow (attacker, target, damage, hit, crit, HP left, strike index). It never
+touches the battle's RNG (view only), so replays and tests see the same clip.
+
+| Clip | Sets | Frames | Markers | What |
+|---|---|---|---|---|
+| `strike_smash` | heavy, polearm, one | 46 | coil 9, launch 11, land = **hit** 19, hop 32-35, recovered 42 | Both hands on the haft, crouch, jump with the weapon thrown back over the head, slammed down on the landing into a one-legged crouch, rear leg stretched out behind |
+| `strike_smash_flip` | same | 50 | land = hit 22, hop 35-38 | The same with a forward somersault (`meta.flip_pitch` 0 → TAU, about `flip_pivot` 1.55 m: `BWCharacter._rig_turn`, like `spin_yaw`); the weapon is held level across the chest through the turn so no end points into the floor |
+| `strike_sweep_under` | one, heavy | 40 | coil 9, launch 11, land 13, hit 13.5, hop 26-29 | One hand, sunk on the back foot, the axe hanging down-back behind the rear leg (the coil); down past the floor (a tilted plane for long axes) and up through the target to ~120°. Earthsplitter's clip |
+| `strike_throw_under` | one, heavy | 42 | coil 8, **release** 11, hit 12, draw 20 | The underhand toss; `meta.toss` hides the held axe from release to draw (`BWCharacter._update_toss`); a fresh axe drawn over the shoulder. Axe Throw's clip (the flight: `BWRangedVFX._throw_blade`, lobbed, end over end) |
+| `strike_thrust_2h` | one | 40 | the reference strike's | Both fists close at the hip, the blade level, driven straight in |
+| `strike_lunge` | one, spear | 42 | coil 7, launch 9, land 11.5, hit 17, hop 30-33 | Fencing lunge: en garde side-on, a hop in, the long step (front knee over the foot, rear leg straight), the point a touch above level, the off arm flung back (the lance's shield arm too) |
+| `strike_flourish` | pair | 40 | coil 8, launch 10, hit 15, land 18, hop 27-30 | Crouched, arms crossed; a jump up and forward slashing out and up until both blades are over the head. Self-detonate plays it in place (`SETUP_BY_SKILL`, hold 0.83 s) |
+| `strike_backstab` | pair | 44 | coil 6, launch 8, land 16, hit 19, slide_back 26, slide_home 33 | Low and coiled; `BWBackstab.slide` moves the root on an S round to the target's back (launch..land, the feet skid) and home (slide_back..slide_home); the target keeps its back turned |
+| `shot_jump` | bow | 46 | nock 6, launch 11, coil 15, **release** 17, land 22 | Nock on the ground, spring up drawing, loose at the apex (the arrow leaves the string there), land |
+| `cast_tempest` | staff | 54 | coil 9, **release** 26 | The cast's gather; she floats up and turns once (`spin_yaw`) with the staff high, looses at the top, settles. Tempest's clip (`"tempest"`; `BWUnitView` maps `cast` → `cast_<skill>`) |
+
+**The lance class's off hand (D520).** The lance, javelin and trident
+(`BWCharacterPose.SHIELD_SPEARS`, by id) use the **spear** set, one-handed
+with a shield; the halberd, glaive and naginata keep the two-handed
+**polearm** set (a small forearm guard). The bake replaces the spear set's
+off hand in every clip (`BWAnimClips._pass_shield`): forearm across the
+chest, the shield facing out; `shield_hand(raise)` turns the off-hand socket
+from the shield's mount data (`weapons.json` "shields") so the face looks
+out and the top up, and `BWCharacterPose.shield_arm` holds that socket like
+a grip. `SHIELD_CLIPS` raise it in block, brace and fumble (the spear stays
+low: the shield blocks) and let it swing in the falls; a clip keys its own
+with `Clip.shield(frame, raise, weight)` (the lunge: weight 0, the arm swings
+back). Aimed clips carry it with the chest's turn. The Colossus keeps the
+polearm set.
+
+Review: `godot --path . --resolution 1600x900 -s res://tools/anim_preview.gd
+-- --only clipgif --style s --clip a,b [--rep id] [--name n] --frames <dir>`
+(one character from the cutscene's side and from her left), then
+`python tools/anim_gif.py <dir> <out> 30`. Committed review GIFs:
+`design/art/anim510_*.gif`. Tests: `test_anim_alternates.gd`.
+
+Known limits: the preview doesn't run the backstab's slither or the thrown
+axe's flight (combat only; see the in-combat capture). Legs hang fairly
+straight in the jump shot and the flourish's air time. The Colossus still
+gets the lance's kite shield model from the weapon lane (its hands are both
+on the shaft).

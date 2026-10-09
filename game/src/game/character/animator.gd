@@ -704,6 +704,26 @@ func spin_yaw() -> float:
 	return 0.0
 
 
+## D511: the whole-body somersault of a flip clip (meta flip_pitch, radians
+## about her left axis, + = head over forward; strike_smash_flip), read like
+## spin_yaw: 0 before the take-off, exactly TAU from the landing on.
+## Vector2(angle, the height it turns about).
+func flip_pitch() -> Vector2:
+	for i in range(layers.size() - 1, -1, -1):
+		var l: Dictionary = layers[i]
+		if l.kind != "clip":
+			continue
+		var m := clip_meta(l.clip)
+		if not m.has("flip_pitch"):
+			continue
+		var v := _curve(m.flip_pitch, float(l.t) * float(m.get("flip_hz", BWAnimClips.BAKE_HZ)))
+		var w := 1.0
+		for j in range(i + 1, layers.size()):
+			w *= 1.0 - _w(layers[j])
+		return Vector2(wrapf(v, -PI, PI) * w if w < 1.0 else v, float(m.get("flip_pivot", 1.0)))
+	return Vector2.ZERO
+
+
 # ------------------------------------------------------------------- update
 
 func update(delta: float) -> void:

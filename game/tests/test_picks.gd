@@ -81,7 +81,7 @@ func test_registry_loads_every_skill(t) -> void:
 	var keys := BWSkillRegistry.keys()
 	# weapon-class skills only (keystone actions belong to the element lane and come and go)
 	var weapon_keys := keys.filter(func(k): return str(BWSkillRegistry.row(k).get("weapon", "")) in ["sword", "axe", "lance", "daggers", "bow", "pistols", "staff", "fists"])
-	t.eq(weapon_keys.size(), 71, "71 weapon skills, one file each: D435-D441 added Reckless Arc, Bellow, Thread the Needle, Tapestry, Overload, Kindle (their old defs kept, retired)")
+	t.eq(weapon_keys.size(), 72, "72 weapon skills, one file each: D435-D441 added Reckless Arc, Bellow, Thread the Needle, Tapestry, Overload, Kindle (their old defs kept, retired); D531 Axe Throw")
 	for k in keys:
 		var r := BWSkillRegistry.row(k)
 		for f in ["key", "name", "weapon", "cd", "targeting", "range", "desc", "clip"]:
@@ -90,7 +90,7 @@ func test_registry_loads_every_skill(t) -> void:
 	var n := 0
 	for wc in ["sword", "axe", "lance", "daggers", "bow", "pistols", "staff"]:
 		n += BWSkillRegistry.pool(wc).size()
-	t.eq(n, 17 + 33, "17 weapon skills + 35 learnable (D103-D108) + Lance Charge (D428; En Passant replaced Elemental Truth, D426) - Guardrush, Aegis, Aimed Shot (D442)")
+	t.eq(n, 17 + 34, "17 weapon skills + 35 learnable (D103-D108) + Lance Charge (D428; En Passant replaced Elemental Truth, D426) - Guardrush, Aegis, Aimed Shot (D442) + Axe Throw (D531)")
 	t.eq(BWSkillRegistry.pool("fists").slice(0, 3), ["flurry", "uppercut", "palm_burst"], "plus the three fists skills first")
 	t.eq(BWSkillRegistry.pool("fists").size(), 8, "and five learnable fists skills")
 	t.eq(BWSkillRegistry.clip("palm_burst"), "palm_burst", "fists skills name their clip")

@@ -373,7 +373,8 @@ static func idle_weapon(st: String) -> BWAnimClips.Clip:
 			_free(c, 12, Vector3(-0.1, 0.15, 0.25), "f")
 			_free(c, 26, Vector3(-0.1, 0.16, 0.26), "f")
 			c.key("hand_r_pos", 33, Vector3(-0.3, 0.05, 0.1))
-			_spin(c, "hand_r_aim", 30.0, 40.0, Vector3(0.05, 0.12, 0.99).normalized(), Vector3(1, 0, 0), -1.25)
+			# D520: tipped back up to the guard (a flip put the 2.6 m lance through the floor)
+			_spin(c, "hand_r_aim", 30.0, 40.0, Vector3(0.05, 0.12, 0.99).normalized(), Vector3(1, 0, 0), -0.25)
 		"staff":
 			# overhead spin: the staff lies flat and turns a circle and a half above her
 			c.key("hand_l_grip", 6, 0.0)

@@ -78,6 +78,13 @@ var _applying := false
 ## D404: the header's filter and action buttons (with Unequip all the row
 ## outgrew the hall's panel at F_SMALL).
 const HEADER_FONT := BWStyle.F_SMALL - 3
+## D532: the doll column's scrolled lower part (skills, sets, abilities) and
+## the inventory grid's share of its column (at least 3 rows; it splits the
+## free height with the item card, which keeps CARD_MIN_H).
+const LOWER_W := 500.0
+const GRID_MIN_H := 360.0               # D534 (author: "try 4 rows of shown gear"): was 278 (3 rows)
+const GRID_RATIO := 1.6
+const CARD_MIN_H := 150.0
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -151,6 +158,7 @@ func _init(p_run: BWRun) -> void:
 	# -- doll column
 	var dc := VBoxContainer.new()
 	dc.add_theme_constant_override("separation", 8)
+	dc.size_flags_vertical = Control.SIZE_EXPAND_FILL      # ---- D532
 	body.add_child(dc)
 	var dollrow := HBoxContainer.new()
 	dollrow.add_theme_constant_override("separation", 10)
@@ -199,6 +207,29 @@ func _init(p_run: BWRun) -> void:
 			_swap_btn.pressed.connect(_swap)
 			rs.add_child(_swap_btn)
 	doll.tooltip_text = "Drag to turn the model. Double-click a slot to take it off."
+	# ---- D532 (author: "Sometimes I can't see secondary weapon skill options"): everything
+	# under the doll scrolls inside the panel instead of running off the screen's
+	# bottom, and the skills (both weapons' rows) come first, right under the doll
+	var lower_sc := ScrollContainer.new()
+	lower_sc.name = "lower_scroll"
+	lower_sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	lower_sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower_sc.custom_minimum_size = Vector2(LOWER_W + 14, 120)
+	dc.add_child(lower_sc)
+	var lower := VBoxContainer.new()
+	lower.add_theme_constant_override("separation", 8)
+	lower.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_sc.add_child(lower)
+	dc = lower
+	_skills_title = BWStyle.section_label("Skills")
+	dc.add_child(_skills_title)
+	_skills = HFlowContainer.new()
+	_skills.name = "skill_rows"
+	_skills.add_theme_constant_override("h_separation", 6)
+	_skills.add_theme_constant_override("v_separation", 6)
+	_skills.custom_minimum_size = Vector2(LOWER_W, 0)
+	dc.add_child(_skills)
+	# ---- end D532
 	_sets = RichTextLabel.new()                         # D282: the active element sets, one line
 	_sets.name = "active_sets"
 	_sets.bbcode_enabled = true
@@ -259,13 +290,6 @@ func _init(p_run: BWRun) -> void:
 	_abil.add_theme_constant_override("separation", 4)
 	_abil.custom_minimum_size = Vector2(500, 0)
 	dc.add_child(_abil)
-	_skills_title = BWStyle.section_label("Skills")
-	dc.add_child(_skills_title)
-	_skills = HFlowContainer.new()
-	_skills.add_theme_constant_override("h_separation", 6)
-	_skills.add_theme_constant_override("v_separation", 6)
-	_skills.custom_minimum_size = Vector2(500, 0)
-	dc.add_child(_skills)
 	# -- inventory column
 	var ic := VBoxContainer.new()
 	ic.add_theme_constant_override("separation", 8)
@@ -290,8 +314,11 @@ func _init(p_run: BWRun) -> void:
 		_sort_btns[m] = sb
 	var sc := _GridDrop.new()
 	sc.panel = self
-	sc.custom_minimum_size = Vector2(BWItemCard.W + 8, 178)
+	sc.custom_minimum_size = Vector2(BWItemCard.W + 8, GRID_MIN_H)      # ---- D532: was 178 (2 rows)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.size_flags_stretch_ratio = GRID_RATIO
+	sc.name = "inventory_scroll"
 	ic.add_child(sc)
 	_grid = GridContainer.new()
 	_grid.columns = 5
@@ -303,6 +330,7 @@ func _init(p_run: BWRun) -> void:
 	var cs := ScrollContainer.new()
 	cs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	cs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cs.custom_minimum_size = Vector2(0, CARD_MIN_H)                    # ---- D532
 	ic.add_child(cs)
 	card = BWItemCard.new()
 	cs.add_child(card)
@@ -489,8 +517,49 @@ picked"
 	_trash_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
 	_trash_btn.tooltip_text = "Throw away the picked loose item when the battle starts"
 	_trash_btn.pressed.connect(func(): discard(_sel))
-	h.add_child(_trash_btn)
+	# ---- D534 (author): a drop-down to discard by tier ("drop all D tier and under")
+	var bv := VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 3)
+	bv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(bv)
+	_trash_btn.size_flags_vertical = Control.SIZE_FILL
+	bv.add_child(_trash_btn)
+	_bulk_btn = MenuButton.new()
+	_bulk_btn.name = "discard_bulk"
+	_bulk_btn.text = "By tier ▾"
+	_bulk_btn.flat = false
+	_bulk_btn.focus_mode = Control.FOCUS_NONE
+	_bulk_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
+	_bulk_btn.tooltip_text = "Discard every loose item of a tier and below (worn gear is never touched)"
+	var pm := _bulk_btn.get_popup()
+	for i in BULK.size():
+		pm.add_item(str(BULK[i][1]), i)
+	pm.add_separator()
+	pm.add_item("Keep all (empty the pile)", BULK.size())
+	pm.id_pressed.connect(_bulk)
+	bv.add_child(_bulk_btn)
+	# ---- end D534
 	return _trash_box
+
+
+## D534: the tier drop-down's rows: [tier, label].
+const BULK := [["E", "Discard all E"], ["D", "Discard D and under"], ["C", "Discard C and under"], ["B", "Discard B and under"]]
+var _bulk_btn: MenuButton
+
+
+func _bulk(id: int) -> void:
+	if id >= BULK.size():
+		var k := run.untrash_all()
+		_msg.text = "Kept all %d discarded item%s." % [k, "" if k == 1 else "s"]
+	else:
+		var n := run.trash_tier_and_under(str(BULK[id][0]))
+		_msg.text = "%d loose item%s %s in the discard pile: thrown away when the battle starts." % [
+			n, "" if n == 1 else "s", "goes" if n == 1 else "go"] if n > 0 else "No loose items of %s." % str(BULK[id][1]).trim_prefix("Discard ").to_lower()
+	if not _sel.is_empty() and not _sel in run.inventory and _worn_slot(_sel) == "":
+		_sel = {}
+		_show_give({}, "")
+	refresh()
+	changed.emit()
 
 
 func _fill_trash() -> void:

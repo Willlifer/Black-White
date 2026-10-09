@@ -165,6 +165,7 @@ func _run() -> void:
 	var names: Array = screen.last_tiers.map(func(x): return str(x[1]))
 	_check(not names.is_empty() and names.all(func(n): return n in BWCutsceneTier.NAMES), "every blow got a tier (%s)" % ", ".join(names.slice(0, 8)))
 	_check(screen.last_tiers.any(func(x): return x[0] == "attack" and (x[1] == "minimal" or x[1] == "full")), "basic attacks play minimal (or full on a crit / KO)")
+	await _crit_probe()                          # D530: the crit flash before the swing
 	await _gear_tooltip_probe()                  # D171: the author's stuck tooltip
 	await _autoequip_probe()                     # D315-D318
 	await _split_gear_probe()                    # D493: the Split Front plate over the gear panel
@@ -173,6 +174,52 @@ func _run() -> void:
 
 var _fan_done := false
 var _swap_done := false
+
+
+## D530: a crit's flash plays BEFORE the attacker's swing, once, and nothing
+## flashes on the impact. A synthetic crit through the real playback, FULL
+## (the white-out and its freeze) and MINIMAL (the tiny pulse); the order of
+## crit_flashed against the target's reaction (posed just before the impact).
+func _crit_probe() -> void:
+	await _wait_ready()
+	var att: BWUnitView = null
+	var tgt: BWUnitView = null
+	for id in screen._views:
+		var v: BWUnitView = screen._views[id]
+		if not is_instance_valid(v) or v.unit == null or not v.unit.alive():
+			continue
+		if att == null:
+			att = v
+		elif tgt == null and v.unit.team != att.unit.team:
+			tgt = v
+	_check(att != null and tgt != null, "crit probe: an attacker and a foe on the board")
+	if att == null or tgt == null:
+		return
+	for tier in [BWCutsceneTier.FULL, BWCutsceneTier.MINIMAL]:
+		var order: Array = []
+		var on_flash := func(_u: String) -> void: order.append("flash")
+		var on_react := func(_u: String, _r: String, _i: Dictionary) -> void: order.append("react")
+		screen.crit_flashed.connect(on_flash)
+		screen.reaction_chosen.connect(on_react)
+		var n0: int = screen.crit_log.size()
+		var res := { "hit": true, "crit": true, "glance": false, "resisted": false, "damage": 1 }
+		var rs := [{ "target": tgt.unit.id, "result": res, "ko": false, "target_hp": tgt.unit.hp, "tags": [] }]
+		var tc := { "tier": tier, "flash": "full" if tier == BWCutsceneTier.FULL else "tiny" }
+		if tier == BWCutsceneTier.FULL:
+			await screen._cutscene(att.unit.id, rs, "", [], "", "", {}, tc)
+		else:
+			await screen._quick_hit(att.unit.id, rs, "", "", "", tc)
+		screen.crit_flashed.disconnect(on_flash)
+		screen.reaction_chosen.disconnect(on_react)
+		var log: Array = screen.crit_log.slice(n0)
+		var name: String = "full" if tier == BWCutsceneTier.FULL else "minimal"
+		_check(order.count("flash") == 1, "crit (%s): one flash (%s)" % [name, order])
+		_check(not order.is_empty() and order[0] == "flash", "crit (%s): the flash comes before the reaction (%s)" % [name, order])
+		_check(log.size() == 2 and str(log[0].at) == "pre" and str(log[1].at) == "impact" and int(log[0].ms) < int(log[1].ms),
+			"crit (%s): flashed before the swing, the impact after (%s)" % [name, log.map(func(x): return x.at)])
+		_check(log.size() >= 1 and not str(log[0].get("clip", "")).begins_with("strike") and not str(log[0].get("clip", "")).begins_with("windup"),
+			"crit (%s): the attacker hadn't started its swing at the flash (clip %s)" % [name, log[0].get("clip", "") if log.size() >= 1 else "?"])
+	_check(Engine.time_scale == 1.0, "crit probe: the time scale is handed back (%.3f)" % Engine.time_scale)
 
 
 ## D181: click "Swap weapon" (right under Attack): the class, the menu's
@@ -200,7 +247,7 @@ func _swap_probe(p: BWUnit) -> void:
 	await get_tree().create_timer(0.2).timeout
 	await _wait_ready()
 	_check(p.weapon_class == "bow" and p.weapon_class != wc0, "the swap draws the bow (%s -> %s)" % [wc0, p.weapon_class])
-	_check(b.weapon_range(p) == 6 and rng0 != 6, "the attack range follows (%d -> %d)" % [rng0, b.weapon_range(p)])
+	_check(b.weapon_range(p) == 5 and rng0 != 5, "the attack range follows (%d -> %d)" % [rng0, b.weapon_range(p)])
 	var after: Array = b.skills_for(p).map(func(r): return str(r.key))
 	_check(after != before and after.all(func(k): return k in BWSkillRegistry.expand(p.fight_loadout("bow"))), "the action bar shows the bow's skills (%s)" % [after])
 	_check(not p.acted and b.can_move(p), "free: the action and the move are unspent")

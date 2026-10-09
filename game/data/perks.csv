@@ -25,7 +25,7 @@ dark_ambush,dark,Ambush,"Attacking from dark 1/2/3: +6/+12/+18 crit, and +0.1 cr
 dark_pall,dark,Pall,A foe you hit while it stands on dark 2+ is Blinded (it can't crit).,hit_status,on=dark;min=2;status=blinded,,
 light_sun,light,Sunpath,+1 move when you start on light; +2 on light 3. Allies on your beam start their turn with +1 move.,start_move,on=light;l1=1;l2=1;l3=2,,
 light_judge,light,Judgement,Your attacks on a foe standing on light can't glance. Allies (you too) starting their turn on your light get +5 crit per light level that turn.,judgement,on=light,on_event(on=ally_turn_start;do=empower;on_tile=light;own=1;crit=5;per_level=1;uses=turn),
-light_glare,light,Glare,A foe starting its turn on light you laid isn't healed; on light 2+ it's also Blinded.,glare,min=2;status=blinded,,
+light_glare,light,Glare,A foe starting its turn on light you laid is Blinded.,glare,min=1;status=blinded,,
 light_sanct,light,Sanctuary,"Your light heals allies 5/9/14% (base 3/6/9), and light's hit bonus spares you and allies on it. Once per battle, when an ally within 3 drops under 35% HP, its hex gains light 2.",sanctuary,l1=5;l2=9;l3=14;radius=3;threshold=35;steps=2,radiant_guard(allies=1),
 duo_wildfire,fire,Wildfire Gale,"Fire your gales carry spreads one ring further, at full steps.",duo,id=wildfire_gale;radius=1,,wind
 duo_powder_keg,fire,Powder Keg,A fuse set off on your fire blows 1 ring wider. (A Lava Walker's fire still fizzles a fuse: lava wins.),duo,id=powder_keg;radius=1,,thunder

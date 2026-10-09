@@ -73,8 +73,11 @@ static func fatigue_heal_mult(cycle: int, giant: bool = false) -> float:
 ## PRESSURE_MIN_RANGE+: a ranged class's basic, or a single-target skill with
 ## that range) made while any foe stands within PRESSURE_RADIUS of the
 ## attacker deals ×PRESSURE_MULT. Lance (reach 2) is melee; areas are exempt.
+## D499 (author): the cut scales with how close the TARGET is: −25% on an
+## adjacent foe, −18% at 2, −10% at 3 or more (index = distance, last = 3+).
 const PRESSURE_RADIUS := 2
-const PRESSURE_MULT := 0.9
+const PRESSURE_PCT := [25, 25, 18, 10]
+const PRESSURE_MULT := 0.9                     # the floor (3+ away), = 1 − PRESSURE_PCT[-1]%
 const PRESSURE_MIN_RANGE := 3
 const PRESSURE_TAG := "Pressured"
 
@@ -86,10 +89,22 @@ static func is_ranged(reach: int, single: bool) -> bool:
 	return single and reach >= PRESSURE_MIN_RANGE
 
 
-## D424: the forecast modifier (a ×0.9 dmg stage, a named line).
-static func pressure_mod() -> Dictionary:
-	return { "stage": "dmg", "value": PRESSURE_MULT, "tag": PRESSURE_TAG,
-		"label": "Pressured (enemy within %d) −%d%%" % [PRESSURE_RADIUS, roundi((1.0 - PRESSURE_MULT) * 100)] }
+## D424 / D499: the forecast modifier for a blow at `dist` hexes (a dmg
+## stage, a named line).
+static func pressure_pct(dist: int = 99) -> int:
+	return int(PRESSURE_PCT[clampi(dist, 0, PRESSURE_PCT.size() - 1)])
+
+
+static func pressure_mod(dist: int = 99) -> Dictionary:
+	var pct := pressure_pct(dist)
+	return { "stage": "dmg", "value": 1.0 - pct / 100.0, "tag": PRESSURE_TAG,
+		"label": "Pressured (enemy within %d; target %s) −%d%%" % [PRESSURE_RADIUS, _pressure_span(dist), pct] }
+
+
+static func _pressure_span(dist: int) -> String:
+	if dist <= 1:
+		return "adjacent"
+	return "2 away" if dist == 2 else "3+ away"
 
 
 static func calc(label: String, value: float, formula: String, values: String) -> Dictionary:

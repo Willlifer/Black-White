@@ -227,6 +227,9 @@ func refresh_equipment() -> void:
 	poser.update(0.0)
 	# 8. clips
 	var sid := BWAnimClips.set_for(weapon.meta) if weapon and animate else ""
+	if sid == "spear" and unit != null and str(unit.encounter) == "colossus":
+		sid = "polearm"                              # D520: the Colossus keeps its two-handed thrust (no shield)
+		poser.shield_arm = false
 	if animator and animator.set_id != sid:
 		animator.dispose()
 		animator = null
@@ -699,6 +702,7 @@ func _process(delta: float) -> void:
 		_track_motion(delta)
 		animator.update(delta)
 		_update_bow(delta)
+		_update_toss()                         # D513: the thrown axe's empty hand
 		_update_sparkle()
 	else:
 		poser.update(delta)
@@ -869,6 +873,44 @@ func nocked_arrows() -> Array:
 ## character's own frame and the yaw rate. A teleport (> 1.5 u in a frame)
 ## resets instead of reading as a huge acceleration. Also smooths turns:
 ## the view's yaw snaps (BWUnitView.face), the rig turns on an s-curve.
+## D511: the rig's visual yaw, and a flip clip's somersault (animator
+## flip_pitch) about a point at the hips' height, so she turns over in the
+## air in place instead of about her feet.
+var _flipped := false
+
+func _rig_turn(yaw: float) -> void:
+	var fp := animator.flip_pitch() if animator else Vector2.ZERO
+	if absf(fp.x) < 1e-5:
+		if _flipped:
+			rig.rotation.x = 0.0
+			rig.position = Vector3.ZERO
+			_flipped = false
+		rig.rotation.y = yaw
+		return
+	_flipped = true
+	rig.rotation = Vector3(fp.x, yaw, 0.0)
+	var p := Vector3(0, fp.y, 0)
+	rig.position = p - Basis.from_euler(Vector3(fp.x, yaw, 0.0)) * p
+
+
+## D513: a toss clip (meta toss = [release s, draw s], strike_throw_under)
+## leaves the hand empty between the throw and the draw of a fresh weapon.
+var _tossed := false
+
+func _update_toss() -> void:
+	if weapon == null or animator == null:
+		return
+	var hide := false
+	if not animator.layers.is_empty():
+		var top: Dictionary = animator.layers.back()
+		if top.kind == "clip":
+			var tw: Array = animator.clip_meta(str(top.clip)).get("toss", [])
+			hide = tw.size() == 2 and float(top.t) >= float(tw[0]) and float(top.t) < float(tw[1])
+	if hide != _tossed:
+		_tossed = hide
+		weapon.visible = not hide
+
+
 func _track_motion(delta: float) -> void:
 	if delta <= 0.0 or not is_inside_tree():
 		return
@@ -910,7 +952,7 @@ func _track_motion(delta: float) -> void:
 				_turn_from = wrapf(_turn_from - dyaw, -PI, PI)
 			_yaw_vis = _turn_from * (1.0 - tp)
 			_yaw_vis_v = 0.0
-			rig.rotation.y = _yaw_vis + animator.spin_yaw()      # D102: a spin clip turns the whole body
+			_rig_turn(_yaw_vis + animator.spin_yaw())      # D102: a spin clip turns the whole body; D511: a flip somersaults it
 			animator.yaw_rate = (dyaw + _yaw_vis - vis0) / delta
 			return
 	# exact critically damped step (stable at any frame time)
@@ -925,7 +967,7 @@ func _track_motion(delta: float) -> void:
 	if absf(_yaw_vis) < 1e-4 and absf(_yaw_vis_v) < 1e-3:
 		_yaw_vis = 0.0
 		_yaw_vis_v = 0.0
-	rig.rotation.y = _yaw_vis + animator.spin_yaw()      # D102: a spin clip turns the whole body
+	_rig_turn(_yaw_vis + animator.spin_yaw())      # D102: a spin clip turns the whole body; D511: a flip somersaults it
 	# the turn the eye sees (snap + smoothing), for the head-leads-the-turn layer
 	animator.yaw_rate = (dyaw + _yaw_vis - vis0) / delta
 

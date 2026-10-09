@@ -26,7 +26,7 @@ Chamber, Fan of Knives, Haymaker, the fists' jab: L-13).
 | Aegis (staff) | channel 0.35 s | ~ (no aim) | Faces the ally, channel, then a cast at it |
 | Aimed Shot (bow) | shot_aimed | yes | — |
 | Arcing Shot (bow) | shot_sky | yes | — |
-| Assassinate (daggers) | pair strike | yes | — |
+| Assassinate (daggers) | pair strike | yes | D517: the backstab (the slither round to the back, the stab) |
 | Bolt (staff) | channel > cast | yes | — |
 | **Brace** (fists) | channel (circling hand) | **no**: a self-guard played a cast gesture | `brace`: step out, low wide stance, high guard set |
 | **Charge** (axe) | the whole strike during the slide, then the strike again | **no** (double swing) | Rides in on the strike's held coil; the cutscene releases it. An empty Charge no longer channels |
@@ -37,7 +37,7 @@ Chamber, Fan of Knives, Haymaker, the fists' jab: L-13).
 | **Dragoon Dive** (lance) | windup, strike, KO kneel | **no** (landing) | Lands on the `leap` clip's landing |
 | **Dualthrow** (daggers) | pair melee flurry in place, the blade flies on its hit | **no**: ranged skill playing melee | `strike_throw`: overhand throw, blade released on `release` |
 | **Second Dagger** (daggers) | same | **no** | `strike_throw_l`: the other hand throws |
-| **Earthsplitter** (axe) | free-hand cast at range | **no** | The overhead chop; the bolt runs out on the hit |
+| **Earthsplitter** (axe) | free-hand cast at range | **no** | D512: the underhand sweep (it was the overhead chop); the bolt runs out on the hit |
 | Elemental Truth (sword) | strike | yes | — |
 | **Empty the Chamber** (pistols) | one recoil under a 4-tracer sweep | **no** | `strike_chamber` (D389): fanning the hammer, four recoils swept right to left, a tracer on each |
 | Energized Shot (bow) | strike (full draw) | yes | — |
@@ -75,7 +75,7 @@ Chamber, Fan of Knives, Haymaker, the fists' jab: L-13).
 | Sunder (axe) | strike_axe | yes | — |
 | Surge (staff) | channel > cast | yes | — |
 | **Sweep** (lance) | the polearm thrust | **no**: a 3-tile sweep | `strike_sweep`: level swing across the front |
-| Tempest (staff) | channel > cast | yes | — |
+| Tempest (staff) | channel > cast | yes | D519: the floating cast (`cast_tempest`): she rises and turns once, looses at the top |
 | Transfer (staff) | channel 0.35 s | ~ (no aim) | Faces the tile, channel, cast at it |
 | **Tridentpierce** (lance) | free-hand cast at range 2 | **no** | The thrust; bolt on the hit |
 | Triumph (sword) | strike, held gleam | yes | — |
@@ -136,3 +136,16 @@ Known limits: the Blanks' faces are blank, so their head turns read mostly
 through the tilt and the chest; the chibi arms keep the grapple's reach short
 (the toss of the foe carries the throw); the leap is a jump for Vault too
 (no pole plant).
+
+## Alternates and new clips (D510-D521, 2026-10-09)
+
+Since this sweep, blows can play **alternate clips** (`BWClipRoute.ALTERNATES`,
+design/art/ANIMATION.md "Alternates"): the 2h smash and its flip (crits always
+flip), the axes' underhand sweep, the sword's 2h thrust and fencing lunge,
+every lance stab's lunge, the dagger flourish, the bow's jump shot. New
+routes: Earthsplitter → `sweep_under`, Axe Throw → `throw_under` (D531's
+skill), Tempest → `cast_tempest`, Self-detonate → the flourish (daggers;
+others cast), Assassinate and every basic dagger attack from behind →
+`backstab`. The lance, javelin and trident now fight one-handed behind a
+shield (the spear set, D520); the halberd, glaive and naginata stay
+two-handed. Tests: `tests/test_anim_alternates.gd`.

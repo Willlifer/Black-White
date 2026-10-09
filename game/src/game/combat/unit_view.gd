@@ -337,12 +337,12 @@ func idle() -> void:
 func pose_named(p: String) -> void:
 	if character:
 		var play := p
-		if skill != "" and p in ["windup", "strike"]:
+		if skill != "" and p in ["windup", "strike", "cast"]:      # ---- D519: "cast" too (cast_tempest)
 			var key := skill.to_lower().replace(" ", "_")
-			var sp := ("windup_" + key) if p == "windup" else key
+			var sp := ("windup_" + key) if p == "windup" else (("cast_" + key) if p == "cast" else key)
 			if character.has_clip(sp):
 				play = sp
-			if p == "strike":
+			if p in ["strike", "cast"]:
 				skill = ""
 		var ok := play in BWCharacterPose.POSE_NAMES or character.has_clip(play)
 		character.pose(play if ok else "idle")
