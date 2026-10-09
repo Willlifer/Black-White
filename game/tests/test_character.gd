@@ -122,7 +122,7 @@ func test_hair_modes(t) -> void:
 	var c := BWCharacter.create(u)
 	u.equipment["head"] = _item("feathered_full_helm")
 	c.refresh_equipment()
-	t.ok(not c.part("hair").visible, "full helm hides hair")
+	t.ok(c.part("hair").visible, "D490: full helm shows hair")
 	u.equipment["head"] = _item("crown")
 	c.refresh_equipment()
 	t.ok(c.part("hair").visible, "crown shows hair")

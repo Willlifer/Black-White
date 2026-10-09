@@ -37,7 +37,7 @@ func test_hide_all_hides_hair_on_the_rig(t) -> void:
 	var c := BWCharacter.create(u)
 	t.ok(c != null and c.hair != null, "built with hair")
 	if c and c.hair:
-		t.ok(not c.hair.visible, "a full helm hides the hair")
+		t.ok(c.hair.visible, "D490: a full helm no longer hides the hair")
 		u.equipment["head"] = { "base": "tiara", "slot": "head" }
 		c.refresh_equipment()
 		t.ok(c.hair.visible, "a tiara shows it again")

@@ -225,8 +225,16 @@ static func piece_hair_mode(base_id: String) -> String:
 	return m if m in HAIR_MODES else "show"
 
 
+## D490: headgear never hides hair any more (the author: "show them even if
+## they clip through the hats"); hair is the element's colour, so it must read.
+## Set false to bring back the D228 per-item hiding below.
+const HATS_SHOW_HAIR := true
+
+
 ## The strictest hair_mode among equipped pieces: show < hide_top < hide_all.
 func hair_mode() -> String:
+	if HATS_SHOW_HAIR:
+		return "show"
 	var best := 0
 	for s in _pieces:
 		best = maxi(best, HAIR_MODES.find(piece_hair_mode(str(_pieces[s].base))))

@@ -388,7 +388,7 @@ func _squad_row(u: BWUnit) -> Control:
 	row.selected = u == _sel
 	row.deployed = u in _deployed
 	row.placed = _placed.has(u.id)
-	row.custom_minimum_size = Vector2(0, 54)
+	row.custom_minimum_size = Vector2(0, 70)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -421,11 +421,31 @@ func _squad_row(u: BWUnit) -> Control:
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sub.custom_minimum_size = Vector2(250, 0)
 	sub.add_theme_font_size_override("normal_font_size", BWStyle.F_SMALL - 2)
-	sub.text = "[color=#%s]Lv %d · %s · [/color][color=#%s]%s[/color]" % [BWGearText.hex(BWStyle.LABEL), u.level,
-		BWText.weapon(u.weapon_class),
-		BWGearText.hex(BWGearText.readable(BWLook.element_color(u.element))), u.element.capitalize()]
+	sub.text = _row_gear_text(u)
 	v.add_child(sub)
 	return row
+
+
+## D491: the row names what the unit actually carries and every element it
+## holds, so picking who deploys doesn't need the gear panel:
+##   Lv 3 · Jagged Dagger + Short Bow
+##   Light 2 · Fire 1
+func _row_gear_text(u: BWUnit) -> String:
+	var lab := BWGearText.hex(BWStyle.LABEL)
+	var main: Dictionary = u.equipment.get("main_hand", {})
+	var weap := BWRun.item_name(main) if not main.is_empty() else BWText.weapon(u.weapon_class)
+	var second := u.second_weapon()
+	if not second.is_empty():
+		weap += " + %s" % BWRun.item_name(second)
+	if weap.length() > 22:                     # keep clear of the drag grip; the card has the full name
+		weap = weap.left(21).strip_edges() + "…"
+	var els: Array = []
+	for el in BWAutoEquip.elements(u):
+		els.append("[color=#%s]%s %d[/color]" % [BWGearText.hex(BWGearText.readable(BWLook.element_color(el))),
+			str(el).capitalize(), maxi(1, u.affinity_rank(el))])
+	if els.is_empty() and u.element != "":
+		els.append("[color=#%s]%s[/color]" % [BWGearText.hex(BWGearText.readable(BWLook.element_color(u.element))), u.element.capitalize()])
+	return "[color=#%s]Lv %d · %s[/color]\n%s" % [lab, u.level, weap, " · ".join(els)]
 
 
 ## A squad row: selection on click, a map drag on press-and-move.

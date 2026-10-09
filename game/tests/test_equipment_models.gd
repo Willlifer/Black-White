@@ -125,13 +125,13 @@ func test_hair_mode(t) -> void:
 	eq.equip_model("tiara")
 	t.ok(hair.visible, "tiara shows hair")
 	eq.equip_model("feathered_full_helm")
-	t.eq(eq.hair_mode(), "hide_all", "full helm hides hair")
-	t.ok(not hair.visible, "hair node hidden, not deleted")
-	eq.equip_model("vest")
-	t.eq(eq.hair_mode(), "hide_all", "chest pieces don't change hair")
+	t.eq(eq.hair_mode(), "show", "D490: even a full helm shows hair")
+	t.ok(hair.visible, "hair stays visible under the helm")
 	eq.unequip("head")
-	t.ok(hair.visible, "hair returns when the helm comes off")
+	t.ok(hair.visible, "hair visible with the helm off")
 	r.free()
+	if BWEquipmentView.HATS_SHOW_HAIR:
+		return                       # D490: the D228 hide_top check below only applies when hiding is on
 	# hide_top against real hair: a buzz fits under the cap, a mohawk doesn't
 	if ResourceLoader.exists("res://art/hair/buzzed.glb") and ResourceLoader.exists("res://art/hair/short_mohawk.glb"):
 		for pair in [["buzzed", true], ["short_mohawk", false]]:
