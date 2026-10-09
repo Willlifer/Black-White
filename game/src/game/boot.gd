@@ -43,6 +43,8 @@ const ISOLATED_FLAGS := ["--defaults", "--self-test", "--pace", "--forecast", "-
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
+	if OS.has_feature("web"):
+		BWWebInstanceShim.install(get_tree())                                  # ---- D492: WebGL instance-uniform cap
 	BWSettings.init(Array(args).any(func(a): return a in ISOLATED_FLAGS))     # ---- D124
 	_seed_roster(args)                                                         # ---- D154
 	if "--self-test" in args:
