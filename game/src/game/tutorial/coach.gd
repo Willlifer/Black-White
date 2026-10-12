@@ -14,6 +14,7 @@ signal skip_pressed
 signal exit_pressed
 
 const W := 470.0
+const TOUCH_TOP := 106.0          # D579: the mobile pad's ◀ ▶ ▲ ▼ II row ends at 92
 const ARROW := 34.0
 
 var targets: Callable                  # () -> Array of { rect: Rect2 } | { point: Vector2, ring: float }
@@ -77,7 +78,7 @@ func _ready() -> void:
 	foot.add_theme_constant_override("separation", 10)
 	v.add_child(foot)
 	_esc_hint = Label.new()
-	_esc_hint.text = "Esc  skip or exit"
+	_esc_hint.text = "II  skip or exit" if BWSettings.touch() else "Esc  skip or exit"   # D579: the pad's II
 	_esc_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_esc_hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_esc_hint.add_theme_font_size_override("font_size", 14)
@@ -158,7 +159,8 @@ func dock_low(low: bool) -> void:
 func _place() -> void:
 	var vp := _panel.get_viewport_rect().size
 	_panel.reset_size()
-	_panel.position = Vector2(16, vp.y - _panel.size.y - 16) if _panel.get_meta("low", false) else Vector2(16, 16)
+	var top := TOUCH_TOP if BWSettings.touch() else 16.0      # D579: under the pad's camera buttons
+	_panel.position = Vector2(16, vp.y - _panel.size.y - 16) if _panel.get_meta("low", false) else Vector2(16, top)
 
 
 func set_next_visible(on: bool) -> void:
@@ -167,6 +169,11 @@ func set_next_visible(on: bool) -> void:
 
 func next_button() -> Button:
 	return _next
+
+
+## D579: where the panel ends (the mobile X card docks under it).
+func panel_bottom() -> float:
+	return _panel.get_global_rect().end.y if _panel.visible else 0.0
 
 
 func panel_visible(on: bool) -> void:

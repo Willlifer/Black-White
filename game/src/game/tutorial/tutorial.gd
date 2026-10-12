@@ -53,6 +53,9 @@ func _ready() -> void:
 	screen.gate = _gate
 	screen.turn_hook = _turn_hook
 	add_child(screen)
+	if screen.touch != null:                      # ---- D579: the pad's A presses Next; II opens the coach's skip / exit
+		screen.touch.a_hook = _touch_next
+		screen.touch.pause_hook = func(): coach.open_dialog()
 	_ui = CanvasLayer.new()
 	_ui.layer = 20
 	add_child(_ui)
@@ -69,6 +72,12 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	for k in _saved:
 		BWSettings._v[k] = _saved[k]
+
+
+## D579: on mobile the X card docks under the coach (both sit top left).
+func _process(_d: float) -> void:
+	if screen and is_instance_valid(screen) and screen.touch != null and coach:
+		screen.ui.set_info_top(maxf(130.0, coach.panel_bottom() + 8.0))
 
 
 func battle() -> BWBattle:
@@ -127,7 +136,7 @@ func _do_step(s: Dictionary) -> void:
 			return
 		_hist0 = b.history.size()
 	coach.show_step(int(s.get("lesson", 0)), BWTutorialScript.LESSONS.size() - 1,
-		BWTutorialScript.lesson_name(int(s.get("lesson", 0))), str(s.text), index, steps.size(), w in ["next", "hover", "results"])
+		BWTutorialScript.lesson_name(int(s.get("lesson", 0))), BWTutorialScript.say(s, BWSettings.touch()), index, steps.size(), w in ["next", "hover", "results"])
 	_next = false
 	_hover_t = 0.0
 	if in_fight and battle() and not battle().over:
@@ -187,7 +196,8 @@ func _step_done(s: Dictionary) -> bool:
 			return hit
 		"hover":
 			var h: Vector2i = s.get("hex", Vector2i(-9, -9))
-			var seen: bool = screen._hover == h and (screen.readability.card_shown() or screen.readability.preview.shown())
+			var seen: bool = screen._hover == h and (screen.readability.card_shown() or screen.readability.preview.shown()
+				or screen.touch != null)                 # D579: the mobile cursor resting on it (X reads it)
 			_hover_t = _hover_t + get_process_delta_time() if seen else 0.0
 			return _hover_t > 0.7
 		"over":
@@ -304,6 +314,17 @@ func _esc_passes() -> bool:
 	return w == "over" and screen and is_instance_valid(screen) and (screen.ui.forecast_open() or not screen._skill.is_empty())
 
 
+## D579: the pad's A presses Next on a read-only step (Enter on desktop).
+func _touch_next() -> bool:
+	var s := step()
+	if coach.dialog_open() or not ready_for_input or not str(s.get("wait", "")) in ["next", "hover"]:
+		return false
+	if not coach.next_button().visible:
+		return false
+	_next = true
+	return true
+
+
 # ---------------------------------------------------------------- highlights
 
 ## What the coach outlines this frame, from the step's `hl`.
@@ -360,7 +381,7 @@ func ui_target(what: String, s: Dictionary = {}) -> Control:
 			return ui.find_child("swap_weapon", true, false) as Control
 		"confirm":
 			for c in ui._forecast.find_children("*", "Button", true, false):
-				if (c as Button).text.begins_with("Confirm"):
+				if (c as Button).text.contains("Confirm"):   # D579: "A  Confirm" on mobile
 					return c
 		"notes":
 			for c in ui._fc_rows.find_children("*", "RichTextLabel", true, false):
@@ -534,14 +555,14 @@ class ClosingCard:
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.add_child(row)
 		row.add_child(_panel("Downtime", "downtime",
-			"Each unit spends the day on one activity. Specialize trains what it has, Branch out adds an element (3 at most) and a weapon, Wander is a gamble."))
+			"Each unit spends the day on one activity. Specialize trains two things it has, Branch out adds an element (3 at most) and a weapon, Wander is a gamble."))
 		row.add_child(_panel("Rooms", "rooms",
 			"From fight 3 you often pick a room: Standard, or Hard for better spoils. Some fights are bosses, 6v6 battles or special encounters."))
 		row.add_child(_panel("The shop", "shop",
-			"Trade gear one for one. An imbuement scroll is free and adds an element's enchantment to any item."))
+			"Trade gear one for one. An imbuement scroll is free and adds an element's enchantment to any item. Item cards open short: More shows the numbers."))
 		var b := Button.new()
 		b.name = "card_back"
-		b.text = "Back to the title  [Enter]"
+		b.text = "Back to the title" if BWSettings.touch() else "Back to the title  [Enter]"
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(320, 46)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

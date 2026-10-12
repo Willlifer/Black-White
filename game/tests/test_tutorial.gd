@@ -13,7 +13,8 @@ func test_tutorial_script_plays_every_lesson(t) -> void:
 	var first: Array = h.filter(func(e): return e.type == "attack")
 	t.ok(not first.is_empty() and first[0].unit == "della" and first[0].result.hit, "2: Della's first blow lands")
 	t.ok(has.call(func(e): return e.type == "paint" and e.element == "fire" and BWTutorialScript.F_HEX in e.hexes), "4: fire on the marked hex")
-	t.ok(has.call(func(e): return e.type == "detonate" and e.hex == BWTutorialScript.C0), "5: the fuse detonates")
+	t.ok(has.call(func(e): return e.type == "overheat" and e.hex == BWTutorialScript.F_HEX), "5: fire on fire 3 Overheats (D579)")
+	t.ok(has.call(func(e): return e.type == "detonate" and e.hex == BWTutorialScript.C0), "6: the fuse detonates")
 	t.ok(has.call(func(e): return e.type == "tile_damage" and e.unit == "della" and e.cause == "detonation"), "5: Della is in the splash (the red tag)")
 	t.ok(has.call(func(e): return e.type == "attack" and "Shatter" in e.get("tags", [])), "5: Shatter on the glazed tile")
 	t.ok(has.call(func(e): return e.type == "skill" and e.skill == "bolt" and e.results.any(func(x): return "Spark" in x.get("tags", []))), "5: Spark")
@@ -28,7 +29,7 @@ func test_tutorial_script_plays_every_lesson(t) -> void:
 		t.ok(u.attuned_elements().size() <= BWUnit.MAX_ELEMENTS, "%s holds %d elements, the cap is %d" % [u.id, u.attuned_elements().size(), BWUnit.MAX_ELEMENTS])
 	# D468: the board-painting core and the new rules are named on the way
 	var said := " ".join(BWTutorialScript.steps().map(func(s): return str(s.text)))
-	for w in ["paint", "cash it in", "ignites", "Unsteady", "Shatter", "keystone", "title"]:
+	for w in ["paint", "cash it in", "ignites", "Unsteady", "Shatter", "keystone", "title", "Overheat", "duo"]:
 		t.ok(said.contains(w), "a step says \"%s\"" % w)
 	t.ok(not has.call(func(e): return e.type == "tile_damage" and e.unit == "della" and e.cause == "fire_cross"), "8: the way behind Burt doesn't cross fire")
 
@@ -53,9 +54,10 @@ func test_tutorial_after_the_fight(t) -> void:
 func test_tutorial_prompts(t) -> void:
 	var last := 0
 	for s in BWTutorialScript.steps():
-		var text := str(s.text)
-		var sentences := text.split(". ", false).size()
-		t.ok(sentences <= 2 and text.length() <= 150, "%s: short (%d sentences, %d chars)" % [s.id, sentences, text.length()])
+		for touch in [false, true]:                  # D579: the mobile text too
+			var text := BWTutorialScript.say(s, touch)
+			var sentences := text.split(". ", false).size()
+			t.ok(sentences <= 2 and text.length() <= 150, "%s%s: short (%d sentences, %d chars)" % [s.id, " (touch)" if touch else "", sentences, text.length()])
 		t.ok(int(s.lesson) >= last, "%s: lessons in order" % s.id)
 		last = int(s.lesson)
 	t.eq(last, BWTutorialScript.LESSONS.size() - 1, "the closing card is the last lesson")

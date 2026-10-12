@@ -622,6 +622,13 @@ func _show_recap(line: String) -> void:
 	_recap.offset_left = right - w - 28.0
 	_recap.offset_right = right
 	_recap.offset_top = -16
+	_recap.offset_bottom = -16
+	if screen and screen.ui.touch:                    # D579: mobile: centred, just above the acting plate (it sits bottom centre)
+		var top: float = (screen.ui._acting.panel as Control).get_global_rect().position.y
+		_recap.offset_left = roundf(vp.x * 0.5 - (w + 28.0) * 0.5)
+		_recap.offset_right = roundf(vp.x * 0.5 + (w + 28.0) * 0.5)
+		_recap.offset_bottom = top - vp.y - 8.0
+		_recap.offset_top = _recap.offset_bottom
 	_recap.visible = true
 	if _recap_tw:
 		_recap_tw.kill()

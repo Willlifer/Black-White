@@ -1845,9 +1845,20 @@ func _touch_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String) -> 
 	after.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	after.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 	_fc_rows.add_child(after)
+	for n in (fc.get("notes", []) as Array).slice(0, 3):   # D579: the reaction riders stay (Shatter, the arc): they're the loop
+		_fc_rows.add_child(_note_line(str(n)))
 	_forceful_toggle(att, what)
 	_wind_toggle(att)
 	_forecast.visible = true
 	_menu.visible = false
 	_hovered.panel.visible = false
+
+
+## D579: the X card's top (the tutorial's coach sits above it on mobile).
+func set_info_top(y: float) -> void:
+	if not _inspect.is_empty():
+		(_inspect.panel as Control).offset_top = y
+		(_inspect.panel as Control).offset_bottom = y
+	if _info:
+		_info.offset_top = y
 # ---- end D574 ----

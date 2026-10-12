@@ -32,6 +32,10 @@ var cursor := Vector2i(-1, -1)
 var mode := "idle"                 # idle · root · act · move · aim · look
 var _ring: MeshInstance3D
 var _t := 0.0
+## D579 (the tutorial): A goes here first (true = taken, e.g. the coach's
+## Next); II calls pause_hook instead of the pause menu when set.
+var a_hook: Callable
+var pause_hook: Callable
 
 
 func setup(screen: BWCombatScreen) -> void:
@@ -104,11 +108,10 @@ func _on_ui_action(id: String) -> void:
 		"touch:act":
 			mode = "act"
 			s.ui.touch_act()
-		"touch:undo":
-			s.ui.touch_close()
+		"touch:undo":                                  # D579: through the screen's own Esc (so the tutorial's gate sees it)
 			if s._player_turn() and s.battle.can_undo_move(u):
-				s.battle.undo_move(u)
-				s._after_events()
+				s.ui.touch_close()
+				s._on_action("cancel")
 		"touch:wait":
 			s.ui.touch_close()
 			s._on_action("wait")
@@ -163,13 +166,19 @@ func press(id: String) -> void:
 		"turn_right": s.rig.rotate_by(60.0)
 		"tilt_up": s.rig.tilt_by(TILT)               # D578: a steeper, more top-down view
 		"tilt_down": s.rig.tilt_by(-TILT)            # flatter, toward side-on
-		"pause": s.open_pause()
+		"pause":
+			if pause_hook.is_valid():
+				pause_hook.call()
+			else:
+				s.open_pause()
 		"x": _info()
 		"a": _a()
 		"b": _b()
 
 
 func _a() -> void:
+	if a_hook.is_valid() and a_hook.call():
+		return
 	if s.ui.info_open():
 		s.ui.hide_info()
 		return
