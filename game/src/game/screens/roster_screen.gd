@@ -291,7 +291,50 @@ func _build_ui() -> void:
 	reroll.tooltip_text = "Re-roll everyone's weapon, element and clothes (clears your picks)"
 	reroll.pressed.connect(randomize_roster)
 	root.add_child(reroll)
+	if BWSettings.touch():                       # ---- D577: the stick, A and B (author: "at character select")
+		left.anchor_top = 0.0                      # the stats go to the free top-left corner, clear of the stick
+		left.anchor_bottom = 0.0
+		left.offset_top = 14
+		left.offset_bottom = 240
+		left.grow_vertical = Control.GROW_DIRECTION_END
+		right.visible = false                      # the close-up repeats the highlighted contestant; A and B sit there
+		pad = BWTouchPad.new()
+		pad.menu = true
+		pad.name = "touch_pad"
+		root.add_child(pad)
+		pad.step.connect(pad_step)
+		pad.pressed.connect(pad_press)
+		help.text = "Stick to look  ·  A to pick or unpick  ·  B to unpick the last  ·  tap Begin when six are in"
+		for b in [_begin, info, reroll]:
+			b.text = b.text.get_slice("  [", 0)
 	_refresh_count()
+
+
+# ---- D577 the mobile layout's pad (marked edit) ----
+var pad: BWTouchPad
+
+
+## The stick: left / right walk the line-up (diagonals count as sideways),
+## up / down change row, as the arrow keys do.
+func pad_step(d: int) -> void:
+	match d:
+		0, 1, 7: _select(_sel + 1)
+		3, 4, 5: _select(_sel - 1)
+		6: _select(_sel + PER_ROW if _sel < PER_ROW else _sel)
+		2: _select(_sel - PER_ROW if _sel >= PER_ROW else _sel)
+
+
+## A picks (or unpicks) the highlighted contestant; B unpicks the last pick.
+func pad_press(id: String) -> void:
+	match id:
+		"a":
+			_toggle(_sel)
+		"b":
+			if not _chosen.is_empty():
+				var last: int = _chosen[_chosen.size() - 1]
+				_select(last)
+				_toggle(last)
+# ---- end D577 ----
 
 
 func _set_face(u: BWUnit) -> void:

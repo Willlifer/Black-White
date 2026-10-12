@@ -6,6 +6,7 @@ extends SceneTree
 ## Shots: the commands on the turn start; Move with the cursor walked off;
 ## the commands after the move; the Act list; aiming at a foe; its one-line
 ## forecast; X on a foe (its full card); X on a skill row.
+## SCREEN=roster: character select with the stick, A and B (D577).
 
 var out := ""
 var s: BWCombatScreen
@@ -38,6 +39,13 @@ func _shot(name: String) -> void:
 	print("shot ", name, " ", img.get_size(), "  mode=", s.touch.mode if s.touch else "-")
 
 
+func _shot_plain(name: String) -> void:
+	await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png(out.path_join("mobile_" + name + ".png"))
+	print("shot ", name)
+
+
 func _until(f: Callable, limit: float = 30.0) -> bool:
 	var t := 0.0
 	while not f.call() and t < limit:
@@ -48,6 +56,24 @@ func _until(f: Callable, limit: float = 30.0) -> bool:
 
 func _go() -> void:
 	BWMusic.ensure(root)
+	if OS.get_environment("SCREEN") == "roster":     # D577: character select with the stick, A and B
+		var r := BWRosterScreen.new()
+		root.add_child(r)
+		await _wait(3.5)
+		await _shot_plain("roster_1")
+		for d in [0, 0, 0]:
+			r.pad_step(d)
+			await _wait(0.2)
+		r.pad_press("a")
+		r.pad_step(4)
+		r.pad_press("a")
+		await _wait(1.0)
+		await _shot_plain("roster_2_two_picked")
+		r.pad_press("b")
+		await _wait(0.8)
+		await _shot_plain("roster_3_b_unpicks")
+		quit(0)
+		return
 	var roster := BWData.table("roster")
 	var players: Array = []
 	var enemies: Array = []

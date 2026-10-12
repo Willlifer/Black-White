@@ -10,9 +10,16 @@ extends Control
 ##                 No Y (author: the commands open on your turn, or on A over
 ##                 your own unit, as in Fire Emblem / FFT)
 ## A held through playback fast-forwards it (hold Space on desktop).
-## Fingers and the mouse both work: a screen touch is taken per finger (so a
-## thumb resting on the stick doesn't block a tap on A); once a touch has been
-## seen, the emulated mouse copies of it are ignored.
+## `menu` (D577, character select): only the stick, A and B.
+##
+## D577 (author: "Stick was stuck permanently aiming up and right"): fingers
+## are tracked here, in _input, by touch index: a finger that lands on a part
+## owns it until that same finger lifts (wherever it lifts), and every part
+## lets go when the window loses focus or the pad hides. Before, the lift had
+## to be routed back to the stick by the GUI, and on a phone browser it
+## wasn't, so the last direction kept repeating. The mouse (desktop) still
+## goes through the parts' own _gui_input; once a touch has been seen, the
+## emulated mouse copies of fingers are ignored there.
 
 signal step(dir: int)                 # 0 right, 1 down-right, 2 down … 7 up-right (screen space, 45° apart)
 signal pressed(id: String)            # "a", "b", "x", "turn_left", "turn_right", "pause"
@@ -24,12 +31,15 @@ const STICK := 220.0                  # stick diameter
 const REPEAT_FIRST := 0.32
 const REPEAT := 0.13
 const MARGIN := 28.0
+const HIT_GROW := 10.0                # a finger slightly outside a part still takes it
 
 static var touch_seen := false
 
+var menu := false                     # D577: stick, A and B only (set before adding)
 var held := {}                        # id -> true while down
 var _stick: Stick
 var _buttons := {}
+var _fingers := {}                    # touch index -> the part it owns
 
 
 func _ready() -> void:
@@ -45,12 +55,15 @@ func _ready() -> void:
 	_stick.offset_bottom = -MARGIN
 	add_child(_stick)
 	var c := Vector2(-MARGIN - BTN / 2.0 - GAP, -MARGIN - BTN / 2.0 - GAP)     # diamond centre, from the bottom-right
-	_face("x", "X", c + Vector2(-GAP, 0))
+	if not menu:
+		_face("x", "X", c + Vector2(-GAP, 0))
 	_face("a", "A", c + Vector2(GAP, 0))
 	_face("b", "B", c + Vector2(0, GAP))
-	_corner("turn_left", "◀", Vector2(MARGIN, MARGIN))
-	_corner("turn_right", "▶", Vector2(MARGIN + 76, MARGIN))
-	_corner("pause", "II", Vector2(MARGIN + 168, MARGIN))
+	if not menu:
+		_corner("turn_left", "◀", Vector2(MARGIN, MARGIN))
+		_corner("turn_right", "▶", Vector2(MARGIN + 76, MARGIN))
+		_corner("pause", "II", Vector2(MARGIN + 168, MARGIN))
+	visibility_changed.connect(release_all)
 
 
 func _face(id: String, label: String, centre: Vector2) -> void:
@@ -112,6 +125,62 @@ func _release(id: String) -> void:
 		released.emit(id)
 
 
+## Every part lets go (the window lost focus, the pad hid, a screen change).
+func release_all() -> void:
+	_fingers.clear()
+	_stick._end()
+	for id in _buttons:
+		(_buttons[id] as PadButton)._set_down(false)
+
+
+func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_EXIT_TREE]:
+		release_all()
+
+
+# ---------------------------------------------------------------- fingers (D577)
+
+func _input(ev: InputEvent) -> void:
+	if ev is InputEventScreenTouch:
+		touch_seen = true
+		if ev.pressed:
+			if not is_visible_in_tree():
+				return
+			var part := _part_at(ev)
+			if part == null:
+				return
+			_fingers[ev.index] = part
+			if part == _stick:
+				_stick._begin(_stick.make_input_local(ev).position)
+			else:
+				(part as PadButton)._set_down(true)
+			get_viewport().set_input_as_handled()
+		elif _fingers.has(ev.index):
+			var part: Control = _fingers[ev.index]
+			_fingers.erase(ev.index)
+			if part == _stick:
+				_stick._end()
+			else:
+				(part as PadButton)._set_down(false)
+			get_viewport().set_input_as_handled()
+	elif ev is InputEventScreenDrag and _fingers.get(ev.index) == _stick:
+		_stick._move(_stick.make_input_local(ev).position)
+		get_viewport().set_input_as_handled()
+
+
+func _part_at(ev: InputEvent) -> Control:
+	var parts: Array = [_stick]
+	parts.append_array(_buttons.values())
+	for p in parts:
+		var c := p as Control
+		if not c.is_visible_in_tree() or c in _fingers.values():
+			continue
+		var at: Vector2 = c.make_input_local(ev).position
+		if Rect2(Vector2.ZERO, c.size).grow(HIT_GROW).has_point(at):
+			return c
+	return null
+
+
 ## The 8-way index for a vector in screen space (y down), or -1 inside the dead zone.
 static func dir_of(v: Vector2, dead: float = 0.0) -> int:
 	if v.length() <= dead:
@@ -132,21 +201,12 @@ class PadButton:
 	var label := ""
 	var small := false
 	var _down := false
-	var _finger := -1
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 
 	func _gui_input(ev: InputEvent) -> void:
-		if ev is InputEventScreenTouch:
-			BWTouchPad.touch_seen = true
-			if ev.pressed and not _down:
-				_finger = ev.index
-				_set_down(true)
-			elif not ev.pressed and ev.index == _finger:
-				_set_down(false)
-			accept_event()
-		elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
 			accept_event()
 			if BWTouchPad.touch_seen:
 				return
@@ -182,7 +242,6 @@ class Stick:
 	extends Control
 	var pad: BWTouchPad
 	var _down := false
-	var _finger := -1
 	var _knob := Vector2.ZERO
 	var _dir := -1
 	var _t := 0.0
@@ -191,26 +250,12 @@ class Stick:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 
 	func _gui_input(ev: InputEvent) -> void:
-		if ev is InputEventScreenTouch:
-			BWTouchPad.touch_seen = true
-			accept_event()
-			if ev.pressed and not _down:
-				_finger = ev.index
-				_down = true
-				_move(ev.position)
-			elif not ev.pressed and ev.index == _finger:
-				_end()
-		elif ev is InputEventScreenDrag:
-			accept_event()
-			if _down and ev.index == _finger:
-				_move(ev.position)
-		elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
 			accept_event()
 			if BWTouchPad.touch_seen:
 				return
 			if ev.pressed:
-				_down = true
-				_move(ev.position)
+				_begin(ev.position)
 			else:
 				_end()
 		elif ev is InputEventMouseMotion:
@@ -218,7 +263,14 @@ class Stick:
 			if _down and not BWTouchPad.touch_seen:
 				_move(ev.position)
 
+	func _begin(p: Vector2) -> void:
+		_down = true
+		_dir = -1
+		_move(p)
+
 	func _move(p: Vector2) -> void:
+		if not _down:
+			return
 		var c := size / 2.0
 		var v := p - c
 		var r := size.x / 2.0 - 30.0
@@ -236,6 +288,9 @@ class Stick:
 		_dir = -1
 		_knob = Vector2.ZERO
 		queue_redraw()
+
+	func held_dir() -> int:
+		return _dir if _down else -1
 
 	func _process(delta: float) -> void:
 		if not _down or _dir < 0:
