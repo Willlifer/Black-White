@@ -88,6 +88,11 @@ var castle_view: BWCastleView       # ---- D340: the castle maps' walls, gate, t
 var kit2_view: BWKit2View           # ---- D425-D432: charge lines, Riposte's release, barriers
 var mode_opts := {}                # ---- D328: BWObjectives.configure before setup (tools)
 var touch: BWTouchCombat            # ---- D574: the mobile layout's pad and cursor (BWSettings.touch)
+## D578 (author: "Follow units as they move ... Tried moving my main character
+## and she just kinda left the board"): the unit walking (or leaping, charging,
+## being thrown) right now; the camera follows it every frame until it lands.
+## Both layouts. Pushes and pulls inside a blow don't take the camera.
+var _track: Node3D
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -230,6 +235,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	perf_frame_ms.append(_delta * 1000.0 / maxf(Engine.time_scale, 0.01))   # ---- D323: real frame time
+	if _track != null and is_instance_valid(_track):     # ---- D578: the camera rides along with a walk
+		rig.follow(_track.global_position)
 	# the action menu rides beside the acting unit, wherever the camera is
 	var u := battle.current() if battle else null
 	if u and _views.has(u.id):
@@ -736,7 +743,10 @@ func _play(e: Dictionary) -> void:
 			rig.follow(v.global_position)
 			await get_tree().create_timer(0.3).timeout
 		"move":
-			match str(e.get("kind", "")):
+			var kind := str(e.get("kind", ""))
+			if not kind in ["shove", "knockback", "pull", "push", "gale"] and _views.has(str(e.unit)):
+				_track = _views[e.unit]                    # ---- D578: follow the walker
+			match kind:
 				"leap":
 					if vfx and vfx.dives(e, _queue):    # ---- D168: Dragoon Dive's leap, shadow, crash
 						await vfx.dive(_views[e.unit], e.path)
@@ -746,6 +756,7 @@ func _play(e: Dictionary) -> void:
 				"shove", "knockback", "pull", "push", "gale": await _animate_slide(_views[e.unit], e.path, 0.12)
 				"place": await _animate_toss(_views[e.unit], e.path)    # ---- D221: thrown (Grapple Throw), not walked
 				_: await _animate_move(_views[e.unit], e.path)
+			_track = null
 		"swap":                                             # ---- D181: put away, draw
 			await _animate_swap(_views[e.unit], e)
 		"undo_move":

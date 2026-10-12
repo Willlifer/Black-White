@@ -97,9 +97,18 @@ func _go() -> void:
 	await _wait(0.6)
 	await _shot("2_move")
 	t.press("a")                                    # walk there
+	await _wait(0.45)
+	await _shot("2b_walking")                       # D578: the camera rides along
 	await _until(func(): return t.mode == "root", 20.0)
 	await _wait(0.8)
 	await _shot("3_after_move")
+	t.press("tilt_up")                              # D578: ▲ a steeper view
+	t.press("tilt_up")
+	await _wait(0.6)
+	await _shot("3b_tilted_up")
+	t.press("tilt_down")
+	t.press("tilt_down")
+	await _wait(0.4)
 	t.press("a")                                    # Act (the spent Move row is skipped)
 	await _wait(0.6)
 	await _shot("4_act")

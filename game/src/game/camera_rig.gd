@@ -177,6 +177,13 @@ func pan(px: Vector2) -> void:
 	_follow_offset += delta
 
 
+## D578: tilt (the mobile pad's ▲ ▼): pitch up or down, tweened, inside PITCH_MIN..PITCH_MAX.
+func tilt_by(deg: float) -> void:
+	var to := clampf(rad_to_deg(pitch) + deg, PITCH_MIN, PITCH_MAX)
+	var tw := create_tween()
+	tw.tween_property(self, "pitch", deg_to_rad(to), 0.25).set_trans(Tween.TRANS_SINE)
+
+
 func rotate_by(deg: float) -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "yaw", yaw + deg_to_rad(deg), 0.3).set_trans(Tween.TRANS_SINE)

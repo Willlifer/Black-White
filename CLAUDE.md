@@ -55,6 +55,7 @@ These are durable and easy to get wrong:
 - **Randomness wants agency.** Random rolls are welcome, but offer a choice where a build is at stake (e.g. Branch out's two cards).
 - **"If we win, we win."** The Giant isn't forced to be unbeatable.
 - **Minor ambiguities:** make the call that makes the game more fun, log it in DECISIONS as Claude, and keep going. Ask only when it's genuinely the author's decision.
+- **Every build is mobile and desktop (D578).** The web build is played on phones in the mobile layout (`BWSettings.touch`, D574-D577); a new feature works in both layouts and is checked in both (`tools/mobile_shots.gd`, `-- --mobile`).
 - **Reviews on mobile:** the author often reviews through Remote Control, so long write-ups go in a Claude Doc or artifact.
 
 ## Project rules

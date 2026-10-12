@@ -2,7 +2,8 @@ class_name BWTouchPad
 extends Control
 ## D574 (author, 2026-10-11, "make it mobile browser friendly"): the mobile
 ## layout's on-screen controller, laid over the combat HUD.
-##   top-left      ◀ ▶ turn the camera 60° around the acting unit, II pauses
+##   top-left      ◀ ▶ turn the camera 60° around the acting unit, ▲ ▼ tilt
+##                 it (D578: a steeper or flatter view), II pauses
 ##   bottom-left   an 8-way stick: steps the board cursor (or the menu
 ##                 highlight), repeating while held
 ##   bottom-right  three face buttons: A right (confirm / open your unit's
@@ -22,7 +23,7 @@ extends Control
 ## emulated mouse copies of fingers are ignored there.
 
 signal step(dir: int)                 # 0 right, 1 down-right, 2 down … 7 up-right (screen space, 45° apart)
-signal pressed(id: String)            # "a", "b", "x", "turn_left", "turn_right", "pause"
+signal pressed(id: String)            # "a", "b", "x", "turn_left", "turn_right", "tilt_up", "tilt_down", "pause"
 signal released(id: String)
 
 const BTN := 84.0                     # face button diameter
@@ -62,7 +63,9 @@ func _ready() -> void:
 	if not menu:
 		_corner("turn_left", "◀", Vector2(MARGIN, MARGIN))
 		_corner("turn_right", "▶", Vector2(MARGIN + 76, MARGIN))
-		_corner("pause", "II", Vector2(MARGIN + 168, MARGIN))
+		_corner("tilt_up", "▲", Vector2(MARGIN + 152, MARGIN))     # D578: up and down
+		_corner("tilt_down", "▼", Vector2(MARGIN + 228, MARGIN))
+		_corner("pause", "II", Vector2(MARGIN + 320, MARGIN))
 	visibility_changed.connect(release_all)
 
 

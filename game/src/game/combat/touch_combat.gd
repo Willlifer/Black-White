@@ -22,6 +22,7 @@ extends Node
 ## The screen keeps every rule: this only turns pad input into the screen's
 ## own hover (_on_hover), click (_on_click) and actions (_on_action).
 
+const TILT := 12.0                 # D578: degrees per ▲ / ▼ press
 const TOUCH_DIST := 17.0          # a closer camera than the desktop's 24 (a phone screen)
 const FOLLOW_EDGE := 0.30          # the camera follows the cursor once it leaves the middle 40% of the screen
 
@@ -160,6 +161,8 @@ func press(id: String) -> void:
 	match id:
 		"turn_left": s.rig.rotate_by(-60.0)
 		"turn_right": s.rig.rotate_by(60.0)
+		"tilt_up": s.rig.tilt_by(TILT)               # D578: a steeper, more top-down view
+		"tilt_down": s.rig.tilt_by(-TILT)            # flatter, toward side-on
 		"pause": s.open_pause()
 		"x": _info()
 		"a": _a()
@@ -272,6 +275,8 @@ func key(ev: InputEvent) -> bool:
 			KEY_I, KEY_TAB: press("x")
 			KEY_Q: press("turn_left")
 			KEY_E: press("turn_right")
+			KEY_PAGEUP, KEY_R: press("tilt_up")
+			KEY_PAGEDOWN, KEY_V: press("tilt_down")
 			KEY_P: press("pause")
 			_: return false
 		return true
@@ -283,6 +288,8 @@ func key(ev: InputEvent) -> bool:
 			JOY_BUTTON_START: press("pause")
 			JOY_BUTTON_LEFT_SHOULDER: press("turn_left")
 			JOY_BUTTON_RIGHT_SHOULDER: press("turn_right")
+			JOY_BUTTON_RIGHT_STICK: press("tilt_up")
+			JOY_BUTTON_LEFT_STICK: press("tilt_down")
 			JOY_BUTTON_DPAD_UP: step(6)
 			JOY_BUTTON_DPAD_DOWN: step(2)
 			JOY_BUTTON_DPAD_LEFT: step(4)
