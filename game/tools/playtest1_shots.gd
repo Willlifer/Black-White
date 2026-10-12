@@ -1,7 +1,7 @@
 extends SceneTree
 ## D233-D236 review renders, from the real screens (needs a window):
 ##   [SHOTS=<dir>] godot --path . --resolution 1920x1080 --script res://tools/playtest1_shots.gd
-## playtest1_gear_trash.png   the pre-battle gear panel: three pieces on the discard pile, its count
+## playtest1_gear_trash.png   the pre-battle gear panel after Discard ▾ > Discard all E (D541; was D234's pile)
 ## playtest1_gear_sorted.png  the same grid sorted by Element (fire .. light, plain last)
 ## playtest1_hall_perks.png   the hall before fight 1: each unit's drawn first perk under its name
 ## playtest1_shop.png         the shop: the seven free scrolls, sorted grids
@@ -60,10 +60,8 @@ func _go() -> void:
 	pre._open_overlay(pre._equip)
 	await _wait(1.5)
 	var gp: BWGearPanel = pre._equip
-	for k in 3:
-		gp.discard(run.inventory[k])
+	gp.discard_tier("E")
 	await _wait(1.0)
-	print("trash box ", gp._trash_box.get_global_rect(), " panel ", gp.get_global_rect(), " screen ", root.get_visible_rect().size)
 	await _shot("playtest1_gear_trash")
 	gp.set_sort("element")
 	await _wait(1.0)

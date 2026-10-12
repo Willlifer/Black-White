@@ -287,8 +287,6 @@ func test_deterministic(t) -> void:
 
 func test_apply_and_undo(t) -> void:
 	var r := _setup_mixed(12)
-	r.trash.append(r.inventory.pop_back())
-	var trashed: Dictionary = r.trash[0]
 	var before_inv := r.inventory.map(func(it): return str(it.uid))
 	var before_eq := {}
 	var count := r.inventory.size()
@@ -304,14 +302,13 @@ func test_apply_and_undo(t) -> void:
 		t.ok(not u.equipment.get("main_hand", {}).is_empty(), "%s holds a weapon" % u.name)
 		t.eq(u.weapon_class, str(u.equipment.main_hand.weight), "%s's class follows the hand" % u.name)
 	t.eq(after, count, "no piece lost or doubled")
-	t.ok(trashed in r.trash and not trashed in r.inventory, "the discard pile is untouched")
 	t.ok(BWAutoEquip.undo(r, snap), "undo")
 	t.eq(r.inventory.map(func(it): return str(it.uid)), before_inv, "the inventory as it was, in order")
 	for u in r.squad:
 		t.eq(BWRun.GEAR_SLOTS.map(func(s): return str(u.equipment.get(s, {}).get("uid", ""))), before_eq[u.id], "%s as it was" % u.name)
 	# undo is refused once the owned pieces change
 	var snap2 := BWAutoEquip.apply(r, BWAutoEquip.plan_all(r))
-	r.trash_item(r.inventory[0])
+	r.discard_item(r.inventory[0])
 	t.ok(not BWAutoEquip.undo(r, snap2), "undo refused after a discard")
 
 

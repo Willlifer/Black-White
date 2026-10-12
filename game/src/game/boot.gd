@@ -31,6 +31,7 @@ extends Node
 ##                               opens on it, a new run and every tool use it; also the
 ##                               --combat fight seed. Probes, shots and the self-test
 ##                               default to BWRosterGen.DEFAULT_SEED; play is random.
+##   --mobile                    D574: the mobile layout this run (the pad, the trimmed HUD), not saved
 ##   --defaults                  ignore user://settings.cfg this run (and never write it);
 ##                               every probe, the self-test and the shot tools imply it (D124)
 ## With no args the game starts normally.
@@ -46,6 +47,8 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		BWWebInstanceShim.install(get_tree())                                  # ---- D492: WebGL instance-uniform cap
 	BWSettings.init(Array(args).any(func(a): return a in ISOLATED_FLAGS))     # ---- D124
+	if "--mobile" in args:
+		BWSettings._v["layout"] = "mobile"          # ---- D574: the mobile layout for this run (probes, shots), never saved
 	_seed_roster(args)                                                         # ---- D154
 	if "--self-test" in args:
 		_self_test.call_deferred()

@@ -394,14 +394,15 @@ func _build_tiles(u: BWUnit) -> void:
 	_tile_btns = {}
 	_keys = []
 	_tiles_for = u.id
+	var settled := not run.specialize_preview(u).is_empty()   # D561: both tiles train a pairing
 	for c in run.day_choices(u):
-		var cards: Array = run.branch_preview(u) if c == "branch_out" else []
-		if c == "branch_out" and not cards.is_empty():
-			var bt := BWDowntimeWidgets.BranchTile.new(cards, _keys.size() + 1)
+		var cards: Array = run.day_cards(u, c)
+		if not cards.is_empty():
+			var bt := BWDowntimeWidgets.BranchTile.new(cards, _keys.size() + 1, "specialize" if settled else "branch_out")
 			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			bt.size_flags_stretch_ratio = 1.6
+			bt.size_flags_stretch_ratio = 1.6 if cards.size() > 1 else 1.0
 			bt.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			bt.picked.connect(func(i: int): _choose("branch_out", i))
+			bt.picked.connect(func(i: int): _choose(c, i))
 			_tiles.add_child(bt)
 			_tile_btns[c] = bt
 			for i in cards.size():
@@ -459,11 +460,13 @@ func _refresh_tags() -> void:
 		var c: BWDowntimeWidgets.Chip = tag.chips[0]
 		var ch := str(_plans.get(u.id, ""))
 		var bi := int(_branch.get(u.id, -1))
-		if ch == "branch_out" and bi >= 0:
-			# D176: the chip names the card taken (its element, in colour)
-			var card: Dictionary = run.branch_preview(u)[bi]
+		var dc: Array = run.day_cards(u, ch) if ch != "" else []
+		if not dc.is_empty():
+			# D176: the chip names the card taken (its element, in colour); D561 a pairing too
+			var card: Dictionary = dc[clampi(bi, 0, dc.size() - 1)]
 			var el := str(card.element)
-			c.set_action(ch, el.capitalize() if el != "" else BWText.weapon(str(card.weapon)),
+			c.set_action("specialize" if run.choice_name(u, ch) == str(BWRun.CHOICE_NAMES.specialize) else ch,
+				el.capitalize() if el != "" else BWText.weapon(str(card.weapon)),
 				BWLook.element_color(el) if el != "" else Color.TRANSPARENT)
 		else:
 			c.set_action(ch, str(BWDowntimeWidgets.info(ch)[1]) if ch != "" else "")
@@ -556,12 +559,12 @@ func _choose(c: String, card: int = -1) -> void:
 	var u: BWUnit = run.squad[_sel]
 	if _day or not c in run.day_choices(u):
 		return
-	if c == "branch_out" and card < 0 and not run.branch_preview(u).is_empty():
+	if card < 0 and not run.day_cards(u, c).is_empty():
 		card = 0
 	var first := str(_plans[u.id]) == ""
 	_plans[u.id] = c
-	if c == "branch_out":
-		_branch[u.id] = card
+	if card >= 0:
+		_branch[u.id] = card                    # D176 Branch out's card; D561 a pairing tile's one
 	else:
 		_branch.erase(u.id)                     # another choice discards the cards
 	if first or _rng.randf() < 0.5:

@@ -60,7 +60,7 @@ func _run() -> void:
 	var prep: BWPrepScreen = await _wait_screen(BWPrepScreen, 12.0)
 	_probe_first_perks(prep)
 	await _probe_prep(prep)
-	var trashed: Array = game.run.trash.duplicate()
+	var discarded: Array = _discarded.duplicate()
 	_key(KEY_ENTER)
 	# D208: fight 1 has no room choice: straight from the hall to the pre-battle
 	var pre_n: Node = await _wait_any([BWPrebattleScreen, BWRoomScreen], 12.0)
@@ -75,10 +75,9 @@ func _run() -> void:
 	_check(not pre._begin.disabled, "three placed, Begin enabled")
 	await _probe_prebattle(pre)
 	_check(not pre._begin.disabled, "still three placed after the drags, Begin enabled")
-	_check(not trashed.is_empty() and game.run.trash == trashed, "the discard pile carried from the hall to the pre-battle")
+	_check(not discarded.is_empty() and discarded.all(func(x): return not x in game.run.inventory), "what the hall discarded is still gone in the pre-battle (D541)")
 	pre._try_begin()
 	var combat: BWCombatScreen = await _wait_screen(BWCombatScreen)
-	_check(game.run.trash.is_empty() and trashed.all(func(x): return not x in game.run.inventory), "the battle started: the discard pile is gone (D234)")
 	combat.autoplay = true
 	# The probe tests transitions, not balance: tilt this one fight so it is won.
 	for e in combat.battle.side("enemy"):
@@ -90,7 +89,22 @@ func _run() -> void:
 	var res := next as BWResultsScreen
 	_check(res.find_children("*", "Button", true, false).is_empty(), "results has no Continue button")
 	await get_tree().create_timer(BWResultsScreen.MIN_SHOW).timeout
-	_key(KEY_A)
+	# D545: a left click anywhere goes on, here on the middle of the summary panel (over a unit row)
+	var res_sent := [0]
+	res.done.connect(func(): res_sent[0] += 1)
+	var probe_btn := Button.new()                  # a click on a real button presses it and doesn't go on
+	probe_btn.text = "probe"
+	probe_btn.position = Vector2(40, 40)
+	probe_btn.size = Vector2(120, 40)
+	var btn_hits := [0]
+	probe_btn.pressed.connect(func(): btn_hits[0] += 1)
+	res.add_child(probe_btn)
+	await _click(Vector2(100, 60))
+	_check(btn_hits[0] == 1 and res_sent[0] == 0, "results: a click on a button presses it, nothing more (button %d, on %d)" % [btn_hits[0], res_sent[0]])
+	probe_btn.queue_free()
+	await get_tree().process_frame
+	await _click(res.get_viewport_rect().size * Vector2(0.3, 0.4))
+	_check(res_sent[0] == 1, "results: a left click on the panel goes on (once: %d)" % res_sent[0])
 	var down: BWDowntimeScreen = await _wait_screen(BWDowntimeScreen)
 	await _probe_downtime(down)
 	await get_tree().create_timer(BWDowntimeScreen.MIN_CONTINUE + 0.3).timeout
@@ -319,7 +333,7 @@ func _probe_prep(prep: BWPrepScreen) -> void:
 		var ok := prep._panel.give(b, it, slot)
 		_check(ok and b.equipment.get(slot, {}) == it and not a.equipment.has(slot), "gave it to %s" % b.name)
 		_check(before_b.is_empty() or before_b in run.inventory, "what %s wore there went to the inventory" % b.name)
-	await _probe_trash_and_sort(prep._panel)
+	await _probe_discard_and_sort(prep._panel)
 	_key(KEY_I)
 	await get_tree().process_frame
 	_check(prep.get_children().any(func(c): return c is BWCodex), "Info opens the codex in the hall")
@@ -330,12 +344,16 @@ func _probe_prep(prep: BWPrepScreen) -> void:
 	_check(not prep._open, "Esc closes the panel")
 
 
-## D234 the discard pile and D235 sorting in the hall's gear panel: drag a
-## loose tile onto the pile (real mouse), a double-click on it takes it back,
-## the Discard button sends the picked one; Element sorts the grid by the
-## element order; the shop won't offer what's on the pile. One stays on the
-## pile for the battle to throw away.
-func _probe_trash_and_sort(gp: BWGearPanel) -> void:
+## D541 Discard ▾ (it replaced D234's pile) and D235 sorting in the hall's
+## gear panel: a real click opens the menu, "Discard selected item" shows for
+## a selected loose piece and throws it away at once, Undo discard brings it
+## back, "Discard all E" takes every loose E (never worn gear) and its undo
+## too; Element sorts the grid by the element order; the shop won't offer a
+## discarded piece. One stays thrown away.
+var _discarded: Array = []
+
+
+func _probe_discard_and_sort(gp: BWGearPanel) -> void:
 	var run := game.run
 	for b in ["vest", "chaps"]:
 		run.inventory.append(run.make_item(b, "E"))
@@ -344,29 +362,39 @@ func _probe_trash_and_sort(gp: BWGearPanel) -> void:
 	run.inventory.append(fire)
 	gp.refresh()
 	await get_tree().process_frame
-	var tiles: Array = gp._grid.get_children().filter(func(c): return c is BWItemTile)
+	var it: Dictionary = {}
+	for x in run.inventory:
+		if str(x.base) == "vest":
+			it = x
 	var n := run.inventory.size()
-	if tiles.is_empty():
-		_check(false, "loose tiles to discard")
-		return
-	var src: BWItemTile = tiles[0]
-	for c in tiles:
-		if str(c.item.base) == "vest":
-			src = c
-	var it: Dictionary = src.item
-	var where := "tile %s, pile %s" % [src.get_global_rect(), gp._trash_box.get_global_rect()]
-	await _drag(src.get_global_rect().get_center(), gp._trash_box.get_global_rect().get_center())
-	await get_tree().process_frame
-	_check(it in run.trash and run.inventory.size() == n - 1, "a tile dragged onto the pile is set aside (%s)" % where)
-	_check(gp._trash_title.text.contains("1"), "the pile shows its count (%s)" % gp._trash_title.text)
-	var tt: Array = gp._trash_row.get_children().filter(func(c): return c is BWItemTile)
-	if not tt.is_empty():
-		await _click(tt[0].get_global_rect().get_center(), true)
-	_check(it in run.inventory and run.trash.is_empty(), "a double-click on the pile keeps it")
+	var worn := run.squad.map(func(u): return u.equipment.duplicate())
 	gp._pick_tile(_tile_of(gp, it))
-	gp._trash_btn.pressed.emit()
+	var pm := gp._discard_btn.get_popup()
+	await _click(gp._discard_btn.get_global_rect().get_center())
 	await get_tree().process_frame
-	_check(it in run.trash and gp._sel.is_empty(), "Discard picked sends the picked one")
+	_check(pm.visible, "a click on Discard ▾ opens its menu")
+	var labels := range(pm.item_count).map(func(i): return pm.get_item_text(i))
+	_check(labels.any(func(l): return l.begins_with("Discard all E")) and labels.any(func(l): return l.begins_with("Discard B and under")) \
+		and "Discard selected item" in labels, "the menu: the tiers and the selected item (%s)" % ", ".join(labels))
+	pm.hide()
+	pm.id_pressed.emit(BWGearPanel.DISCARD_PICKED)
+	await get_tree().process_frame
+	_check(not it in run.inventory and run.inventory.size() == n - 1 and gp._sel.is_empty(), "Discard selected item throws it away at once")
+	_check(gp._undo_btn.visible and gp._undo_btn.text == "Undo discard", "Undo discard is offered")
+	gp._undo_btn.pressed.emit()
+	await get_tree().process_frame
+	_check(it in run.inventory and run.inventory.size() == n and not gp._undo_btn.visible, "Undo discard brings it back")
+	var es := run.inventory.filter(func(x): return str(x.tier) == "E").size()
+	pm.id_pressed.emit(0)                                   # Discard all E
+	await get_tree().process_frame
+	_check(es >= 2 and run.inventory.size() == n - es and run.inventory.all(func(x): return str(x.tier) != "E"), "Discard all E takes every loose E (%d)" % es)
+	_check(run.squad.map(func(u): return u.equipment) == worn, "worn gear is never discarded")
+	gp._undo_btn.pressed.emit()
+	await get_tree().process_frame
+	_check(run.inventory.size() == n and it in run.inventory, "and Undo discard brings them all back")
+	gp._pick_tile(_tile_of(gp, it))
+	_check(gp.discard_selected() and not it in run.inventory, "one stays thrown away")
+	_discarded = [it]
 	gp.set_sort("element")
 	await get_tree().process_frame
 	var order: Array = gp._grid.get_children().filter(func(c): return c is BWItemTile and not c.is_queued_for_deletion()).map(func(c): return c.item)

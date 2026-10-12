@@ -1336,6 +1336,7 @@ func _plan(u: BWUnit, s: Dictionary, element: String, target: Vector2i, choice: 
 	BWBeams.magnify(self, u, d, p)            # D289: an ally on a Magnify holder's light casts magnified
 	BWKs3.plan(self, u, d, p)                 # D454 El Niño: a wind area +1 ring
 	BWOverheat.plan_notes(self, u, p)         # D285: the forecast names an Overheat
+	BWBrim.plan_notes(self, u, p)             # D564/D565: ... a Runneth Over, a Glinting
 	BWOverfreeze.plan_notes(self, u, p)       # D312: ... an Overfreeze
 	BWSquall.plan_notes(self, u, p)           # D309: ... a Squall
 	p.victims = (p.victims as Array).filter(func(v): return can_harm(u, v))   # D140: the enemy's shapes pass over an obelisk
@@ -2342,9 +2343,9 @@ func _heal(u: BWUnit, pct: float, cause: String = "") -> void:
 func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool = true, extra: Dictionary = {}) -> Dictionary:
 	var o := BWEffects.paint_opts(by, element, hexes, board, cast)
 	o.merge(extra, true)                       # v2: `propagated` (on-kill paint arrives as spread)
-	var guard: Array = []                      # D307 Static Field: allies' paint can't set off your fuses
+	var guard: Array = []                      # D307/D550 Static Field: a FOE's paint can't set off, re-arm or wash your fuses
 	for w in _fx_units:
-		if w != by and w.team == by.team and BWEffects.has(w, "static_field"):
+		if w.team != by.team and BWEffects.has(w, "static_field"):
 			guard.append(w.id)
 	if not guard.is_empty():
 		o["fuse_guard"] = guard
@@ -2375,6 +2376,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 	if not r.detonations.is_empty():
 		by.fx["detonated"] = true              # D93 Bolt Step reads it after the action
 	var hurt := {}       # unit -> [pct sum, source]
+	var sunlit := {}     # D569 Sunbolt: unit -> the blast's owner (healed once a paint)
 	var pushes: Array = []
 	for d in r.detonations:
 		var src := _unit(str(d.source))
@@ -2390,6 +2392,7 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 			for e in BWEffects.list(src, "effect_repeat", "thunder"):
 				for k in int(BWEffects.p(e, "extra", 0)):
 					echoes.append(float(BWEffects.p(e, "scale_pct", 100)) / 100.0)
+		var sun := src != null and BWDuo.has(src, "sunbolt")   # D569 Sunbolt: your side heals in your blasts
 		var dmix: Dictionary = d.get("mix", {})    # D423: the ring's colour (BWTiles.blast_mix)
 		radius = BWKs3.det_radius(self, by, d, radius)   # D452 Superconductor 2, D457b Powder Keg +1
 		d.pct = float(d.pct) * BWKs3.det_mult(ks3pre, d)   # D459: a Sculptor's pillar shatters for double
@@ -2403,6 +2406,9 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 				continue
 			var dist := BWHex.distance(u.pos, d.hex)
 			if dist > radius:
+				continue
+			if sun and u.team == src.team:
+				sunlit[u] = src
 				continue
 			var dmg := _tile_dmg(u, d.pct * factor, "thunder", mult)
 			if dist >= 1:
@@ -2418,9 +2424,14 @@ func paint(hexes: Array, element: String, by: BWUnit, steps: int = 1, cast: bool
 					pushes.append([occ, BWHex.direction_index(src.pos, d.hex), int(BWEffects.p(e, "hexes", 1))])
 	for u in hurt:
 		_tile_hurt(u, hurt[u][0], "detonation", hurt[u][1])
+	for u in sunlit:
+		if u.alive() and not over:
+			_emit({ "type": "sunbolt", "unit": u.id, "by": sunlit[u].id })
+			_heal(u, float(BWTiles.DETONATE_BASE_PCT), "sunbolt")   # D569: the blast's base 5%
 	BWEnchant.after_blast(self, hurt)          # v2 hook: Sapping
 	BWOverheat.after_paint(self, by, r)        # D285: Overheat rings (events, 6% summed per unit)
 	BWOverfreeze.after_paint(self, by, r)      # D312: Overfreeze bursts (12%, once per unit)
+	BWBrim.after_paint(self, by, r)            # D564/D565: Runneth Over drenches, Glinting blinds
 	for g in r.gales:
 		for e in BWEffects.list(by, "knockback", "wind"):
 			if str(BWEffects.p(e, "on", "")) != "trigger" or not _chance(e):
@@ -2758,7 +2769,7 @@ func apply_pick(u: BWUnit, req: Dictionary, choice: String) -> bool:
 
 
 func _picked(u: BWUnit, rec: Dictionary) -> void:
-	if rec.kind == "perk" or rec.kind == "keystone":   # D277: a keystone may be an effect source too
+	if rec.kind in ["perk", "keystone", "duo"]:   # D277 / D560: a keystone may be an effect source too
 		u.refresh_effects()                # a perk is an effect source (BWEffects.collect)
 		_fx_units = units.filter(func(o: BWUnit): return not o.effects.is_empty())
 	elif str(rec.get("id", "")).begins_with("learn:"):

@@ -15,10 +15,10 @@ extends PanelContainer
 ##   give_enabled = true     moving gear between units: a picked inventory item
 ##                           shows "Equip on: <unit> …"; a picked worn piece shows
 ##                           "Give to: <unit> …" (it comes off and onto them)
-## D234 the discard pile under the grid (BWRun.trash): drag a loose (or worn)
-## piece onto it, or pick one and press Discard; drag it back to the grid or
-## double-click it to keep it. Everything there is thrown away when the battle
-## starts (BWGame.go_combat -> BWRun.empty_trash).
+## D541 "Discard ▾" in the header (it replaced D234's discard pile and D534's
+## By tier): Discard all E / D, C, B and under, or the selected loose item.
+## Loose items only, never worn gear; thrown away at once, and "Undo discard"
+## (the same one-step undo as Optimize) brings them back.
 ## D235 the grid sorts by BWInvSort (Newest / Element / Slot / Tier), the
 ## filters stay; the order is shared with the shop for the session.
 ## D315-D318 auto-equip (BWAutoEquip): "Optimize all [O]" in the header hands
@@ -58,10 +58,7 @@ var _give_label: Label
 var _swap_btn: Button              # D180
 var _sort_btns := {}               # D235
 var _sets: RichTextLabel           # D282
-var _trash_box: PanelContainer     # D234
-var _trash_row: HBoxContainer
-var _trash_title: Label
-var _trash_btn: Button
+var _discard_btn: MenuButton       # D541
 var _opt_all: Button               # D315-D318
 var _opt_unit: Button
 var _undo_btn: Button
@@ -77,14 +74,30 @@ var _undo_snap := {}               # BWAutoEquip.apply's snapshot (one step)
 var _applying := false
 ## D404: the header's filter and action buttons (with Unequip all the row
 ## outgrew the hall's panel at F_SMALL).
-const HEADER_FONT := BWStyle.F_SMALL - 3
+const HEADER_FONT := BWStyle.F_SMALL - 4       # D541: was -3; Discard ▾ joined the row
 ## D532: the doll column's scrolled lower part (skills, sets, abilities) and
 ## the inventory grid's share of its column (at least 3 rows; it splits the
 ## free height with the item card, which keeps CARD_MIN_H).
+## D540 (author: "make the character and items a bit smaller … no scrollbar
+## on the character skills and abilities"): a smaller doll and slot boxes,
+## and the lower part's text a size down, so at 1600x900 both weapons' skill
+## rows, sets, Optimize and the abilities show without scrolling (the scroll
+## stays as a safety net for a very long loadout).
 const LOWER_W := 500.0
-const GRID_MIN_H := 360.0               # D534 (author: "try 4 rows of shown gear"): was 278 (3 rows)
+const DOLL_SIZE := Vector2(236, 276)    # D540: was 330x372 (D229)
+const SLOT_PX := 66.0                   # D540: was 88
+const LOWER_FONT := BWStyle.F_SMALL - 3
+## D534 (author: "try 4 rows of shown gear") set a 360 px grid floor; D573 trades it for GRID_FLOOR_H below.
 const GRID_RATIO := 1.6
 const CARD_MIN_H := 150.0
+## D573 (author: "I want to read the full text in the equipment thing"): the
+## card's box grows to the whole card, and the grid gives up rows for it down
+## to GRID_FLOOR_H (2 rows; it scrolls); only a card taller than that still
+## scrolls. The box only grows while one unit is shown (reset in set_unit), so
+## hovering tiles doesn't make the grid jump.
+const GRID_FLOOR_H := 186.0
+var _card_sc: ScrollContainer
+var _card_h := CARD_MIN_H
 ## The hall's prep (D84): hand gear between units in one click.
 var give_enabled := false
 
@@ -100,11 +113,11 @@ func _init(p_run: BWRun) -> void:
 	add_child(v)
 	# header
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 6)                # D404: a 4th action fits the hall's header
+	hb.add_theme_constant_override("separation", 4)                # D404 / D541: was 6
 	v.add_child(hb)
 	_header = hb
 	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", BWStyle.F_NAME - 6)
+	_title.add_theme_font_size_override("font_size", BWStyle.F_NAME - 12)  # D541: was -6; room for Discard ▾
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(_title)
 	for f in [["", "All"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["main_hand", "Weapons"]]:
@@ -130,6 +143,7 @@ func _init(p_run: BWRun) -> void:
 	_opt_all.shortcut_in_tooltip = false
 	_opt_all.pressed.connect(optimize_all)
 	hb.add_child(_opt_all)
+	hb.add_child(_build_discard())                     # ---- D541
 	_unequip_all = Button.new()                        # ---- D404
 	_unequip_all.name = "unequip_all"
 	_unequip_all.text = "Unequip all [U]"
@@ -145,7 +159,7 @@ func _init(p_run: BWRun) -> void:
 	_unequip_all.pressed.connect(unequip_all)
 	hb.add_child(_unequip_all)
 	var close := Button.new()
-	close.text = "Close  [Esc]"
+	close.text = "Close [Esc]"
 	close.focus_mode = Control.FOCUS_NONE
 	close.add_theme_font_size_override("font_size", HEADER_FONT)
 	close.pressed.connect(func(): closed.emit())
@@ -164,7 +178,7 @@ func _init(p_run: BWRun) -> void:
 	dollrow.add_theme_constant_override("separation", 10)
 	dc.add_child(dollrow)
 	var ls := VBoxContainer.new()
-	ls.add_theme_constant_override("separation", 16)   # D229 (L-22): was 34; the doll is shorter
+	ls.add_theme_constant_override("separation", 8)    # D540: was 16 (D229: 34)
 	ls.alignment = BoxContainer.ALIGNMENT_CENTER
 	dollrow.add_child(ls)
 	var frame := PanelContainer.new()
@@ -174,16 +188,15 @@ func _init(p_run: BWRun) -> void:
 	frame.add_theme_stylebox_override("panel", fs)
 	dollrow.add_child(frame)
 	doll = BWPaperdoll.new()
-	doll.custom_minimum_size = Vector2(330, 372)       # D229 (L-22): 440 ran the skill rows off a 16:9 screen
+	doll.custom_minimum_size = DOLL_SIZE               # D540 (D229: 440 ran the skill rows off a 16:9 screen)
 	frame.add_child(doll)
 	var rs := VBoxContainer.new()
-	rs.add_theme_constant_override("separation", 34)
 	rs.alignment = BoxContainer.ALIGNMENT_CENTER
 	dollrow.add_child(rs)
-	rs.add_theme_constant_override("separation", 10)
+	rs.add_theme_constant_override("separation", 8)
 	for slot in BWRun.GEAR_SLOTS:
-		var t := BWItemTile.new({}, 88.0)
-		t.custom_minimum_size = Vector2(88, 88 + 24)
+		var t := BWItemTile.new({}, SLOT_PX)
+		t.custom_minimum_size = Vector2(SLOT_PX, SLOT_PX + 22)
 		t.slot = slot
 		t.source = "slot"
 		t.caption = BWGearText.SLOT_NAMES[slot]
@@ -202,7 +215,7 @@ func _init(p_run: BWRun) -> void:
 			_swap_btn.name = "swap_weapons"
 			_swap_btn.text = "Swap"
 			_swap_btn.focus_mode = Control.FOCUS_NONE
-			_swap_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+			_swap_btn.add_theme_font_size_override("font_size", LOWER_FONT)
 			_swap_btn.tooltip_text = "Draw the second weapon and carry the one in hand.\nIn battle: Swap weapon, under Attack (free, as often as you like)."
 			_swap_btn.pressed.connect(_swap)
 			rs.add_child(_swap_btn)
@@ -217,7 +230,7 @@ func _init(p_run: BWRun) -> void:
 	lower_sc.custom_minimum_size = Vector2(LOWER_W + 14, 120)
 	dc.add_child(lower_sc)
 	var lower := VBoxContainer.new()
-	lower.add_theme_constant_override("separation", 8)
+	lower.add_theme_constant_override("separation", 5)                  # D540: was 8
 	lower.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lower_sc.add_child(lower)
 	dc = lower
@@ -225,8 +238,8 @@ func _init(p_run: BWRun) -> void:
 	dc.add_child(_skills_title)
 	_skills = HFlowContainer.new()
 	_skills.name = "skill_rows"
-	_skills.add_theme_constant_override("h_separation", 6)
-	_skills.add_theme_constant_override("v_separation", 6)
+	_skills.add_theme_constant_override("h_separation", 5)
+	_skills.add_theme_constant_override("v_separation", 4)
 	_skills.custom_minimum_size = Vector2(LOWER_W, 0)
 	dc.add_child(_skills)
 	# ---- end D532
@@ -237,8 +250,8 @@ func _init(p_run: BWRun) -> void:
 	_sets.scroll_active = false
 	_sets.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # D318: an unwrapped hint widened the panel off screen
 	_sets.custom_minimum_size = Vector2(500, 0)
-	_sets.add_theme_font_size_override("normal_font_size", BWStyle.F_SMALL - 1)
-	_sets.add_theme_font_size_override("bold_font_size", BWStyle.F_SMALL - 1)
+	_sets.add_theme_font_size_override("normal_font_size", LOWER_FONT)
+	_sets.add_theme_font_size_override("bold_font_size", LOWER_FONT)
 	dc.add_child(_sets)
 	var orow := HBoxContainer.new()                    # ---- D317: this unit, from the inventory
 	orow.add_theme_constant_override("separation", 8)
@@ -247,7 +260,7 @@ func _init(p_run: BWRun) -> void:
 	_opt_unit.name = "optimize_unit"
 	_opt_unit.text = "Optimize"
 	_opt_unit.focus_mode = Control.FOCUS_NONE
-	_opt_unit.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_opt_unit.add_theme_font_size_override("font_size", LOWER_FONT)
 	_opt_unit.tooltip_text = "Fill this unit's slots from the loose inventory (never from another unit):\nits element and weapon first, then the higher tier."
 	_opt_unit.pressed.connect(optimize_unit)
 	orow.add_child(_opt_unit)
@@ -255,7 +268,7 @@ func _init(p_run: BWRun) -> void:
 	_unequip_unit.name = "unequip_unit"
 	_unequip_unit.text = "Unequip"
 	_unequip_unit.focus_mode = Control.FOCUS_NONE
-	_unequip_unit.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_unequip_unit.add_theme_font_size_override("font_size", LOWER_FONT)
 	_unequip_unit.tooltip_text = "Take this unit's armour and second weapon off, into the inventory.\nThe main-hand weapon stays."
 	_unequip_unit.pressed.connect(unequip_unit)
 	orow.add_child(_unequip_unit)
@@ -263,13 +276,13 @@ func _init(p_run: BWRun) -> void:
 	_undo_btn.name = "undo_optimize"
 	_undo_btn.text = "Undo optimize"
 	_undo_btn.focus_mode = Control.FOCUS_NONE
-	_undo_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
-	_undo_btn.tooltip_text = "Put everyone's gear back as it was before the last Optimize or Unequip"
+	_undo_btn.add_theme_font_size_override("font_size", LOWER_FONT)
+	_undo_btn.tooltip_text = "Put everyone's gear back as it was before the last Optimize, Unequip or Discard"
 	_undo_btn.visible = false
 	_undo_btn.pressed.connect(undo_optimize)
 	orow.add_child(_undo_btn)
 	_msg = Label.new()
-	_msg.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 1)
+	_msg.add_theme_font_size_override("font_size", LOWER_FONT)
 	_msg.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_msg.custom_minimum_size = Vector2(500, 0)
@@ -285,10 +298,10 @@ func _init(p_run: BWRun) -> void:
 	_give_flow.add_theme_constant_override("h_separation", 6)
 	_give_flow.add_theme_constant_override("v_separation", 6)
 	_give_box.add_child(_give_flow)
-	dc.add_child(BWStyle.section_label("Abilities — one of each type"))
-	_abil = VBoxContainer.new()
+	_abil = VBoxContainer.new()                        # D540: title + Focus on one line, the three picks on the next
+	_abil.name = "abilities"
 	_abil.add_theme_constant_override("separation", 4)
-	_abil.custom_minimum_size = Vector2(500, 0)
+	_abil.custom_minimum_size = Vector2(LOWER_W, 0)
 	dc.add_child(_abil)
 	# -- inventory column
 	var ic := VBoxContainer.new()
@@ -314,7 +327,7 @@ func _init(p_run: BWRun) -> void:
 		_sort_btns[m] = sb
 	var sc := _GridDrop.new()
 	sc.panel = self
-	sc.custom_minimum_size = Vector2(BWItemCard.W + 8, GRID_MIN_H)      # ---- D532: was 178 (2 rows)
+	sc.custom_minimum_size = Vector2(BWItemCard.W + 8, GRID_FLOOR_H)    # ---- D573: was GRID_MIN_H (D532/D534)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.size_flags_stretch_ratio = GRID_RATIO
@@ -325,15 +338,17 @@ func _init(p_run: BWRun) -> void:
 	_grid.add_theme_constant_override("h_separation", 8)
 	_grid.add_theme_constant_override("v_separation", 8)
 	sc.add_child(_grid)
-	ic.add_child(_build_trash())                       # ---- D234
 	ic.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var cs := ScrollContainer.new()
 	cs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	cs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cs.custom_minimum_size = Vector2(0, CARD_MIN_H)                    # ---- D532
+	cs.size_flags_vertical = Control.SIZE_SHRINK_END                  # ---- D573: was EXPAND_FILL (D532)
+	cs.custom_minimum_size = Vector2(0, CARD_MIN_H)
 	ic.add_child(cs)
 	card = BWItemCard.new()
 	cs.add_child(card)
+	_card_sc = cs
+	card.minimum_size_changed.connect(_fit_card, CONNECT_DEFERRED)
+	ic.resized.connect(_fit_card, CONNECT_DEFERRED)
 	_build_preview()
 	changed.connect(func():
 		if not _applying:
@@ -348,6 +363,17 @@ func _enter_tree() -> void:
 	BWItemIcons.ensure(self)
 
 
+func _fit_card() -> void:
+	if _card_sc == null or not is_instance_valid(card) or not card.is_visible_in_tree():
+		return
+	if card._empty.visible or card.size.x < BWItemCard.W - 1.0:   # empty, or mid-layout: a stale height
+		return
+	var col := _card_sc.get_parent() as Control
+	var room := col.size.y - GRID_FLOOR_H - 50.0        # the inventory header and gaps
+	_card_h = maxf(_card_h, minf(card.get_combined_minimum_size().y, room))
+	_card_sc.custom_minimum_size.y = _card_h
+
+
 func add_header(c: Control, at: int = 1) -> void:
 	_header.add_child(c)
 	_header.move_child(c, at)
@@ -355,6 +381,7 @@ func add_header(c: Control, at: int = 1) -> void:
 
 func set_unit(u: BWUnit) -> void:
 	unit = u
+	_card_h = CARD_MIN_H
 	_sel = {}
 	_show_give({}, "")
 	_msg.text = "Drag an item onto a slot, or double-click it, to equip."
@@ -382,7 +409,6 @@ func refresh() -> void:
 	elif not _sel in run.inventory:
 		_sel = {}
 		card.clear()
-	_fill_trash()
 
 
 ## D282: "Sets: Fire 2/3 · Water 3/3 (Breakwater)", each in its colour; hover
@@ -391,8 +417,8 @@ func _fill_sets() -> void:
 	var act := BWSets.active(unit)
 	var faint := BWGearText.hex(BWStyle.FAINT)
 	if act.is_empty():
-		_sets.text = "[color=#%s]Sets: none. Head, chest, legs and the drawn weapon's imbue count toward their element.[/color]" % faint
-		_sets.tooltip_text = ""
+		_sets.text = "[color=#%s]Sets: none yet (head, chest, legs and the drawn weapon's imbue)[/color]" % faint
+		_sets.tooltip_text = "Head, chest, legs and the drawn weapon's imbue count toward their element's set:\n2 pieces of one element give its 2-piece bonus, 3 its 3-piece."
 		return
 	var parts: PackedStringArray = []
 	var tips: PackedStringArray = []
@@ -415,7 +441,6 @@ func _fill_grid() -> void:
 		_sort_btns[m].button_pressed = m == BWInvSort.mode
 	for c in _grid.get_children():
 		c.queue_free()
-	_fill_trash()
 	var items := BWInvSort.sorted(run.inventory.filter(func(it): return _filter == "" or str(it.slot) == _filter))
 	_inv_title.text = ("Inventory · %d item%s" % [items.size(), "" if items.size() == 1 else "s"]).to_upper()
 	if items.is_empty():
@@ -435,9 +460,8 @@ func _fill_grid() -> void:
 		t.unhovered.connect(_unhover)
 		t.picked.connect(_pick_tile)
 		t.activated.connect(func(tile): _equip(tile.item))
-		# a worn piece dropped on any tile comes off, like a drop on the grid;
-		# a discarded one comes back (D234)
-		t.accept = func(x: Dictionary) -> bool: return x in run.trash or (not x in run.inventory and str(x.get("slot", "")) != "main_hand")
+		# a worn piece dropped on any tile comes off, like a drop on the grid
+		t.accept = func(x: Dictionary) -> bool: return not x in run.inventory and str(x.get("slot", "")) != "main_hand"
 		t.on_drop = func(x: Dictionary): _back_to_grid(x)
 		_grid.add_child(t)
 
@@ -448,11 +472,9 @@ func set_sort(m: String) -> void:
 	_fill_grid()
 
 
-## A drop on the grid: a discarded piece comes back, a worn one comes off.
+## A drop on the grid: a worn piece comes off.
 func _back_to_grid(x: Dictionary) -> void:
-	if x in run.trash:
-		restore(x)
-	elif str(x.get("slot", "")) != "main_hand":
+	if str(x.get("slot", "")) != "main_hand":
 		_unequip(_worn_slot(x))
 
 
@@ -464,180 +486,85 @@ func _worn_slot(x: Dictionary) -> String:
 	return ""
 
 
-# ---------------------------------------------------------------- discard (D234)
+# ---------------------------------------------------------------- discard (D541)
 
-func _build_trash() -> Control:
-	_trash_box = _TrashDrop.new()
-	_trash_box.panel = self
-	_trash_box.name = "trash"
-	var st := BWStyle.column_style()
-	st.bg_color = Color(0, 0, 0, 0.35)
-	st.border_color = Color(1, 1, 1, 0.22)
-	st.set_border_width_all(1)
-	st.set_content_margin_all(4)
-	st.content_margin_left = 8
-	_trash_box.add_theme_stylebox_override("panel", st)
-	_trash_box.custom_minimum_size = Vector2(BWItemCard.W + 8, 0)
-	_trash_box.tooltip_text = "Drag a loose item here to throw it away when the battle starts.\nDrag it back, or double-click it, to keep it."
-	# one compact row: the title and its rule | the pile | Discard picked
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 8)
-	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_trash_box.add_child(h)
-	var tv := VBoxContainer.new()
-	tv.add_theme_constant_override("separation", 0)
-	tv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	h.add_child(tv)
-	_trash_title = BWStyle.section_label("Discard")
-	tv.add_child(_trash_title)
-	for line in ["Discarded when", "the battle starts"]:      # two Labels: the theme spaces lines wide
-		var note := Label.new()
-		note.text = line
-		note.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
-		note.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
-		tv.add_child(note)
-	var sc := ScrollContainer.new()
-	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	sc.custom_minimum_size = Vector2(0, 44)
-	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sc.mouse_filter = Control.MOUSE_FILTER_PASS
-	h.add_child(sc)
-	_trash_row = HBoxContainer.new()
-	_trash_row.add_theme_constant_override("separation", 5)
-	_trash_row.alignment = BoxContainer.ALIGNMENT_BEGIN
-	_trash_row.mouse_filter = Control.MOUSE_FILTER_PASS
-	sc.add_child(_trash_row)
-	_trash_btn = Button.new()
-	_trash_btn.name = "discard_picked"
-	_trash_btn.text = "Discard
-picked"
-	_trash_btn.focus_mode = Control.FOCUS_NONE
-	_trash_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_trash_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
-	_trash_btn.tooltip_text = "Throw away the picked loose item when the battle starts"
-	_trash_btn.pressed.connect(func(): discard(_sel))
-	# ---- D534 (author): a drop-down to discard by tier ("drop all D tier and under")
-	var bv := VBoxContainer.new()
-	bv.add_theme_constant_override("separation", 3)
-	bv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(bv)
-	_trash_btn.size_flags_vertical = Control.SIZE_FILL
-	bv.add_child(_trash_btn)
-	_bulk_btn = MenuButton.new()
-	_bulk_btn.name = "discard_bulk"
-	_bulk_btn.text = "By tier ▾"
-	_bulk_btn.flat = false
-	_bulk_btn.focus_mode = Control.FOCUS_NONE
-	_bulk_btn.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 5)
-	_bulk_btn.tooltip_text = "Discard every loose item of a tier and below (worn gear is never touched)"
-	var pm := _bulk_btn.get_popup()
-	for i in BULK.size():
-		pm.add_item(str(BULK[i][1]), i)
-	pm.add_separator()
-	pm.add_item("Keep all (empty the pile)", BULK.size())
-	pm.id_pressed.connect(_bulk)
-	bv.add_child(_bulk_btn)
-	# ---- end D534
-	return _trash_box
+## The menu's tier rows: [tier, label] (D534's labels, now in the header).
+const DISCARD_TIERS := [["E", "Discard all E"], ["D", "Discard D and under"], ["C", "Discard C and under"], ["B", "Discard B and under"]]
+const DISCARD_PICKED := 100
 
 
-## D534: the tier drop-down's rows: [tier, label].
-const BULK := [["E", "Discard all E"], ["D", "Discard D and under"], ["C", "Discard C and under"], ["B", "Discard B and under"]]
-var _bulk_btn: MenuButton
+func _build_discard() -> MenuButton:
+	_discard_btn = MenuButton.new()
+	_discard_btn.name = "discard_menu"
+	_discard_btn.text = "Discard ▾"
+	_discard_btn.flat = false
+	_discard_btn.focus_mode = Control.FOCUS_NONE
+	_discard_btn.add_theme_font_size_override("font_size", HEADER_FONT)
+	_discard_btn.tooltip_text = "Throw away loose items: a tier and everything below it, or the\nselected one. Worn gear is never touched. Undo discard brings them back."
+	var pm := _discard_btn.get_popup()
+	pm.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	pm.about_to_popup.connect(_fill_discard_menu)
+	pm.id_pressed.connect(_discard_pressed)
+	return _discard_btn
 
 
-func _bulk(id: int) -> void:
-	if id >= BULK.size():
-		var k := run.untrash_all()
-		_msg.text = "Kept all %d discarded item%s." % [k, "" if k == 1 else "s"]
-	else:
-		var n := run.trash_tier_and_under(str(BULK[id][0]))
-		_msg.text = "%d loose item%s %s in the discard pile: thrown away when the battle starts." % [
-			n, "" if n == 1 else "s", "goes" if n == 1 else "go"] if n > 0 else "No loose items of %s." % str(BULK[id][1]).trim_prefix("Discard ").to_lower()
+## Rebuilt each time it opens: each tier row counts what it would throw away
+## (greyed at 0), and "Discard selected item" shows while a loose one is selected.
+func _fill_discard_menu() -> void:
+	var pm := _discard_btn.get_popup()
+	pm.clear()
+	for i in DISCARD_TIERS.size():
+		var n := run.loose_tier_and_under(str(DISCARD_TIERS[i][0])).size()
+		pm.add_item("%s  (%d)" % [DISCARD_TIERS[i][1], n], i)
+		pm.set_item_disabled(pm.get_item_index(i), n == 0)
+	if not _sel.is_empty() and _sel in run.inventory:
+		pm.add_separator()
+		pm.add_item("Discard selected item", DISCARD_PICKED)
+
+
+func _discard_pressed(id: int) -> void:
+	if id == DISCARD_PICKED:
+		discard_selected()
+	elif id >= 0 and id < DISCARD_TIERS.size():
+		discard_tier(str(DISCARD_TIERS[id][0]))
+
+
+## Throw away every loose item of `tier` and below. Returns how many went.
+func discard_tier(tier: String) -> int:
+	var items := run.loose_tier_and_under(tier)
+	if items.is_empty():
+		_msg.text = "No loose items of %s." % ("tier E" if tier == "E" else "%s and under" % tier)
+		return 0
+	_discard(items)
+	return items.size()
+
+
+## Throw away the selected loose item.
+func discard_selected() -> bool:
+	if _sel.is_empty() or not _sel in run.inventory:
+		return false
+	_discard([_sel])
+	return true
+
+
+## D541: the items go now; "Undo discard" (the one-step undo) brings them back.
+func _discard(items: Array) -> void:
+	var snap := BWAutoEquip.snapshot(run)
+	for it in items:
+		run.discard_item(it)
+	snap["uids"] = BWAutoEquip.snapshot(run).uids        # the undo holds while nothing else changes
 	if not _sel.is_empty() and not _sel in run.inventory and _worn_slot(_sel) == "":
 		_sel = {}
 		_show_give({}, "")
-	refresh()
-	changed.emit()
-
-
-func _fill_trash() -> void:
-	if _trash_row == null:
-		return
-	for c in _trash_row.get_children():
-		c.queue_free()
-	var n := run.trash.size()
-	_trash_title.text = ("Discard · %d" % n).to_upper() if n > 0 else "DISCARD"
-	_trash_btn.disabled = _sel.is_empty() or not _sel in run.inventory
-	if n == 0:
-		var l := Label.new()
-		l.text = "Drag loose items here"
-		l.add_theme_color_override("font_color", BWStyle.FAINT)
-		l.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 3)
-		l.custom_minimum_size = Vector2(0, 42)
-		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_trash_row.add_child(l)
-		return
-	for it in run.trash:
-		var t := BWItemTile.new(it, 42.0)
-		t.source = "trash"
-		t.modulate = Color(1, 1, 1, 0.6)
-		t.hovered.connect(_hover_trash)
-		t.unhovered.connect(_unhover)
-		t.activated.connect(func(tile): restore(tile.item))
-		_trash_row.add_child(t)
-
-
-func _hover_trash(t: BWItemTile) -> void:
-	_peek = false
-	card.show_item(t.item, unit, run, unit.equipment.get(str(t.item.slot), {}),
-		{ "hint": "Discarded when the battle starts. Drag it back or double-click to keep it." })
-
-
-## Put a loose piece (or, from a slot, a worn one) on the discard pile.
-func discard(it: Dictionary) -> bool:
-	if it.is_empty():
-		return false
-	if not it in run.inventory:
-		var slot := _worn_slot(it)
-		if slot == "" or slot == "main_hand":
-			return false
-		run.unequip(unit, slot)
 		doll.refresh()
-	if not run.trash_item(it):
-		return false
-	if _sel == it:
-		_sel = {}
-		_show_give({}, "")
-		doll.refresh()
-	_msg.text = "%s goes in the discard pile: thrown away when the battle starts." % BWGearText.plain_name(it)
+	var what := BWGearText.plain_name(items[0]) if items.size() == 1 else "%d loose items" % items.size()
+	_msg.text = "Threw away %s. Undo discard brings %s back." % [what, "it" if items.size() == 1 else "them"]
 	refresh()
+	_applying = true
 	changed.emit()
-	return true
-
-
-## Take a piece back off the discard pile.
-func restore(it: Dictionary) -> bool:
-	if not run.untrash_item(it):
-		return false
-	_msg.text = "Kept %s." % BWGearText.plain_name(it)
-	refresh()
-	changed.emit()
-	return true
-
-
-## The discard pile as a drop target: loose pieces, or worn ones (not the main hand).
-class _TrashDrop:
-	extends PanelContainer
-	var panel: BWGearPanel
-	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-		if not (data is Dictionary and data.has("bw_item")):
-			return false
-		var it: Dictionary = data.bw_item
-		return it in panel.run.inventory or (str(data.get("from", "")) == "slot" and str(data.get("slot", "")) != "main_hand")
-	func _drop_data(_at: Vector2, data: Variant) -> void:
-		panel.discard(data.bw_item)
+	_applying = false
+	_undo_kind = "discard"
+	_set_undo(snap)
 
 
 ## (item) -> bool for a slot box: the right slot and allowed for this unit.
@@ -658,7 +585,6 @@ func _pick_tile(t: BWItemTile) -> void:
 		if c is BWItemTile:
 			c.selected = c.item == _sel
 			c.queue_redraw()
-	_trash_btn.disabled = _sel.is_empty()
 	if _sel.is_empty():
 		doll.refresh()
 		card.clear()
@@ -702,7 +628,7 @@ func _process(_d: float) -> void:
 	if not _peek or not is_visible_in_tree():
 		return
 	var over: Control = get_viewport().gui_get_hovered_control()
-	if over != null and (over is BWItemTile or card.is_ancestor_of(over) or over == card):
+	if over != null and (over is BWItemTile or _card_sc.is_ancestor_of(over) or over == _card_sc):
 		return
 	_peek = false
 	if not _sel.is_empty():
@@ -748,28 +674,44 @@ func _unequip(slot: String) -> void:
 func _fill_abilities() -> void:
 	for c in _abil.get_children():
 		c.queue_free()
-	_abil.add_child(_focus_row())
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 12)
+	var at := BWStyle.section_label("Abilities — one of each type")
+	at.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(at)
+	top.add_child(_focus_row())
+	_abil.add_child(top)
 	var known: Array = run.learned.get(unit.id, [])
 	if known.is_empty():
 		var n := Label.new()
 		n.text = "None yet — wear a piece of armour for %d battles to learn what it teaches." % BWRun.LEARN_BATTLES
 		n.autowrap_mode = TextServer.AUTOWRAP_WORD
 		n.add_theme_color_override("font_color", BWStyle.FAINT)
-		n.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
-		n.custom_minimum_size = Vector2(500, 0)
+		n.add_theme_font_size_override("font_size", LOWER_FONT)
+		n.custom_minimum_size = Vector2(LOWER_W, 0)
 		_abil.add_child(n)
 		return
+	var picks := HBoxContainer.new()
+	picks.name = "ability_picks"
+	picks.add_theme_constant_override("separation", 6)
+	_abil.add_child(picks)
 	for type in BWEffects.TYPES:
 		var mine := known.filter(func(a): return BWRun.ability_type(a) == type)
 		var ob := OptionButton.new()
 		ob.focus_mode = Control.FOCUS_NONE
-		ob.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		ob.add_theme_font_size_override("font_size", LOWER_FONT)
 		ob.add_item("%s: none" % str(type).capitalize())
 		ob.disabled = mine.is_empty()
+		ob.fit_to_longest_item = false                  # D540: the three share a line (the list shows names in full)
+		ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ob.custom_minimum_size = Vector2(0, 28)
+		ob.clip_text = true
+		ob.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var cur := str(run.equipped_ability.get(unit.id, {}).get(type, ""))
 		for a in mine:
 			var row := BWData.row("abilities", a)
-			ob.add_item("%s: %s (rank %d)" % [str(type).capitalize(), row.name, int(run.ability_ranks[unit.id].get(a, 1))])
+			var rk := int(run.ability_ranks[unit.id].get(a, 1))
+			ob.add_item(str(row.name) + (" · rank %d" % rk if rk > 1 else ""))   # D540: the name fits its third
 			if a == cur:
 				ob.select(ob.item_count - 1)
 		ob.tooltip_text = "\n".join(mine.map(func(a): return "%s — %s" % [BWData.row("abilities", a).name, BWData.row("abilities", a).effect_text])) \
@@ -780,7 +722,7 @@ func _fill_abilities() -> void:
 			else:
 				run.equip_ability(unit, mine[i - 1])
 			changed.emit())
-		_abil.add_child(ob)
+		picks.add_child(ob)
 
 
 ## D132: the focus element (what Specialize trains), a small toggle of the
@@ -790,7 +732,7 @@ func _focus_row() -> Control:
 	row.add_theme_constant_override("separation", 6)
 	var l := Label.new()
 	l.text = "Focus"
-	l.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	l.add_theme_font_size_override("font_size", LOWER_FONT)
 	l.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
 	row.add_child(l)
 	for el in unit.focus_options():
@@ -799,8 +741,8 @@ func _focus_row() -> Control:
 		b.toggle_mode = true
 		b.button_pressed = el == unit.focus()
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
-		b.custom_minimum_size = Vector2(0, 30)
+		b.add_theme_font_size_override("font_size", LOWER_FONT)
+		b.custom_minimum_size = Vector2(0, 26)
 		var on: bool = el == unit.focus()
 		var ec := BWLook.element_color(el)
 		for st in ["normal", "hover", "pressed"]:
@@ -850,14 +792,15 @@ func _fill_skills() -> void:
 		if classes.size() > 1:
 			var l := Label.new()
 			l.text = BWText.weapon(wc) + ("" if wc == unit.weapon_class else " (carried)")
-			l.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+			l.add_theme_font_size_override("font_size", LOWER_FONT)
 			l.add_theme_color_override("font_color", BWStyle.LABEL)
-			l.custom_minimum_size = Vector2(0, 30)
+			l.custom_minimum_size = Vector2(0, 26)
+			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			_skills.add_child(l)
 		_fill_skill_row(wc)
 		if classes.size() > 1 and wc == classes[0]:
 			var br := Control.new()                 # a line break in the flow
-			br.custom_minimum_size = Vector2(480, 0)
+			br.custom_minimum_size = Vector2(LOWER_W - 20, 0)
 			_skills.add_child(br)
 	_skills_title.text = ("Skills — up to 3 per weapon, staff 4 · " + " · ".join(titles)).to_upper()
 
@@ -872,7 +815,7 @@ func _fill_skill_row(wc: String) -> void:
 		b.button_pressed = k in on
 		b.focus_mode = Control.FOCUS_NONE
 		b.text = str(row.get("name", k)) + ("  +" if unit.skill_upgraded(k) else "")
-		b.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+		b.add_theme_font_size_override("font_size", LOWER_FONT)
 		for st in ["normal", "hover"]:
 			b.add_theme_stylebox_override(st, BWStyle.button_style(st))
 		b.add_theme_stylebox_override("pressed", BWStyle.element_button_style(unit.element, "pressed"))
@@ -893,13 +836,8 @@ class _GridDrop:
 	extends ScrollContainer
 	var panel: BWGearPanel
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-		if data is Dictionary and data.get("from", "") == "trash":
-			return true                                  # D234: back off the discard pile
 		return data is Dictionary and data.get("from", "") == "slot" and str(data.get("slot", "")) != "main_hand"
 	func _drop_data(_at: Vector2, data: Variant) -> void:
-		if data.get("from", "") == "trash":
-			panel.restore(data.bw_item)
-			return
 		panel._unequip(str(data.slot))
 
 
@@ -1080,7 +1018,7 @@ func cancel_preview() -> void:
 
 
 func _set_buttons_disabled(on: bool) -> void:
-	for b in [_opt_all, _opt_unit, _unequip_all, _unequip_unit]:
+	for b in [_opt_all, _opt_unit, _unequip_all, _unequip_unit, _discard_btn]:
 		b.disabled = on
 
 
@@ -1115,7 +1053,7 @@ func undo_optimize() -> void:
 		_msg.text = "✕ The gear changed since (a trade or a discard): can't undo."
 		_set_undo({})
 		return
-	_msg.text = "Undone: everyone's gear is back as it was."
+	_msg.text = "Undone: the discarded items are back." if _undo_kind == "discard" else "Undone: everyone's gear is back as it was."
 	_sel = {}
 	doll.refresh()
 	refresh()
@@ -1129,7 +1067,7 @@ func _set_undo(snap: Dictionary) -> void:
 	_undo_snap = snap
 	if _undo_btn != null:
 		_undo_btn.visible = not snap.is_empty()
-		_undo_btn.text = "Undo unequip" if _undo_kind == "unequip" else "Undo optimize"
+		_undo_btn.text = { "unequip": "Undo unequip", "discard": "Undo discard" }.get(_undo_kind, "Undo optimize")
 
 
 func can_undo() -> bool:

@@ -33,6 +33,16 @@ var _banner: PanelContainer
 var _banner_label: Label
 var _hint: Label
 var _last_menu := {}
+## D574: the mobile layout (BWSettings.touch, set before _ready). The feed,
+## the hint line, the hovered card, the tile card and the odds strip are cut;
+## the acting card is a compact plate at the bottom centre; the forecast is
+## one line; the menu opens only when the touch controller (BWTouchCombat)
+## asks, and the stick moves its highlight. X shows what was cut (show_info).
+var touch := false
+var touch_act_open := false        # the Act list (set_skills) may show
+var touch_root_open := false       # the command list (Move / Act / Wait) is up
+var _feed_plate: Control
+var _hint_plate: Control
 
 
 func _ready() -> void:
@@ -52,7 +62,7 @@ func _ready() -> void:
 	_order_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_root.add_child(_order_panel)
 	# D217: the over-unit bars and labels keep below the turn-order bar
-	_order_panel.item_rect_changed.connect(func(): BWHPBar3D.hud_rect = _order_panel.get_global_rect())
+	_order_panel.item_rect_changed.connect(_publish_order_rect)      # ---- D545: not while a cutscene hides it
 	tree_exiting.connect(func(): BWHPBar3D.hud_rect = Rect2(); BWHPBar3D.hover_unit = null; BWHPBar3D.covers = Callable())
 	BWHPBar3D.covers = cover_rects                # D230 (L-21): bars hide behind HUD panels
 	_order = HBoxContainer.new()
@@ -77,6 +87,7 @@ func _ready() -> void:
 	fp.offset_top = -186
 	fp.offset_bottom = -16
 	_root.add_child(fp)
+	_feed_plate = fp
 	_feed = BWGlossary.Rich.new()                 # D125: terms in the feed hover too
 	_feed.bbcode_enabled = true
 	_feed.scroll_following = true
@@ -106,6 +117,7 @@ func _ready() -> void:
 	hint_plate.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	hint_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(hint_plate)
+	_hint_plate = hint_plate
 	_hint = Label.new()
 	_hint.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
 	_hint.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
@@ -142,8 +154,8 @@ func _ready() -> void:
 	fb.alignment = BoxContainer.ALIGNMENT_CENTER
 	fb.add_theme_constant_override("separation", 10)
 	fv.add_child(fb)
-	_button(fb, "Confirm  [Enter]", "confirm")
-	_button(fb, "Back  [Esc]", "cancel")
+	_button(fb, "A  Confirm" if touch else "Confirm  [Enter]", "confirm")
+	_button(fb, "B  Back" if touch else "Back  [Esc]", "cancel")
 	_forecast.visible = false
 
 	# banner: a prompt-weight plaque, top centre under the turn order
@@ -160,6 +172,8 @@ func _ready() -> void:
 	_banner.add_child(_banner_label)
 	_banner.visible = false
 	_root.add_child(_banner)
+	if touch:
+		_apply_touch()
 
 
 ## Old name kept for the other screens: they share the HUD theme.
@@ -233,6 +247,11 @@ func _fill_card(c: Dictionary, u: BWUnit, tiles: BWTiles) -> void:
 	var lines: PackedStringArray = []
 	lines.append("[font_size=%d][b]%s[/b][/font_size]  [color=#%s]%s[/color]" % [BWStyle.F_NAME, BWKeystones.titled(u),
 		BWStyle.TEXT_DIM.to_html(false), "enemy" if u.team == "enemy" else "Lv %d" % u.level])
+	if touch and c.get("compact", false):             # ---- D574: name and HP only
+		lines.append("[font_size=%d]HP %d / %d[/font_size]" % [BWStyle.F_SUB, u.hp, u.max_hp()])
+		_set_rich(c.text, "
+".join(lines))
+		return
 	var model := BWText.model_name(u.weapon_model, u.weapon_class)      # D218: no "Sword · Sword"
 	lines.append("[font_size=%d][color=#%s]%s%s ([hint=%s]%s[/hint])  [/color][color=#%s]■[/color] [color=#%s]%s[/color][/font_size]" % [
 		BWStyle.F_SUB, BWStyle.LABEL.to_html(false), (model + " · ") if model != "" else "",
@@ -312,7 +331,7 @@ func set_acting(u: BWUnit, tiles: BWTiles = null) -> void:
 
 ## The hovered unit (hidden when it's the acting unit or nobody).
 func set_card(u: BWUnit, tiles: BWTiles = null, acting: BWUnit = null) -> void:
-	if u == null or u == acting:
+	if u == null or u == acting or touch:                # D574: the mobile layout shows it on X
 		_hovered.panel.visible = false
 		return
 	_fill_card(_hovered, u, tiles)
@@ -341,6 +360,8 @@ var group_shown := {}          # D347: probes / review: group key -> members sho
 
 func set_order(queue: Array, current: BWUnit, upcoming: Array = []) -> void:
 	group_shown.clear()
+	if not _cine:
+		order_cine(false)                           # ---- D545: never left hidden past a cutscene
 	for c in _order.get_children():
 		_order.remove_child(c)
 		c.queue_free()
@@ -508,6 +529,9 @@ func set_skills(u: BWUnit, rows: Array, mode_key: String, can_swap: Variant = nu
 	if can_swap == null:
 		can_swap = _last_menu.get("swap", false) if _last_menu.get("u") == u else false
 	_last_menu = { "u": u, "rows": rows, "mode": mode_key, "swap": can_swap }
+	if touch and not touch_act_open:                 # ---- D574: the Act list opens on the controller's say
+		return
+	touch_root_open = false
 	for c in _menu_list.get_children():
 		_menu_list.remove_child(c)      # out of the layout now, not at frame end
 		c.queue_free()
@@ -545,7 +569,8 @@ func set_skills(u: BWUnit, rows: Array, mode_key: String, can_swap: Variant = nu
 				b.add_theme_stylebox_override("normal", BWStyle.element_button_style(str(el)))
 				b.add_theme_stylebox_override("hover", BWStyle.element_button_style(str(el), "hover"))
 	_menu_list.add_child(HSeparator.new())
-	_menu_item("Wait  [T]" if fu.is_empty() else "Skip follow-up  [T]", "End this unit's turn", false,
+	var wk := "" if touch else "  [T]"                # D574: no key names on the pad
+	_menu_item(("Wait" if fu.is_empty() else "Skip follow-up") + wk, "End this unit's turn", false,
 		func(): action_pressed.emit("wait"))
 	if _cine:
 		_menu_want = true                   # D111: not over a cutscene
@@ -603,6 +628,8 @@ func cover_rects() -> Array:
 
 
 func set_actions_visible(v: bool) -> void:
+	if touch and v and not (touch_act_open or touch_root_open):   # ---- D574
+		return
 	var want := v and _menu_list.get_child_count() > 0
 	if _cine:
 		_menu_want = want                   # D111: shown again when the cutscene ends
@@ -635,6 +662,7 @@ func cinematic(on: bool) -> void:
 			_menu_tw.tween_callback(func(): _menu.visible = false)
 		return
 	_cine = false
+	order_cine(false)                               # ---- D545: every cutscene's end brings the turn order back
 	if _menu_want and not _forecast.visible:
 		_menu.visible = true
 		_menu.modulate.a = 0.0
@@ -656,6 +684,41 @@ func _menu_show(v: bool) -> void:
 # ---- end D111 ----
 
 
+# ---- D545 cutscene turn order (marked edit) ----
+## A zoomed cutscene (FULL / SHORT, the area volleys) fades the turn order out:
+## close in, the heads and the name labels rose into it. While it's out the
+## bars and labels clamp under a thin top band (ORDER_CINE_BAND) instead of
+## under the bar, so they sit by their heads. `cinematic(false)` always
+## brings it back, and so does the next `set_order` outside a cutscene.
+const ORDER_CINE_BAND := 36.0
+var _order_out := false
+var _order_tw: Tween
+
+
+func order_cine(hide: bool) -> void:
+	if hide == _order_out:
+		return
+	_order_out = hide
+	if _order_tw:
+		_order_tw.kill()
+	_order_tw = create_tween()
+	_order_tw.tween_property(_order_panel, "modulate:a", 0.0 if hide else 1.0, 0.15 if hide else 0.25)
+	_publish_order_rect()
+
+
+func order_hidden() -> bool:
+	return _order_out
+
+
+func _publish_order_rect() -> void:
+	if _order_out:
+		var w := get_viewport().get_visible_rect().size.x if is_inside_tree() else 1600.0
+		BWHPBar3D.hud_rect = Rect2(0, 0, w, ORDER_CINE_BAND)
+	else:
+		BWHPBar3D.hud_rect = _order_panel.get_global_rect()
+# ---- end D545 ----
+
+
 # ---------------------------------------------------------------- forecast
 
 func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", extra: int = 0) -> void:
@@ -667,6 +730,9 @@ func show_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String = "", 
 	_fc_bar.set_hp(dfn.hp, dfn.max_hp(), maxi(0, dfn.hp - int(fc.damage.value)))
 	for c in _fc_rows.get_children():
 		c.queue_free()
+	if touch:                                        # ---- D574: one line
+		_touch_forecast(att, dfn, fc, what)
+		return
 	var rows := [["hit", "Hit chance", "%"], ["dodge", str(fc.get("dodge", {}).get("label", "Dodge")), "%"], ["avoid", "Avoid (in hit)", "%"], ["glance", "Glance chance", "%"],
 		["crit", "Crit chance", "%"], ["resist", "Resist chance", "%"], ["damage", "Damage per hit", ""],
 		["expected", "Expected", ""]]
@@ -784,7 +850,7 @@ func forecast_extra(lines: Array) -> void:
 	if _fc_extra and is_instance_valid(_fc_extra):
 		_fc_extra.queue_free()
 	_fc_extra = null
-	if lines.is_empty() or not _forecast.visible:
+	if lines.is_empty() or not _forecast.visible or touch:   # D574: cut in the mobile layout
 		return
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 2)
@@ -812,7 +878,7 @@ func show_plan(att: BWUnit, what: String, notes: Array) -> void:
 		_fc_rows.add_child(_note_line(str(n)))
 	_wind_toggle(att)                            # D365: the shaping strip
 	var tip := Label.new()
-	tip.text = "Nothing to roll. Click again or press Enter to confirm."
+	tip.text = "Nothing to roll. A to confirm." if touch else "Nothing to roll. Click again or press Enter to confirm."
 	tip.add_theme_font_size_override("font_size", 14)
 	tip.add_theme_color_override("font_color", BWStyle.FAINT)
 	_fc_rows.add_child(tip)
@@ -1072,6 +1138,8 @@ var _odds_tw: Tween
 
 
 func odds_show(o: Dictionary, target_name: String = "", extra: int = 0, element: String = "") -> void:
+	if touch:                                        # ---- D574: cut in the mobile layout
+		return
 	if o.is_empty():
 		odds_hide(true)
 		return
@@ -1587,3 +1655,199 @@ class ObeliskIcon:
 			draw_arc(Vector2(cx, s.y * 0.5), s.x * 0.08, 0.0, TAU, 12, line, 1.5)
 
 # ---- end D140/D145 ----
+
+
+# ---- D574 the mobile layout (marked edit) ----
+const TOUCH_CARD_W := 420
+var _focus := -1                   # the highlighted row of the open list (buttons only)
+var _info: PanelContainer
+var _info_text: RichTextLabel
+var _inspect: Dictionary = {}
+
+
+func _apply_touch() -> void:
+	_feed_plate.visible = false
+	_hint_plate.visible = false
+	_hovered.panel.visible = false
+	_acting["compact"] = true
+	var p: PanelContainer = _acting.panel
+	p.anchor_left = 0.5
+	p.anchor_right = 0.5
+	p.offset_left = -TOUCH_CARD_W / 2.0
+	p.offset_right = TOUCH_CARD_W / 2.0
+	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	(_acting.text as Control).custom_minimum_size = Vector2(TOUCH_CARD_W - 150, 0)
+	(_acting.icon as Control).custom_minimum_size = Vector2(72, 72)
+	_inspect = _card(Control.PRESET_BOTTOM_RIGHT)
+	var ip: PanelContainer = _inspect.panel
+	ip.anchor_left = 0.0                       # docked left, under the camera buttons: the board's middle stays clear
+	ip.anchor_right = 0.0
+	ip.anchor_top = 0.0
+	ip.anchor_bottom = 0.0
+	ip.offset_left = 24
+	ip.offset_right = 24 + CARD_W
+	ip.offset_top = 130
+	ip.offset_bottom = 130
+	ip.grow_vertical = Control.GROW_DIRECTION_END
+	ip.visible = false
+	_info = PanelContainer.new()
+	_info.add_theme_stylebox_override("panel", BWStyle.box_style())
+	_info.offset_left = 24
+	_info.offset_right = 624
+	_info.offset_top = 130
+	_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.visible = false
+	_root.add_child(_info)
+	var iv := VBoxContainer.new()
+	iv.add_theme_constant_override("separation", 8)
+	_info.add_child(iv)
+	_info_text = BWGlossary.Rich.new()
+	_info_text.bbcode_enabled = true
+	_info_text.fit_content = true
+	_info_text.scroll_active = false
+	_info_text.custom_minimum_size = Vector2(560, 0)
+	_info_text.add_theme_font_size_override("normal_font_size", BWStyle.F_BODY)
+	_info_text.add_theme_font_size_override("bold_font_size", BWStyle.F_BODY)
+	iv.add_child(_info_text)
+	var close := Label.new()
+	close.text = "B  close"
+	close.add_theme_color_override("font_color", BWStyle.FAINT)
+	close.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	iv.add_child(close)
+
+
+## X: the full card for a unit (and its ground), or words (a skill, a tile).
+func show_info(u: BWUnit, tiles: BWTiles, extra_bb: String = "") -> void:
+	hide_info()
+	if u != null:
+		_fill_card(_inspect, u, tiles)
+		_inspect.panel.visible = true
+		_inspect.panel.reset_size()
+		return
+	if extra_bb == "":
+		return
+	_info_text.set_glossed(extra_bb)
+	_info.visible = true
+	_info.reset_size()
+
+
+func hide_info() -> void:
+	if not _inspect.is_empty():
+		_inspect.panel.visible = false
+	if _info:
+		_info.visible = false
+
+
+func info_open() -> bool:
+	return (not _inspect.is_empty() and _inspect.panel.visible) or (_info != null and _info.visible)
+
+
+## The command list: [{id, label, enabled}]; a row presses action_pressed("touch:<id>").
+func touch_root(u: BWUnit, items: Array) -> void:
+	touch_act_open = false
+	touch_root_open = true
+	for c in _menu_list.get_children():
+		_menu_list.remove_child(c)
+		c.queue_free()
+	_menu_list.add_child(BWStyle.section_label(u.name if u else ""))
+	for it in items:
+		var id := str(it.id)
+		var b := _menu_item(str(it.label), "", false, func(): action_pressed.emit("touch:" + id))
+		b.name = "touch_" + id
+		b.disabled = not it.get("enabled", true)
+	_focus = 0
+	_menu_show(true)
+	_menu.size = Vector2.ZERO
+	_menu.reset_size()
+	_place_menu.call_deferred()
+	_restyle_focus()
+
+
+## The Act list: the desktop menu (Attack, Swap, the skills, Wait).
+func touch_act() -> void:
+	touch_act_open = true
+	touch_root_open = false
+	_focus = 0
+	if not _last_menu.is_empty():
+		set_skills(_last_menu.u, _last_menu.rows, _last_menu.mode, _last_menu.swap)
+	_restyle_focus()
+
+
+func touch_close() -> void:
+	touch_act_open = false
+	touch_root_open = false
+	_menu_show(false)
+
+
+func touch_list_open() -> bool:
+	return (touch_act_open or touch_root_open) and _menu.visible
+
+
+func _focusable() -> Array:
+	return _menu_list.get_children().filter(func(c): return c is Button and not (c as Button).disabled)
+
+
+## The stick in a list: up / down move the highlight (wrapping).
+func menu_nav(delta: int) -> void:
+	var bs := _focusable()
+	if bs.is_empty():
+		return
+	_focus = posmod(clampi(_focus, 0, bs.size() - 1) + delta, bs.size())
+	_restyle_focus()
+
+
+func menu_press() -> void:
+	var bs := _focusable()
+	if bs.is_empty():
+		return
+	var b: Button = bs[clampi(_focus, 0, bs.size() - 1)]
+	b.pressed.emit()
+	_restyle_focus.call_deferred()
+
+
+## The highlighted row's words (X on a menu row).
+func menu_focus_tip() -> String:
+	var bs := _focusable()
+	if bs.is_empty():
+		return ""
+	return str((bs[clampi(_focus, 0, bs.size() - 1)] as Button).tooltip_text)
+
+
+func _restyle_focus() -> void:
+	var bs := _focusable()
+	for i in bs.size():
+		var b: Button = bs[i]
+		if not b.has_meta("normal_sb"):
+			b.set_meta("normal_sb", b.get_theme_stylebox("normal"))
+		if i == clampi(_focus, 0, bs.size() - 1):
+			var sb := BWStyle.button_style("hover")
+			sb.border_width_left = 8
+			sb.border_color = Color.WHITE
+			b.add_theme_stylebox_override("normal", sb)
+		else:
+			b.add_theme_stylebox_override("normal", b.get_meta("normal_sb"))
+
+
+func _touch_forecast(att: BWUnit, dfn: BWUnit, fc: Dictionary, what: String) -> void:
+	var bits: PackedStringArray = []
+	if fc.has("damage"):
+		bits.append("%s dmg" % _num(fc.damage.value))
+	if fc.has("hit"):
+		bits.append("%s%% hit" % _num(fc.hit.value))
+	if fc.has("crit") and float(fc.crit.value) > 0.0:
+		bits.append("%s%% crit" % _num(fc.crit.value))
+	var l := Label.new()
+	l.text = "  ·  ".join(bits)
+	l.add_theme_font_size_override("font_size", 26)
+	_fc_rows.add_child(l)
+	var after := Label.new()
+	after.text = "HP %d → %d" % [dfn.hp, maxi(0, dfn.hp - int(fc.damage.value))]
+	after.add_theme_color_override("font_color", BWStyle.TEXT_DIM)
+	after.add_theme_font_size_override("font_size", BWStyle.F_SMALL)
+	_fc_rows.add_child(after)
+	_forceful_toggle(att, what)
+	_wind_toggle(att)
+	_forecast.visible = true
+	_menu.visible = false
+	_hovered.panel.visible = false
+# ---- end D574 ----

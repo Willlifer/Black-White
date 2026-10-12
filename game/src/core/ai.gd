@@ -299,6 +299,7 @@ static func _best_skill(b: BWBattle, u: BWUnit, previews: int = -1) -> Dictionar
 					continue
 				var score := d.ai_score(b, u, pv)
 				score += BWOverheat.ai_skill(b, u, pv)                      # D285: Overheat rings and setups
+				score += BWBrim.ai_skill(b, u, pv)                          # D564/D565: Runneth Over, Glinting
 				score += BWKs3.ai_skill(b, u, pv)                           # D447/D459: lava past 3, pillars
 				sims += 1
 				if per <= 0 or BIG_SIMS <= 0 or sims <= BIG_SIMS:            # D323: big boards cap the simulated extras

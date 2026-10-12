@@ -11,9 +11,9 @@ const RANGE := 6
 func _init() -> void:
 	define({
 		"key": "pinning_shot", "name": "Pinning Shot", "weapon": "bow", "clip": "",
-		"desc": "An arrow through the boot of an enemy up to 6 tiles away: it is Pinned (-2 move)",
+		"desc": "An arrow through the boot of an enemy up to 6 tiles away: it is Pinned (-2 move), and its tile takes 2 steps of your element",
 		"targeting": "unit", "needs_element": true, "range": RANGE, "cd": CD,
-		"power": POWER,
+		"steps": 2, "power": POWER,
 	}, 334)
 
 

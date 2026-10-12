@@ -4,7 +4,9 @@ extends SceneTree
 ## a main-hand and a carried weapon of another class, every skill of both
 ## known (so both skill rows fill), three learned abilities, and a long
 ## inventory. -> design/art/ui530_<TAG>_<gear|hall>_<w>x<h>.png
-##   [TAG=before|after] [RESES=1280x720,1920x1080] [ONLY=gear|hall]
+##   [TAG=before|after] [RESES=1280x720,1920x1080] [ONLY=gear|hall] [PREFIX=ui540]
+## Each gear shot also prints whether the doll column's lower part scrolls
+## ("lower_scroll vbar") and the panel's rect against the screen (D540).
 ##   godot --path . --script res://tools/ui530_shots.gd
 ## The window is resized in place (canvas_items stretch, base 1600x900), so a
 ## size larger than the desktop may be clamped: the file name is the size the
@@ -13,6 +15,7 @@ const DEFAULT_RESES := "1280x720,1366x768,1600x900,1920x1080,2560x1440,1080x1350
 
 var out := ""
 var tag := "before"
+var prefix := "ui530"
 
 
 func _initialize() -> void:
@@ -21,6 +24,8 @@ func _initialize() -> void:
 		out = ProjectSettings.globalize_path("res://../design/art")
 	if OS.get_environment("TAG") != "":
 		tag = OS.get_environment("TAG")
+	if OS.get_environment("PREFIX") != "":
+		prefix = OS.get_environment("PREFIX")
 	_go.call_deferred()
 
 
@@ -58,11 +63,22 @@ func _run() -> BWRun:
 	for a in abil:
 		run.learned[u.id].append(a)
 		run.ability_ranks[u.id][a] = 1
+		run.equip_ability(u, a)                    # D540: one picked per type, the widest case
 	var pieces := BWData.table("equipment")
 	for k in 26:
 		var row: Dictionary = pieces[(k * 7) % pieces.size()]
 		run.inventory.append(run.make_item(str(row.id), ["E", "D", "C", "B"][k % 4]))
 	return run
+
+
+## D540: does anything under the doll scroll, and does the panel fit the screen?
+func _report(gp: BWGearPanel, what: String) -> void:
+	var ls: ScrollContainer = gp.find_child("lower_scroll", true, false)
+	var bar := "n/a"
+	if ls != null:
+		var vb := ls.get_v_scroll_bar()
+		bar = "%s (content %d / view %d)" % [vb.visible, int(vb.max_value), int(ls.size.y)]
+	print("[", what, "] lower_scroll vbar ", bar, "  panel ", gp.get_global_rect(), "  screen ", root.get_visible_rect().size)
 
 
 func _go() -> void:
@@ -90,12 +106,24 @@ func _go() -> void:
 			await _wait(0.6)
 			pre._open_overlay(pre._equip)
 			await _wait(1.6)
-			await _shot("ui530_%s_gear_%s" % [tag, tagres])
+			_report(pre._equip, "gear " + tagres)
+			await _shot("%s_%s_gear_%s" % [prefix, tag, tagres])
 			if want == Vector2i(1600, 900):
 				var gp: BWGearPanel = pre._equip
 				gp._hover_slot(gp._slots["second"])        # the carried weapon's card
 				await _wait(1.0)
-				await _shot("ui530_%s_gearcard_%s" % [tag, tagres])
+				await _shot("%s_%s_gearcard_%s" % [prefix, tag, tagres])
+				if gp.has_method("discard_tier"):           # D541: Discard ▾ open, a loose item selected
+					var tiles: Array = gp._grid.get_children().filter(func(c): return c is BWItemTile)
+					if not tiles.is_empty():
+						gp._pick_tile(tiles[0])
+					gp._discard_btn.show_popup()
+					await _wait(0.6)
+					await _shot("%s_%s_discardmenu_%s" % [prefix, tag, tagres])
+					gp._discard_btn.get_popup().hide()
+					gp.discard_tier("D")
+					await _wait(0.6)
+					await _shot("%s_%s_discarded_%s" % [prefix, tag, tagres])
 			pre.queue_free()
 			await _wait(0.3)
 		if only == "" or only == "hall":
@@ -105,7 +133,11 @@ func _go() -> void:
 			await _wait(3.0)
 			hall._select(0)
 			await _wait(1.6)
-			await _shot("ui530_%s_hall_%s" % [tag, tagres])
+			_report(hall._panel, "hall " + tagres)
+			await _shot("%s_%s_hall_%s" % [prefix, tag, tagres])
+			hall._panel._hover_slot(hall._panel._slots["second"])   # D573: the full card
+			await _wait(1.0)
+			await _shot("%s_%s_hallcard_%s" % [prefix, tag, tagres])
 			hall.queue_free()
 			await _wait(0.3)
 	quit(0)

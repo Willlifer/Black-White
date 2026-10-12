@@ -271,7 +271,7 @@ func _refresh_card() -> void:
 		_card_off = Vector2i(-99, -99)
 	var want: bool = not s._busy and not s.battle.over and s.battle.board.exists(h) \
 		and not s.get_tree().paused and not s.ui._cine and not s.ui.forecast_open() and not preview.shown() \
-		and h != _card_off and _cursor_on_board()
+		and h != _card_off and _cursor_on_board() and not s.ui.touch     # D574: X shows it in the mobile layout
 	if not want:
 		_card.visible = false
 		_card_hex = Vector2i(-99, -99)
@@ -385,7 +385,7 @@ static func card_bbcode(b: BWBattle, h: Vector2i) -> String:
 		lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color("wind" if str(l).find("Rot") < 0 and str(l).find("Gravity") < 0 else "dark").lightened(0.35)), BWGlossary.markup(str(l))])
 	# D285-D292: Overheat, beams, Dawn, Magnify, Empowered, Static fuses, keystone holders
 	for pair in [["fire", BWOverheat.card_lines(b, h)], ["light", BWBeams.card_lines(b, h)], ["thunder", BWThunderKeys.card_lines(b, h)],
-			["wind", BWSquall.card_lines(b, h)], ["ice", BWOverfreeze.card_lines(b, h)]]:   # D309/D312: Squall, Overfreeze
+			["wind", BWSquall.card_lines(b, h)], ["ice", BWOverfreeze.card_lines(b, h)], ["water", BWBrim.card_lines(b, h)]]:   # D309/D312: Squall, Overfreeze; D564/D565 Runneth Over, Glinting
 		for l in pair[1]:
 			lines.append("[color=#%s]%s[/color]" % [_hx(BWLook.element_color(str(pair[0])).lightened(0.35)), BWGlossary.markup(str(l))])
 	# the occupant

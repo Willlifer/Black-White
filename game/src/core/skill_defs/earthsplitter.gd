@@ -3,7 +3,8 @@ extends BWSkillDef
 ## every foe on the line takes POWER, and the ground HEAVES: each foe on it
 ## is thrown HEAVE hex back along the line (a secondary: it lands on an
 ## avoid, a resist or an immune foe stops it; farthest first). Jagged rock
-## stops the split. D416: it no longer paints the line. Sunder (D415) is the
+## stops the split. D416: it no longer paints the line; D572 (author): it paints
+## the line again, 2 steps. Sunder (D415) is the
 ## axe's fissure that marks the earth with the element; Earthsplitter is the
 ## one aimed anywhere that breaks a line up.
 
@@ -16,9 +17,9 @@ const HEAVE := 1
 func _init() -> void:
 	define({
 		"key": "earthsplitter", "name": "Earthsplitter", "weapon": "axe", "clip": "sweep_under",   # D512: the underhand sweep
-		"desc": "A rising underhand blow that splits the ground 3 tiles ahead: every enemy on the line is hit and heaved 1 tile back along it",
+		"desc": "A rising underhand blow that splits the ground 3 tiles ahead: every enemy on the line is hit and heaved 1 tile back along it, and the line takes 2 steps of your element",
 		"targeting": "dir", "needs_element": true, "range": LEN, "cd": CD,
-		"power": POWER, "aoe": true,
+		"steps": 2, "power": POWER, "aoe": true,
 	}, 314)
 
 
@@ -30,11 +31,6 @@ func plan(b: BWBattle, u: BWUnit, _element: String, target: Vector2i, p: Diction
 	p.victims = b._foes_on(u, p.hexes)
 	if not p.victims.is_empty():
 		p.notes.append("Heave: %s thrown %d back" % [", ".join(p.victims.map(func(v): return v.name)), HEAVE])
-
-
-## D416: the line is not painted (Sunder's fissure is the one that is).
-func ground(_b: BWBattle, _u: BWUnit, _el: String, _target_hex: Vector2i, _p: Dictionary) -> int:
-	return 0
 
 
 func after_hits(b: BWBattle, u: BWUnit, p: Dictionary, results: Array) -> void:

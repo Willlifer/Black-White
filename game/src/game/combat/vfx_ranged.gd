@@ -754,6 +754,7 @@ func _cine_in(a: BWUnitView, targets: Array, hexes: Array, centre: Vector3, full
 	var s := screen
 	var zoom_t := 0.45 if full else 0.3
 	s.ui.cinematic(true)
+	s.ui.order_cine(true)                     # ---- D545: the turn order fades while the camera is close
 	var keep: Array = [a]
 	keep.append_array(targets)
 	keep.append_array(s.board_view.hex_parts(a.unit.pos))

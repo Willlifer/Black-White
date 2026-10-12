@@ -500,6 +500,28 @@ func can_continue() -> bool:
 	return _t >= MIN_SHOW and not _sent
 
 
+## D545: a left click anywhere goes on. The plates and the hover rows take
+## mouse events in the GUI, so a click never reached `_unhandled_input`;
+## catch it first, unless it lands on a real button (that button acts).
+func _input(ev: InputEvent) -> void:
+	if BWResultsScreen.click_continues(self, ev) and can_continue():
+		get_viewport().set_input_as_handled()
+		_sent = true
+		done.emit()
+
+
+## D545: a left press over no button (shared with BWEndScreen).
+static func click_continues(c: Control, ev: InputEvent) -> bool:
+	if not (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or not c.is_visible_in_tree():
+		return false
+	var n: Node = c.get_viewport().gui_get_hovered_control()
+	while n != null and n != c:
+		if n is BaseButton:
+			return false
+		n = n.get_parent()
+	return true
+
+
 func _unhandled_input(ev: InputEvent) -> void:
 	var pressed: bool = (ev is InputEventKey and ev.pressed and not ev.echo) \
 		or (ev is InputEventMouseButton and ev.pressed) \

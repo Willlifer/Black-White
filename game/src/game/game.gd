@@ -22,8 +22,50 @@ func _ready() -> void:
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl.add_child(_fade)
+	_build_menu_button()                   # ---- D574
 	BWMusic.ensure(self)
 	go_title()
+
+
+# ---- D574 the mobile layout's pause button (marked edit) ----
+## No Esc on a phone: the hall, pre-battle and downtime get a small "II" in
+## the top-left corner that opens their pause menu (Settings, Codex, Quit to
+## title). Combat has its own on the pad (BWTouchPad).
+var _menu_btn: Button
+
+
+func _build_menu_button() -> void:
+	var cl := CanvasLayer.new()
+	cl.layer = 90
+	add_child(cl)
+	_menu_btn = Button.new()
+	_menu_btn.name = "touch_menu"
+	_menu_btn.text = "II"
+	_menu_btn.focus_mode = Control.FOCUS_NONE
+	_menu_btn.theme = BWStyle.theme()
+	_menu_btn.custom_minimum_size = Vector2(56, 56)
+	_menu_btn.position = Vector2(8, 8)
+	_menu_btn.add_theme_font_size_override("font_size", 24)
+	_menu_btn.visible = false
+	_menu_btn.pressed.connect(func():
+		var kind := _pause_kind()
+		if kind != "" and not get_tree().paused:
+			BWPauseMenu.open(screen, kind))
+	cl.add_child(_menu_btn)
+
+
+func _pause_kind() -> String:
+	if screen is BWPrebattleScreen:
+		return "prebattle"
+	if screen is BWPrepScreen or screen is BWDowntimeScreen:
+		return "hall"
+	return ""
+
+
+func _process(_d: float) -> void:
+	if _menu_btn:
+		_menu_btn.visible = BWSettings.touch() and _pause_kind() != "" and not get_tree().paused
+# ---- end D574 ----
 
 
 # ---------------------------------------------------------------- screens
@@ -116,6 +158,10 @@ func go_rooms(from_hall: bool = false) -> void:
 
 
 func go_prebattle() -> void:
+	if run.auto_dress_first():                     # D563: an undressed squad before fight 1
+		_save()
+	for u in run.squad:
+		run.fill_abilities(u)                      # D562: empty ability slots fill (shown on the gear panel)
 	var s := BWPrebattleScreen.new()
 	s.run = run
 	await _swap(s)
@@ -126,7 +172,6 @@ func go_prebattle() -> void:
 
 func go_combat(plan: Dictionary) -> void:
 	var enemies := run.enemies_for(run.fight)
-	run.empty_trash()                              # D234: the discard pile is gone once the battle starts
 	run.prepare_for_battle(plan.units)
 	var s := BWCombatScreen.new()
 	s.configure("res://maps/%s.json" % run.map_for(run.fight), plan.units, enemies, plan.at,

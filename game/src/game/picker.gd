@@ -39,7 +39,7 @@ func _init(u: BWUnit, req: Dictionary, ctx: String = "") -> void:
 	request = req
 	context = ctx
 	options = BWPicks.options(u, req)
-	var el := str(req.get("element", "")) if req.get("kind", "") in ["perk", "keystone"] else u.element
+	var el := str(req.get("element", "")) if req.get("kind", "") in ["perk", "keystone", "duo"] else u.element
 	accent = BWLook.element_color(el) if el != "" else Color.WHITE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -64,8 +64,8 @@ func _build() -> void:
 	sb.border_color = Color.WHITE
 	sb.border_width_top = 6
 	sb.border_color = accent if request.get("kind", "") == "perk" else Color.WHITE
-	if request.get("kind", "") == "keystone":
-		sb.border_color = GOLD                      # D278: a keystone pick is gold-ruled
+	if request.get("kind", "") in ["keystone", "duo"]:
+		sb.border_color = GOLD                      # D278: a keystone pick is gold-ruled (D560: a duo too)
 	box.add_theme_stylebox_override("panel", sb)
 	center.add_child(box)
 	var v := VBoxContainer.new()
@@ -85,7 +85,7 @@ func _build() -> void:
 	kicker.add_theme_color_override("font_color", Color(accent, 0.95) if accent != Color.WHITE else Color(1, 1, 1, 0.6))
 	hv.add_child(kicker)
 	var title := Label.new()
-	title.text = "%s — choose one" % BWKeystones.titled(unit)   # D445: the title shows
+	title.text = "%s — %s" % [BWKeystones.titled(unit), "a duo unlocked" if request.get("kind", "") == "duo" else "choose one"]   # D445: the title shows; D560 a duo is one card
 	title.add_theme_font_size_override("font_size", BWStyle.F_NAME)
 	hv.add_child(title)
 	var sub := Label.new()
@@ -143,6 +143,9 @@ func _kicker() -> String:
 			return "KEYSTONE  ·  second slot  ·  rank 6%s" % [("  ·  " + context) if context != "" else ""]
 		return "KEYSTONE  ·  %s  ·  rank %d%s" % [kel.capitalize(), unit.affinity_rank(kel),
 			("  ·  " + context) if context != "" else ""]
+	if request.get("kind", "") == "duo":              # D560: its own pick
+		return "DUO  ·  %s + %s%s" % [str(request.element).capitalize(), str(request.duo).capitalize(),
+			("  ·  " + context) if context != "" else ""]
 	if request.get("kind", "") == "perk":
 		var el := str(request.element)
 		return "%s perk  ·  rank %d%s" % [el.capitalize(), unit.affinity_rank(el),
@@ -158,6 +161,9 @@ func _subtitle() -> String:
 		var n := BWPicks.perks_of(el).size()
 		return "Affinity rank %d in %s: perk %d of %d, one of two drawn for you. Rank 3 brings a keystone and a title, rank 6 a second." % [
 			unit.affinity_rank(el), el, BWPicks.owned(unit, el).size() + 1, n]
+	if request.get("kind", "") == "duo":
+		return "%d picks in both %s and %s: their duo perk, on top of your perks (it takes no slot)." % [BWDuo.MIN_TREE,
+			str(request.element), str(request.duo)]
 	if request.get("kind", "") == "leviathan":
 		if str(request.get("step", "")) == "submerge":
 			return "%s ended its walk on water 3. Once a battle it may sink: its turn ends now." % unit.name
@@ -302,7 +308,7 @@ class Card:
 		if kind in ["keystone", "leviathan"]:
 			BWPicker.draw_keystone_sigil(self, c, 40.0, Color(BWPicker.GOLD, fade))
 			BWPicker.draw_element_glyph(self, el, Rect2(c - Vector2(20, 20), Vector2(40, 40)), Color(glyph_col, fade))
-		elif kind == "perk" and duo != "":           # D455: two glyphs, side by side, the two colours
+		elif kind in ["perk", "duo"] and duo != "":           # D455: two glyphs, side by side, the two colours
 			var c2 := BWLook.element_color(duo)
 			draw_arc(c, 46, PI * 0.5, PI * 1.5, 32, Color(glyph_col, 0.95 * fade), 3.0, true)
 			draw_arc(c, 46, -PI * 0.5, PI * 0.5, 32, Color(c2, 0.95 * fade), 3.0, true)
@@ -344,7 +350,7 @@ class Card:
 				Color(BWStyle.TEXT_DIM, fade))
 			y += BWStyle.F_SMALL + 3
 		if owned:
-			var tag := "OWNED" if kind in ["perk", "keystone", "passive"] else "IMPROVED"
+			var tag := "OWNED" if kind in ["perk", "keystone", "passive", "duo"] else "IMPROVED"
 			if opt.get("locked", false):
 				tag = "NOT YET"                    # D451: Leviathos isn't built
 			draw_string(font, Vector2(14, s.y - 14), tag, HORIZONTAL_ALIGNMENT_CENTER, s.x - 28, BWStyle.F_MENU_TITLE,

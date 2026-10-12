@@ -226,7 +226,7 @@ func test_earthsplitter_line(t) -> void:
 	t.eq(pv.hexes, line, "3 hexes ahead")
 	t.eq(pv.units.size(), 2, "both foes on the line")
 	var ev := _use(t, b, me, "earthsplitter", "fire", E)
-	t.ok(not line.any(func(h): return b.tiles.carries(h, "fire")), "D416: the line is not painted (Sunder's is)")
+	t.ok(line.all(func(h): return b.tiles.intensity(h, "fire") == 2), "D572: the line takes 2 steps (D416's no-paint is gone)")
 	for r in ev.results:
 		var v: BWUnit = b._unit(str(r.target))
 		var was: Vector2i = line[0] if r.target == "a" else line[2]
@@ -239,8 +239,8 @@ func test_earthsplitter_line(t) -> void:
 ## empty hex just takes the step; a ranged single-target blow, so Pressured.
 func test_axe_throw(t) -> void:
 	var row := BWSkills.get_skill("axe_throw")
-	t.eq([str(row.weapon), int(row.range), int(row.cd), int(row.steps), str(row.clip)], ["axe", 3, 1, 1, "throw_under"],
-		"axe, range 3, cd 1, 1 step, the underhand clip")
+	t.eq([str(row.weapon), int(row.range), int(row.cd), int(row.steps), str(row.clip)], ["axe", 3, 1, 2, "throw_under"],
+		"axe, range 3, cd 1, 2 steps (D572), the underhand clip")
 	t.ok(BWBattle.ranged_skill(row), "a ranged single-target skill (Pressured applies)")
 	var line := _line(4)
 	var me := _equip(_u("me", "axe", "fire"), ["axe_throw"])
@@ -254,7 +254,7 @@ func test_axe_throw(t) -> void:
 	t.eq(ev.results.size(), 1, "one blow, on the foe there")
 	var res: Dictionary = ev.results[0].result
 	t.eq(foe.hp, hp0 - int(res.damage), "it takes the blow (%d)" % int(res.damage))
-	t.eq(b.tiles.intensity(line[2], "fire"), 1, "its tile takes fire 1")
+	t.eq(b.tiles.intensity(line[2], "fire"), 2, "its tile takes fire 2")
 	t.eq(b.tiles.intensity(line[1], "fire"), 0, "only the one tile")
 	var cd := 0
 	for k in me.cooldowns:
@@ -266,7 +266,7 @@ func test_axe_throw(t) -> void:
 	var me2 := _equip(_u("me", "axe", "water"), ["axe_throw"])
 	var b2 := _fight(me2, [_foe("f")], [line[3]])
 	var ev2 := _use(t, b2, me2, "axe_throw", "water", line[1])
-	t.ok((ev2.results as Array).is_empty() and b2.tiles.intensity(line[1], "water") == 1, "an empty tile takes water 1, no blow")
+	t.ok((ev2.results as Array).is_empty() and b2.tiles.intensity(line[1], "water") == 2, "an empty tile takes water 2, no blow")
 	# Pressured: a foe within 2 of the thrower
 	var me3 := _equip(_u("me", "axe", "fire"), ["axe_throw"])
 	var b3 := _fight(me3, [_foe("a"), _foe("n")], [line[2], line[0]])

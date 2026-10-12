@@ -95,7 +95,7 @@ func test_static_field_still_guards(t) -> void:
 	var tl := _tiles()
 	_fuse(tl, C, "ally")
 	var r := tl.apply([C], "ice", "me", 1, { "fuse_guard": ["ally"] })
-	t.eq(r.detonations.size(), 0, "Static Field: an ally's ice doesn't set off the fuse")
+	t.eq(r.detonations.size(), 0, "Static Field: a guarded (foe-painted, D550) ice doesn't set off the fuse")
 	t.eq(str(tl.at(C).marker), "fuse", "it stands")
 
 

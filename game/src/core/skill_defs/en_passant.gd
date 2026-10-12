@@ -20,9 +20,9 @@ const LEN := 3
 func _init() -> void:
 	define({
 		"key": "en_passant", "name": "En Passant", "weapon": "sword", "clip": "thrust",
-		"desc": "Dash through an enemy up to 3 tiles away in a straight line, striking it, and land on the tile beyond. Every tile you cross takes your element; then a second elemental strike at any foe beside you",
+		"desc": "Dash through an enemy up to 3 tiles away in a straight line, striking it, and land on the tile beyond. Every tile you cross takes 2 steps of your element; then a second elemental strike at any foe beside you",
 		"targeting": "unit", "needs_element": true, "range": LEN, "cd": CD,
-		"power": POWER, "follow_up": ["en_passant_strike"],
+		"steps": 2, "power": POWER, "follow_up": ["en_passant_strike"],
 	}, 305)
 
 

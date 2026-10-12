@@ -246,6 +246,13 @@ func _process(delta: float) -> void:
 		_prompt.modulate.a = 0.4 + 0.25 * sin((_t - MIN_SHOW) * 2.4)
 
 
+## D545: a left click anywhere goes on (the plates ate it before), unless it lands on a button.
+func _input(ev: InputEvent) -> void:
+	if BWResultsScreen.click_continues(self, ev) and not (run != null and _t < MIN_SHOW):
+		get_viewport().set_input_as_handled()
+		_finish()
+
+
 func _unhandled_input(ev: InputEvent) -> void:
 	if (ev is InputEventKey or ev is InputEventMouseButton) and ev.pressed:
 		if run != null and _t < MIN_SHOW:

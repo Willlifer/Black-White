@@ -10,10 +10,10 @@ const PLUS_LEN := 6
 func _init() -> void:
 	define({
 		"key": "ley_line", "name": "Ley Line", "weapon": "staff", "clip": "",
-		"desc": "Draw your element in a straight line, then act again. Allies on the line get +1 move next turn",
+		"desc": "Draw 2 steps of your element in a straight line, then act again. Allies on the line get +1 move next turn",
 		"plus": "Ley Line+: length 6",
 		"targeting": "dir", "needs_element": true, "range": BWSkills.LEY_LEN, "cd": BWSkills.DEFAULT_CD,
-		"power": 0, "follow_up": ["basic"], "spell": true,
+		"steps": 2, "power": 0, "follow_up": ["basic"], "spell": true,
 	}, 210)
 
 

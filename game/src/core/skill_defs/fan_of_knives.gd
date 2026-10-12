@@ -16,9 +16,9 @@ const RADIUS := 2
 func _init() -> void:
 	define({
 		"key": "fan_of_knives", "name": "Fan of Knives", "weapon": "daggers", "clip": "spin",
-		"desc": "Spin and loose knives at every enemy within 2 tiles; everything within 2 takes your element, and the blasts and shocks it sets off can't hurt you (your allies aren't spared)",
+		"desc": "Spin and loose knives at every enemy within 2 tiles; everything within 2 takes 2 steps of your element, and the blasts and shocks it sets off can't hurt you (your allies aren't spared)",
 		"targeting": "self", "needs_element": true, "range": 0, "cd": CD,
-		"power": POWER, "radius": RADIUS, "aoe": true,
+		"steps": 2, "power": POWER, "radius": RADIUS, "aoe": true,
 	}, 354)
 
 

@@ -215,28 +215,17 @@ func test_branch_out(t) -> void:
 	var rep2 := r2.downtime(u2, "branch_out")
 	t.ok(not rep2.pending and int(rep2.picked) == 0, "auto takes the first option")
 	t.eq(u2.affinity_rank(str(rep2.options[0].element)), 1, "and applies it")
-	# one valid option: one card. D417: a unit holding 3 elements is offered no
-	# new element, so with one class left it is one class-only card.
+	# D561 (was D417's class-only card): a unit holding 3 elements has nothing
+	# to branch into, so its Branch out tile trains a Specialize pairing instead
 	var r3 := _run(9)
 	var u3: BWUnit = r3.squad[0]
 	var left: Array = BWFormulas.ELEMENTS.filter(func(e): return u3.affinity_rank(e) == 0)
 	for e in left.slice(0, BWUnit.MAX_ELEMENTS - u3.attuned_elements().size()):
 		u3.affinity[e] = 10
-	var cls: Array = BWRun.weapon_classes().filter(func(c): return c != u3.weapon_class and u3.expertise_rank(c) == 0)
-	for c in cls.slice(1):
-		u3.expertise[c] = 10
 	var rep3 := r3.downtime(u3, "branch_out", false)
-	t.eq(rep3.options, [{ "element": "", "weapon": cls[0] }], "at 3 elements, one class left: one class-only card")
-	# nothing left: every element ranked, every class at D
-	for e in BWFormulas.ELEMENTS:
-		u3.affinity[e] = maxi(int(u3.affinity.get(e, 0)), 10)
-	for c in BWRun.weapon_classes():
-		u3.expertise[c] = maxi(int(u3.expertise.get(c, 0)), 10)
-	var xp3 := _stat_total(u3)
-	r3.day += 1                                      # a new day: new cards
-	var rep4 := r3.downtime(u3, "branch_out", false)
-	t.ok(rep4.options.is_empty() and not rep4.get("pending", false), "nothing new to try: no options")
-	t.ok(str(rep4.headline).contains("nothing new") and _stat_total(u3) - xp3 == 1, "+1 to a stat: " + rep4.headline)
+	t.eq(str(rep3.choice), "specialize", "at 3 elements Branch out is a Specialize (D561)")
+	t.ok(not rep3.has("options") and not rep3.get("pending", false), "no Branch out cards")
+	t.eq(u3.attuned_elements().size(), BWUnit.MAX_ELEMENTS, "still 3 elements")
 
 
 ## D176: the cards are rolled when the day starts and shown in the hall;

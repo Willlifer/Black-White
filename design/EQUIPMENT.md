@@ -335,9 +335,11 @@ armour). The bias stays invisible to the player, per the brief.
 - **Stock:** each visit offers 1 head, 1 chest, 1 legs piece and 2 weapons at
   your current tier. Trade 1 loose item for 1 of them; what you give joins the
   stock. There is no currency. The stock rerolls after every battle.
-- **Discard pile (D234):** under the gear panel's grid. Loose pieces set
-  aside there leave the inventory (the shop won't offer them) and can be
-  dragged back; whatever is still there when a battle starts is thrown away.
+- **Discard ▾ (D541; it replaced D234's pile):** in the gear panel's header
+  after Optimize all: Discard all E, D and under, C and under, B and under,
+  or the selected loose item. Loose items only, never worn gear. They are
+  thrown away at once; **Undo discard** (the panel's one-step undo, shared
+  with Optimize / Unequip) brings them back until the gear changes again.
 - **Sorting (D235):** the gear panel's grid and the shop's grids sort by
   Newest, Element (fire … light, plain last), Slot or Tier; the choice holds
   for the session.
@@ -370,7 +372,8 @@ under the sets line. Optimize shows the changes first (one line per unit:
 each gain with its reason; Unequip shows one line ("15 pieces from 5 units
 go to the inventory. Main-hand weapons stay."). Apply / Cancel (Esc cancels);
 after Apply, **Undo optimize** / **Undo unequip** puts everything back (one
-step, shared by both; gone after a change by hand). Code: `BWAutoEquip`
+step, shared by both and by Discard ▾'s **Undo discard**, D541; gone after a
+change by hand). Code: `BWAutoEquip`
 (`src/core/auto_equip.gd`).
 
 - **Who goes first:** most fights deployed this run, then damage dealt, then
@@ -391,8 +394,7 @@ step, shared by both; gone after a change by hand). Code: `BWAutoEquip`
 - **Cursed pieces** are never handed out; one already worn may stay.
 - **Optimize all** may take from units used less, never from units used more.
   A second weapon is never someone's drawn weapon, and nobody is left
-  without a weapon. Leftovers go to the inventory; the discard pile is left
-  alone.
+  without a weapon. Leftovers go to the inventory.
 - **Optimize** (one unit) takes from the loose inventory only.
 - **Unequip all [U] (D404)** takes every squad unit's armour and second
   weapon off into the inventory, cursed pieces too. Each unit **keeps its

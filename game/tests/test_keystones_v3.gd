@@ -576,32 +576,36 @@ func test_sculptor(t) -> void:
 # ------------------------------------------------------------------ duo perks (D455-D463)
 
 func test_duo_offers(t) -> void:
-	t.eq(BWDuo.rows().size(), 8, "eight duo perks")
-	var seen := 0
-	for k in 60:
-		var u := _u("d%d" % k, "staff", "fire")
-		u.pick_seed = k * 7919
-		u.affinity["fire"] = 50                   # D498: rank 5 owes the 4th fire perk
-		u.affinity["wind"] = 40
-		u.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye", "wind_force"]
-		var req := { "kind": "perk", "element": "fire" }
-		var o := BWPicks.options(u, req)
-		t.eq(BWPicks.options(u, req), o, "%s: the same cards each time" % u.id)
-		if o.any(func(x): return str(x.id) == "duo_wildfire"):
-			seen += 1
-			t.ok(not BWPicks.apply(u, req, "duo_wildfire").is_empty(), "%s: take it" % u.id)
-			u.refresh_effects()
-			t.ok(BWDuo.has(u, "wildfire_gale"), "%s: it holds Wildfire Gale" % u.id)
-	t.eq(seen, 60, "D498: eligible = always offered: %d of 60" % seen)
+	t.eq(BWDuo.rows().size(), 12, "twelve duo perks")
+	# D560: its own pick at 4 tree picks in each element (perks + keystone); no perk slot
+	var u := _u("d", "staff", "fire")
+	u.affinity["fire"] = 50
+	u.affinity["wind"] = 50
+	u.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye", "wind_force"]
+	u.keystones = ["lava_walker"]
+	t.eq(BWDuo.tree(u, "fire"), 4, "fire: 3 perks + a keystone")
+	t.ok(BWDuo.owed(u).is_empty(), "wind at 3: not yet")
+	var before := BWPicks.pending(u).filter(func(r): return r.kind == "perk").size()
+	u.perks.append("wind_cross")
+	var owed := BWDuo.owed(u)
+	t.eq(owed.size(), 1, "4 and 4: one duo owed")
+	var req: Dictionary = owed[0]
+	t.ok(BWPicks.pending(u).any(func(r): return r.kind == "duo"), "it's a pending pick")
+	var o := BWPicks.options(u, req)
+	t.eq(o.map(func(x): return str(x.id)), ["duo_wildfire"], "the pair's duo")
+	var rec := BWPicks.apply(u, req, "duo_wildfire")
+	t.eq(str(rec.get("kind", "")), "duo", "taken")
+	u.refresh_effects()
+	t.ok(BWDuo.has(u, "wildfire_gale"), "it holds Wildfire Gale")
+	t.ok(BWDuo.owed(u).is_empty(), "one per pair")
+	t.eq(BWPicks.owned(u, "fire").size(), 3, "it fills no fire perk slot")
+	t.eq(BWPicks.pending(u).filter(func(r): return r.kind == "perk").size(), before - 1, "perk picks unchanged by the duo (the 4th wind perk was taken)")
+	t.ok(BWPicks.options(u, { "kind": "perk", "element": "fire" }).all(func(x): return str(x.get("duo", "")) == ""), "perk picks never show a duo")
 	var thin := _u("th", "staff", "fire")
-	thin.affinity["fire"] = 20
-	thin.affinity["wind"] = 20
-	thin.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye"]
-	t.ok(BWDuo.eligible(thin, "fire").is_empty(), "D498: 2 wind picks: not yet")
-	var lone := _u("l", "staff", "fire")
-	lone.affinity["fire"] = 20
-	lone.perks = ["fire_rush"]
-	t.ok(BWDuo.eligible(lone, "fire").is_empty(), "no perk in the other element: no duo")
+	thin.affinity["fire"] = 50
+	thin.affinity["wind"] = 50
+	thin.perks = ["fire_rush", "fire_skin", "fire_kindling", "wind_tail", "wind_eye", "wind_force"]
+	t.ok(BWDuo.owed(thin).is_empty(), "D560: 3 and 3: not yet")
 
 
 func test_duo_wildfire_and_powder_keg(t) -> void:

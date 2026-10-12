@@ -12,9 +12,9 @@ const RANGE := 3
 func _init() -> void:
 	define({
 		"key": "kindle", "name": "Kindle", "weapon": "daggers", "clip": "throw",
-		"desc": "Mark an enemy up to 3 tiles away: all 6 tiles around it take your element (no damage)",
+		"desc": "Mark an enemy up to 3 tiles away: all 6 tiles around it take 2 steps of your element (no damage)",
 		"targeting": "unit", "needs_element": true, "range": RANGE, "cd": CD,
-		"power": 0,
+		"steps": 2, "power": 0,
 	}, 353)
 
 

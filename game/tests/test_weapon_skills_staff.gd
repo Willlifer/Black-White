@@ -75,7 +75,7 @@ func test_inversion(t) -> void:
 	var hp0: int = b.units[1].hp
 	K._use(t, b, me, "inversion", "", X)
 	t.eq(b.tiles.intensity(X, "water"), 3, "fire 3 becomes water 3")
-	t.eq(b.tiles.intensity(foe_at, "light"), 2, "dark 2 under the foe becomes light 2")
+	t.eq(b.tiles.intensity(foe_at, "light"), 3, "dark 2 under the foe becomes light 3 (D572: maxed)")
 	t.eq(str(b.tiles.at(ring2[0]).marker), "gale", "a fuse 2 away becomes a gale")
 	t.eq(b.tiles.intensity(far, "fire"), 2, "outside the radius: untouched")
 	t.eq(me.follow_up, [], "no follow-up any more")
@@ -91,7 +91,7 @@ func test_inversion_plus_ring(t) -> void:
 	var area: Array = Array(BWHex.area(X, 2)).filter(func(h): return b.board.exists(h))
 	b.tiles.apply(area, "light", "x", 2)
 	b.use_skill(me, "inversion", "", X)
-	t.ok(area.all(func(h): return b.tiles.intensity(h, "dark") == 2), "all 19 flip")
+	t.ok(area.all(func(h): return b.tiles.intensity(h, "dark") == 3), "all 19 flip (to dark 3)")
 	t.eq(me.cooldowns.get("inversion", 0), 3, "Inversion+: cd 3")
 
 

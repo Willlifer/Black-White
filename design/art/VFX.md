@@ -102,6 +102,16 @@ hit-stop and the final-KO slow-mo are skipped while skipping.
   pivot 35 % toward the fallen, then back. None in Minimal / while skipping.
 - Settings → Combat → **Screen shake** (default on) gates every shake.
 
+## Cutscene HUD (D111, D545)
+
+A cutscene fades the action menu and the hint line (D111). A zoomed one
+(FULL / SHORT `_cutscene`, the Arcing Shot / Rain of Arrows camera) also
+fades the **turn order** out (0.15 s) and back in when it ends (0.25 s):
+close in, the heads and the name labels rose into it. While it's out, the
+over-unit bars, names and floaters clamp under a 36 px top band instead of
+under the bar. Minimal blows (basics in place, group turns) keep it. Every
+`cinematic(false)` restores it, and so does the next turn-order refresh.
+
 ## Playback order (D390)
 
 Wind that draws in plays its motion before the hit; wind that pushes out

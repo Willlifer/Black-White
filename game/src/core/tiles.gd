@@ -353,6 +353,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 	var spine := BWPools.begin(self, hexes, element, fresh, steps, caster, opts)   # D264: pool reactions, pre-action
 	var hot := BWOverheat.begin(self, hexes, element, fresh, opts)   # D285: fresh fire on fire 3 erupts
 	var frz := BWOverfreeze.begin(self, hexes, element, fresh, opts)   # D312: fresh ice on glazed water shatters
+	var brim := BWBrim.begin(self, hexes, element, fresh, opts)   # D564/D565: fresh water on water 3, light on light 3
 	spine["no_pillar"] = frz
 	var guard: Array = opts.get("fuse_guard", [])   # D307 Static Field: an ally's fuse ignores this paint
 	for hex in hexes:
@@ -361,11 +362,11 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 				continue
 			if fuse_guarded(hex, guard):
 				continue
-			plans[hex] = spine.plans[hex] if spine.plans.has(hex) else _route(at(hex), element, fresh, steps, caster, opts)
+			plans[hex] = spine.plans[hex] if spine.plans.has(hex) else _route(at(hex), element, fresh, steps, caster, _hex_opts(hex, opts))
 	var ring: Dictionary = opts.get("ring", {})
 	for hex in ring:
 		if can_hold(hex) and not plans.has(hex) and not fuse_guarded(hex, guard):
-			plans[hex] = _route(at(hex), element, true, int(ring[hex]), caster, opts)
+			plans[hex] = _route(at(hex), element, true, int(ring[hex]), caster, _hex_opts(hex, opts))
 	for hex in lava_plans:
 		if not plans.has(hex):
 			plans[hex] = lava_plans[hex]
@@ -385,6 +386,9 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 				scars[hex] = STATIC_SCAR_TICKS          # D115: a blown static stays spent a cycle
 			out.detonations.append({ "hex": hex, "pct": p.detonate, "source": p.get("det_source", caster),
 				"points": int(p.get("det_points", 0)), "mix": p.get("det_mix", {}) })   # v2 Overload reads the points blown; D423 mix
+		if p.get("scald", false):
+			out.detonations.append({ "hex": hex, "pct": float(DETONATE_BASE_PCT), "source": caster,
+				"points": 0, "mix": { "fire": 1, "water": 1 }, "scald": true })   # D566 The Scalding: the douse goes off like a fuse
 		if p.has("gale"):
 			gales.append([hex, p.gale, int(p.get("gale_level", 1))])
 		if p.get("fired", false):
@@ -408,6 +412,7 @@ func apply(hexes: Array, element: String, caster: String, steps: int = 1, opts: 
 			if not en.is_empty() and int(en.h) >= int(opts.wild) and str(en.source) == caster 					and en.origin == "cast" and int(en.glaze) == 0:
 				en["wild"] = true
 	BWOverheat.finish(self, hot, caster, out, opts)   # D285: the eruptions (ring +2, vent to 2), out.overheat
+	BWBrim.finish(self, brim, element, caster, out)   # D564/D565: Runneth Over, Glinting, out.brim
 	for g in gales:
 		# D95: a gale 2 copies one ring further (rings 1 and 2, same skip rules)
 		var gr := int(opts.get("gale_radius", 1)) + int(g[2]) - 1
@@ -479,6 +484,17 @@ func route_at(hex: Vector2i, element: String, fresh: bool, steps: int, caster: S
 	if _lava_ok(hex, element, caster):
 		return _route(at(hex), element, fresh, steps, caster, opts)
 	return _lava_route(at(hex), element, fresh, steps, caster, opts)
+
+
+## D567/D568: a pillar is never FrostFire's or Charged Ice's (fire melts it,
+## thunder shatters it, as ever): the paint's options without them there.
+func _hex_opts(hex: Vector2i, opts: Dictionary) -> Dictionary:
+	if not is_pillar(hex) or not (opts.has("frostfire") or opts.has("charged_ice")):
+		return opts
+	var o := opts.duplicate()
+	o.erase("frostfire")
+	o.erase("charged_ice")
+	return o
 
 
 ## D307 Static Field: a fuse whose owner is in `guard` (allies of the painter
@@ -689,9 +705,30 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 	var marker: String = e.get("marker", "")
 	var glaze: int = e.get("glaze", 0)
 	var charged := h != 0 or v != 0
+	var mine := glaze > 0 and marker == "" and str(e.get("glaze_source", "")) == caster
+	var frost := mine and element == "fire" and bool(opts.get("frostfire", false))
+
+	# D568 Charged Ice: your glaze is a fuse for you: any FRESH element of
+	# yours but ice (it re-glazes or Overfreezes) and thunder (it already
+	# shatters) sets it off as a shatter. FrostFire's fire holds it instead.
+	if mine and fresh and bool(opts.get("charged_ice", false)) and not element in ["ice", "thunder"] and not frost:
+		var ci := _operate(e.duplicate(), "fuse", caster)
+		ci["charged_ice"] = true
+		return ci
 
 	if element in AXIS:
 		if glaze > 0:
+			if frost:                       # D567 FrostFire: your fire under your glaze; it holds
+				var ff := e.duplicate()
+				ff.h = clampi(maxi(h, 0) + steps, 0, AXIS_MAX)   # the fire takes the place of any water
+				ff.source = caster
+				if v > 0:
+					ff["lsrc"] = _lsrc(e, element, caster)
+				ff.permanent = false
+				ff.timer = STEP_CYCLES + int(opts.get("timer_plus", 0))
+				ff.erase("seeded")
+				ff.erase("lava")
+				return { "op": "set", "entry": ff, "frostfire": true }
 			if element == "fire":           # fire melts the glaze, and is spent
 				var melted := e.duplicate()
 				melted.glaze = 0
@@ -723,12 +760,14 @@ func _route(e: Dictionary, element: String, fresh: bool, steps: int, caster: Str
 		var douse := marker == "" and ((element == "fire" and h < 0) or (element == "water" and h > 0))
 		if douse:
 			nh = 0
+			# D566 The Scalding: your fire meeting your water (either order) goes off like a fuse
+			var scald := fresh and bool(opts.get("scald", false)) and str(e.get("source", "")) == caster
 			if nv == 0:
-				return { "op": "erase", "doused": true }
+				return { "op": "erase", "doused": true, "scald": scald }
 			var dz := _entry(0, nv, "", str(e.get("source", caster)), str(e.get("origin", "cast")))
 			if nv > 0:
 				dz["lsrc"] = _lsrc(e, element, caster)   # D496
-			return { "op": "set", "doused": true, "entry": dz }
+			return { "op": "set", "doused": true, "entry": dz, "scald": scald }
 		if marker != "":
 			if not fresh:
 				return { "op": "none" }      # containment rule 1

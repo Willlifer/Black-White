@@ -31,6 +31,7 @@ var _prompt: Label
 var _cont: Label
 var _set_line: Button               # D124: "S  settings"
 var _tut_line: Button               # D223: "T  tutorial"
+var _lay_line: Button               # D574: "M  mobile / desktop"
 var settings: BWSettingsPanel
 var _black: ColorRect
 var _ready_for_input := false
@@ -165,6 +166,18 @@ func _ready() -> void:
 	_tut_line.add_theme_constant_override("outline_size", 8)
 	_tut_line.pressed.connect(open_tutorial)
 	opts.add_child(_tut_line)
+	# ---- D574: the layout (author: "default to mobile, and have a (desktop) option on the title screen")
+	_lay_line = Button.new()
+	_lay_line.name = "layout_entry"
+	for k in ["flat", "focus_mode", "modulate"]:
+		_lay_line.set(k, _set_line.get(k))
+	for c in ["font_color", "font_hover_color", "font_outline_color"]:
+		_lay_line.add_theme_color_override(c, _set_line.get_theme_color(c))
+	_lay_line.add_theme_font_size_override("font_size", 19)
+	_lay_line.add_theme_constant_override("outline_size", 8)
+	_lay_line.pressed.connect(toggle_layout)
+	opts.add_child(_lay_line)
+	_lay_text()
 	_black = ColorRect.new()
 	_black.color = Color.BLACK
 	_black.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -184,6 +197,7 @@ func _ready() -> void:
 	mk.tween_property(_cont, "modulate:a", 1.0, 0.6)
 	mk.parallel().tween_property(_set_line, "modulate:a", 1.0, 0.6)
 	mk.parallel().tween_property(_tut_line, "modulate:a", 1.0, 0.6)
+	mk.parallel().tween_property(_lay_line, "modulate:a", 1.0, 0.6)
 
 
 ## A shell of nearer stars around the arena, in front of the sky's: as the
@@ -251,6 +265,16 @@ func open_settings() -> void:
 	settings = BWSettingsPanel.summon(self)
 
 
+## D574: mobile <-> desktop (saved; the UI size follows at once).
+func toggle_layout() -> void:
+	BWSettings.put("layout", "desktop" if BWSettings.touch() else "mobile")
+	_lay_text()
+
+
+func _lay_text() -> void:
+	_lay_line.text = "M    %s  (switch to %s)" % ["mobile" if BWSettings.touch() else "desktop", "desktop" if BWSettings.touch() else "mobile"]
+
+
 ## D223: the guided practice fight; the title waits for nothing else.
 func open_tutorial() -> void:
 	if not _ready_for_input or (settings and is_instance_valid(settings)):
@@ -264,6 +288,10 @@ func _unhandled_input(ev: InputEvent) -> void:
 		return
 	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_S:
 		open_settings()
+		get_viewport().set_input_as_handled()
+		return
+	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_M:   # ---- D574
+		toggle_layout()
 		get_viewport().set_input_as_handled()
 		return
 	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_T:   # ---- D223

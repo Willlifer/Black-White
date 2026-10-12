@@ -42,41 +42,42 @@ func test_later_picks_keep_two_cards(t) -> void:
 	t.eq(BWPicks.options(u, req).size(), 2, "with two cards")
 
 
-# ---------------------------------------------------------------- D234
+# ---------------------------------------------------------------- D541 (was D234 / D534)
 
-func test_trash_pile(t) -> void:
+func test_discard_d541(t) -> void:
 	var r := BWRun.start(_ids(), 5)
 	var it: Dictionary = r.inventory[0]
 	var n := r.inventory.size()
-	t.ok(r.trash_item(it), "a loose item goes on the pile")
-	t.ok(not it in r.inventory and it in r.trash, "out of the inventory")
+	t.ok(r.discard_item(it), "a loose item is thrown away")
+	t.ok(not it in r.inventory, "gone from the inventory at once")
 	t.eq(r.inventory.size(), n - 1, "one fewer loose")
 	t.ok(not r.trade(it, r.shop[0]), "the shop can't take a discarded item")
-	t.ok(not r.trash_item(r.squad[0].equipment.main_hand), "only loose items")
+	t.ok(not r.discard_item(r.squad[0].equipment.main_hand), "only loose items")
+	t.ok(not r.to_dict().has("trash"), "no pile is saved")
+	# an older save's D234 pile comes back loose (it was never thrown away)
 	var d: Dictionary = JSON.parse_string(JSON.stringify(r.to_dict()))
+	d["trash"] = [JSON.parse_string(JSON.stringify(it))]
 	var r2 := BWRun.from_dict(d)
-	t.eq(r2.trash.size(), 1, "the pile is saved")
-	t.ok(r.untrash_item(it), "and recoverable")
-	t.ok(it in r.inventory and r.trash.is_empty(), "back in the inventory")
-	r.trash_item(it)
-	r.trash_item(r.inventory[0])
-	t.eq(r.empty_trash(), 2, "the battle starts: two thrown away")
-	t.ok(r.trash.is_empty() and not it in r.inventory, "gone for good")
+	t.eq(r2.inventory.size(), n, "an old pile returns to the inventory")
+	t.ok(r2.inventory.any(func(x): return str(x.uid) == str(it.uid)), "the piled item is loose again")
 	d.erase("trash")
-	t.eq(BWRun.from_dict(d).trash, [], "an older save has no pile")
+	t.eq(BWRun.from_dict(d).inventory.size(), n - 1, "a save without a pile loads as it was")
 
 
-func test_trash_by_tier_d534(t) -> void:
+func test_discard_by_tier_d541(t) -> void:
 	var r := BWRun.start(_ids(), 5)
 	r.inventory.clear()
 	for tier in ["E", "D", "C", "B", "A"]:
 		r.inventory.append(r.make_item("vest", tier, ""))
-	t.eq(r.trash_tier_and_under("D"), 2, "D and under: the E and the D")
+	var worn: Dictionary = r.squad[0].equipment.duplicate()
+	t.eq(r.loose_tier_and_under("C").size(), 3, "C and under counts E, D, C")
+	var gone := r.discard_tier_and_under("D")
+	t.eq(gone.map(func(i): return str(i.tier)), ["E", "D"], "D and under: the E and the D")
 	t.eq(r.inventory.map(func(i): return str(i.tier)), ["C", "B", "A"], "C and up stay")
-	t.eq(r.trash_tier_and_under("E"), 0, "nothing left at E")
-	t.ok(not r.squad[0].equipment.main_hand in r.trash, "worn gear untouched")
-	t.eq(r.untrash_all(), 2, "keep all")
-	t.eq(r.inventory.size(), 5, "all back")
+	t.eq(r.discard_tier_and_under("E").size(), 0, "nothing left at E")
+	t.eq(r.squad[0].equipment, worn, "worn gear untouched")
+	t.eq(r.discard_tier_and_under("B").size(), 2, "B and under: the C and the B")
+	t.eq(r.inventory.size(), 1, "the A stays")
 
 
 # ---------------------------------------------------------------- D235

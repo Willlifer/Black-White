@@ -1066,7 +1066,7 @@ hover) or an event. Keys: `BWEffects.PERK_KEYS`; hooks marked "D93" in
 | Thunder | Bolt Step | After any action that detonated a tile: move 2 more. | `bolt_step` |
 | Thunder | Grounded | Chain arcs reaching you deal half; detonation splash on you is halved again. Still conductive. | `grounded` |
 | Thunder | Overcharge | An arc from a target you hit jumps once more: a second arc at 50% of the first's damage to the next-nearest of that team. With it, nobody is arced twice in one action. | `overcharge` |
-| Thunder | Static Field | Your fuses last 5 cycles (base 3); a foe ending its move on one is Staggered. D307: your allies' paint can't set off, re-arm or wash your fuses (`fuse_guard` in the paint opts). | `static_field` |
+| Thunder | Static Field | Your fuses last 5 cycles (base 3); a foe ending its move on one is Staggered. D550 (was D307's ally guard): only your side can set off, re-arm or wash your fuses; a foe's paint can't (`fuse_guard` in the paint opts). | `static_field` |
 | Thunder | Lightning Rod | An arc that would hit an ally within 3 of you hits you instead at 50%. | `lightning_rod` |
 | Wind | Tailwind | +2 move starting on a gale marker; after any wind action, move 1 more. **Updraft** (D376/D377): +1 jump after every other modifier; a unit of your team starting its turn on your gale marker gets +1 jump that turn (you on your own: +2). | `tailwind` |
 | Wind | Eye of the Storm | Immune to displacement; bow, pistol and thrown (daggers beyond 1) attacks on you get −15 hit. | `eye_of_storm` |
@@ -1517,6 +1517,28 @@ hooks marked D309/D312 in `BWTiles.apply`, `BWPools.finish`, `BWBattle`
   ring with an ice-cyan core and white/cyan spikes, white shards flung out,
   the seven hexes flashing white with cyan rims.
 
+### 17.2b Water: Runneth Over, Light: Glinting (D564, D565)
+
+Code: `src/core/brim.gd` (BWBrim), wrapping `BWTiles.apply` like Overheat;
+tests `tests/test_d564_reactions.gd`.
+
+- **Runneth Over:** a FRESH water arrival on a hex that was already water 3
+  (unglazed, no marker, not lava, before the action). The hex stays water 3;
+  each of its six neighbours gets a propagated +1 water (empty → water 1,
+  fire 1 doused, water 1 → 2; glazed, marked, pillars, walls and lava
+  skipped). Every foe of the caster on the seven hexes is **Drenched**.
+- **Glinting:** a FRESH light arrival on a hex that was already light 3 (same
+  terms). Every foe of the caster on the seven hexes is **Blinded**; the hex
+  dims to light 2.
+- No damage (the status is the reaction). A hex reacts once per action;
+  the ring is propagated, so nothing chains. Both count as reactions for
+  Overflow. Allies are never marked (Claude, D564: the status is a foe's
+  debuff; Overheat's both-teams rule is about damage).
+- **Readability:** forecast notes "Runneth Over: …" / "Glinting: …", tile
+  card lines, glossary entries, a water / light burst ring with the feed
+  line, and a "RUNNETH OVER" / "GLINTING" tag on the blast preview.
+- **AI:** `BWBrim.ai_skill` adds 5% of each marked foe's base HP to a skill's score.
+
 ### 17.3 AI (D314)
 
 `BWAI._best_skill` simulates only when cheap pre-checks pass: an ice skill
@@ -1662,7 +1684,7 @@ tile." Code: `src/core/wind_modes.gd` (BWWind), `ks_wind.gd`,
 - **Saves (v13):** a removed keystone is refunded (the slot reopens); a converted one is refunded and comes back as the matching enchanted item in the inventory.
 
 ### 20.4 Duo perks (D455-D458)
-Offered on a perk pick of the first element, once the unit has learned **3 picks of each element's tree** (ordinary perks + that element's keystone; `BWDuo.MIN_TREE`), and then **always** as the second card (D498, author; was 1 perk each at 35%); it fills that perk slot.
+**Its own pick (D560, author: "available once you hit 4 in 2 elements"):** owed once the unit has learned **4 picks of each element's tree** (ordinary perks + that element's keystone; `BWDuo.MIN_TREE`), one per pair that has a duo; gold-ruled like a keystone, and it **fills no perk slot** (it's on top of the 4 perks). Was: a card on the first element's perk pick at 3 picks each (D498), 1 perk each at 35% before that.
 
 | Duo | Elements | Rule |
 |---|---|---|
@@ -1674,3 +1696,9 @@ Offered on a perk pick of the first element, once the unit has learned **3 picks
 | **Solar Wind** | light + fire | On your light: allies also heal for its fire steps (no burn), foes also burn for its light steps (no heal). |
 | **Eclipse** | light + dark | Your light and dark on one hex both stay instead of cancelling. |
 | **Blizzard** | wind + ice | Your wind pushes glaze the hex the foe lands on. |
+| **The Scalding** (D566) | fire + water | Your fire and your water dousing each other (either cast on the other, fresh) goes off like a fuse: the base 5% blast, half on the ring (thunder class, a detonation: Powder Keg widens it, Superconductor reaches 2). |
+| **FrostFire** (D567) | fire + ice | Your fire on your glaze doesn't melt it: the glaze holds and the fire burns under it, taking the place of any water there (glazed fire: it burns, and it's Unsteady and Shatter ground). Not on a pillar: fire melts it as ever. |
+| **Charged Ice** (D568) | ice + thunder | Your glaze is a fuse for you: any fresh element you cast on it sets it off as a shatter (x1.5), consumed. Not ice (it re-glazes or Overfreezes) and not thunder (it shatters already); with FrostFire your fire holds the glaze instead; never a pillar. |
+| **Sunbolt** (D569) | thunder + light | Your side (you included) caught in your blasts heals the blast's base 5% (once a paint) instead of taking damage. |
+
+Author's rulings on the 2026-10-11 identity doc: no "Bridge" frame for duos, no strict Hold / Spend split for keystones (elements have their own identities), Wildfire Gale and Powder Keg stay as they are.

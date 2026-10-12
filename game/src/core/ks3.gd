@@ -75,6 +75,12 @@ static func paint_opts(by: BWUnit, element: String, o: Dictionary) -> void:
 		o["gale_radius"] = int(o.get("gale_radius", 1)) + 1   # D454 El Niño: gales spread 1 further
 	if BWDuo.has(by, "wildfire_gale"):
 		o["fire_gale_plus"] = 1                         # D456 Wildfire Gale: fire it carries, 1 further
+	if element in ["fire", "water"] and BWDuo.has(by, "scalding"):
+		o["scald"] = true                               # D566 The Scalding: your douse blows
+	if element == "fire" and BWDuo.has(by, "frostfire"):
+		o["frostfire"] = true                           # D567 FrostFire: your fire under your glaze
+	if BWDuo.has(by, "charged_ice"):
+		o["charged_ice"] = true                         # D568 Charged Ice: your glaze is your fuse
 
 
 # ---------------------------------------------------------------- around BWTiles.apply
@@ -119,7 +125,7 @@ static func after_paint(b: BWBattle, by: BWUnit, _element: String, r: Dictionary
 	if by == null or b.over or not by.alive():
 		return
 	var n: int = (r.get("detonations", []) as Array).size() + (r.get("overheat", []) as Array).size() \
-		+ (r.get("overfreeze", []) as Array).size()
+		+ (r.get("overfreeze", []) as Array).size() + (r.get("brim", []) as Array).size()   # D564/D565
 	var pools: Dictionary = r.get("pools", {})
 	if not (pools.get("shock", []) as Array).is_empty():
 		n += 1

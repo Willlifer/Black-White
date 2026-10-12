@@ -15,8 +15,8 @@ extends PanelContainer
 ## Re-imbue (D38/D183) is gone (D202). Hover any tile for its card.
 ## `unit` (the screen's selected unit) is who the cards compare against.
 ## D235: the grids sort by BWInvSort (Newest / Element / Slot / Tier, the
-## header's buttons, shared with the gear panel for the session). D234: items
-## set aside to throw away (BWRun.trash) aren't loose, so never offered here.
+## header's buttons, shared with the gear panel for the session). A discarded
+## item (D541) is gone from the inventory at once, so never offered here.
 
 signal changed
 signal closed

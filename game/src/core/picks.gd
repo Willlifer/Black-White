@@ -63,8 +63,9 @@ static func perk(id: String) -> Dictionary:
 
 
 ## Perks of `element` the unit has, in the order taken.
+## D560: duo perks aren't counted (they fill no perk slot; BWDuo).
 static func owned(u: BWUnit, element: String) -> Array:
-	return u.perks.filter(func(id): return str(perk(id).get("element", "")) == element)
+	return u.perks.filter(func(id): return str(perk(id).get("element", "")) == element and str(perk(id).get("duo", "")) == "")
 
 
 ## How many of the element's perks the unit's rank entitles it to (D277 ladder).
@@ -161,6 +162,7 @@ static func pending(u: BWUnit) -> Array:
 			out.append({ "kind": "keystone", "element": el })
 	if not out.any(func(r): return str(r.kind) == "keystone") and not wild_elements(u).is_empty():
 		out.append({ "kind": "keystone", "element": BWKeystones.ANY })   # D444: rank 6, another element
+	out.append_array(BWDuo.owed(u))                   # D560: 4 in each of two elements
 	for wc in _classes(u):
 		for i in skill_picks_owed(u, wc):
 			out.append({ "kind": "skill", "weapon": wc })
@@ -193,11 +195,9 @@ static func settle(u: BWUnit) -> Array:
 static func options(u: BWUnit, req: Dictionary) -> Array:
 	if str(req.get("kind", "")) == "leviathan":
 		return BWKs3Water.options(u, req)          # D451: submerge, then the form
+	if str(req.get("kind", "")) == "duo":
+		return BWDuo.options(u, req).filter(func(o): return not o.owned)   # D560: its own pick
 	var free: Array = all_options(u, req).filter(func(o): return not o.owned)
-	var duo := BWDuo.offer(u, req, _offer_salt(u, req))   # D455: a duo perk now and then
-	if not duo.is_empty():
-		var one := _draw(free, _offer_salt(u, req), OFFER - 1)
-		return one + [duo]
 	return _draw(free, _offer_salt(u, req), OFFER)
 
 
@@ -295,6 +295,13 @@ static func apply(u: BWUnit, req: Dictionary, choice: String) -> Dictionary:
 				return {}                        # D174: only one of the two offered
 			u.perks.append(choice)
 			return _record("perk", el, choice, false)
+		"duo":                                       # D560
+			if choice in u.perks or not choice in offered(u, req) or not BWDuo.is_ready(u, perk(choice)):
+				return {}
+			u.perks.append(choice)
+			var rec := _record("duo", str(req.element), choice, false)
+			rec["duo"] = str(req.duo)
+			return rec
 		"keystone":
 			var kel := str(req.element)
 			var cel := BWKeystones.element_of(choice)
@@ -380,6 +387,8 @@ static func describe(u: BWUnit, rec: Dictionary) -> String:
 		return "%s took the keystone %s (%s): %s" % [u.name, BWKeystones.name_of(str(rec.id)), str(rec.element), BWKeystones.titled(u)]
 	if rec.kind == "perk":
 		return "%s took %s (%s)" % [u.name, str(perk(str(rec.id)).get("name", rec.id)), str(rec.element)]
+	if rec.kind == "duo":
+		return "%s took the duo %s (%s)" % [u.name, str(perk(str(rec.id)).get("name", rec.id)), BWDuo.pair_label(perk(str(rec.id)))]
 	if str(rec.id) == "":
 		return "%s had nothing left to learn in %s" % [u.name, str(rec.weapon)]
 	var parts: PackedStringArray = str(rec.id).split(":")

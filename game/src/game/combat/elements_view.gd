@@ -247,6 +247,20 @@ func on_event(e: Dictionary) -> void:
 				screen._name(str(e.unit)), int(e.pct), " (chained)" if int(e.get("depth", 1)) > 1 else ""])
 			screen.board_view.refresh_tiles()
 			await get_tree().create_timer(0.32).timeout
+		"runneth_over", "glinting":                  # D564/D565
+			var wl := str(e.type) == "runneth_over"
+			_fx_overheat(e.hex, e.ring, BWLook.glow_color("water" if wl else "light"))
+			screen._shake(0.08)
+			var n := (e.get("hit", []) as Array).size()
+			screen.ui.feed("[b]%s![/b] %s's %s: %s" % ["Runneth Over" if wl else "Glinting", screen._name(str(e.unit)),
+				"water spills onto the ring" if wl else "light glints and dims to 2",
+				("%d foe%s %s" % [n, "" if n == 1 else "s", "Drenched" if wl else "Blinded"]) if n > 0 else "no foe caught"])
+			screen.board_view.refresh_tiles()
+			await get_tree().create_timer(0.3).timeout
+		"sunbolt":                                   # D569
+			var sv: Node3D = screen._views.get(str(e.unit))
+			if sv:
+				_fx_glint(sv.global_position + Vector3(0, screen._label_height(sv) * 0.6, 0))
 		"light_beams":
 			for bm in e.beams:
 				_fx_beam(bm.points)
@@ -326,19 +340,19 @@ func _shot(st: SurfaceTool, at: Vector3) -> MeshInstance3D:
 
 
 ## The eruption: the centre flares, a fire ring bursts out over the ring.
-func _fx_overheat(hex: Vector2i, ring: Array) -> void:
+func _fx_overheat(hex: Vector2i, ring: Array, col: Color = fire_col()) -> void:
 	var c := _top(hex)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	_ring(st, Vector3.ZERO, 0.55, 0.22, INK)
-	_ring(st, Vector3.ZERO, 0.55, 0.13, fire_col())
+	_ring(st, Vector3.ZERO, 0.55, 0.13, col)
 	for k in 8:                                   # flame tongues
 		var a := TAU * k / 8.0
 		var d := Vector3(cos(a), 0, sin(a))
 		var s := Vector3(-d.z, 0, d.x)
 		var base := d * 0.62
 		var tip := d * 1.25 + Vector3(0, 0.5, 0)
-		_tri(st, base - s * 0.14, base + s * 0.14, tip, fire_col().lightened(0.2))
+		_tri(st, base - s * 0.14, base + s * 0.14, tip, col.lightened(0.2))
 	_fade(_shot(st, c), 0.55, 1.9)
 	var hs := SurfaceTool.new()
 	hs.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -346,7 +360,7 @@ func _fx_overheat(hex: Vector2i, ring: Array) -> void:
 		var p := _top(h) - c
 		var corners := BWLook.hex_corners(p, BWLook.HEX_SIZE * 0.8)
 		for e in 6:
-			_tri(hs, p, corners[e], corners[(e + 1) % 6], Color(fire_col(), 0.55))
+			_tri(hs, p, corners[e], corners[(e + 1) % 6], Color(col, 0.55))
 	_fade(_shot(hs, c), 0.6)
 
 
@@ -441,6 +455,14 @@ static func preview(bp: BWBlastPreview, st: SurfaceTool, sim: Dictionary) -> voi
 						bp._rim(st, h, Color(fire_col(), 0.95), BWBlastPreview.RIM_W, true)
 				bp._rim(st, ev.hex, INK, BWBlastPreview.RIM_W * 1.6)
 				bp._hex_tag(ev.hex, "OVERHEAT %d%%" % int(ev.pct) + (" ×2" if int(ev.get("depth", 1)) > 1 else ""), fire_col(), 0.55)
+			"runneth_over", "glinting":              # D564/D565
+				var wl := str(ev.type) == "runneth_over"
+				var cc := BWLook.glow_color("water" if wl else "light")
+				for h in ev.ring:
+					if bp.board_view.board.exists(h):
+						bp._rim(st, h, Color(cc, 0.95), BWBlastPreview.RIM_W, true)
+				bp._rim(st, ev.hex, INK, BWBlastPreview.RIM_W * 1.6)
+				bp._hex_tag(ev.hex, "RUNNETH OVER" if wl else "GLINTING", cc, 0.55)
 			"static_arm":
 				bp._rim(st, ev.hex, thunder_col(), BWBlastPreview.RIM_W * 1.2, true)
 				bp._hex_tag(ev.hex, "STATIC FUSE", thunder_col(), 0.75)

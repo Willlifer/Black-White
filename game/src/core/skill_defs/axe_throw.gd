@@ -12,13 +12,13 @@ extends BWSkillDef
 const POWER := 10
 const CD := 1
 const RANGE := 3
-const STEPS := 1
+const STEPS := 2                       # D572: was 1
 
 
 func _init() -> void:
 	define({
 		"key": "axe_throw", "name": "Axe Throw", "weapon": "axe", "clip": "throw_under",
-		"desc": "Toss your axe underhand at a tile up to 3 away: an enemy there is hit, and the tile takes 1 step of your element. A new axe is drawn",
+		"desc": "Toss your axe underhand at a tile up to 3 away: an enemy there is hit, and the tile takes 2 steps of your element. A new axe is drawn",
 		"targeting": "hex", "needs_element": true, "range": RANGE, "cd": CD,
 		"power": POWER, "steps": STEPS, "min_range": 1, "los": true,
 	}, 316)

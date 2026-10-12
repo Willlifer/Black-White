@@ -356,7 +356,7 @@ func test_perks_feed_the_effects_pipeline(t) -> void:
 	var pv2 := b.skill_preview(u, "striketwice", "water", E) if "water" in b.learned_elements(u) else {}
 	t.ok(pv2.is_empty(), "(fire is the only element learned)")
 	# every row uses a key the engine knows (D93), and parses
-	t.eq(BWData.table("perks").size(), 36, "28 perks (D281: 4 per element) + 8 duo perks (D455)")
+	t.eq(BWData.table("perks").size(), 40, "28 perks (D281: 4 per element) + 12 duo perks (D455, D566-D569)")
 	for r in BWData.table("perks"):
 		for made in BWEffects.records(r, str(r.name)):
 			t.ok(made.key in BWEffects.KEYS, "%s uses a known effect_key (%s)" % [r.id, made.key])

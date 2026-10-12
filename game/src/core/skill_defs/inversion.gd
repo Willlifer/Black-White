@@ -4,7 +4,9 @@ extends BWSkillDef
 ## RANGE (sight needed): every tile within RADIUS of it (19 hexes) has its
 ## axes flipped by the inversion pairs: fire n <-> water n, dark n <-> light n;
 ## a fuse and a gale swap; stasis and glaze stay. Nothing else: no damage, no
-## status, no follow-up (the old basic follow-up is gone). Inversion+: the
+## status, no follow-up (the old basic follow-up is gone). D572 (author):
+## each flipped axis is then maxed to 3 (fire 1 -> water 3); lava still flips
+## as fire 1 (D494), not maxed. Inversion+: the
 ## cooldown drops to CD_PLUS.
 
 const CD := 4
@@ -19,7 +21,7 @@ const PAIR := { "fire": "water", "water": "fire", "dark": "light", "light": "dar
 func _init() -> void:
 	define({
 		"key": "inversion", "name": "Inversion", "weapon": "staff", "clip": "",
-		"desc": "Flip every tile within 2 of a tile up to 4 away: fire becomes water, dark becomes light, a fuse becomes a gale, and back. Nothing else happens",
+		"desc": "Flip every tile within 2 of a tile up to 4 away: fire becomes water, dark becomes light, a fuse becomes a gale, and back; every flipped element is then raised to 3",
 		"plus": "Inversion+: cooldown 3 (not 4)",
 		"targeting": "hex", "needs_element": false, "range": RANGE, "cd": CD, "radius": RADIUS,
 		"power": 0, "min_range": 0, "los": true, "spell": true,
@@ -64,7 +66,7 @@ static func swap_text(e: Dictionary) -> String:
 		var n := int(e.get(pair[0], 0))
 		if n != 0:
 			var from: String = pair[1] if n > 0 else pair[2]
-			parts.append("%s %d → %s %d" % [from, absi(n), PAIR[from], absi(n)])
+			parts.append("%s %d → %s %d" % [from, absi(n), PAIR[from], BWTiles.AXIS_MAX])   # D572: maxed
 	var mk := str(e.get("marker", ""))
 	if SWAP.has(mk):
 		parts.append("%s → %s" % [mk, SWAP[mk]])
@@ -90,8 +92,8 @@ func ground(b: BWBattle, u: BWUnit, _el: String, _target_hex: Vector2i, p: Dicti
 			if int(e.h) == 0 and int(e.v) == 0:
 				b.tiles.entries.erase(h)
 			continue
-		e.h = -int(e.h)
-		e.v = -int(e.v)
+		e.h = -signi(int(e.h)) * BWTiles.AXIS_MAX     # D572: flipped, then maxed to 3
+		e.v = -signi(int(e.v)) * BWTiles.AXIS_MAX
 		if int(e.v) > 0:
 			e["lsrc"] = u.id                       # D496: flipped to light, it's the inverter's
 		e.marker = SWAP.get(str(e.marker), str(e.marker))

@@ -197,7 +197,10 @@ func _crit_probe() -> void:
 		return
 	for tier in [BWCutsceneTier.FULL, BWCutsceneTier.MINIMAL]:
 		var order: Array = []
-		var on_flash := func(_u: String) -> void: order.append("flash")
+		var hid: Array = []                          # D545: the turn order at the flash
+		var on_flash := func(_u: String) -> void:
+			order.append("flash")
+			hid.append(screen.ui.order_hidden())
 		var on_react := func(_u: String, _r: String, _i: Dictionary) -> void: order.append("react")
 		screen.crit_flashed.connect(on_flash)
 		screen.reaction_chosen.connect(on_react)
@@ -219,6 +222,10 @@ func _crit_probe() -> void:
 			"crit (%s): flashed before the swing, the impact after (%s)" % [name, log.map(func(x): return x.at)])
 		_check(log.size() >= 1 and not str(log[0].get("clip", "")).begins_with("strike") and not str(log[0].get("clip", "")).begins_with("windup"),
 			"crit (%s): the attacker hadn't started its swing at the flash (clip %s)" % [name, log[0].get("clip", "") if log.size() >= 1 else "?"])
+		_check(hid == [tier == BWCutsceneTier.FULL], "D545 (%s): the turn order is %s during the blow (%s)" % [name, "faded" if tier == BWCutsceneTier.FULL else "kept", hid])
+		await get_tree().create_timer(0.3).timeout
+		_check(not screen.ui.order_hidden() and screen.ui._order_panel.modulate.a > 0.99 and BWHPBar3D.hud_rect == screen.ui._order_panel.get_global_rect(),
+			"D545 (%s): the turn order is back after the cutscene (a %.2f)" % [name, screen.ui._order_panel.modulate.a])
 	_check(Engine.time_scale == 1.0, "crit probe: the time scale is handed back (%.3f)" % Engine.time_scale)
 
 

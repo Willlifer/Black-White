@@ -446,7 +446,7 @@ func test_l30_riders(t) -> void:
 	b.refresh_effects()
 	_turn(b, d)
 	t.eq(int(d.fx.get("start_move", 0)), 0, "without Sunpath: nothing")
-	# Static Field: an ally's paint can't set off the holder's fuse; a foe's can
+	# Static Field (D550): an ally's paint sets off the holder's fuse; a foe's can't
 	var h := _u("h", "daggers", "thunder")
 	h.perks = ["thunder_static"]
 	var al := _u("al", "staff", "fire")
@@ -455,11 +455,10 @@ func test_l30_riders(t) -> void:
 	var b2 := _fight([h, al], [f2], [C, _nb(C, 3)], [Vector2i(12, 12)])
 	_fuse(b2, x, "h")
 	_turn(b2, al)
-	var r := b2.paint([x], "fire", al)
-	t.eq(r.detonations.size(), 0, "Static Field: an ally's fire doesn't set off the fuse")
+	t.eq(b2.paint([x], "fire", f2).detonations.size(), 0, "Static Field: a foe's fire doesn't set off the fuse")
 	t.eq(str(b2.tiles.at(x).get("marker", "")), "fuse", "the fuse stands")
-	_turn(b2, f2)
-	t.eq(b2.paint([x], "fire", f2).detonations.size(), 1, "a foe's fire does")
+	_turn(b2, al)
+	t.eq(b2.paint([x], "fire", al).detonations.size(), 1, "an ally's fire does (D550)")
 	# Gale Force: after moving 4+, the first landed hit pushes 1 (D407), once a turn
 	var g := _u("g", "sword", "fire")
 	g.perks = ["wind_force"]

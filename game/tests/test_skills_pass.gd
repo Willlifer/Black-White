@@ -396,7 +396,9 @@ func test_saturate_status(t) -> void:
 	var f2 := _foe("f")
 	var b2 := _fight(me2, [f2], [T])
 	b2.tiles.apply([T], "water", "x", 3)
-	t.ok(b2.skill_preview(me2, "saturate", "water", T).notes.is_empty(), "already at 3: nothing pushed")
+	var n2: Array = b2.skill_preview(me2, "saturate", "water", T).notes
+	t.ok(n2.all(func(n): return str(n).begins_with("Runneth Over")), "already at 3: nothing pushed (D564: it runs over instead)")
+	t.ok(n2.any(func(n): return str(n).begins_with("Runneth Over")), "D564: and the forecast names Runneth Over")
 
 
 func test_status_lifecycle_and_drenched(t) -> void:

@@ -389,8 +389,8 @@ func test_staff_skills(t) -> void:
 	_give_turn(b, me)
 	b.board.set_cell(Vector2i(7, 4), "jagged")
 	b.use_skill(me, "ley_line", "fire", E)
-	t.eq(b.tiles.intensity(Vector2i(5, 4), "fire"), 1, "ley line lays fire")
-	t.eq(b.tiles.intensity(Vector2i(6, 4), "fire"), 1, "ley line second hex")
+	t.eq(b.tiles.intensity(Vector2i(5, 4), "fire"), 2, "ley line lays fire (D572: 2 steps)")
+	t.eq(b.tiles.intensity(Vector2i(6, 4), "fire"), 2, "ley line second hex")
 	t.ok(b.tiles.at(Vector2i(8, 4)).is_empty(), "ley line stops at jagged")
 	t.eq(me.follow_up, ["basic"], "ley line grants a Channel")
 

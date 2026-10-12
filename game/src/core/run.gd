@@ -149,10 +149,6 @@ var trust := {}                   # "a|b" (sorted ids) -> points
 var last_enemies: Array = []      # unit dicts from the last fight, for recruiting
 var shop: Array = []
 var scrolls: Array = []           # D203: { uid, kind: "scroll", element, enchant, tier, sold }
-## D234: loose items set aside to throw away. Out of the inventory (so the
-## shop never offers them), back with untrash_item, deleted by empty_trash
-## when a battle starts. Saved, so a reload keeps the pile.
-var trash: Array = []
 var learned := {}                 # unit id -> [ability ids]
 var ability_ranks := {}           # unit id -> { ability id: rank }
 var equipped_ability := {}        # unit id -> { type: ability id }
@@ -594,11 +590,18 @@ func random_item(tier: String) -> Dictionary:
 ## its own tier (D and up) it weighs double, so new rows show up. Cursed rows
 ## weigh the same as everything else (D201).
 static func ench_weight(row: Dictionary, tier: String) -> int:
+	if str(row.get("id", "")) in ENCH_OUT_OF_POOL:
+		return 0                                    # D571: never rolls (drops, scrolls, imbues, finds)
 	var t := TIERS.find(str(row.get("tier", "E")))
 	var ti := TIERS.find(tier)
 	if t < 0 or t > ti:
 		return 0
 	return 2 if t == ti and t > 0 else 1
+
+
+## D571 (author: "remove warded from the skill pool, dont like it"): rows that
+## never roll any more. An item already carrying one keeps it and works.
+const ENCH_OUT_OF_POOL := ["warded"]
 
 
 ## A weighted pick from [[id, weight]] with one draw of `r`.
@@ -858,52 +861,49 @@ static func apply_scroll(scroll: Dictionary, item: Dictionary) -> void:
 			item.erase("ward")
 
 
-# ---------------------------------------------------------------- trash (D234)
+# ---------------------------------------------------------------- discard (D541)
 
-## Set a loose item aside to be thrown away when the next battle starts.
-func trash_item(it: Dictionary) -> bool:
+## D541: throw a loose item away, now (D234's pile until the battle starts
+## is gone). Worn gear never. The gear panel's one-step undo can put it back.
+## D563 (author: "auto equip prior to the first battle if nothing is
+## equipped"): before fight 1, a squad nobody has dressed (no armour, no
+## second weapon on anyone; the main hands are the starting weapons) gets
+## Optimize all (BWAutoEquip.plan_all). Returns true when it dressed them.
+func auto_dress_first() -> bool:
+	if fight != 1:
+		return false
+	for u in squad:
+		for slot in u.equipment:
+			if slot != "main_hand" and not (u.equipment[slot] as Dictionary).is_empty():
+				return false
+	var plan := BWAutoEquip.plan_all(self)
+	if BWAutoEquip.empty(plan):
+		return false
+	BWAutoEquip.apply(self, plan)
+	return true
+
+
+func discard_item(it: Dictionary) -> bool:
 	if it.is_empty() or not it in inventory:
 		return false
 	inventory.erase(it)
-	trash.append(it)
 	return true
 
 
-## D534: set aside every loose item of `tier` or lower (E is lowest). Returns
-## how many went. Worn gear is never touched.
-func trash_tier_and_under(tier: String) -> int:
+## D541 (was D534's pile): the loose items of `tier` or lower (E is lowest).
+func loose_tier_and_under(tier: String) -> Array:
 	var cap := TIERS.find(tier)
 	if cap < 0:
-		return 0
-	var n := 0
-	for it in inventory.duplicate():
-		if TIERS.find(str(it.get("tier", ""))) <= cap and trash_item(it):
-			n += 1
-	return n
+		return []
+	return inventory.filter(func(it): return TIERS.find(str(it.get("tier", ""))) <= cap)
 
 
-## D534: take the whole discard pile back.
-func untrash_all() -> int:
-	var n := trash.size()
-	inventory.append_array(trash)
-	trash.clear()
-	return n
-
-
-## Take a set-aside item back into the inventory.
-func untrash_item(it: Dictionary) -> bool:
-	if not it in trash:
-		return false
-	trash.erase(it)
-	inventory.append(it)
-	return true
-
-
-## The battle starts: the pile is gone. Returns how many were thrown away.
-func empty_trash() -> int:
-	var n := trash.size()
-	trash.clear()
-	return n
+## D541: throw away every loose item of `tier` or lower. Returns them.
+func discard_tier_and_under(tier: String) -> Array:
+	var out := loose_tier_and_under(tier)
+	for it in out:
+		discard_item(it)
+	return out
 
 
 ## 1-for-1 trade: give an inventory item, take a shop item. (D202: re-imbue,
@@ -935,25 +935,39 @@ func prepare_for_battle(units: Array) -> Array:
 		if not learned.has(u.id):
 			u.refresh_effects()
 			continue
+		auto.append_array(fill_abilities(u))
 		var eq: Dictionary = equipped_ability.get(u.id, {})
-		for type in BWEffects.TYPES:
-			var id := str(eq.get(type, ""))
-			if id != "" and (not id in learned[u.id] or ability_type(id) != type):
-				id = ""
-			if id == "":
-				for ab in learned[u.id]:
-					if ability_type(ab) == type:
-						id = ab
-						break
-				if id != "":
-					auto.append({ "unit": u.id, "type": type, "ability": id })
-			if id == "":
-				eq.erase(type)
-				continue
-			eq[type] = id
+		for type in eq:
+			var id := str(eq[type])
 			u.abilities[type] = { "id": id, "rank": int(ability_ranks.get(u.id, {}).get(id, 1)) }
-		equipped_ability[u.id] = eq
 		u.refresh_effects()
+	return auto
+
+
+## D562 (author: "auto equip passive skills"): every empty ability slot takes
+## the first learned ability of its type (learn order), and a stale entry
+## (unlearned, or the wrong type) is dropped. Called when an ability is
+## learned (after_fight), on the pre-battle screen and at the battle's start,
+## so the gear panel shows what will fight. Returns [{ unit, type, ability }].
+func fill_abilities(u: BWUnit) -> Array:
+	var auto: Array = []
+	var eq: Dictionary = equipped_ability.get(u.id, {})
+	for type in BWEffects.TYPES:
+		var id := str(eq.get(type, ""))
+		if id != "" and (not id in learned.get(u.id, []) or ability_type(id) != type):
+			id = ""
+		if id == "":
+			for ab in learned.get(u.id, []):
+				if ability_type(ab) == type:
+					id = ab
+					break
+			if id != "":
+				auto.append({ "unit": u.id, "type": type, "ability": id })
+		if id == "":
+			eq.erase(type)
+		else:
+			eq[type] = id
+	equipped_ability[u.id] = eq
 	return auto
 
 
@@ -1218,6 +1232,7 @@ func after_fight(won: bool, deployed: Array, defeated: Array, enemies: Array, hi
 						learned[u.id].append(ab)
 						ability_ranks[u.id][ab] = 1
 						report.learned.append({ "unit": u.id, "ability": ab })
+		fill_abilities(u)                              # D562: a new ability fills an empty slot
 	# Trust (design/BARKS.md): +1 per fight together, +2 per KO save.
 	for i in deployed.size():
 		for j in range(i + 1, deployed.size()):
@@ -1296,7 +1311,17 @@ func downtime(u: BWUnit, choice: String, auto: bool = true, option: int = -1) ->
 		"lines": [], "items": [], "successes": [], "jackpot": false, "levels": 0 }
 	var lv := u.level
 	match choice:
-		"specialize": _specialize(u, rep)
+		"specialize":
+			var sc := specialize_preview(u)            # D561: settled, the day's first pairing
+			if sc.is_empty():
+				_specialize(u, rep)
+			else:
+				_specialize(u, rep, str(sc[0].element), str(sc[0].weapon))
+		"branch_out" when settled(u) and specialize_preview(u).size() > 1:
+			var sc: Array = specialize_preview(u)      # D561: the Branch out slot trains the second pairing
+			rep.choice = "specialize"
+			rep["slot"] = "branch_out"
+			_specialize(u, rep, str(sc[1].element), str(sc[1].weapon))
 		"branch_out":
 			_branch_out(u, rep)
 			if rep.get("pending", false) and (option >= 0 or auto):
@@ -1380,12 +1405,71 @@ func branch_preview(u: BWUnit) -> Array:
 	return (_branch_cards[u.id] as Array).duplicate(true)
 
 
+## D561 (author: "after 2 branch outs and your unit has 3 elements, replace
+## specialize and branch out with Specialize in X element, Y weapon"): a unit
+## attuned to MAX_ELEMENTS elements has nothing left to branch into, so both
+## tiles train a pairing of an element it has and a class it has expertise in.
+func settled(u: BWUnit) -> bool:
+	return u.attuned_elements().size() >= BWUnit.MAX_ELEMENTS
+
+
+## D561: a settled unit's two Specialize pairings for the day ([{ element,
+## weapon }]; [] when not settled). The first is its focus and the class in
+## hand (the old Specialize, so the main line is always on offer); the second
+## is rolled from the other pairings, another element first, on the day's own
+## rng (like branch_preview: stable all day, the run's rng untouched).
+func specialize_preview(u: BWUnit) -> Array:
+	if not settled(u):
+		return []
+	var a := { "element": u.focus(), "weapon": u.weapon_class }
+	var wcs: Array = [u.weapon_class]
+	for c in weapon_classes():
+		if c != u.weapon_class and int(u.expertise.get(c, 0)) > 0:
+			wcs.append(c)
+	var other: Array = []
+	var same_el: Array = []
+	for el in u.attuned_elements():
+		for c in wcs:
+			if el == a.element and c == a.weapon:
+				continue
+			(same_el if el == a.element else other).append({ "element": el, "weapon": c })
+	var pool: Array = other if not other.is_empty() else same_el
+	if pool.is_empty():
+		return [a]
+	var srng := RandomNumberGenerator.new()
+	srng.seed = hash("specialize|%d|%d|%s" % [seed_value, day, u.id])
+	return [a, pool[srng.randi() % pool.size()]]
+
+
+## D561: the cards a day tile shows for `u` (Branch out's two; a settled
+## unit's Specialize pairing on either tile), else [].
+func day_cards(u: BWUnit, choice: String) -> Array:
+	var sc := specialize_preview(u)
+	if not sc.is_empty():
+		if choice == "specialize":
+			return [sc[0]]
+		if choice == "branch_out" and sc.size() > 1:
+			return [sc[1]]
+	if choice == "branch_out":
+		return branch_preview(u)
+	return []
+
+
+## D561: what a day tile is called for `u` (a settled unit's Branch out tile
+## is a second Specialize).
+func choice_name(u: BWUnit, choice: String) -> String:
+	if choice == "branch_out" and specialize_preview(u).size() > 1:
+		return str(CHOICE_NAMES.specialize)
+	return str(CHOICE_NAMES.get(choice, choice))
+
+
 ## Specialize: +half a rank in the unit's focus element (D132) and its weapon
 ## class; 50% a free skill pick in the class (else a weapon of that class),
-## 50% a free perk pick in the element (else armour attuned to it).
-func _specialize(u: BWUnit, rep: Dictionary) -> void:
-	var el := u.focus()                          # D132: the focus element (native by default)
-	var wc := u.weapon_class
+## 50% a free perk pick in the element (else armour attuned to it). D561: a
+## settled unit's pairing names the element and class instead.
+func _specialize(u: BWUnit, rep: Dictionary, p_el: String = "", p_wc: String = "") -> void:
+	var el := p_el if p_el != "" else u.focus()  # D132: the focus element (native by default)
+	var wc := p_wc if p_wc != "" else u.weapon_class
 	var gained: Array = []
 	if el != "":
 		var before := u.affinity_rank(el)
@@ -1826,7 +1910,7 @@ func to_dict() -> Dictionary:
 	return {
 		# seed and rng state as strings: JSON numbers are doubles and would truncate them
 		"version": SAVE_VERSION, "seed": str(seed_value), "rng_state": str(rng.state), "fight": fight, "day": day,
-		"squad": sq, "inventory": inventory.duplicate(true), "trash": trash.duplicate(true), "trust": trust.duplicate(),
+		"squad": sq, "inventory": inventory.duplicate(true), "trust": trust.duplicate(),
 		"last_enemies": last_enemies.duplicate(true), "shop": shop.duplicate(true), "scrolls": scrolls.duplicate(true),
 		"learned": learned.duplicate(true), "ability_ranks": ability_ranks.duplicate(true),
 		"equipped_ability": equipped_ability.duplicate(true), "uid": _uid,
@@ -1935,17 +2019,18 @@ static func from_dict(d: Dictionary) -> BWRun:
 		u.hp = u.max_hp()
 		r.squad.append(u)
 	r.inventory = d.inventory.duplicate(true)
-	r.trash = Array(d.get("trash", [])).duplicate(true)     # D234 (older saves: none)
+	# D541: an older save's discard pile (D234) was never thrown away: it comes back loose
+	r.inventory.append_array(Array(d.get("trash", [])).duplicate(true))
 	migrate_imbues(r.inventory, r.seed_value)              # D206 (save v9)
 	for u in r.squad:
 		migrate_imbues(u.equipment.values(), r.seed_value)
 	if version < 10:                                       # D247 (save v10)
-		for list in [r.inventory, r.trash]:
+		for list in [r.inventory]:
 			migrate_v10(list, r.seed_value)
 		for u in r.squad:
 			migrate_v10(u.equipment.values(), r.seed_value)
 	if version < 11:                                       # D283 (save v11)
-		for list in [r.inventory, r.trash]:
+		for list in [r.inventory]:
 			migrate_v11(list, r.seed_value)
 		for u in r.squad:
 			migrate_v11(u.equipment.values(), r.seed_value)
@@ -2013,7 +2098,7 @@ func keystone_items(old: Array) -> void:
 ## D420: convert everything a save holds of a benched class (D419) to its
 ## stand-in (BENCH_SWAP: pistols -> bow, fists -> daggers). Runs on every load
 ## (a class benched later converts too); a no-op when nothing is benched.
-##   items (worn, carried, inventory, trash, shop): the same uid, tier, stat
+##   items (worn, carried, inventory, shop): the same uid, tier, stat
 ##     values (in stat-line order), imbue and its enchantment; the base becomes
 ##     a model of the stand-in, the first (models' CSV order, starting at the
 ##     old model's index) its enchantment applies to, so it's kept when valid;
@@ -2027,7 +2112,7 @@ func keystone_items(old: Array) -> void:
 func unbench_all() -> void:
 	if all_weapon_classes().all(func(c): return not is_benched(c)):
 		return
-	for list in [inventory, trash, shop]:
+	for list in [inventory, shop]:
 		for it in list:
 			unbench_item(it, seed_value)
 	for u in squad:

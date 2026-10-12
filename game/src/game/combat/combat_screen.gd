@@ -87,6 +87,7 @@ var mode_view: BWModeView           # ---- D327-D333: the 6v6 modes (waves, exit
 var castle_view: BWCastleView       # ---- D340: the castle maps' walls, gate, throne
 var kit2_view: BWKit2View           # ---- D425-D432: charge lines, Riposte's release, barriers
 var mode_opts := {}                # ---- D328: BWObjectives.configure before setup (tools)
+var touch: BWTouchCombat            # ---- D574: the mobile layout's pad and cursor (BWSettings.touch)
 
 
 func configure(map_path: String, players: Array, enemies: Array, placements: Array = [], seed_value: int = 1) -> void:
@@ -116,6 +117,7 @@ func _ready() -> void:
 	rig.clicked.connect(func(p: Vector2): _on_click(board_view.pick(cam, p)))
 
 	ui = BWCombatUI.new()
+	ui.touch = BWSettings.touch()                   # ---- D574
 	add_child(ui)
 	barks = BWCombatBarks.new()
 	barks.screen = self
@@ -130,6 +132,10 @@ func _ready() -> void:
 	add_child(feel)                                 # ---- end D167-D170
 	ui.action_pressed.connect(_on_action)
 	ui.skill_chosen.connect(_on_skill_chosen)
+	if ui.touch:                                    # ---- D574: after the screen's own handlers
+		touch = BWTouchCombat.new()
+		add_child(touch)
+		touch.setup(self)
 
 	battle.setup(_cfg.get("players", []), _cfg.get("enemies", []), _cfg.get("at", []))
 	board_view.build(board, battle.tiles)
@@ -229,7 +235,7 @@ func _process(_delta: float) -> void:
 	if u and _views.has(u.id):
 		ui.set_menu_anchor(cam.unproject_position(_views[u.id].global_position + Vector3(0, 1.4, 0)))
 	# D123: hold Space or the right mouse button through any playback to fast-forward it
-	var want := _busy and bool(BWSettings.value("skip_hold")) and not get_tree().paused 		and (Input.is_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
+	var want := _busy and bool(BWSettings.value("skip_hold")) and not get_tree().paused 		and (Input.is_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or (touch != null and touch.fast_forward_held()))
 	if want != skipping:
 		set_skipping(want)
 
@@ -291,6 +297,14 @@ func open_pause() -> void:
 
 ## Camera input lives in BWCameraRig (V8 controls); clicks arrive via rig.clicked.
 func _unhandled_input(ev: InputEvent) -> void:
+	if touch != null:                               # ---- D574: the pad's keys, taps on the board
+		if touch.key(ev):
+			get_viewport().set_input_as_handled()
+		elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+			touch.tap(ev.position)
+		elif ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_F:
+			cycle_cutscene_mode()
+		return
 	if ev is InputEventMouseMotion and ev.button_mask == 0:
 		_on_hover(board_view.pick(cam, ev.position))
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
@@ -704,6 +718,8 @@ func _after_events() -> void:
 	ui.set_acting(battle.current(), battle.tiles)
 	_show_options()
 	ui.set_actions_visible(battle.current() != null and battle.current().team == "player")
+	if touch != null:
+		touch.ready_for_input()                     # ---- D574: the commands open
 
 
 func _play(e: Dictionary) -> void:
@@ -913,7 +929,7 @@ func _play(e: Dictionary) -> void:
 			ui.feed("[b]Fatigue[/b]: healing is halved" if float(e.get("heal_mult", 0.0)) > 0.0
 					else "[b]Fatigue[/b]: healing stops")
 		"overheat", "light_beams", "empowered", "blade_burst", "launch", "static_arm", "daisy", "magnify", "dawn", \
-				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze":   # ---- D285-D292
+				"phoenix", "light_ward", "light_ward_break", "rider_immune", "trailblaze", 				"runneth_over", "glinting", "sunbolt":   # ---- D285-D292; D564/D565/D569
 			if elements_view:
 				await elements_view.on_event(e)
 		"riposte_release", "lance_charge_set", "lance_charge_run", "blade_dance", "barrier", "barrier_hit", "barrier_end":   # ---- D425-D432
@@ -1379,6 +1395,7 @@ func _cutscene(attacker_id: String, results: Array, skill_name: String, hexes: A
 	if hint:
 		ui.skip_hint(true)
 	ui.cinematic(true)                               # ---- D111: the menu fades for the cutscene
+	ui.order_cine(true)                              # ---- D545: the turn order fades while the camera is close
 	if BWSettings.value("show_odds"):
 		_odds_in(results, element)                   # ---- D113
 	# Keep lit: attacker, every target, their tiles, and the skill's shape.
@@ -2205,7 +2222,7 @@ func perf_line() -> String:
 func _fit_big_board() -> void:
 	if battle == null or not rig.fit_board(battle.board):
 		return
-	rig.dist = BIG_OPEN_DIST
+	rig.dist = BIG_OPEN_DIST if touch == null else BWTouchCombat.TOUCH_DIST + 6.0   # ---- D574: closer on a phone
 	var mine := Vector3.ZERO                      # open a third of the way toward the squad (the near edge sat under the HUD)
 	var ps: Array = battle.side("player")
 	for u in ps:

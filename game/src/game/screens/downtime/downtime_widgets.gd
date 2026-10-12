@@ -81,16 +81,20 @@ class ChoiceTile:
 ## D176: Branch out with its two cards shown before committing: the frame
 ## and name like a ChoiceTile, and under them one card per pairing (the new
 ## element in its colour, "+ the <class>"). A card press is the choice;
-## `picked(i)` fires. `chosen` = the card taken (-1 none).
+## `picked(i)` fires. `chosen` = the card taken (-1 none). D561: a settled
+## unit's Specialize pairing uses the same tile with one card (`icon`
+## "specialize", the card reads "<Element> / and the <class>").
 class BranchTile:
 	extends Control
 	signal picked(i: int)
 	var cards: Array = []
 	var chosen := -1
 	var buttons: Array = []
+	var icon := "branch_out"
 
-	func _init(p_cards: Array, first_key: int) -> void:
+	func _init(p_cards: Array, first_key: int, p_icon: String = "branch_out") -> void:
 		cards = p_cards
+		icon = p_icon
 		custom_minimum_size = Vector2(300, 128)
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		var row := HBoxContainer.new()
@@ -124,10 +128,11 @@ class BranchTile:
 		sb.set_border_width_all(3 if lit else 1)
 		sb.anti_aliasing = true
 		draw_style_box(sb, r)
-		BWDowntimeWidgets.draw_icon(self, "branch_out", Rect2(Vector2(14, 8), Vector2(26, 26)), Color.WHITE)
+		BWDowntimeWidgets.draw_icon(self, icon, Rect2(Vector2(14, 8), Vector2(26, 26)), Color.WHITE)
 		var f := get_theme_font("font", "Label")
-		draw_string(f, Vector2(48, 29), str(BWDowntimeWidgets.info("branch_out")[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, BWStyle.F_BODY + 2, Color.WHITE)
-		draw_string(f, Vector2(0, 28), "take one  ", HORIZONTAL_ALIGNMENT_RIGHT, size.x - 8, 14, Color(1, 1, 1, 0.45))
+		draw_string(f, Vector2(48, 29), str(BWDowntimeWidgets.info(icon)[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, BWStyle.F_BODY + 2, Color.WHITE)
+		if cards.size() > 1:
+			draw_string(f, Vector2(0, 28), "take one  ", HORIZONTAL_ALIGNMENT_RIGHT, size.x - 8, 14, Color(1, 1, 1, 0.45))
 
 
 ## One Branch out card inside a BranchTile.
@@ -170,7 +175,8 @@ class BranchCard:
 		draw_string(f, Vector2(18, size.y * 0.5 - 2), el.capitalize() if el != "" else "—", HORIZONTAL_ALIGNMENT_LEFT, size.x - 30, BWStyle.F_BODY + 2, name_col)
 		var wc := str(opt.get("weapon", ""))
 		if wc != "":
-			draw_string(f, Vector2(18, size.y * 0.5 + 22), "+ the " + BWRun.class_name_of(wc), HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, BWStyle.F_SMALL, ink)
+			var lead := "and the " if tile.icon == "specialize" else "+ the "   # D561
+			draw_string(f, Vector2(18, size.y * 0.5 + 22), lead + BWRun.class_name_of(wc), HORIZONTAL_ALIGNMENT_LEFT, size.x - 24, BWStyle.F_SMALL, ink)
 
 
 ## A locked-in action under a unit's spotlight: a white chip with the glyph

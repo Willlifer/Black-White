@@ -23,7 +23,12 @@ const DEFAULTS := {
 	"screen_shake": true,         # D170: camera shake on hits (BWHitFeel, every BWCombatScreen._shake)
 	"skip_hints": 0,              # how many times the "hold Space to skip" hint has shown
 	"element_kanji": false,       # D231: element kanji on tiles, markers and element words (BWKanji)
+	"item_details": false,        # D576: item cards open short (name, kind, passives); More shows the rest
+	"layout": "desktop",          # D574: "mobile" | "desktop"; a player's first run starts on mobile (init)
 }
+const LAYOUTS := ["mobile", "desktop"]
+## D574: the mobile layout's floor for the UI scale (the screens are checked at 1280x720).
+const TOUCH_SCALE := 1.25
 const BUS_KEYS := { "vol_master": "Master", "vol_music": "Music", "vol_sfx": "SFX", "vol_voice": "Voice", "vol_ui": "UI" }
 const WINDOW_PRESETS := ["", "1280x720", "1600x900", "1920x1080", "2560x1440"]
 const UI_SCALES := [0.9, 1.0, 1.1, 1.25]
@@ -45,6 +50,8 @@ static func init(use_defaults: bool) -> void:
 		for k in DEFAULTS:
 			if cf.has_section_key("settings", k):
 				_v[k] = _clean(k, cf.get_value("settings", k))
+	if not _v.has("layout"):
+		_v["layout"] = "mobile"           # D574 (author: "make the game default to mobile"); tests and tools stay desktop
 	else:
 		# first run with this file: carry over the older audio.cfg volumes
 		for k in BUS_KEYS:
@@ -55,6 +62,11 @@ static func init(use_defaults: bool) -> void:
 
 static func value(key: String) -> Variant:
 	return _v.get(key, DEFAULTS.get(key))
+
+
+## D574: the mobile layout (the on-screen pad, the trimmed HUD, a larger UI).
+static func touch() -> bool:
+	return str(value("layout")) == "mobile"
 
 
 ## Set, apply and save one setting.
@@ -98,6 +110,8 @@ static func _clean(key: String, v: Variant) -> Variant:
 				return d
 			if key == "window" and not s in WINDOW_PRESETS:
 				return d
+			if key == "layout" and not s in LAYOUTS:
+				return d
 			return s
 
 
@@ -140,8 +154,8 @@ static func _apply_one(key: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	match key:
-		"scale_ui":
-			w.content_scale_factor = float(value("scale_ui"))
+		"scale_ui", "layout":
+			w.content_scale_factor = maxf(float(value("scale_ui")), TOUCH_SCALE) if touch() else float(value("scale_ui"))
 		"fullscreen":
 			if bool(value("fullscreen")):
 				w.mode = Window.MODE_FULLSCREEN

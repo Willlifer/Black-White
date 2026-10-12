@@ -31,6 +31,13 @@ var _check: RichTextLabel
 var _hint: Label
 var _empty: Label
 var _body: VBoxContainer
+## D576 (author: "trim both ... a lot of the stats are flavor I don't need to
+## see unless I want to under inspection"): the card opens short (name, kind
+## and imbue, the passives, what it teaches, a cross when it can't be worn);
+## "More" adds the stat deltas, the comparison, the class's move line, the
+## imbue's rule, the set line and the tick line. Remembered (BWSettings.item_details).
+var _more: Button
+var _last := []                 # the last show_item call, to redraw on More / Less
 
 
 func _init(w: float = W) -> void:
@@ -66,11 +73,22 @@ func _init(w: float = W) -> void:
 	head.add_child(hv)
 	_name = _rich(BWStyle.F_SUB)
 	hv.add_child(_name)
+	_more = Button.new()                         # ---- D576
+	_more.name = "item_more"
+	_more.flat = true
+	_more.focus_mode = Control.FOCUS_NONE
+	_more.mouse_filter = Control.MOUSE_FILTER_STOP
+	_more.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
+	_more.add_theme_color_override("font_color", BWStyle.LABEL)
+	_more.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_more.pressed.connect(toggle_details)
+	head.add_child(_more)
 	_kind = Label.new()
 	_kind.add_theme_font_size_override("font_size", BWStyle.F_SMALL - 2)
 	_kind.add_theme_color_override("font_color", BWStyle.LABEL)
-	var kr := HBoxContainer.new()                # D216: kind and imbue share a line
-	kr.add_theme_constant_override("separation", 14)
+	var kr := HFlowContainer.new()               # D216: kind and imbue share a line; D540: the imbue wraps
+	kr.add_theme_constant_override("h_separation", 14)   # rather than widen the card (and the gear panel) off screen
+	kr.add_theme_constant_override("v_separation", 0)
 	hv.add_child(kr)
 	kr.add_child(_kind)
 	_infusion = HBoxContainer.new()
@@ -129,6 +147,13 @@ func showing() -> bool:
 	return _body.visible
 
 
+## D576: More / Less (remembered across cards and runs).
+func toggle_details() -> void:
+	BWSettings.put("item_details", not bool(BWSettings.value("item_details")))
+	if not _last.is_empty():
+		callv("show_item", _last)
+
+
 ## Show `item` for `u`. `compare` is what it would replace ({} = an empty
 ## slot; pass the item itself to show it as worn, without deltas).
 ## opts: hint (footer line), vs (override the comparison caption),
@@ -137,6 +162,10 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	if item.is_empty():
 		clear()
 		return
+	_last = [item, u, run, compare, opts]
+	var full := bool(BWSettings.value("item_details"))     # ---- D576
+	_more.visible = true
+	_more.text = "Less" if full else "More"
 	_body.visible = true
 	_empty.visible = false
 	_stats.visible = true
@@ -171,7 +200,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 		_vs.text = ("Compared with %s's empty %s slot" % [u.name, BWGearText.SLOT_NAMES.get(str(item.slot), "")]) if u else ""
 	else:
 		_vs.text = "Compared with %s's %s" % [u.name if u else "the", BWGearText.plain_name(compare)]
-	_vs.visible = _vs.text != ""
+	_vs.visible = _vs.text != "" and full
 	var keys: Array = []
 	for s in BWUnit.STATS:
 		if item.stats.has(s) or (not worn and compare.get("stats", {}).has(s)):
@@ -192,7 +221,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 				seg += " [color=#ffffff4d](±0)[/color]"
 		segs.append(seg)
 	_stats.text = "   ".join(segs)
-	_stats.visible = not segs.is_empty()
+	_stats.visible = not segs.is_empty() and full
 	# passive
 	var p := BWGearText.passive_text(item)
 	if p == "":
@@ -200,13 +229,14 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	else:
 		_passive.text = "[color=#%s]■[/color] %s" % [BWGearText.hex(col if not weapon else BWStyle.TEXT), BWGlossary.markup(p)]
 	_passive.text += curse_line(BWGearText.enchant(item))       # D201
-	if weapon:                                   # D359-D361: the class's move, jump and traits
+	if weapon and full:                          # D359-D361: the class's move, jump and traits
 		var ml := BWWeaponMove.class_line(str(item.weight))
 		if ml != "":
 			_passive.text += "\n[color=#%s]■ %s[/color]" % [BWGearText.hex(BWStyle.LABEL), BWGlossary.markup(ml)]
 	if weapon and el != "":                      # D182: the imbue is the weapon's second enchantment
 		var ec := BWGearText.hex(BWGearText.readable(BWLook.element_color(el)))
-		_passive.text += "\n[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]
+		if full:
+			_passive.text += "\n[color=#%s]■ Imbued with %s:[/color] basic attacks carry %s and paint it on the target's hex, hit or miss." % [ec, el.capitalize(), el]
 		var ie := BWData.row("enchantments", str(item.get("imbue_enchant", "")))
 		if not ie.is_empty():                    # D206: the imbue's own element enchantment (while drawn)
 			_passive.text += "\n[color=#%s]■ %s imbue · %s:[/color] %s%s" % [ec, el.capitalize(), BWGearText.row_name(ie),
@@ -219,7 +249,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 		setl = ("Set: %s · counts when drawn" % el.capitalize()) if el != "" else ""
 	else:
 		setl = BWSets.card_line(item, u, u != null and not worn)
-	if setl != "":
+	if setl != "" and full:
 		_passive.text += "\n[color=#%s]%s[/color]" % [BWGearText.hex(BWStyle.FAINT), setl]
 	# teaches (D216: collapsed when there's nothing to teach)
 	var t := BWGearText.teaches(item)
@@ -239,6 +269,7 @@ func show_item(item: Dictionary, u: BWUnit, run: BWRun, compare: Dictionary = {}
 	else:
 		_check.visible = true
 		var ck := BWGearText.equip_check(run, u, item)
+		_check.visible = full or not ck[0]           # D576: short cards say only "can't"
 		_check.text = ("[b]✓[/b]  %s" % ck[1]) if ck[0] else "[color=#%s][b]✕[/b]  %s[/color]" % [BWGearText.hex(BWStyle.TEXT_DIM), ck[1]]
 	_hint.text = str(opts.get("hint", ""))
 	_hint.visible = _hint.text != ""
@@ -258,6 +289,8 @@ func show_scroll(s: Dictionary, opts: Dictionary = {}) -> void:
 	if s.is_empty():
 		clear()
 		return
+	_last = []
+	_more.visible = false
 	_body.visible = true
 	_empty.visible = false
 	_icon.set_item(s)

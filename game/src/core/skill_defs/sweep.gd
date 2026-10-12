@@ -17,9 +17,9 @@ const SLAM_PCT := 8
 func _init() -> void:
 	define({
 		"key": "sweep", "name": "Sweep", "weapon": "lance", "clip": "sweep",
-		"desc": "Sweep the 3 tiles in front of you: every enemy there is hit and shoved 1 away from you (slamming for 8% if blocked), and the arc takes your element",
+		"desc": "Sweep the 3 tiles in front of you: every enemy there is hit and shoved 1 away from you (slamming for 8% if blocked), and the arc takes 2 steps of your element",
 		"targeting": "dir", "needs_element": true, "range": 1, "cd": CD,
-		"power": POWER, "aoe": true,
+		"steps": 2, "power": POWER, "aoe": true,
 	}, 322)
 
 
